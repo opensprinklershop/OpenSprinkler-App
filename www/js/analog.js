@@ -6,7 +6,23 @@
  */
 
 var analogSensors = {},
-	progAdjusts = {};
+    progAdjusts = {},
+    analogSensorAvail = false;
+
+function checkAnalogSensorAvail( callback ) {
+	callback = callback || function() {};
+	return sendToOS( "/sl?pw=", "json" ).then( function( data ) {
+		if ( typeof data === "undefined" || $.isEmptyObject( data ) ) {
+			analogSensorAvail = false;
+			return;
+		}
+		analogSensorAvail = true;
+		callback();
+	}, function( data ) {
+		analogSensorAvail = false;
+	} );
+
+}
 
 function refresh() {
     setTimeout( function() {
@@ -31,7 +47,7 @@ function updateAnalogSensor( callback ) {
 }
 
 function updateSensorShowArea( page ) {
-	if ( checkOSVersion( 230 ) ) {
+	if ( analogSensorAvail ) {
 		var showArea =  page.find( "#os-sensor-show" );
 		var html = "", i, j;
 		for ( i = 0; i < progAdjusts.length; i++ ) {
@@ -850,11 +866,16 @@ function build_graph(prefix, chart, csv, title_add, timestr) {
 					unitid = 0;
 
 				if (!chart[unitid]) {
-					var unit, title, unitStr;
+					var unit, title, unitStr,
+						minFunc = function(val) {return Math.floor(Math.max(0, val-4))},
+						maxFunc = function(val) {return Math.ceil(val)},
+						autoY = true;
 					switch (unitid) {
 						case 1: unit = _("Soil moisture");
 								title = _("Soil moisture")+" "+title_add;
 								unitStr = function(val) {return val+" %"};
+								minFunc = 0;
+								maxFunc = 100;
 								break;
 						case 2: unit = _("degree celsius temperature");
 								title = _("Temperature")+" "+title_add;
@@ -865,12 +886,17 @@ function build_graph(prefix, chart, csv, title_add, timestr) {
 								unitStr = function(val) {return val+String.fromCharCode(176)+"F"};
 								break;
 						case 4: unit = _("Volt");
-								title = _("Voltage")+" "+title_add;6
+								title = _("Voltage")+" "+title_add;
 								unitStr = function(val) {return val+" V"};
+								minFunc = 0;
+								maxFunc = 4;
+								autoY = false;
 								break;
 						case 5: unit = _("Humidity");
 								title = _("Air Humidity")+" "+title_add;
 								unitStr = function(val) {return val+" %"};
+								minFunc = 0;
+								maxFunc = 100;
 								break;
 						case 6: unit = _("Rain");
 								title = _("Rainfall")+" "+title_add;
@@ -879,18 +905,24 @@ function build_graph(prefix, chart, csv, title_add, timestr) {
 						case 7: unit = _("Rain");
 								title = _("Rainfall")+" "+title_add;
 								unitStr = function(val) {return val+" mm"};
+								minFunc = 0;
 								break;
 						case 8: unit = _("Wind");
 								title = _("Wind")+" "+title_add;
 								unitStr = function(val) {return val+" mph"};
+								minFunc = 0;
 								break;
 						case 9: unit = _("Wind");
 								title = _("Wind")+" "+title_add;
 								unitStr = function(val) {return val+" kmh"};
+								minFunc = 0;
 								break;
 						case 10: unit = _("Level");
 								title = _("Level")+" "+title_add;
 								unitStr = function(val) {return val+" %"};
+								minFunc = 0;
+								maxFunc = 100;
+								autoY = false;
 								break;
 
 						default: unit = "";
@@ -945,10 +977,12 @@ function build_graph(prefix, chart, csv, title_add, timestr) {
 							title: { text: unit },
 							decimalsInFloat: 0,
 							//tickAmount: 10,
-							forceNiceScale: true,
+							forceNiceScale: autoY,
 							labels: {
 								formatter: unitStr,
-							}
+							},
+							min: minFunc,
+							max: autoY?undefined:maxFunc,
 						},
 						title: {text: title},
 						//forecastDataPoints: {

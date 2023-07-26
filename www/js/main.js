@@ -1,5 +1,5 @@
-	/* global $, ThreeDeeTouch, Windows, MSApp, navigator, chrome, FastClick */
-/* global StatusBar, networkinterface, links, SunCalc, md5, sjcl, Camera */
+/* global $, ThreeDeeTouch, navigator, FastClick */
+/* global StatusBar, networkinterface, links, SunCalc, md5, sjcl */
 
 /* OpenSprinkler App
  * Copyright (C) 2015 - present, Samer Albahra. All rights reserved.
@@ -18,81 +18,64 @@ var DEFAULT_WEATHER_SERVER_URL = "https://weather.opensprinkler.com";
 var WEATHER_SERVER_URL = DEFAULT_WEATHER_SERVER_URL;
 
 // Initialize global variables
-var isIEMobile = /IEMobile/.test( navigator.userAgent ),
-	isAndroid = /Android|\bSilk\b/.test( navigator.userAgent ),
+var isAndroid = /Android|\bSilk\b/.test( navigator.userAgent ),
 	isiOS = /iP(ad|hone|od)/.test( navigator.userAgent ),
 	isFireFox = /Firefox/.test( navigator.userAgent ),
-	isWinApp = /MSAppHost/.test( navigator.userAgent ),
-	isOSXApp = window.cordova && window.cordova.platformId === "osx",
-	isChromeApp = typeof chrome === "object" && typeof chrome.storage === "object",
-	isFileCapable = !isiOS && !isAndroid && !isIEMobile && !isOSXApp &&
-					!isWinApp && window.FileReader,
+	isOSXApp = window.cordova && window.cordova.platformId === "ios" && navigator.platform === "MacIntel",
+	isFileCapable = !isiOS && !isAndroid && !isOSXApp && window.FileReader,
 	isTouchCapable = "ontouchstart" in window || "onmsgesturechange" in window,
 	isMetric = ( [ "US", "BM", "PW" ].indexOf( navigator.languages[ 0 ].split( "-" )[ 1 ] ) === -1 ),
 	groupView = false,
 
-	// Small wrapper to handle Chrome vs localStorage usage
 	storage = {
 		get: function( query, callback ) {
 			callback = callback || function() {};
 
-			if ( isChromeApp ) {
-				chrome.storage.local.get( query, callback );
-			} else {
-				var data = {},
-					i;
+			var data = {},
+				i;
 
-				if ( typeof query === "string" ) {
-					query = [ query ];
-				}
-
-				for ( i in query ) {
-					if ( query.hasOwnProperty( i ) ) {
-						data[ query[ i ] ] = localStorage.getItem( query[ i ] );
-					}
-				}
-
-				callback( data );
+			if ( typeof query === "string" ) {
+				query = [ query ];
 			}
+
+			for ( i in query ) {
+				if ( query.hasOwnProperty( i ) ) {
+					data[ query[ i ] ] = localStorage.getItem( query[ i ] );
+				}
+			}
+
+			callback( data );
 		},
 		set: function( query, callback ) {
 			callback = callback || function() {};
 
-			if ( isChromeApp ) {
-				chrome.storage.local.set( query, callback );
-			} else {
-				var i;
-				if ( typeof query === "object" ) {
-					for ( i in query ) {
-						if ( query.hasOwnProperty( i ) ) {
-							localStorage.setItem( i, query[ i ] );
-						}
+			var i;
+			if ( typeof query === "object" ) {
+				for ( i in query ) {
+					if ( query.hasOwnProperty( i ) ) {
+						localStorage.setItem( i, query[ i ] );
 					}
 				}
-
-				callback( true );
 			}
+
+			callback( true );
 		},
 		remove: function( query, callback ) {
 			callback = callback || function() {};
 
-			if ( isChromeApp ) {
-				chrome.storage.local.remove( query, callback );
-			} else {
-				var i;
+			var i;
 
-				if ( typeof query === "string" ) {
-					query = [ query ];
-				}
-
-				for ( i in query ) {
-					if ( query.hasOwnProperty( i ) ) {
-						localStorage.removeItem( query[ i ] );
-					}
-				}
-
-				callback( true );
+			if ( typeof query === "string" ) {
+				query = [ query ];
 			}
+
+			for ( i in query ) {
+				if ( query.hasOwnProperty( i ) ) {
+					localStorage.removeItem( query[ i ] );
+				}
+			}
+
+			callback( true );
 		}
 	},
 
@@ -156,48 +139,14 @@ var isIEMobile = /IEMobile/.test( navigator.userAgent ),
 	curr183, currToken, currIp, currPrefix, currAuth, currPass, currAuthUser,
 	currAuthPass, currLocal, currLang, language, deviceip, errorTimeout, weather, openPanel;
 
-// Prevent errors from bubbling up on Windows
-if ( isWinApp ) {
-	$( window ).on( "error", function( msg, url, line ) {
-		window.console.log( msg, url, line );
-		return true;
+if ( "serviceWorker" in navigator ) {
+	window.addEventListener( "load", function() {
+		navigator.serviceWorker.register( "/sw.js" );
 	} );
 }
 
-// Redirect jQuery Mobile DOM manipulation to prevent error
-if ( window.MSApp ) {
-
-	if ( window.Windows && Windows.UI && Windows.UI.ApplicationSettings && Windows.UI.ApplicationSettings.SettingsPane ) {
-
-		// Add link to privacy statement
-		var settingsPane = Windows.UI.ApplicationSettings.SettingsPane.getForCurrentView();
-
-		// Bind the privacy policy to the settings panel
-		settingsPane.addEventListener( "commandsrequested", function( eventArgs ) {
-			var applicationCommands = eventArgs.request.applicationCommands;
-			var privacyCommand = new Windows.UI.ApplicationSettings.SettingsCommand(
-				"privacy", "Privacy Policy", function() {
-					window.open( "https://albahra.com/journal/privacy-policy" );
-				}
-			);
-			applicationCommands.append( privacyCommand );
-		} );
-	}
-
-	if ( MSApp.execUnsafeLocalFunction ) {
-
-		// Cache the old domManip function.
-		$.fn.oldDomManIp = $.fn.domManip;
-
-		// Override the domManip function with a call to the cached
-		// domManip function wrapped in a MSapp.execUnsafeLocalFunction call.
-		$.fn.domManip = function( args, callback, allowIntersection ) {
-			var that = this;
-			return MSApp.execUnsafeLocalFunction( function() {
-				return that.oldDomManIp( args, callback, allowIntersection );
-			} );
-		};
-	}
+if ( isOSXApp ) {
+	document.documentElement.classList.add( "macos" );
 }
 
 $( document )
@@ -228,11 +177,8 @@ $( document )
 		} catch ( err ) {}
 	}, 500 );
 
-	// For Android and Windows Phone devices catch the back button and redirect it
+	// For Android devices catch the back button and redirect it
 	$.mobile.document.on( "backbutton", function() {
-		if ( isIEMobile && $.mobile.document.data( "iabOpen" ) ) {
-			return false;
-		}
 		checkChangesBeforeBack();
 		return false;
 	} );
@@ -280,12 +226,6 @@ $( document )
 	}
 } )
 .one( "mobileinit", function() {
-
-	//Change history method for Chrome Packaged Apps
-	if ( isChromeApp || window.location.protocol === "file:" ) {
-		$.mobile.hashListeningEnabled = false;
-	}
-
 	$.support.cors = true;
 	$.mobile.allowCrossDomainPages = true;
 	loadLocalSettings();
@@ -305,8 +245,8 @@ $( document )
 	hash = $.mobile.path.parseUrl( page ).hash;
 
 	if ( currPage.length > 0 && hash === "#" + currPage.attr( "id" ) ) {
-			return;
-		}
+		return;
+	}
 
 	// Animations are patchy if the page isn't scrolled to the top.
 	// This scrolls the page before the animation fires off.
@@ -327,10 +267,12 @@ $( document )
 		getRunonce();
 	} else if ( hash === "#os-options" ) {
 		showOptions( data.options.expandItem );
-	} else if ( hash === "#analogsensorconfig" ) {
-		showAnalogSensorConfig();
-	} else if ( hash === "#analogsensorchart" ) {
-		showAnalogSensorCharts();
+	// Analog Sensor Api:
+	} else if ( analogSensorAvail && hash === "#analogsensorconfig" ) {
+                showAnalogSensorConfig();
+        } else if ( analogSensorAvail && hash === "#analogsensorchart" ) {
+                showAnalogSensorCharts();
+	// Analog Sensor Api end		
 	} else if ( hash === "#preview" ) {
 		getPreview();
 	} else if ( hash === "#logs" ) {
@@ -459,16 +401,6 @@ function initApp() {
 		} );
 	}
 
-	// Fix CSS for IE Mobile (Windows Phone 8)
-	if ( isIEMobile ) {
-		insertStyle( ".ui-toolbar-back-btn{display:none!important}ul{list-style:none!important;}" );
-	}
-
-	// Fix CSS for Chrome Web Store apps
-	if ( isChromeApp ) {
-		insertStyle( "html,body{overflow-y:scroll}" );
-	}
-
 	// Prevent caching of AJAX requests on Android and Windows Phone devices
 	if ( isAndroid ) {
 
@@ -497,8 +429,7 @@ function initApp() {
 	}
 
 	//After jQuery mobile is loaded set initial configuration
-	$.mobile.defaultPageTransition =
-		( isAndroid || isIEMobile ) ? "fade" : "slide";
+	$.mobile.defaultPageTransition = isAndroid ? "fade" : "slide";
 	$.mobile.hoverDelay = 0;
 	$.mobile.activeBtnClass = "activeButton";
 
@@ -506,22 +437,13 @@ function initApp() {
 	$.mobile.document.on( "click", ".iab", function() {
 		var target = isOSXApp ? "_system" : "_blank";
 
-		var button = $( this ),
-			iab = window.open( this.href, target, "location=" + ( isAndroid ? "yes" : "no" ) +
-				",enableViewportScale=" + ( button.hasClass( "iabNoScale" ) ? "no" : "yes" ) +
-				",toolbar=yes,toolbarposition=top,toolbarcolor=" + statusBarPrimary +
-				",closebuttoncaption=" +
-					( button.hasClass( "iabNoScale" ) ? _( "Back" ) : _( "Done" ) )
-			);
-
-		if ( isIEMobile ) {
-
-			// For Windows Mobile, save state of In-App browser to allow back button to close it
-			$.mobile.document.data( "iabOpen", true );
-			iab.addEventListener( "exit", function() {
-				$.mobile.document.removeData( "iabOpen" );
-			} );
-		}
+		var button = $( this );
+		window.open( this.href, target, "location=" + ( isAndroid ? "yes" : "no" ) +
+			",enableViewportScale=" + ( button.hasClass( "iabNoScale" ) ? "no" : "yes" ) +
+			",toolbar=yes,toolbarposition=top,toolbarcolor=" + statusBarPrimary +
+			",closebuttoncaption=" +
+				( button.hasClass( "iabNoScale" ) ? _( "Back" ) : _( "Done" ) )
+		);
 
 		setTimeout( function() {
 			button.removeClass( "ui-btn-active" );
@@ -867,12 +789,13 @@ function newLoad() {
 				weatherAdjust.hide();
 			}
 
-			//Analog sensor api
-			if ( checkOSVersion( 230 ) ) {
+			// Analog Sensor Api:
+			checkAnalogSensorAvail( function() {
 				updateAnalogSensor();
-				updateProgramAdjustments();
-			}
-
+                                updateProgramAdjustments();
+                        });	
+                        // Analog Sensor APi end		
+			
 			// Hide change password feature for unsupported devices
 			if ( isOSPi() || checkOSVersion( 208 ) ) {
 				changePassword.css( "display", "" );
@@ -973,9 +896,26 @@ function updateController( callback, fail ) {
 	};
 
 	if ( isControllerConnected() && checkOSVersion( 216 ) ) {
+		sendToOS( "/ja?pw=", "json" ).then( function( data ) {
 
-			updateControllerData( finish, fail );
+			if ( typeof data === "undefined" || $.isEmptyObject( data ) ) {
+				fail();
+				return;
+			}
 
+			// The /ja call does not contain special station data, so let's cache it
+			var special = controller.special;
+
+			controller = data;
+
+			// Restore the station cache to the object
+			controller.special = special;
+
+			// Fix the station status array
+			controller.status = controller.status.sn;
+
+			finish();
+		}, fail );
 	} else {
 		$.when(
 			updateControllerPrograms(),
@@ -985,29 +925,6 @@ function updateController( callback, fail ) {
 			updateControllerSettings()
 		).then( finish, fail );
 	}
-}
-
-function updateControllerData( callback, fail ) {
-	sendToOS( "/ja?pw=", "json" ).then( function( data ) {
-
-		if ( typeof data === "undefined" || $.isEmptyObject( data ) ) {
-			fail();
-			return;
-		}
-
-		// The /ja call does not contain special station data, so let's cache it
-		var special = controller.special;
-
-		controller = data;
-
-		// Restore the station cache to the object
-		controller.special = special;
-
-		// Fix the station status array
-		controller.status = controller.status.sn;
-
-		callback();
-	} );
 }
 
 function updateControllerPrograms( callback ) {
@@ -2143,32 +2060,17 @@ function updateDeviceIP( finishCheck ) {
 	},
 	ip;
 
-	if ( isChromeApp ) {
-		chrome.system.network.getNetworkInterfaces( function( data ) {
-			var i;
-			for ( i in data ) {
-				if ( data.hasOwnProperty( i ) ) {
-					if ( /^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$/.test( data[ i ].address ) ) {
-						ip = data[ i ].address;
-					}
-				}
-			}
+	try {
 
+		// Request the device's IP address
+		networkinterface.getWiFiIPAddress( function( data ) {
+			ip = data.ip;
 			finish( ip );
 		} );
-	} else {
-		try {
-
-			// Request the device's IP address
-			networkinterface.getWiFiIPAddress( function( data ) {
-				ip = data.ip;
-				finish( ip );
-			} );
-		} catch ( err ) {
-			findRouter( function( status, data ) {
-				finish( !status ? undefined : data );
-			} );
-		}
+	} catch ( err ) {
+		findRouter( function( status, data ) {
+			finish( !status ? undefined : data );
+		} );
 	}
 }
 
@@ -2515,10 +2417,10 @@ function showZimmermanAdjustmentOptions( button, callback ) {
 				br: parseFloat( popup.find( ".br" ).val() )
 			} );
 
-			// OSPi strores in imperial so convert metric at higher precision so we dont lose accuracy
+			// OSPi stores in imperial so onvert metric at higher precision so we dont lose accuracy
 			if ( isMetric ) {
-				options.bt = Math.round( ( options.bt * 9.0 / 5.0 + 32.0 ) * 100.0 ) / 100.0;
-				options.br = Math.round( ( options.br / 25.4 ) * 1000.0 ) / 1000.0;
+				options.bt = Math.round( ( options.bt * 9 / 5 + 32 ) * 100 ) / 100;
+				options.br = Math.round( ( options.br / 25.4 ) * 1000 ) / 1000;
 			}
 		}
 
@@ -2796,14 +2698,14 @@ function showEToAdjustmentOptions( button, callback ) {
 
 	// Elevation and baseline ETo for ETo adjustment.
 	var options = $.extend( {}, {
-			baseETo: 0.0,
+			baseETo: 0,
 			elevation: 600
 		},
 		unescapeJSON( button.value )
 	);
 
 	if ( isMetric ) {
-		options.baseETo = Math.round( options.baseETo * 25.4 * 100.0 ) / 100.0;
+		options.baseETo = Math.round( options.baseETo * 25.4 * 10 ) / 10;
 		options.elevation = Math.round( options.elevation / 3.28 );
 	}
 
@@ -2844,7 +2746,7 @@ function showEToAdjustmentOptions( button, callback ) {
 
 		// Convert to imperial before storing.
 		if ( isMetric ) {
-			options.baseETo = Math.round( options.baseETo / 25.4 * 100.0 ) / 100.0;
+			options.baseETo = Math.round( options.baseETo / 25.4 * 100 ) / 100;
 			options.elevation = Math.round( options.elevation * 3.28 );
 		}
 
@@ -3149,6 +3051,9 @@ function makeAttribution( provider ) {
 
 	var attrib = "<div class='weatherAttribution'>";
 	switch ( provider ) {
+		case "Apple":
+			attrib += _( "Powered by Apple" );
+			break;
 		case "DarkSky":
 		case "DS":
 			attrib += "<a href='https://darksky.net/poweredby/' target='_blank'>" + _( "Powered by Dark Sky" ) + "</a>";
@@ -3159,13 +3064,6 @@ function makeAttribution( provider ) {
 		case "WUnderground":
 		case "WU":
 			attrib += "<a href='https://wunderground.com/' target='_blank'>" + _( "Powered by Weather Underground" ) + "</a>";
-			break;
-		case "DWD":
-			attrib += "<a href='https://brightsky.dev/' target='_blank'>" + _( "Powered by Bright Sky+DWD" ) + "</a>";
-			break;
-		case "OpenMeteo":
-		case "OM":
-			attrib += "<a href='https://open-meteo.com/' target='_blank'>" + _( "Powered by Open Meteo" ) + "</a>";
 			break;
 		case "local":
 			attrib += _( "Powered by your Local PWS" );
@@ -3998,7 +3896,7 @@ function showOptions( expandItem ) {
 					}
 				}
 
-				// Because the firmware has a bug regarding spaces, let us replace them out now with a compatible seperator
+				// Because the firmware has a bug regarding spaces, let us replace them out now with a compatible separator
 				if ( checkOSVersion( 208 ) === true && id === "loc" ) {
 					data = data.replace( /\s/g, "_" );
 				}
@@ -4369,7 +4267,7 @@ function showOptions( expandItem ) {
 						"<button data-mini='true' id='otc' value='" + escapeJSON( controller.settings.otc ) + "'>" +
 							_( "Tap to Configure" ) +
 						"</button>" +
-			"</div>";
+					"</div>";
 		}
 
 		if ( typeof controller.settings.mqtt !== "undefined" ) {
@@ -5244,13 +5142,14 @@ var showHomeMenu = ( function() {
 				"<li><a href='#runonce'>" + _( "Run-Once Program" ) + "</a></li>" +
 				"<li><a href='#programs'>" + _( "Edit Programs" ) + "</a></li>" +
 				"<li><a href='#os-options'>" + _( "Edit Options" ) + "</a></li>" +
-
-				//Analog sensor api:
-				( checkOSVersion( 230 ) ? (
-				"<li><a href='#analogsensorconfig'>" + _( "Analog Sensor Config" ) + "</a></li>" +
-				"<li><a href='#analogsensorchart'>" + _( "Show Sensor Log" ) + "</a></li>"
-				) : "" ) +
-
+				
+				// Analog Sensor Api:
+				( analogSensorAvail ? (
+                                "<li><a href='#analogsensorconfig'>" + _( "Analog Sensor Config" ) + "</a></li>" +
+                                "<li><a href='#analogsensorchart'>" + _( "Show Sensor Log" ) + "</a></li>"
+                                ) : "" ) +
+                                // Analog Sensor Api end
+				
 				( checkOSVersion( 210 ) ? "" : "<li><a href='#manual'>" + _( "Manual Control" ) + "</a></li>" ) +
 			( id === "sprinklers" || id === "runonce" || id === "programs" || id === "manual" || id === "addprogram" ?
 				"</ul>" +
@@ -5329,11 +5228,10 @@ var showHome = ( function() {
 						"</div>" +
 					"</div>" +
 					"<div id='os-stations-list' class='card-group center'></div>" +
-
-					//Analog Sensor API - show area start:
+					
+					// Analog Sensor API - show area start:
 					"<div id='os-sensor-show' class='card-group center'></div>" +
-
-					//Analog Sensor API - show area end
+                                        // Analog Sensor API - show area end
 				"</div>" +
 			"</div>" +
 		"</div>" ),
@@ -5668,11 +5566,9 @@ var showHome = ( function() {
 				"<input class='bold center' data-corners='false' data-wrapper-class='tight stn-name ui-btn' id='stn-name' type='text' value=\"" +
 					name.text() + "\">";
 
-			if ( typeof navigator.camera !== "undefined" && typeof navigator.camera.getPicture === "function" ) {
-				select += "<button class='changeBackground'>" +
-						( typeof sites[ currentSite ].images[ sid ] !== "string" ? _( "Add" ) : _( "Change" ) ) + " " + _( "Image" ) +
-					"</button>";
-			}
+			select += "<button class='changeBackground'>" +
+					( typeof sites[ currentSite ].images[ sid ] !== "string" ? _( "Add" ) : _( "Change" ) ) + " " + _( "Image" ) +
+				"</button>";
 
 			if ( !Station.isMaster( sid ) ) {
 				if ( Supported.master( MASTER_STATION_1 ) ) {
@@ -5840,7 +5736,7 @@ var showHome = ( function() {
 				e.preventDefault();
 				var button = this;
 
-				takePicture( function( image ) {
+				getPicture( function( image ) {
 					sites[ currentSite ].images[ sid ] = image;
 					storage.set( { "sites":JSON.stringify( sites ) }, cloudSaveSites );
 					updateContent();
@@ -5950,7 +5846,7 @@ var showHome = ( function() {
 					// Only send the name of the station being updated
 					if ( sid === id ) {
 
-						// Because the firmware has a bug regarding spaces, let us replace them out now with a compatible seperator
+						// Because the firmware has a bug regarding spaces, let us replace them out now with a compatible separator
 						if ( is208 ) {
 							names[ "s" + sid ] = page.find( "#station_" + sid ).text().replace( /\s/g, "_" );
 						} else {
@@ -5999,7 +5895,6 @@ var showHome = ( function() {
 				}
 			};
 		},
-
 		compareCardsGroupView = function( a, b ) {
 
 			/* Sorting order: 	master ->
@@ -6118,7 +6013,7 @@ var showHome = ( function() {
 				divider = Card.getDivider( thisCard );
 				divider.hide(); // Remove all dividers when switching from group view
 
-				Card.setGroupLabel( thisCard, mapGIDValueToName( Station.getGIDValue( idx ) ) );
+				Card.setGroupLabel( thisCard, mapGIDValueToName( Station.getGIDValue( Card.getSID( thisCard ) ) ) );
 				label = Card.getGroupLabel( thisCard );
 				if ( typeof label !== "undefined" && Card.isMasterStation( thisCard ) ) {
 					label.addClass( "hidden" );
@@ -6162,8 +6057,10 @@ var showHome = ( function() {
 
 			updateClock();
 			updateSites();
+			//Analog Sensor API:
 			updateSensorShowArea( page );
-
+			//Analog Sensor API end
+			
 			page.find( ".waterlevel" ).text( controller.options.wl );
 			page.find( ".sitename" ).text( siteSelect.val() );
 
@@ -6294,7 +6191,9 @@ var showHome = ( function() {
 		page.find( ".sitename" ).toggleClass( "hidden", currLocal ? true : false ).text( siteSelect.val() );
 		page.find( ".waterlevel" ).text( controller.options.wl );
 
+		//Analog Sensor Api:
 		updateSensorShowArea( page );
+		//Analog Sensor Api end
 		updateClock();
 
 		page.on( "click", ".station-settings", showAttributes );
@@ -6392,7 +6291,7 @@ var showHome = ( function() {
 					updateContent();
 				} );
 			} else {
-				takePicture( function( image ) {
+				getPicture( function( image ) {
 					sites[ currentSite ].images[ id ] = image;
 					storage.set( { "sites":JSON.stringify( sites ) }, cloudSaveSites );
 					updateContent();
@@ -6605,15 +6504,7 @@ function refreshStatus( callback ) {
 	};
 
 	if ( checkOSVersion( 216 ) ) {
-		updateController( function() {
-			if ( checkOSVersion( 230 ) ) {
-				updateAnalogSensor( function() {
-					updateProgramAdjustments( finish );
-				} );
-			} else {
-				finish();
-			}
-		}, networkFail );
+		updateController( finish, networkFail );
 	} else {
 		$.when(
 			updateControllerStatus(),
@@ -8674,7 +8565,7 @@ var getLogs = ( function() {
 			$.mobile.loading( "show" );
 
 			if ( ( endtime - starttime ) > 31540000 ) {
-				showerror( _( "The requested time span exceeds the maxiumum of 1 year and has been adjusted" ), 3500 );
+				showerror( _( "The requested time span exceeds the maximum of 1 year and has been adjusted" ), 3500 );
 				var nDate = dates().start;
 				nDate.setFullYear( nDate.getFullYear() + 1 );
 				$( "#log_end" ).val( nDate.getFullYear() + "-" + pad( nDate.getMonth() + 1 ) + "-" + pad( nDate.getDate() ) );
@@ -10337,7 +10228,7 @@ function importConfig( data ) {
 				}
 
 				// Handle data from firmware 2.1+ being imported to a 2.1+ device
-				// The firmware does not accept program name inside the program array and must be submitted seperately
+				// The firmware does not accept program name inside the program array and must be submitted separately
 				if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv >= 210 && checkOSVersion( 210 ) ) {
 					name = "&name=" + prog[ 5 ];
 
@@ -10465,7 +10356,7 @@ var showAbout = ( function() {
 					"</li>" +
 				"</ul>" +
 				"<p class='smaller'>" +
-					_( "App Version" ) + ": 2.3.0" +
+					_( "App Version" ) + ": 2.3.3" +
 					"<br>" + _( "Firmware" ) + ": <span class='firmware'></span>" +
 					"<br><span class='hardwareLabel'>" + _( "Hardware Version" ) + ":</span> <span class='hardware'></span>" +
 				"</p>" +
@@ -11153,19 +11044,13 @@ function showUnifiedFirmwareNotification() {
 
 			// Unable to access the device using it's public IP
 			addNotification( {
-				title: _( "Unified firmware is now avaialble" ),
+				title: _( "Unified firmware is now available" ),
 				desc: _( "Click here for more details" ),
 				on: function() {
-					var iab = window.open( "https://openthings.freshdesk.com/support/solutions/articles/5000631599",
+					window.open( "https://openthings.freshdesk.com/support/solutions/articles/5000631599",
 						"_blank", "location=" + ( isAndroid ? "yes" : "no" ) +
-						",enableViewportScale=yes,toolbarposition=top,closebuttoncaption=" + _( "Back" ) );
-
-					if ( isIEMobile ) {
-						$.mobile.document.data( "iabOpen", true );
-						iab.addEventListener( "exit", function() {
-							$.mobile.document.removeData( "iabOpen" );
-						} );
-					}
+						",enableViewportScale=yes,toolbarposition=top,closebuttoncaption=" + _( "Back" )
+					);
 
 					return false;
 				},
@@ -11205,16 +11090,10 @@ function checkPublicAccess( eip ) {
 						title: _( "Remote access is not enabled" ),
 						desc: _( "Click here to troubleshoot remote access issues" ),
 						on: function() {
-							var iab = window.open( "https://openthings.freshdesk.com/support/solutions/articles/5000569763",
+							window.open( "https://openthings.freshdesk.com/support/solutions/articles/5000569763",
 								"_blank", "location=" + ( isAndroid ? "yes" : "no" ) +
-								",enableViewportScale=yes,toolbarposition=top,closebuttoncaption=" + _( "Back" ) );
-
-							if ( isIEMobile ) {
-								$.mobile.document.data( "iabOpen", true );
-								iab.addEventListener( "exit", function() {
-									$.mobile.document.removeData( "iabOpen" );
-								} );
-							}
+								",enableViewportScale=yes,toolbarposition=top,closebuttoncaption=" + _( "Back" )
+							);
 
 							return false;
 						},
@@ -12539,7 +12418,7 @@ function openPopup( popup, args ) {
 
 	popup.one( "popupafterclose", function() {
 
-		// Retreive popup data
+		// Retrieve popup data
 		var updateRemainingStations = $( "#shift-sta" ).is( ":checked" );
 
 		// Save data before view is destroyed
@@ -12635,24 +12514,46 @@ function showLoading( ele ) {
 	}
 }
 
-function takePicture( callback ) {
-	if ( typeof navigator.camera !== "object" || typeof navigator.camera.getPicture !== "function" ) {
-		return;
-	}
-
-	navigator.camera.getPicture( callback, function() {}, {
-		quality: 50,
-		destinationType: Camera.DestinationType.DATA_URL,
-		sourceType: Camera.PictureSourceType.PHOTOLIBRARY,
-		allowEdit: true,
-		targetWidth: 200,
-		targetHeight: 200
-	} );
+function getPicture( callback ) {
+	var imageLoader = $( "<input style='display: none' type='file' accept='image/*' />" )
+		.insertAfter( "body" )
+		.on( "change", function( event ) {
+			var reader = new FileReader();
+			reader.onload = function( readerEvent ) {
+				var image = new Image();
+				image.onload = function() {
+					var canvas = document.createElement( "canvas" ),
+						maxSize = 200,
+						width = image.width,
+						height = image.height;
+					if ( width > height ) {
+						if ( width > maxSize ) {
+							height *= maxSize / width;
+							width = maxSize;
+						}
+					} else {
+						if ( height > maxSize ) {
+							width *= maxSize / height;
+							height = maxSize;
+						}
+					}
+					canvas.width = width;
+					canvas.height = height;
+					canvas.getContext( "2d" ).drawImage( image, 0, 0, width, height );
+					var resizedImage = canvas.toDataURL( "image/jpeg", 0.5 ).replace( "data:image/jpeg;base64,", "" );
+					imageLoader.remove();
+					callback( resizedImage );
+				};
+				image.src = readerEvent.target.result;
+			};
+			reader.readAsDataURL( event.target.files[ 0 ] );
+		} );
+	imageLoader.get( 0 ).click();
 }
 
 function goHome( firstLoad ) {
 
-	// Transition to home page after succesful load
+	// Transition to home page after successful load
 	if ( $( ".ui-page-active" ).attr( "id" ) !== "sprinklers" ) {
 		$.mobile.document.one( "pageshow", function() {
 
@@ -12699,31 +12600,15 @@ function goBack() {
 			navigator.app.exitApp();
 		} catch ( err ) {}
 	} else {
-		if ( isChromeApp || window.location.protocol === "file:" ) {
-			var url = $.mobile.navigate.history.getPrev().url;
+		if ( pageHistoryCount > 0 ) {
+			pageHistoryCount--;
+		}
 
-			if ( url.slice( 0, 1 ) !== "#" ) {
-				return;
-			}
-
-			changePage( url, {
-				reverse: true
-			} );
-			$.mobile.document.one( "pagehide", function() {
-				$.mobile.navigate.history.activeIndex -= 2;
-			} );
+		if ( pageHistoryCount === 0 ) {
+			navigator.app.exitApp();
 		} else {
-			if ( pageHistoryCount > 0 ) {
-				pageHistoryCount--;
-			}
-
-			if ( pageHistoryCount === 0 ) {
-				navigator.app.exitApp();
-			} else {
-				goingBack = true;
-				$.mobile.back();
-			}
-
+			goingBack = true;
+			$.mobile.back();
 		}
 	}
 }
@@ -13297,7 +13182,7 @@ function transformKeysinString( co ) {
 	return co;
 }
 
-/* Compatability methods, verify that necessary data is
+/* Compatibility methods, verify that necessary data is
  * sent from the controller to the UI without explicitly
  * checking for OS version. */
 
