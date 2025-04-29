@@ -13,6 +13,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+// Disables site selection menu
+window.currLocal = true;
+
 ( function( document ) {
 	var assetLocation = getAssetLocation(),
 		isReady = false;
@@ -25,7 +28,7 @@
 			return def;
 		}
 
-		mainScript = /^\s*(((([^:\/#\?]+:)?(?:(\/\/)((?:(([^:@\/#\?]+)(?:\:([^:@\/#\?]+))?)@)?(([^:\/#\?\]\[]+|\[[^\/\]@#?]+\])(?:\:([0-9]+))?))?)?)?((\/?(?:[^\/\?#]+\/+)*)([^\?#]*)))?(\?[^#]+)?)(#.*)?/.exec( mainScript || "" ) || [];
+		mainScript = /^\s*(((([^:/#?]+:)?(?:(\/\/)((?:(([^:@/#?]+)(?::([^:@/#?]+))?)@)?(([^:/#?\][]+|\[[^/\]@#?]+\])(?::([0-9]+))?))?)?)?((\/?(?:[^/?#]+\/+)*)([^?#]*)))?(\?[^#]+)?)(#.*)?/.exec( mainScript || "" ) || [];
 		return mainScript[ 1 ].slice( 0, -10 ) || def;
 	}
 
@@ -76,7 +79,6 @@
 
 	// Insert script into the DOM
 	function insertScript( src, callback ) {
-
 		// Create callback if one is not provided
 		callback = callback || function() {};
 
@@ -123,45 +125,52 @@
 	insertStyleSheet( assetLocation + "css/jqm.css" );
 	insertStyleSheet( assetLocation + "css/main.css" );
 	insertStyleSheet( assetLocation + "css/analog.css" );
-	insertStyleSheet( assetLocation + "css/dataTables-2.1.8.dataTables.min.css" );
 
 	// Insert favicon for web page
 	insertStyleSheet( assetLocation + "img/favicon.ico", "shortcut icon" );
 
 	// Insert jQuery
-	insertScript( assetLocation + "js/jquery.js", function() {
+	insertScript( assetLocation + "vendor-js/jquery.js", function() {
 
 		// Insert libraries
-		insertScript( assetLocation + "js/libs.js", function() {
+		insertScript( assetLocation + "vendor-js/libs.js", function() {
 
-			// Insert primary application script
-			insertScript( assetLocation + "js/main.js", function() {
-				try {
-					localStorage.setItem( "testQuota", "true" );
-					localStorage.removeItem( "testQuota" );
-					init();
-				} catch ( err ) {
-					if ( err.code === 22 ) {
-						document.body.innerHTML = "<div class='spinner'><div class='logo'></div>" +
-							"<span class='feedback'>Local storage is not " +
-							"enabled on your device and is required by the application. " +
-							"You may be in private browsing mode.</span></div>";
-							return;
+			// Insert charting library for analog support
+			insertScript( assetLocation + "vendor-js/apexcharts.min.js" );
+
+			// Insert datatables grid library
+			insertScript( assetLocation + "vendor-js/dataTables-2.1.8.min.js" );
+
+			fetch( assetLocation + "modules.json" )
+				.then( response => response.json() )
+				.then( modules => {
+					let loadedScripts = 0;
+					const totalScripts = modules.length;
+
+					function scriptLoaded() {
+						loadedScripts++;
+						if ( loadedScripts === totalScripts ) {
+							// Once all scripts loaded, insert main.js
+							insertScript( assetLocation + "js/main.js", function () {
+								try {
+									localStorage.setItem( "testQuota", "true" );
+									localStorage.removeItem( "testQuota" );
+									init();
+								} catch ( err ) {
+									if ( err.code === 22 ) {
+										document.body.innerHTML = "<div class='spinner'><div class='logo'></div>" +
+											"<span class='feedback'>Local storage is not enabled. You may be in private browsing mode.</span></div>";
+									}
+								}
+							});
+						}
 					}
-				}
-			} );
 
-			//Insert charting library for analog support
-			insertScript( assetLocation + "js/dataTables-2.1.8.min.js" );
-
-			// Insert analog sensor (if supported)
-			insertScript( assetLocation + "js/analog.js" );
-
-			// Insert analog sensor (if supported)
-			insertScript( assetLocation + "js/programview.js" );
-
-			//Insert charting library for analog support
-			insertScript( assetLocation + "js/apexcharts.min.js" );
+					// Dynamically insert all scripts from modules.json
+					modules.forEach( script => {
+						insertScript( assetLocation + "js/modules/" + script, scriptLoaded );
+					});
+				});
 		} );
 	} );
 
@@ -205,7 +214,7 @@
 
 						// Load jQuery Mobile
 						$.ajax( {
-							url: assetLocation + "js/jqm.js",
+							url: assetLocation + "vendor-js/jqm.js",
 							dataType: "script",
 							cache: true
 						} );
@@ -259,11 +268,8 @@
 		 * Licensed MIT (/blob/master/LICENSE.txt)
 		 */
 
-		//jscs:disable maximumLineLength
-
+		// eslint-disable-next-line
 		( function() {if ( $.support.cors || !$.ajaxTransport || !window.XDomainRequest ) {return;}var b = /^https?:\/\//i;var c = /^get|post$/i;var a = new RegExp( "^" + location.protocol, "i" );$.ajaxTransport( "* text html xml json", function( e, g ) {if ( !e.crossDomain || !e.async || !c.test( e.type ) || !b.test( e.url ) || !a.test( e.url ) ) {return;}var d = null;return { send:function( k, i ) {var h = "";var j = ( g.dataType || "" ).toLowerCase();d = new XDomainRequest();if ( /^\d+$/.test( g.timeout ) ) {d.timeout = g.timeout;}d.ontimeout = function() {i( 500, "timeout" );};d.onload = function() {var q = "Content-Length: " + d.responseText.length + "\r\nContent-Type: " + d.contentType;var l = { code:200, message:"success" };var n = { text:d.responseText };try {if ( j === "html" || /text\/html/i.test( d.contentType ) ) {n.html = d.responseText;}else {if ( j === "json" || ( j !== "text" && /\/json/i.test( d.contentType ) ) ) {try {n.json = $.parseJSON( d.responseText );}catch ( p ) {l.code = 500;l.message = "parseerror";}}else {if ( j === "xml" || ( j !== "text" && /\/xml/i.test( d.contentType ) ) ) {var o = new ActiveXObject( "Microsoft.XMLDOM" );o.async = false;try {o.loadXML( d.responseText );}catch ( p ) {o = undefined;}if ( !o || !o.documentElement || o.getElementsByTagName( "parsererror" ).length ) {l.code = 500;l.message = "parseerror";throw"Invalid XML: " + d.responseText;}n.xml = o;}}}}catch ( m ) {throw m;}finally {i( l.code, l.message, n, q );}};d.onprogress = function() {};d.onerror = function() {i( 500, "error", { text:d.responseText } );};if ( g.data ) {h = ( $.type( g.data ) === "string" ) ? g.data : $.param( g.data );}d.open( e.type, e.url );d.send( h );}, abort:function() {if ( d ) {d.abort();}} };} );}() );
-
-		//jscs:enable maximumLineLength
 
 		if ( sites ) {
 
@@ -289,7 +295,7 @@
 
 			loader.on( "submit", function() {
 				var pw = $( "#os_pw" ).val(),
-					checkPW = function( pass, callback ) {
+					homeCheckPW = function( pass, callback ) {
 						$.ajax( {
 							url: document.URL.match( /(https?:\/\/.*)\/.*?/ )[ 1 ] + "/sp?pw=" + encodeURIComponent( pass ) + "&npw=" + encodeURIComponent( pass ) + "&cpw=" + encodeURIComponent( pass ),
 							cache: false,
@@ -311,7 +317,7 @@
 						);
 					},
 					checkClear = function() {
-						checkPW( pw, function( clearResult ) {
+						homeCheckPW( pw, function( clearResult ) {
 							if ( clearResult === true ) {
 								savePassword( pw );
 							} else {
@@ -328,7 +334,7 @@
 				$.support.cors = true;
 
 				if ( ver >= 213 ) {
-					checkPW( md5( pw ), function( result ) {
+					homeCheckPW( md5( pw ), function( result ) {
 						if ( result === true ) {
 							savePassword( md5( pw ), true );
 						} else {
@@ -359,9 +365,6 @@
 
 				// Grab the pages from index.html (body content)
 				var pages = data.match( /<body>([.\s\S]*)<\/body>/ )[ 1 ];
-
-				// Disables site selection menu
-				window.currLocal = true;
 
 				// Show the body when jQM attempts first page transition
 				$( document ).one( "mobileinit", function() {
