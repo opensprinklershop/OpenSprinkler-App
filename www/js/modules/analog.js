@@ -1134,7 +1134,7 @@ OSApp.Analog.addToObjectIPs = function(popup, fieldId, obj) {
 	if (field) {
 		let property = fieldId.substring(1);
 		var ipstr = field.val();
-		obj[property] =  intFromBytes(ipstr?ipstr.split("."):0);
+		obj[property] =  OSApp.Analog.intFromBytes(ipstr?ipstr.split("."):0);
 		OSApp.Analog.requiredCheck(field, obj, property);
 	}
 };
@@ -2728,12 +2728,15 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 						show: canExport,
 						tools: {
 							download: canExport,
-							selection: false,
+							selection: canExport,
 							zoom: canExport,
 							zoomin: canExport,
 							zoomout: canExport,
 							pan: canExport
 						},
+					},
+					zoom: {
+						enabled: canExport
 					},
 					dropShadow: {
 						enabled: true
@@ -2916,15 +2919,18 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 				width: '100%',
 				height: (screen.height > screen.width ? screen.height : screen.width) / 3,
 				toolbar: {
-                                	show: canExport,
-                                        tools: {
-                                        	download: canExport,
-                                                selection: false,
-                                                zoom: canExport,
-                                                zoomin: canExport,
-                                                zoomout: canExport,
-                                                pan: canExport
-                                        },
+                	show: canExport,
+					tools: {
+						download: canExport,
+							selection: canExport,
+							zoom: canExport,
+							zoomin: canExport,
+							zoomout: canExport,
+							pan: canExport
+					},
+				},
+				zoom: {
+					enabled: canExport
 				},
 				dropShadow: {
 					enabled: true

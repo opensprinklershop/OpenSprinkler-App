@@ -23,7 +23,9 @@ var OSApp = OSApp || {};
 window.onerror = function(message, source, lineno, colno, error) {
 	// Catch any uncaught exceptions. Write them to console, show the user a modal to report the error.
 	console.error( "*** Uncaught Exception", {message, source, lineno, colno, error} );
-	OSApp.Errors.showErrorModal(message, source, lineno, colno, error);
+	if (!message.includes("this.series is null") && !message.includes("cordova")) {
+		OSApp.Errors.showErrorModal(message, source, lineno, colno, error);
+	}
 	return true;
 };
 
