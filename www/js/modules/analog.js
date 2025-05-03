@@ -2070,7 +2070,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 			var limit = OSApp.currentSession.token ? "&max=5500" : ""; //download limit is 140kb, 5500 lines ca 137kb
 			var dest = "/so?pw=&csv=1" + limit;
-			dest = dest.replace("pw=", "pw=" + OSApp.Analog.enc(OSApp.currentSessing.pass));
+			dest = dest.replace("pw=", "pw=" + OSApp.Analog.enc(OSApp.currentSession.pass));
 			link.target = "_blank";
 			link.href = OSApp.currentSession.token ? ("https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + dest) : (OSApp.currentSession.prefix + OSApp.currentSession.ip + dest);
 			document.body.appendChild(link); // Required for FF
