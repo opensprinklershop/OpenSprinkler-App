@@ -2206,7 +2206,7 @@ OSApp.Analog.buildSensorConfig = function() {
 			$("<td>").text(item.nr),
 			$("<td class=\"hidecol\">").text(item.type),
 			$("<td class=\"hidecol\">").text(item.group ? item.group : ""),
-			"<td><a data-role='button' class='edit-sensor' value='" + item.nr + "' row='" + row + "' href='#' data-mini='true' data-icon='edit'>" +
+			"<td><a data-role='button' class='edit-sensor wraptext' value='" + item.nr + "' row='" + row + "' href='#' data-mini='true' data-icon='edit'>" +
 			item.name + "</a></td>",
 			$("<td class=\"hidecol\">").text(item.ip ? OSApp.Analog.toByteArray(item.ip).join(".") : ""),
 			$("<td class=\"hidecol\">").text(item.port ? (":" + item.port) : ""),
@@ -2266,7 +2266,7 @@ OSApp.Analog.buildSensorConfig = function() {
 			$("<td class=\"hidecol\">").text(item.type),
 			$("<td class=\"hidecol2\">").text(item.sensor),
 			$("<td class=\"hidecol2\">").text(sensorName),
-			"<td><a data-role='button' class='edit-progadjust' value='" + item.nr + "' row='" + row + "' href='#' data-mini='true' data-icon='edit'>" +
+			"<td><a data-role='button' class='edit-progadjust wraptext' value='" + item.nr + "' row='" + row + "' href='#' data-mini='true' data-icon='edit'>" +
 			item.name + "</a></td>",
 			$("<td class=\"hidecol2\">").text(progName),
 			$("<td class=\"hidecol2\">").text(Math.round(item.factor1 * 100) + "%"),
@@ -2362,7 +2362,7 @@ OSApp.Analog.buildSensorConfig = function() {
 				$("<td class=\"hidecol\">").text(item.type),
 				$("<td class=\"hidecol2\">").text(sensorNr),
 				$("<td class=\"hidecol2\">").text(source),
-				"<td><a data-role='button' class='edit-monitor' value='" + item.nr + "' row='" + row + "' href='#' data-mini='true' data-icon='edit'>" +
+				"<td><a data-role='button' class='edit-monitor wraptext' value='" + item.nr + "' row='" + row + "' href='#' data-mini='true' data-icon='edit'>" +
 				item.name + "</a></td>",
 				$("<td class=\"hidecol2\">").text(progName),
 				$("<td class=\"hidecol2\">").text(zoneName),
@@ -2393,12 +2393,12 @@ OSApp.Analog.buildSensorConfig = function() {
 	if (OSApp.Firmware.checkOSVersion(231)) {
 		list += "<fieldset data-role='collapsible'" + (OSApp.Analog.expandItem.has("backup") ? " data-collapsed='false'" : "") + ">" +
 			"<legend>" + OSApp.Language._("Backup and Restore") + "</legend>";
-		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-all'  href='#' data-mini='true'>" + OSApp.Language._("Backup Config") + "</a>" +
-			"<a data-role='button' data-icon='back'      class='restore-all' href='#' data-mini='true'>" + OSApp.Language._("Restore Config") + "</a>";
-		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-sensors'  href='#' data-mini='true'>" + OSApp.Language._("Backup Sensor Config") + "</a>" +
-			"<a data-role='button' data-icon='back'      class='restore-sensors' href='#' data-mini='true'>" + OSApp.Language._("Restore Sensor Config") + "</a>";
-		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-adjustments'  href='#' data-mini='true'>" + OSApp.Language._("Backup Program Adjustments") + "</a>" +
-			"<a data-role='button' data-icon='back'      class='restore-adjustments' href='#' data-mini='true'>" + OSApp.Language._("Restore Program Adjustments") + "</a>";
+		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-all wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Config") + "</a>" +
+			"<a data-role='button' data-icon='back'      class='restore-all wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Config") + "</a>";
+		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-sensors wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Sensor Config") + "</a>" +
+			"<a data-role='button' data-icon='back'      class='restore-sensors wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Sensor Config") + "</a>";
+		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-adjustments wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Program Adjustments") + "</a>" +
+			"<a data-role='button' data-icon='back'      class='restore-adjustments wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Program Adjustments") + "</a>";
 		if (OSApp.Firmware.checkOSVersion(233)) {
 			list += "<a data-role='button' data-icon='arrow-d-r' class='backup-monitors'  href='#' data-mini='true'>" + OSApp.Language._("Backup Monitors") + "</a>" +
 				"<a data-role='button' data-icon='back'      class='restore-monitors' href='#' data-mini='true'>" + OSApp.Language._("Restore Monitors") + "</a>";

@@ -27,6 +27,7 @@
 	border: 1px solid lightgray;
 	border-collapse: collapse;
 }
+
 #analogsensorlist table tr {
 	border: 1px solid lightgray;
 	border-collapse: collapse;
@@ -37,3 +38,9 @@
 	border-collapse: collapse;
 	background: lightskyblue;
 }
+
+.wraptext {
+	white-space: pre-wrap; 
+	word-wrap: break-word;
+}
+
