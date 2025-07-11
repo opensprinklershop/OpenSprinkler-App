@@ -76,7 +76,8 @@ OSApp.Logs.displayPage = function() {
 
 			$.each( data, function() {
 				var station = this[ 1 ],
-					duration = parseInt( this[ 2 ] );
+                                        duration = parseInt( this[ 2 ] ),
+                                        flowRate = ( typeof this[ 4 ] !== "undefined" ) ? OSApp.Utils.flowRateToVolume( parseFloat( this[ 4 ] ) ) : null;
 
 				// Adjust for negative watering time firmware bug
 				if ( duration < 0 ) {
@@ -108,17 +109,19 @@ OSApp.Logs.displayPage = function() {
 					stats.totalCount++;
 				}
 
+
+
 				if ( type === "table" ) {
 					switch ( grouping ) {
 						case "station":
-							var stationItem = [ utc, OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( duration ) ), station, new Date( utc.getTime() + ( duration * 1000 ) ) ];
+                                                        var stationItem = [ utc, OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( duration ) ), station, new Date( utc.getTime() + ( duration * 1000 ) ), flowRate ];
 							sortedData[ station ].push( stationItem );
 							break;
 						case "day":
 							var day = Math.floor( date.getTime() / 1000 / 60 / 60 / 24 ),
-								item = [ utc, OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( duration ) ), station, new Date( utc.getTime() + ( duration * 1000 ) ) ];
+                                                                item = [ utc, OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( duration ) ), station, new Date( utc.getTime() + ( duration * 1000 ) ), flowRate ];
 
-							// Item structure: [startDate, runtime, station, endDate]
+                                                        // Item structure: [startDate, runtime, station, endDate, flowRate]
 
 							if ( typeof sortedData[ day ] !== "object" ) {
 								sortedData[ day ] = [ item ];
@@ -157,7 +160,7 @@ OSApp.Logs.displayPage = function() {
 					} else {
 						className = "program-" + ( ( pid + 3 ) % 4 );
 						name = OSApp.Programs.pidToName( pid );
-						group = OSApp.currentSession.controller.stations.snames[ station ];
+						group = OSApp.Stations.getName(station);
 						shortname = "S" + ( station + 1 );
 					}
 
@@ -336,6 +339,7 @@ OSApp.Logs.displayPage = function() {
 					"<th data-priority='2'>" + OSApp.Language._( "Runtime" ) + "</th>" +
 					"<th data-priority='3'>" + OSApp.Language._( "Start Time" ) + "</th>" +
 					"<th data-priority='4'>" + OSApp.Language._( "End Time" ) + "</th>" +
+                                        "<th data-priority='5'>" + OSApp.Language._( "Flow Rate" ) + "</th>" +
 					"</tr></thead><tbody>",
 				html = showStats( stats ) + "<div data-role='collapsible-set' data-inset='true' data-theme='b' data-collapsed-icon='arrow-d' data-expanded-icon='arrow-u'>",
 				i = 0,
@@ -377,16 +381,20 @@ OSApp.Logs.displayPage = function() {
 					groupArray[ i ] += tableHeader;
 
 					for ( k = 0; k < sortedData[ group ].length; k++ ) {
-						var stationName = ( grouping === 'station' ) ? stations[ group ] : stations[ sortedData[ group ][ k ][ 2 ] ];
+						var sid = ( grouping === 'station' ) ? group  : sortedData[group][k][2];
+						var stationName = OSApp.Stations.getName(sid);
 						var runTime = sortedData[ group ][ k ][ 1 ];
 						var startTime = formatTime( sortedData[ group ][ k ][ 0 ], grouping ) ;
 						var endTime = formatTime( sortedData[ group ][ k ][ 3 ], grouping );
+                                                var fRate = sortedData[ group ][ k ][ 4 ];
+                                                var flowDisplay = ( typeof fRate === "number" ) ? fRate.toFixed( 2 ) + " L/min" : "";
 
 						groupArray[ i ] += "<tr>" +
 							"<td>" + stationName + "</td>" + // Station name
 							"<td>" + runTime + "</td>" + // Runtime
 							"<td>" + startTime + "</td>" + // Startdate
 							"<td>" + endTime + "</td>" + // Enddate
+                                                        "<td>" + flowDisplay + "</td>" + // Flow rate
 							"</tr>";
 					}
 					groupArray[ i ] += "</tbody></table></div>";
@@ -563,7 +571,7 @@ OSApp.Logs.displayPage = function() {
 			OSApp.Language._( "Rain Delay" )
 		] : [ OSApp.Language._( "Rain Sensor" ), OSApp.Language._( "Rain Delay" ) ];
 
-		stations = $.merge( $.merge( [], OSApp.currentSession.controller.stations.snames ), additionalMetrics );
+		stations = $.merge( $.merge( [], OSApp.currentSession.controller.stations?.snames ), additionalMetrics );
 		page.find( ".clear_logs" ).toggleClass( "hidden", ( OSApp.Firmware.isOSPi() || OSApp.Firmware.checkOSVersion( 210 ) ?  false : true ) );
 
 		if ( logStart.val() === "" || logEnd.val() === "" ) {

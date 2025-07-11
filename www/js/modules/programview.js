@@ -117,7 +117,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 
 		var programChart = OSApp.ProgramView.programCharts[i];
 		if (!programChart) {
-			programChart = {updated : 1};
+			programChart = {updated : 1, current : 0, remaining : 0, running : false, en : prog.en, stationsRunning : sr, name: name, chart: null};
 			OSApp.ProgramView.programCharts[i] = programChart;
 		}
 		else programChart.updated = 0;
@@ -208,7 +208,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 		let programChart = OSApp.ProgramView.programCharts[i];
 		if (!programChart.en) continue;
 		var chart = programChart.chart;
-		if (!chart) {
+		if (!chart || reset) {
 			let options = {
 				pid : i,
 				clicked : 0,
@@ -359,8 +359,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 				chart.updateOptions({
 					series: [programChart.current],
 					chart: {width: width},
-					labels: [programChart.name] },
-					false, true );
+					labels: [programChart.name] });
 			}
 		}
 	}

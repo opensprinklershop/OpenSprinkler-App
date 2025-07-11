@@ -631,14 +631,21 @@ OSApp.Weather.finishWeatherUpdate = function() {
 };
 
 OSApp.Weather.updateWeather = function() {
+	if ( !OSApp.Utils.isSessionValid() ) {
+		console.log("*** updateWeather aborted due to invalid session");
+		return;
+	}
+
 	var now = new Date().getTime();
 
 	if ( OSApp.currentSession.weather && OSApp.currentSession.weather.providedLocation === OSApp.currentSession.controller.settings.loc && now - OSApp.currentSession.weather.lastUpdated < 60 * 60 * 100 ) {
 		OSApp.Weather.finishWeatherUpdate();
 		return;
-	} else if ( localStorage.weatherData ) {
+       } else {
+               var storedData = OSApp.Storage.getItemSync( "weatherData" );
+               if ( storedData ) {
 		try {
-			var weatherData = JSON.parse( localStorage.weatherData );
+                               var weatherData = JSON.parse( storedData );
 			if ( weatherData.providedLocation === OSApp.currentSession.controller.settings.loc && now - weatherData.lastUpdated < 60 * 60 * 100 ) {
 				OSApp.currentSession.weather = weatherData;
 				OSApp.Weather.finishWeatherUpdate();
@@ -647,6 +654,7 @@ OSApp.Weather.updateWeather = function() {
 			//eslint-disable-next-line
 		} catch ( err ) {}
 	}
+       }
 
 	OSApp.currentSession.weather = undefined;
 
@@ -657,9 +665,9 @@ OSApp.Weather.updateWeather = function() {
 
 	OSApp.UIDom.showLoading( "#weather" );
 
-	const provider = OSApp.currentSession.controller.settings.wto.provider;
-	const key = OSApp.currentSession.controller.settings.wto.key;
-	const pws = OSApp.currentSession.controller.settings.wto.pws;
+	const provider = OSApp.currentSession.controller.settings.wto?.provider;
+	const key = OSApp.currentSession.controller.settings.wto?.key;
+	const pws = OSApp.currentSession.controller.settings.wto?.pws;
 
 	let url = OSApp.currentSession.weatherServerUrl + "/weatherData?loc=" +
 	encodeURIComponent( OSApp.currentSession.controller.settings.loc );
@@ -690,7 +698,7 @@ OSApp.Weather.updateWeather = function() {
 			OSApp.currentSession.weather = data;
 			data.lastUpdated = new Date().getTime();
 			data.providedLocation = OSApp.currentSession.controller.settings.loc;
-			localStorage.weatherData = JSON.stringify( data );
+                       OSApp.Storage.setItemSync( "weatherData", JSON.stringify( data ) );
 			OSApp.Weather.finishWeatherUpdate();
 		}
 	} );
@@ -758,7 +766,7 @@ OSApp.Weather.showForecast = function() {
 				"<ul data-role='listview' data-inset='true'>" +
 					OSApp.Weather.makeForecast() +
 				"</ul>" +
-				OSApp.Weather.makeAttribution( OSApp.currentSession.controller.settings.wto.provider || OSApp.currentSession.weather.wp || OSApp.currentSession.weather.weatherProvider ) +
+				OSApp.Weather.makeAttribution( OSApp.currentSession.controller.settings.wto?.provider || OSApp.currentSession.weather.wp || OSApp.currentSession.weather.weatherProvider ) +
 			"</div>" +
 		"</div>" );
 
@@ -877,7 +885,7 @@ OSApp.Weather.makeAttribution = function( provider ) {
 			attrib += OSApp.Language._( "Powered by your Local PWS" );
 			break;
 		case "Manual":
-			attrib += OSApp.Language._( "Using manual watering" );
+			attrib += OSApp.Language._( "Using manual weather adjustment" );
 			break;
 		default:
 			attrib += OSApp.Language._( "Unrecognised weather provider" );

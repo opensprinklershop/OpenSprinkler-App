@@ -162,3 +162,15 @@ OSApp.Utils.isValidOTC = function( token ) {
 OSApp.Utils.flowCountToVolume = function( count ) {
 	return parseFloat( ( count * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / 100 ).toFixed( 2 ) );
 };
+
+// Convert flow rate (sensor pulses per minute) to volume per minute
+OSApp.Utils.flowRateToVolume = function( rate ) {
+       return parseFloat( ( rate * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / 100 ).toFixed( 2 ) );
+};
+
+/*
+Returns true when currentSession.controller.settings is populated
+*/
+OSApp.Utils.isSessionValid = function() {
+	return !$.isEmptyObject(OSApp.currentSession?.controller?.settings || {});
+};

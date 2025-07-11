@@ -15,6 +15,42 @@
 var OSApp = OSApp || {};
 OSApp.Storage = OSApp.Storage || {};
 
+// Prefix to namespace localStorage keys by path. This allows the app to be
+// served from different URLs under the same origin without clobbering each
+// other's storage.
+OSApp.Storage.prefix = ( function() {
+       var path = window.location.pathname
+               .replace(/\/index\.html$/, "")
+               .replace(/\/$/, "");
+       return path ? path + ":" : "";
+} )();
+
+OSApp.Storage._key = function( key ) {
+       return OSApp.Storage.prefix + key;
+};
+
+OSApp.Storage.getItemSync = function( key ) {
+       var value = localStorage.getItem( OSApp.Storage._key( key ) );
+       if ( value === null && OSApp.Storage.prefix ) {
+               value = localStorage.getItem( key );
+       }
+       return value;
+};
+
+OSApp.Storage.setItemSync = function( key, value ) {
+       localStorage.setItem( OSApp.Storage._key( key ), value );
+       if ( OSApp.Storage.prefix ) {
+               localStorage.removeItem( key );
+       }
+};
+
+OSApp.Storage.removeItemSync = function( key ) {
+       localStorage.removeItem( OSApp.Storage._key( key ) );
+       if ( OSApp.Storage.prefix ) {
+               localStorage.removeItem( key );
+       }
+};
+
 // Functions
 OSApp.Storage.get = function( query, callback ) {
 	callback = callback || function() {};
@@ -27,7 +63,7 @@ OSApp.Storage.get = function( query, callback ) {
 
 	for ( i in query ) {
 		if ( Object.prototype.hasOwnProperty.call(query,  i ) ) {
-			data[ query[ i ] ] = localStorage.getItem( query[ i ] );
+                       data[ query[ i ] ] = OSApp.Storage.getItemSync( query[ i ] );
 		}
 	}
 
@@ -39,7 +75,7 @@ OSApp.Storage.set = function( query, callback ) {
 	var i;
 	for ( i in query ) {
 		if ( Object.prototype.hasOwnProperty.call(query,  i ) ) {
-			localStorage.setItem( i, query[ i ] );
+                       OSApp.Storage.setItemSync( i, query[ i ] );
 		}
 	}
 
@@ -56,7 +92,7 @@ OSApp.Storage.remove = function( query, callback ) {
 
 	for ( i in query ) {
 		if ( Object.prototype.hasOwnProperty.call(query,  i ) ) {
-			localStorage.removeItem( query[ i ] );
+                       OSApp.Storage.removeItemSync( query[ i ] );
 		}
 	}
 

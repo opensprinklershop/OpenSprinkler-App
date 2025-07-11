@@ -21,6 +21,12 @@ OSApp.UIDom = OSApp.UIDom || {};
 
 // App entry point
 OSApp.UIDom.launchApp = function() {
+       // Load any stored local settings immediately since the `mobileinit`
+       // event may fire before this script is executed
+       if ( OSApp.Storage && typeof OSApp.Storage.loadLocalSettings === "function" ) {
+               OSApp.Storage.loadLocalSettings();
+       }
+
 	Number.prototype.clamp = function( min, max ) {
 		return Math.min( Math.max( this, min ), max );
 	};
@@ -338,10 +344,16 @@ OSApp.UIDom.showHomeMenu = ( function() {
 			} else if ( href === "#show-hidden" ) {
 				if ( showHidden ) {
 					$( ".station-hidden" ).hide();
+                                        $( ".disabled-programs-note" ).show();
 					page.removeClass( "show-hidden" );
+                                        OSApp.Storage.set( { showDisabled: false } );
+                                        showHidden = false;
 				} else {
 					$( ".station-hidden" ).show();
+                                        $( ".disabled-programs-note" ).hide();
 					page.addClass( "show-hidden" );
+                                        OSApp.Storage.set( { showDisabled: true } );
+                                        showHidden = true;
 				}
 			} else if ( href === "#raindelay" ) {
 				OSApp.Weather.showRainDelay();

@@ -388,7 +388,7 @@ OSApp.Dashboard.displayPage = function() {
 
 			select += "<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Station Name" ) + ":</div>" +
 				"<input class='bold center' data-corners='false' data-wrapper-class='tight stn-name ui-btn' id='stn-name' type='text' value=\"" +
-				name.text() + "\">";
+				OSApp.currentSession.controller.stations.snames[sid] + "\">";
 
 			select += "<button class='changeBackground'>" +
 				( typeof sites[ currentSite ].images[ sid ] !== "string" ? OSApp.Language._( "Add" ) : OSApp.Language._( "Change" ) ) + " " + OSApp.Language._( "Image" ) +
@@ -966,7 +966,7 @@ OSApp.Dashboard.displayPage = function() {
 						card.show().removeClass( "station-hidden" );
 					}
 
-					card.find( "#station_" + sid ).text( OSApp.currentSession.controller.stations.snames[ sid ] );
+					card.find( "#station_" + sid ).text( OSApp.Stations.getName( sid) );
 					card.find( ".special-station" ).removeClass( "hidden" ).addClass( OSApp.Stations.isSpecial( sid ) ? "" : "hidden" );
 					card.find( ".station-status" ).removeClass( "on off wait" ).addClass( isRunning ? "on" : ( isScheduled ? "wait" : "off" ) );
 					if ( OSApp.Stations.isMaster( sid ) ) {

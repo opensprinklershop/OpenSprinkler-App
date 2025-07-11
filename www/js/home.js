@@ -1,4 +1,4 @@
-/*global $, ver, ipas, XDomainRequest, ActiveXObject, md5 */
+/*global $, ver, ipas, XDomainRequest, ActiveXObject, md5, OSApp */
 
 /* OpenSprinkler App
  * Copyright (C) 2015 - present, Samer Albahra. All rights reserved.
@@ -153,8 +153,8 @@ window.currLocal = true;
 							// Once all scripts loaded, insert main.js
 							insertScript( assetLocation + "js/main.js", function () {
 								try {
-									localStorage.setItem( "testQuota", "true" );
-									localStorage.removeItem( "testQuota" );
+                                                                        OSApp.Storage.setItemSync( "testQuota", "true" );
+                                                                        OSApp.Storage.removeItemSync( "testQuota" );
 									init();
 								} catch ( err ) {
 									if ( err.code === 22 ) {
@@ -238,8 +238,8 @@ window.currLocal = true;
 				document.title = "Loading...";
 
 				// Inject site information to storage so Application loads current device
-				localStorage.setItem( "sites", JSON.stringify( sites ) );
-				localStorage.setItem( "current_site", currentSite );
+                                OSApp.Storage.setItemSync( "sites", JSON.stringify( sites ) );
+                                OSApp.Storage.setItemSync( "current_site", currentSite );
 				finishInit();
 			},
 			wrongPassword = function() {
@@ -257,7 +257,7 @@ window.currLocal = true;
 						"<div class='logo'></div><span class='feedback'>Unable to load UI</span>" +
 					"</div>" );
 			},
-			sites = JSON.parse( localStorage.getItem( "sites" ) ),
+                        sites = JSON.parse( OSApp.Storage.getItemSync( "sites" ) ),
 			loader;
 
 		// Fix to allow CORS ajax requests to work on IE8 and 9

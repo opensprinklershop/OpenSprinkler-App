@@ -370,23 +370,33 @@ OSApp.Options.showOptions = function( expandItem ) {
 				OSApp.Language._( "Enable Logging" ) + "</label>";
 		}
 
-		list += "<label for='isMetric'><input data-mini='true' id='isMetric' type='checkbox' " + ( OSApp.currentDevice.isMetric ? "checked='checked'" : "" ) + ">" +
+		list += "<label for='isMetric'><input data-mini='true' class='noselect'id='isMetric' type='checkbox' " + ( OSApp.currentDevice.isMetric ? "checked='checked'" : "" ) + ">" +
 			OSApp.Language._( "Use Metric" ) + "</label>";
 
-		list += "<label for='is24Hour'><input data-mini='true' id='is24Hour' type='checkbox' " + ( OSApp.uiState.is24Hour ? "checked='checked'" : "" ) + ">" +
+               list += "<label for='is24Hour'><input data-mini='true' class='noselect' id='is24Hour' type='checkbox' " + ( OSApp.uiState.is24Hour ? "checked='checked'" : "" ) + ">" +
 			OSApp.Language._( "Use 24 Hour Time" ) + "</label>";
 	list += "</div>";
 
 	list += "<div data-role='controlgroup' data-type='horizontal' style='text-align:center'>";
 		if ( OSApp.Supported.groups() ) {
-			list += "<label for='groupView'><input data-mini='true' id='groupView' type='checkbox' " + ( OSApp.uiState.groupView ? "checked='checked'" : "" ) + ">" +
+                       list += "<label for='groupView'><input data-mini='true' class='noselect' id='groupView' type='checkbox' " + ( OSApp.uiState.groupView ? "checked='checked'" : "" ) + ">" +
 			OSApp.Language._( "Order Stations by Groups" ) + "</label>";
 		}
 
-		list += "<label for='sortByStationName'><input data-mini='true' id='sortByStationName' type='checkbox' " + ( OSApp.uiState.sortByStationName ? "checked='checked'" : "" ) + ">" +
+               list += "<label for='sortByStationName'><input data-mini='true' class='noselect' id='sortByStationName' type='checkbox' " + ( OSApp.uiState.sortByStationName ? "checked='checked'" : "" ) + ">" +
 		OSApp.Language._( "Order Stations by Name" ) + "</label>";
 	list += "</div>";
 
+       list += "<div data-role='controlgroup' data-type='horizontal' style='text-align:center'>";
+               var showDisabled = OSApp.Storage.getItemSync( "showDisabled" ) === "true";
+               var showStationNum = OSApp.Storage.getItemSync( "showStationNum" ) === "true";
+               list += "<label for='showDisabled'><input data-mini='true' class='noselect' id='showDisabled' type='checkbox' " + ( showDisabled ? "checked='checked'" : "" ) + ">" +
+                       OSApp.Language._( "Show Disabled" ) + "</label>";
+
+               list += "<label for='showStationNum'><input data-mini='true' class='noselect' id='showStationNum' type='checkbox' " + ( showStationNum ? "checked='checked'" : "" ) + ">" +
+                       OSApp.Language._( "Show Station Number" ) + "</label>";
+       list += "</div>";
+       
 	//Select Zone/Program display options:
 	var displayOption = OSApp.ProgramView.Constants.SHOW_ZONES;
 	if (localStorage.hasOwnProperty('displayOption'))
@@ -413,7 +423,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 		for ( i = 0; i < OSApp.currentSession.controller.stations.snames.length; i++ ) {
 			list += "<option " + ( ( OSApp.Stations.isMaster( i ) === 1 ) ? "selected" : "" ) + " value='" + ( i + 1 ) + "'>" +
-				OSApp.currentSession.controller.stations.snames[ i ] + "</option>";
+				OSApp.Stations.getName( i ) + "</option>";
 
 			if ( !OSApp.Firmware.checkOSVersion( 214 ) && i === 7 ) {
 				break;
@@ -444,7 +454,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"</label><select data-mini='true' id='o37'><option value='0'>" + OSApp.Language._( "None" ) + "</option>";
 
 		for ( i = 0; i < OSApp.currentSession.controller.stations.snames.length; i++ ) {
-			list += "<option " + ( ( OSApp.Stations.isMaster( i ) === 2 ) ? "selected" : "" ) + " value='" + ( i + 1 ) + "'>" + OSApp.currentSession.controller.stations.snames[ i ] +
+			list += "<option " + ( ( OSApp.Stations.isMaster( i ) === 2 ) ? "selected" : "" ) + " value='" + ( i + 1 ) + "'>" + OSApp.Stations.getName(i) +
 				"</option>";
 
 			if ( !OSApp.Firmware.checkOSVersion( 214 ) && i === 7 ) {
@@ -702,7 +712,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'>" +
 							"</button>" +
 						"</label>" +
-						"<button data-mini='true' id='otc' value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.otc ) + "'>" +
+						"<button data-mini='true' id='otc' class=" + (OSApp.currentSession.controller.settings.otc.en ? "'blue'" : "''") + " value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.otc ) + "'>" +
 							OSApp.Language._( "Tap to Configure" ) +
 						"</button>" +
 					"</div>";
@@ -716,7 +726,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'>" +
 							"</button>" +
 						"</label>" +
-						"<button data-mini='true' id='mqtt' value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.mqtt ) + "'>" +
+						"<button data-mini='true' id='mqtt' class=" + (OSApp.currentSession.controller.settings.mqtt.en ? "'blue'" : "''") + " value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.mqtt ) + "'>" +
 							OSApp.Language._( "Tap to Configure" ) +
 						"</button>" +
 					"</div>";
@@ -744,7 +754,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'>" +
 							"</button>" +
 						"</label>" +
-						"<button data-mini='true' id='email' value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.email ) + "'>" +
+						"<button data-mini='true' id='email' class=" + (OSApp.currentSession.controller.settings.email.en ? "'blue'" : "''") + " value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.email ) + "'>" +
 							OSApp.Language._( "Tap to Configure" ) +
 						"</button>" +
 					"</div>";
@@ -764,7 +774,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					"<button data-helptext='" +
 						OSApp.Language._( "Select notification events. Applicable to all of MQTT, Email, and IFTTT. <b>NOTE</b>: enabling too many events or notification methods may cause delays, missed responses, or skipped short watering events." ) +
 						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-				"</label><button data-mini='true' id='o49' value='" + ifev + "'>" + OSApp.Language._( "Configure Events" ) + "</button></div>";
+				"</label><button data-mini='true' id='o49' class=" + (ifev == 0 ?  "''" : "'blue'") + " value='" + ifev + "'>" + OSApp.Language._( "Configure Events" ) + "</button></div>";
 		}
 
 		if ( typeof OSApp.currentSession.controller.settings.dname !== "undefined" ) {
@@ -984,6 +994,36 @@ OSApp.Options.showOptions = function( expandItem ) {
 		OSApp.Storage.set( { showDisabled: this.checked } );
 		return false;
 	} );
+
+        page.find( "#showStationNum" ).on( "change", function() {
+                OSApp.Storage.set( { showStationNum: this.checked } );
+                return false;
+        } );
+
+        page.find( "#isMetric" ).on( "change", function() {
+                OSApp.currentDevice.isMetric = this.checked;
+                OSApp.Storage.set( { isMetric: this.checked } );
+                OSApp.Language.updateUIElements();
+                return false;
+        } );
+
+        page.find( "#is24Hour" ).on( "change", function() {
+                OSApp.uiState.is24Hour = this.checked;
+                OSApp.Storage.set( { is24Hour: this.checked } );
+                return false;
+        } );
+
+        page.find( "#groupView" ).on( "change", function() {
+                OSApp.uiState.groupView = this.checked;
+                OSApp.Storage.set( { groupView: this.checked } );
+                return false;
+        } );
+
+        page.find( "#sortByStationName" ).on( "change", function() {
+                OSApp.uiState.sortByStationName = this.checked;
+                OSApp.Storage.set( { sortByStationName: this.checked } );
+                return false;
+        } );
 
 	page.find( "#loc" ).on( "click", function() {
 		var loc = $( this );
@@ -1452,6 +1492,13 @@ OSApp.Options.showOptions = function( expandItem ) {
 				a++;
 			} );
 			popup.popup( "close" );
+
+			if ( ife > 0 ) {
+				page.find( "#o49" ).addClass( "blue" );
+			} else {
+				page.find( "#o49" ).removeClass( "blue" );
+			}
+
 			if ( curr === ife ) {
 				return;
 			} else {
@@ -1582,6 +1629,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 				subt: popup.find( "#subt" ).val()
 			};
 
+			if ( options.en ) {
+				page.find( "#mqtt" ).addClass( "blue" )
+						} else {
+				page.find( "#mqtt" ).removeClass( "blue" )
+			}
+				
 			popup.popup( "close" );
 			if ( curr === OSApp.Utils.escapeJSON( options ) ) {
 				return;
@@ -1776,6 +1829,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 				recipient: popup.find( "#recipient" ).val()
 			};
 
+			if ( options.en ) {
+				page.find( "#email" ).addClass( "blue" )
+			} else {
+				page.find( "#email" ).removeClass( "blue" )
+			}
+
 			popup.popup( "close" );
 			if ( curr === OSApp.Utils.escapeJSON( options ) ) {
 				return;
@@ -1858,6 +1917,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 				server: popup.find( "#server" ).val(),
 				port: parseInt( popup.find( "#port" ).val() )
 			};
+
+			if ( options.en ) {
+				page.find( "#otc" ).addClass( "blue" )
+			} else {
+				page.find( "#otc" ).removeClass("blue")
+			}
 
 			popup.popup( "close" );
 			if ( curr === OSApp.Utils.escapeJSON( options ) ) {

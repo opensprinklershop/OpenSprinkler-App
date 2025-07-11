@@ -17,15 +17,14 @@
 var OSApp = OSApp || {};
 OSApp.Programs = OSApp.Programs || {};
 
-OSApp.Programs.displayPage = function() {
+OSApp.Programs.displayPage = function(programId) {
 	// Program management functions
 	var page = $(`
 		<div data-role="page" id="programs">
 			<div class="ui-content" role="main" id="programs_list">
 			</div>
 		</div>
-	`),
-		expandId;
+	`);
 
 	page
 		.on( "programrefresh", updateContent )
@@ -36,12 +35,12 @@ OSApp.Programs.displayPage = function() {
 			OSApp.Programs.updateProgramHeader();
 
 			if ( typeof expandId !== "number" && OSApp.currentSession.controller.programs.pd.length === 1 ) {
-				expandId = 0;
+				programId = 0;
 			}
 
-			if ( typeof expandId === "number" ) {
+			if ( typeof programId === "number" ) {
 				page.find( "fieldset[data-collapsed='false']" ).collapsible( "collapse" );
-				$( "#program-" + expandId ).collapsible( "expand" );
+				$( "#program-" + programId ).collapsible( "expand" );
 			}
 		} );
 
@@ -50,6 +49,12 @@ OSApp.Programs.displayPage = function() {
 
 		list.find( "[id^=program-]" ).on( {
 			collapsiblecollapse: function() {
+                                var pid = $( this ).attr( "id" ).split( "-" )[ 1 ];
+                                var select = $( "#d-" + pid );
+                                if ( select.length && select.data( "mobile-selectmenu" ) ) {
+                                        select.selectmenu( "destroy" );
+                                }
+                                $( "#d-" + pid + "-listbox" ).remove();
 				$( this ).find( ".ui-collapsible-content" ).empty();
 			},
 			collapsiblebeforecollapse: function( e ) {
@@ -104,9 +109,7 @@ OSApp.Programs.displayPage = function() {
 		page.find( "#programs_list" ).html( list.enhanceWithin() );
 	}
 
-	function begin( pid ) {
-		expandId = pid;
-
+	function begin() {
 		OSApp.UIDom.changeHeader( {
 			title: OSApp.Language._( "Programs" ),
 			leftBtn: {
@@ -171,7 +174,7 @@ OSApp.Programs.displayPageManual = function() {
 					}
 				}
 
-				item.text( OSApp.currentSession.controller.stations.snames[ currPos ] );
+				item.text( OSApp.Stations.getName(currPos) );
 
 				if ( OSApp.currentSession.controller.status[ currPos ] ) {
 					item.removeClass( "yellow" ).addClass( "green" );
@@ -392,14 +395,14 @@ OSApp.Programs.displayPageRunOnce = function() {
 		}
 		quickPick += "</select>";
 		list += quickPick + "<form>";
-		$.each( OSApp.currentSession.controller.stations.snames, function( i, station ) {
+		$.each( OSApp.currentSession.controller.stations.snames, function( i ) {
 			if ( OSApp.Stations.isMaster( i ) ) {
 				list += "<div class='ui-field-contain duration-input" + ( OSApp.Stations.isDisabled( i ) ? " station-hidden' style='display:none" : "" ) + "'>" +
-					"<label for='zone-" + i + "'>" + station + ":</label>" +
+					"<label for='zone-" + i + "'>" + OSApp.Stations.getName(i) + ":</label>" +
 					"<button disabled='true' data-mini='true' name='zone-" + i + "' id='zone-" + i + "' value='0'>Master</button></div>";
 			} else {
 				list += "<div class='ui-field-contain duration-input" + ( OSApp.Stations.isDisabled( i ) ? " station-hidden' style='display:none" : "" ) + "'>" +
-					"<label for='zone-" + i + "'>" + station + ":</label>" +
+					"<label for='zone-" + i + "'>" + OSApp.Stations.getName(i) + ":</label>" +
 					"<button data-mini='true' name='zone-" + i + "' id='zone-" + i + "' value='0'>0s</button></div>";
 			}
 		} );
@@ -1127,7 +1130,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 			"content":pname,
 			"pid": pid - 1,
 			"shortname":"S" + ( sid + 1 ),
-			"group": OSApp.currentSession.controller.stations.snames[ sid ],
+			"group": OSApp.Stations.getName(sid),
 			"station": sid
 		} );
 	};
@@ -1467,6 +1470,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 			var stn = $( this );
 			var name = shortnames[ stn.text() ];
 			stn.attr( "data-shortname", name );
+
 		} );
 
 		page.find( ".timeline-groups-axis" ).children().first().html( "<div class='timeline-axis-text center dayofweek' data-shortname='" +
@@ -1506,7 +1510,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 		is211 = OSApp.Firmware.checkOSVersion( 211 );
 		is216 = OSApp.Firmware.checkOSVersion( 216 );
 
-		if ( page.find( "#preview_date" ).val() === "" ) {
+		if ( OSApp.currentSession.controller.settings.devt && page.find( "#preview_date" ).val() === "" ) {
 			now = new Date( OSApp.currentSession.controller.settings.devt * 1000 );
 			date = now.toISOString().slice( 0, 10 ).split( "-" );
 			day = new Date( date[ 0 ], date[ 1 ] - 1, date[ 2 ] );
@@ -1643,6 +1647,7 @@ OSApp.Programs.readProgram21 = function( program ) {
 	}
 
 	newdata.days = days;
+
 	return newdata;
 };
 
@@ -1703,8 +1708,6 @@ OSApp.Programs.pidToName = function( pid ) {
 		pname = OSApp.Language._( "Manual program" );
 	} else if ( pid === 254 || pid === 98 ) {
 		pname = OSApp.Language._( "Run-once program" );
-	} else if ( pid === 253) {
-		pname = OSApp.Language._( "Monitoring and control" );
 	} else if ( OSApp.Firmware.checkOSVersion( 210 ) && pid <= OSApp.currentSession.controller.programs.pd.length ) {
 		pname = OSApp.currentSession.controller.programs.pd[ pid - 1 ][ 5 ];
 	}
@@ -1712,7 +1715,7 @@ OSApp.Programs.pidToName = function( pid ) {
 	return pname;
 };
 
-// Check each program and change the background color to red if disabled
+// Check each program and change the background color to red if disabled. Also apply program-disabled class for program hiding feature
 OSApp.Programs.updateProgramHeader = function() {
 	$( "#programs_list" ).find( "[id^=program-]" ).each( function( a, b ) {
 		var item = $( b ),
@@ -1721,30 +1724,50 @@ OSApp.Programs.updateProgramHeader = function() {
 
 		if ( en ) {
 			heading.removeClass( "red" );
+			heading.removeClass( "program-disabled" );
 		} else {
 			heading.addClass( "red" );
+			heading.addClass( "program-disabled" );
 		}
 	} );
 };
 
-//Make the list of all programs
+// Make the list of all programs, respecting the "hide disabled" option/waffle setting to toggle visibility of disabled programs
 OSApp.Programs.makeAllPrograms = function() {
 	if ( OSApp.currentSession.controller.programs.pd.length === 0 ) {
 		return "<p class='center'>" + OSApp.Language._( "You have no programs currently added. Tap the Add button on the top right corner to get started." ) + "</p>";
 	}
-	var list = "<p class='center'>" + OSApp.Language._( "Click any program below to expand/edit. Be sure to save changes." ) + "</p><div data-role='collapsible-set'>",
-		name;
+
+	var list = "<p class='center'>" + OSApp.Language._( "Click any program below to expand/edit. Be sure to save changes." ) + "</p><div data-role='collapsible-set'>";
+
+	var numDisabledPrograms = 0;
 
 	for ( var i = 0; i < OSApp.currentSession.controller.programs.pd.length; i++ ) {
-		name = OSApp.Language._( "Program" ) + " " + ( i + 1 );
-		if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-			name = OSApp.currentSession.controller.programs.pd[ i ][ 5 ];
+		var program = OSApp.Programs.readProgram( OSApp.currentSession.controller.programs.pd[ i ] );
+		var name = program.name || OSApp.Language._( "Program" ) + " " + ( i + 1 );
+
+		if ( program.en === 0) {
+			numDisabledPrograms++;
 		}
-		list += "<fieldset id='program-" + i + "' data-role='collapsible'><h3><a " + ( i > 0 ? "" : "style='visibility:hidden' " ) +
-				"class='hidden ui-btn ui-btn-icon-notext ui-icon-arrow-u ui-btn-corner-all move-up'></a><a class='ui-btn ui-btn-corner-all program-copy'>" +
-			OSApp.Language._( "copy" ) + "</a><span class='program-name'>" + name + "</span></h3>";
-		list += "</fieldset>";
+
+		list += `
+			<fieldset id='program-${i}' data-role='collapsible'>
+				<h3>
+					<a ${( i > 0 ? "" : "style='visibility:hidden' " )} class='hidden ui-btn ui-btn-icon-notext ui-icon-arrow-u ui-btn-corner-all move-up'></a>
+					<a class='ui-btn ui-btn-corner-all program-copy'>${OSApp.Language._( "copy" )}</a>
+					<span class='program-name'>${name}</span>
+				</h3>
+			</fieldset>`;
 	}
+
+	if ( numDisabledPrograms ) {
+		var pluralProgram = 'program';
+		if ( numDisabledPrograms > 1 ) {
+			pluralProgram = 'programs';
+		}
+		list += "<p class='center disabled-programs-note'>" + numDisabledPrograms + " " + OSApp.Language._( `disabled ${pluralProgram} hidden. Tap 'Show Disabled' in the footer menu to view` ) + "</p>";
+	}
+
 	return list + "</div>";
 };
 
@@ -1825,7 +1848,7 @@ OSApp.Programs.makeProgram183 = function( n, isCopy ) {
 		list += "<label for='station_" + j + "-" + id + "'><input " +
 			( OSApp.Stations.isDisabled( j ) ? "data-wrapper-class='station-hidden hidden' " : "" ) +
 			"data-mini='true' type='checkbox' " + ( ( ( typeof setStations !== "undefined" ) && setStations[ j ] ) ? "checked='checked'" : "" ) +
-			" name='station_" + j + "-" + id + "' id='station_" + j + "-" + id + "'>" + OSApp.currentSession.controller.stations.snames[ j ] + "</label>";
+			" name='station_" + j + "-" + id + "' id='station_" + j + "-" + id + "'>" + OSApp.Stations.getName(j) + "</label>";
 	}
 
 	list += "</fieldset>";
@@ -1960,7 +1983,7 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 	list += "<div class='ui-bar ui-bar-a'><h3>" + OSApp.Language._( "Basic Settings" ) + "</h3></div>";
 	list += "<div class='ui-body ui-body-a center'>";
 
-	// Progran name
+	// Program name
 	list += "<label for='name-" + id + "'>" + OSApp.Language._( "Program Name" ) + "</label>" +
 		"<input data-mini='true' type='text' name='name-" + id + "' id='name-" + id + "' maxlength='" + OSApp.currentSession.controller.programs.pnsize + "' " +
 		"placeholder='" + OSApp.Language._( "Program" ) + " " + ( OSApp.currentSession.controller.programs.pd.length + 1 ) + "' value=\"" + program.name + "\">";
@@ -2088,13 +2111,13 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 	for ( j = 0; j < OSApp.currentSession.controller.stations.snames.length; j++ ) {
 		if ( OSApp.Stations.isMaster( j ) ) {
 			list += "<div class='ui-field-contain duration-input" + ( OSApp.Stations.isDisabled( j ) ? " station-hidden" + hideDisabled : "" ) + "'>" +
-				"<label for='station_" + j + "-" + id + "'>" + OSApp.currentSession.controller.stations.snames[ j ] + ":</label>" +
+				"<label for='station_" + j + "-" + id + "'>" + OSApp.Stations.getName(j) + ":</label>" +
 				"<button disabled='true' data-mini='true' name='station_" + j + "-" + id + "' id='station_" + j + "-" + id + "' value='0'>" +
 				OSApp.Language._( "Master" ) + "</button></div>";
 		} else {
 			time = program.stations[ j ] || 0;
 			list += "<div class='ui-field-contain duration-input" + ( OSApp.Stations.isDisabled( j ) ? " station-hidden" + hideDisabled : "" ) + "'>" +
-				"<label for='station_" + j + "-" + id + "'>" + OSApp.currentSession.controller.stations.snames[ j ] + ":</label>" +
+				"<label for='station_" + j + "-" + id + "'>" + OSApp.Stations.getName(j) + ":</label>" +
 				"<button " + ( time > 0 ? "class='green' " : "" ) + "data-mini='true' name='station_" + j + "-" + id + "' " +
 					"id='station_" + j + "-" + id + "' value='" + time + "'>" + OSApp.Dates.getDurationText( time ) + "</button></div>";
 		}
@@ -2264,7 +2287,7 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 	// Handle all station duration inputs
 	page.find( "[id^=station_]" ).on( "click", function() {
 		var dur = $( this ),
-			name = OSApp.currentSession.controller.stations.snames[ dur.attr( "id" ).split( "_" )[ 1 ].split( "-" )[ 0 ] ];
+			name = OSApp.Stations.getName( dur.attr( "id" ).split( "_" )[ 1 ].split( "-" )[ 0 ] );
 
 		OSApp.UIDom.showDurationBox( {
 			seconds: dur.val(),
@@ -2434,6 +2457,7 @@ OSApp.Programs.submitProgram183 = function( id ) {
 		OSApp.Firmware.sendToOS( "/cp?pw=&pid=" + id + "&v=" + program ).done( function() {
 			$.mobile.loading( "hide" );
 			OSApp.Sites.updateControllerPrograms( function() {
+				$( "#programs" ).trigger( "programrefresh" );
 				OSApp.Programs.updateProgramHeader();
 			} );
 			OSApp.Errors.showError( OSApp.Language._( "Program has been updated" ) );
@@ -2486,7 +2510,7 @@ OSApp.Programs.submitProgram21 = function( id, ignoreWarning ) {
 		j |= ( 2 << 4 );
 		days[ 0 ] = parseInt( $( "#monthDay-" + id ).val(), 10 );
 		if ( days[ 0 ] < 0 || days[ 0 ] > 31) {
-			OSApp.Errors.showError( OSApp.Language._("Error: Day of month is out of bounds." ) );
+			OSApp.Errors.showerror( OSApp.Language._("Error: Day of month is out of bounds." ) );
 			return;
 		}
 
@@ -2494,7 +2518,7 @@ OSApp.Programs.submitProgram21 = function( id, ignoreWarning ) {
 		j |= ( 1 << 4 );
 		var time = OSApp.Dates.dateToEpoch( $( "#singleDate-" + id ).val());
 		if ( time === -1 ){
-			OSApp.Errors.showError( OSApp.Language._( "Error: Start date is input incorrectly." ) );
+			OSApp.Errors.showerror( OSApp.Language._( "Error: Start date is input incorrectly." ) );
 			return;
 		}
 		days[ 0 ] = (time >> 8) & 0b11111111;
@@ -2615,6 +2639,7 @@ OSApp.Programs.submitProgram21 = function( id, ignoreWarning ) {
 		OSApp.Firmware.sendToOS( "/cp?pw=&pid=" + id + url + daterange ).done( function() {
 			$.mobile.loading( "hide" );
 			OSApp.Sites.updateControllerPrograms( function() {
+				$( "#programs" ).trigger( "programrefresh" );
 				OSApp.Programs.updateProgramHeader();
 				$( "#program-" + id ).find( ".program-name" ).text( name );
 			} );
