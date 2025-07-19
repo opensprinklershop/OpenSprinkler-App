@@ -152,10 +152,10 @@ window.currLocal = true;
 						if ( loadedScripts === totalScripts ) {
 							// Once all scripts loaded, insert main.js
 							insertScript( assetLocation + "js/main.js", function () {
-								try {
+                                                                try {
                                                                         OSApp.Storage.setItemSync( "testQuota", "true" );
                                                                         OSApp.Storage.removeItemSync( "testQuota" );
-									init();
+                                                                        init();
 								} catch ( err ) {
 									if ( err.code === 22 ) {
 										document.body.innerHTML = "<div class='spinner'><div class='logo'></div>" +

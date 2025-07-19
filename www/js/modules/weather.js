@@ -644,16 +644,16 @@ OSApp.Weather.updateWeather = function() {
        } else {
                var storedData = OSApp.Storage.getItemSync( "weatherData" );
                if ( storedData ) {
-		try {
+                       try {
                                var weatherData = JSON.parse( storedData );
-			if ( weatherData.providedLocation === OSApp.currentSession.controller.settings.loc && now - weatherData.lastUpdated < 60 * 60 * 100 ) {
-				OSApp.currentSession.weather = weatherData;
-				OSApp.Weather.finishWeatherUpdate();
-				return;
-			}
-			//eslint-disable-next-line
-		} catch ( err ) {}
-	}
+                               if ( weatherData.providedLocation === OSApp.currentSession.controller.settings.loc && now - weatherData.lastUpdated < 60 * 60 * 100 ) {
+                                       OSApp.currentSession.weather = weatherData;
+                                       OSApp.Weather.finishWeatherUpdate();
+                                       return;
+                               }
+                               //eslint-disable-next-line
+                       } catch ( err ) {}
+               }
        }
 
 	OSApp.currentSession.weather = undefined;
@@ -697,11 +697,11 @@ OSApp.Weather.updateWeather = function() {
 
 			OSApp.currentSession.weather = data;
 			data.lastUpdated = new Date().getTime();
-			data.providedLocation = OSApp.currentSession.controller.settings.loc;
+                       data.providedLocation = OSApp.currentSession.controller.settings.loc;
                        OSApp.Storage.setItemSync( "weatherData", JSON.stringify( data ) );
-			OSApp.Weather.finishWeatherUpdate();
-		}
-	} );
+                       OSApp.Weather.finishWeatherUpdate();
+               }
+       } );
 };
 
 OSApp.Weather.checkURLandUpdateWeather = function() {

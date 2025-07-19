@@ -27,9 +27,9 @@ OSApp.UIDom.launchApp = function() {
                OSApp.Storage.loadLocalSettings();
        }
 
-	Number.prototype.clamp = function( min, max ) {
-		return Math.min( Math.max( this, min ), max );
-	};
+       Number.prototype.clamp = function( min, max ) {
+               return Math.min( Math.max( this, min ), max );
+       };
 
 	if ( "serviceWorker" in navigator ) {
 		window.addEventListener( "load", function() {
@@ -342,19 +342,19 @@ OSApp.UIDom.showHomeMenu = ( function() {
 			if ( href === "#stop-all" ) {
 				OSApp.Stations.stopAllStations();
 			} else if ( href === "#show-hidden" ) {
-				if ( showHidden ) {
-					$( ".station-hidden" ).hide();
+                                if ( showHidden ) {
+                                        $( ".station-hidden" ).hide();
                                         $( ".disabled-programs-note" ).show();
-					page.removeClass( "show-hidden" );
+                                        page.removeClass( "show-hidden" );
                                         OSApp.Storage.set( { showDisabled: false } );
                                         showHidden = false;
-				} else {
-					$( ".station-hidden" ).show();
+                                } else {
+                                        $( ".station-hidden" ).show();
                                         $( ".disabled-programs-note" ).hide();
-					page.addClass( "show-hidden" );
+                                        page.addClass( "show-hidden" );
                                         OSApp.Storage.set( { showDisabled: true } );
                                         showHidden = true;
-				}
+                                }
 			} else if ( href === "#raindelay" ) {
 				OSApp.Weather.showRainDelay();
 			} else if ( href === "#globalpause" ) {

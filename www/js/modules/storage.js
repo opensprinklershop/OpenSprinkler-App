@@ -53,50 +53,50 @@ OSApp.Storage.removeItemSync = function( key ) {
 
 // Functions
 OSApp.Storage.get = function( query, callback ) {
-	callback = callback || function() {};
-	var data = {},
-		i;
+       callback = callback || function() {};
+       var data = {},
+               i;
 
-	if ( typeof query === "string" ) {
-		query = [ query ];
-	}
+       if ( typeof query === "string" ) {
+               query = [ query ];
+       }
 
-	for ( i in query ) {
-		if ( Object.prototype.hasOwnProperty.call(query,  i ) ) {
+       for ( i in query ) {
+               if ( Object.prototype.hasOwnProperty.call( query, i ) ) {
                        data[ query[ i ] ] = OSApp.Storage.getItemSync( query[ i ] );
-		}
-	}
+               }
+       }
 
-	callback( data );
+       callback( data );
 };
 
 OSApp.Storage.set = function( query, callback ) {
-	callback = callback || function() {};
-	var i;
-	for ( i in query ) {
-		if ( Object.prototype.hasOwnProperty.call(query,  i ) ) {
+       callback = callback || function() {};
+       var i;
+       for ( i in query ) {
+               if ( Object.prototype.hasOwnProperty.call( query, i ) ) {
                        OSApp.Storage.setItemSync( i, query[ i ] );
-		}
-	}
+               }
+       }
 
-	callback( true );
+       callback( true );
 };
 
 OSApp.Storage.remove = function( query, callback ) {
-	callback = callback || function() {};
-	var i;
+       callback = callback || function() {};
+       var i;
 
-	if ( typeof query === "string" ) {
-		query = [ query ];
-	}
+       if ( typeof query === "string" ) {
+               query = [ query ];
+       }
 
-	for ( i in query ) {
-		if ( Object.prototype.hasOwnProperty.call(query,  i ) ) {
+       for ( i in query ) {
+               if ( Object.prototype.hasOwnProperty.call( query, i ) ) {
                        OSApp.Storage.removeItemSync( query[ i ] );
-		}
-	}
+               }
+       }
 
-	callback( true );
+       callback( true );
 };
 
 OSApp.Storage.loadLocalSettings = function() {

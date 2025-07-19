@@ -564,7 +564,7 @@ OSApp.Sites.showAddNew = function( autoIP, closeOld ) {
 						OSApp.Language._( "May be an IP, URL, or OTC Token" ) +
 					"</p>" ) +
 						"<input data-wrapper-class='url-field' " + ( isAuto ? "data-role='none' style='display:none' " : "" ) +
-						"autocomplete='off' autocorrect='off' autocapitalize='off' " +
+							"autocomplete='off' autocorrect='off' autocapitalize='off' " +
 							"spellcheck='false' type='text' inputmode='url' pattern='' name='os_url' id='os_url' " +
 							"value='" + ( isAuto ? autoIP : "" ) + "'" +
 					"<label for='os_pw'>" + OSApp.Language._( "Device Password:" ) + "</label>" +
@@ -668,7 +668,7 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
                ip = $.mobile.path.parseUrl( urlStr ).hrefNoHash.replace( /https?:\/\//, "" );
        }
 
-		success = function( data, sites ) {
+       success = function( data, sites ) {
 			$.mobile.loading( "hide" );
 			var is183;
 
