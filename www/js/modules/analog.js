@@ -2153,9 +2153,9 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 	updateSensorContent();
 
 	$("#analogsensorconfig").remove();
+
 	$.mobile.pageContainer.append(page);
 };
-
 OSApp.Analog.checkFirmwareUpdate = function() {
 	if (OSApp.Firmware.checkOSVersion(OSApp.Analog.Constants.CURRENT_FW_ID) && OSApp.currentSession.controller.options.fwm >= OSApp.Analog.Constants.CURRENT_FW_MIN)
 		return "";
@@ -2505,7 +2505,6 @@ OSApp.Analog.showAnalogSensorCharts = function(limit2sensor) {
 
 	OSApp.Analog.updateCharts(limit2sensor);
 }
-
 OSApp.Analog.updateCharts = function(limit2sensor) {
 	var chart1 = new Array(OSApp.Analog.Constants.CHARTS),
 		chart2 = new Array(OSApp.Analog.Constants.CHARTS),

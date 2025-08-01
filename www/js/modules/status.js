@@ -34,6 +34,12 @@ OSApp.Status.refreshStatus = function( callback ) {
 
 	if ( OSApp.Firmware.checkOSVersion( 216 ) ) {
 		OSApp.Sites.updateController( finish, OSApp.Network.networkFail );
+		
+		if ( OSApp.Analog.checkAnalogSensorAvail() ) {
+			OSApp.Analog.updateAnalogSensor();
+			OSApp.Analog.updateProgramAdjustments();
+			OSApp.Analog.updateMonitors();
+		}	 
 	} else {
 		$.when(
 			OSApp.Sites.updateControllerStatus(),
