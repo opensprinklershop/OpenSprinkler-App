@@ -316,8 +316,11 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 				if (monitor.active) {
 					let prio = Object.prototype.hasOwnProperty.call(monitor, "prio")?monitor.prio:0;
 					let pcolor = OSApp.Analog.Constants.NOTIFICATION_COLORS[prio];
+					var name = monitor.name;
+					//if (monitor.ts>0)
+					//	name += " "+monitor.ts+"s";
 					html += "<div id='monitor-" + monitor.nr + "' class='ui-body ui-body-a center' style='background-color:"+pcolor+"'>";
-					html += "<label>" + monitor.name + "</label>";
+					html += "<label>" + name + "</label>";
 					html += "</div>";
 				}
 			}
@@ -1149,6 +1152,7 @@ OSApp.Analog.getMonitor = function(popup) {
 	OSApp.Analog.addToObjectInt(popup, "#zone", result);
 	OSApp.Analog.addToObjectFlt(popup, "#maxrun", result);
 	OSApp.Analog.addToObjectInt(popup, "#prio", result);
+	OSApp.Analog.addToObjectInt(popup, "#rs", result);
 
 	//Min+Max
 	OSApp.Analog.addToObjectFlt(popup, "#value1", result);
@@ -1298,10 +1302,16 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 		for (i = 0; i < 3; i++) {
 			list += "<option " + (monitor.prio == i ? "selected" : "") + " value='" + i + "'>" + prios[i] + "</option>";
 		}
-		list += "</select></div>" +
+		list += "</select></div>";
 
-			//typ = MIN+MAX
-			"<div id='type_minmax'>"+
+		//reset seconds (rs)
+		if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 178) {
+			list += "<label for='rs'>" + OSApp.Language._("Reset status after (s)") +
+			"</label><input id='rs' type='number' inputmode='decimal' min='0' max='99999' value='" + monitor.rs + "'>";
+		}
+
+		//typ = MIN+MAX
+		list +=	"<div id='type_minmax'>"+
 			"<label for='value1'>" +
 			OSApp.Language._("Value for activate") +
 			"</label><input id='value1' type='number' inputmode='decimal' value='" + OSApp.Analog.formatVal(monitor.value1) + "'>" +
@@ -1311,7 +1321,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			"</label><input id='value2' type='number' inputmode='decimal' value='" + OSApp.Analog.formatVal(monitor.value2) + "'>" +
 			"</div>" +
 
-			//typ = SENSOR12
+		//typ = SENSOR12
 			"<div id='type_sensor12'>"+
 			"<label for='sensor12'>" +
 			OSApp.Language._("Digital Sensor Port") +
@@ -1324,7 +1334,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			"<input data-mini='true' id='invers' type='checkbox' " + (monitor.invers ? "checked='checked'" : "") + ">" + OSApp.Language._("inverse") + "</input>" +
 			"</label></div>" +
 
-			//typ = SET_SENSOR12
+		//typ = SET_SENSOR12
 			"<div id='type_set_sensor12'>"+
 			"<label for='sensor12'>" +
 			OSApp.Language._("Set Digital Sensor Port") +
@@ -1336,7 +1346,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			"<label for='monitor'>"+OSApp.Language._("Monitor")+"</label>"+OSApp.Analog.monitorSelection("monitor", monitor.monitor, monitor.nr)+
 			"</label></div>" +
 
-			//typ == ANDORXOR
+		//typ == ANDORXOR
 			"<div id='type_andorxor'>"+
 			"<label for='monitor1'>"+OSApp.Language._("Monitor 1")+"</label>"+OSApp.Analog.monitorSelection("monitor1", monitor.monitor1, monitor.nr)+
 			"<label for='invers1'><input data-mini='true' id='invers1' type='checkbox' " + (monitor.invers1 ? "checked='checked'" : "") + ">" + OSApp.Language._("inverse") + "</input></label>" +
@@ -1348,12 +1358,12 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			"<label for='invers4'><input data-mini='true' id='invers4' type='checkbox' " + (monitor.invers4 ? "checked='checked'" : "") + ">" + OSApp.Language._("inverse") + "</input></label>" +
 			"</div>" +
 
-			//typ == NOT
+		//typ == NOT
 			"<div id='type_not'>"+
 			"<label for='monitor'>"+OSApp.Language._("Monitor")+"</label>"+OSApp.Analog.monitorSelection("monitor", monitor.monitor, monitor.nr)+
 			"</div>"+
 
-			//typ == TIME
+		//typ == TIME
 			"<div id='type_time'>"+
 			"<label for='from'>"+OSApp.Language._("From")+"</label>"+
 			"<input id='from' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.round(monitor.from / 100)) + ":" + OSApp.Utils.pad(monitor.from % 100) + "'>" +
@@ -1363,7 +1373,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			"<input id='wdays' type='number' inputmode='decimal' min='0' max ='255' value='" + monitor.wdays + "'>" +
 			"</div>"+
 
-			//typ == REMOTE
+		//typ == REMOTE
 			"<div id='type_remote'>"+
 			"<label for='rmonitor'>"+OSApp.Language._("Remote Monitor nr")+"</label>"+
 			"<input id='rmonitor' type='number' inputmode='decimal' min='1' max='99999' value='" + monitor.rmonitor + "'>" +
@@ -1373,7 +1383,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			"<input id='port' type='number' inputmode='decimal' min='1' max='99999' value='" + monitor.port + "'>" +
 			"</div>"+
 
-			//END
+		//END
 			"<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
 
 			((row < 0) ? "" : ("<a data-role='button' class='black delete-monitor' value='" + monitor.nr + "' row='" + row + "' href='#' data-icon='delete'>" +
@@ -2035,8 +2045,12 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			//Add a monitor:
 			list.find(".add-monitor").on("click", function () {
 				var monitor = {
-					type: 1
+					type: 1,
 				};
+				if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 178) {
+					monitor.rs = 0;
+				}
+
 
 				OSApp.Analog.expandItem.add("monitors");
 				OSApp.Analog.showMonitorEditor(monitor, -1, function (monitorOut) {

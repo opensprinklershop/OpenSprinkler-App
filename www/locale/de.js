@@ -775,6 +775,7 @@
    "Backup Config": "Sicherung komplett",
    "Restore Config": "Wiederherstellung komplett",
    "Backup Monitors": "Überwachung und Kontrolle sichern",
-   "Restore Monitors": "Überwachung und Kontrolle wiederherstellen"
+   "Restore Monitors": "Überwachung und Kontrolle wiederherstellen",
+   "Reset status after (s)": "Zurücksetzen nach (s)"
 
 }}

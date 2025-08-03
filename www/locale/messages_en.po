@@ -2373,3 +2373,6 @@ msgstr ""
 msgid "Restore Monitors"
 msgstr ""
 
+msgid "Reset status after (s)"
+msgstr ""
+
