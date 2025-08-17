@@ -80,10 +80,10 @@ OSApp.Utils.getBitFromByte = function( byte, bit ) {
 	return ( byte & ( 1 << bit ) ) !== 0;
 };
 
-// Pad a single digit with a leading zero
-OSApp.Utils.pad = function( number ) {
+// Pad digit with leading zeros
+OSApp.Utils.pad = function( number, len=2 ) {
 	var r = String( number );
-	if ( r.length === 1 ) {
+	while ( r.length < len ) {
 		r = "0" + r;
 	}
 	return r;

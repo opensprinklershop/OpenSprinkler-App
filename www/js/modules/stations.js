@@ -199,6 +199,30 @@ OSApp.Stations.parseRemoteStationData = function( hex ) {
 	return result;
 };
 
+OSApp.Stations.parseModbusStationData = function( hex ) {
+	var result = {};
+		
+	hex = hex.split( "" );
+
+	var ip = [], value;
+
+	for ( var i = 0; i < 8; i+=2 ) {
+		value = parseInt( hex[ i ] + hex[ i + 1 ], 16 ) || 0;
+		ip.push( value );
+	}
+
+	result.ip      = ip.join( "." );
+	result.port    = parseInt( hex[ 8 ] + hex[ 9 ] + hex[ 10 ] + hex[ 11 ], 16 );
+	result.device  = parseInt( hex[ 12 ] + hex[ 13 ], 16 );
+	result.address = parseInt( hex[ 14 ] + hex[ 15 ], 16 );
+	result.regOn   = hex[ 16 ] + hex[ 17 ] + hex[ 18 ] + hex[ 19 ];
+	result.dataOn  = hex[ 20 ] + hex[ 21 ] + hex[ 22 ] + hex[ 23 ];
+	result.regOff  = hex[ 24 ] + hex[ 25 ] + hex[ 26 ] + hex[ 27 ];
+	result.dataOff = hex[ 28 ] + hex[ 29 ] + hex[ 30 ] + hex[ 31 ];
+
+	return result;
+};
+
 OSApp.Stations.verifyRemoteStation = function( data, callback ) {
 	callback = callback || function() {};
 	data = OSApp.Stations.parseRemoteStationData( data );

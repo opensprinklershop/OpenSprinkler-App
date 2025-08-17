@@ -231,6 +231,35 @@ OSApp.Dashboard.displayPage = function() {
 
 						validateLength();
 						$( ".validate-length" ).on( "input", validateLength );
+					} else if (value === 7) { //RS485 Modbus Station
+						if (OSApp.Firmware.checkOSVersion( 233 ) && OSApp.currentSession.controller.options.fwm >= 180) {
+							data = OSApp.Stations.parseModbusStationData( ( type === value ) ? data : "000000000000000006000100060000" );
+							if (OSApp.Firmware.getHWVersion() === "OSPi") {
+								opts.append(
+								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device Index" ) + ":</div>" +
+								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-device' required='true' type='number' min='0' max='3' placeholder='0' value='" + data.device + "'>"
+								);
+							} else {
+								opts.append(
+								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device IP" ) + ":</div>" +
+								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-ip' required='true' type='text' pattern='^(?:[0-9]{1,3}.){3}[0-9]{1,3}$' value='" + data.ip + "'>" +
+								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device Port" ) + ":</div>" +
+								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-port' required='true' type='number' placeholder='502' min='0' max='65535' value='" + data.port + "'>"
+								);
+							}
+							opts.append(
+							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Address" ) + ":</div>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-address' required='true' type='number' min='0' max='255' value='" + data.address + "'>" +
+							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Register On" ) + ":</div>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regon' required='true' type='text' pattern='^[0-9A-F]{4}$' value='" + data.regOn + "'>" +
+							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Data On" ) + ":</div>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataon' required='true' type='text' pattern='^[0-9A-F]{4}$' value='" + data.dataOn + "'>" +
+							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Register Off" ) + ":</div>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regoff' required='true' type='text' pattern='^[0-9A-F]{4}$' value='" + data.regOff + "'>" +
+							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Data Off" ) + ":</div>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataoff' required='true' type='text' pattern='^[0-9A-F]{4}$' value='" + data.dataOff + "'>"
+							).enhanceWithin();
+						}
 					}
 				},
 				validateLength = function() {
@@ -344,6 +373,26 @@ OSApp.Dashboard.displayPage = function() {
 						sdata += "," + select.find( "#http-on" ).val();
 						sdata += "," + select.find( "#http-off" ).val();
 						button.data( "specialData", sdata );
+					} else if ( hs === 7 ) { //RS485 Modbus
+						var hex = "", ip, port;
+						if (OSApp.Firmware.getHWVersion() === "OSPi") {
+							hex = "000000000000"; //ip+port ESP8266 only
+							hex += OSApp.Utils.pad( select.find( "#modbus-device" ).val().toString( 16 ) );
+						} else {
+							ip = select.find( "#modbus-ip" ).val().split( "." );
+							port = parseInt( select.find( "#modbus-port" ).val() ) || 502;
+							for ( var i = 0; i < 4; i++ ) {
+								hex += OSApp.Utils.pad( parseInt( ip[ i ] ).toString( 16 ) );
+							}
+							hex += OSApp.Utils.pad( port.toString( 16 ), 4 );
+							hex += "00"; //device OSPi only
+						}
+						hex += OSApp.Utils.pad( select.find( "#modbus-address" ).val().toString( 16 ) );
+						hex += OSApp.Utils.pad( select.find( "#modbus-regon" ).val(), 4 );
+						hex += OSApp.Utils.pad( select.find( "#modbus-dataon" ).val(), 4 );
+						hex += OSApp.Utils.pad( select.find( "#modbus-regoff" ).val(), 4 );
+						hex += OSApp.Utils.pad( select.find( "#modbus-dataoff" ).val(), 4 );
+						button.data( "specialData", hex );
 					}
 
 					button.data( "um", select.find( "#um" ).is( ":checked" ) ? 1 : 0 );
@@ -490,6 +539,7 @@ OSApp.Dashboard.displayPage = function() {
 					"<option data-hs='4' value='4'" + ( OSApp.Firmware.checkOSVersion( 217 ) ? ">" : " disabled>" ) + OSApp.Language._( "HTTP" ) + "</option>" +
 					"<option data-hs='5' value='5'" + ( typeof OSApp.currentSession.controller.settings.email === "object" ? ">" : " disabled>" ) + OSApp.Language._( "HTTPS" ) + "</option>" +
 					"<option data-hs='6' value='6'" + ( typeof OSApp.currentSession.controller.settings.email === "object" ? ">" : " disabled>" ) + OSApp.Language._( "Remote Station (OTC)" ) + "</option>" +
+					"<option data-hs='7' value='7'" + ( (OSApp.Firmware.checkOSVersion( 233 ) && OSApp.currentSession.controller.options.fwm >= 180) ? ">" : " disabled>" ) + OSApp.Language._( "RS 485 Modbus" ) + "</option>" +
 					"</select>" +
 					"<div id='specialOpts'></div>";
 			}
