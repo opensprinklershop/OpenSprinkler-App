@@ -251,13 +251,13 @@ OSApp.Dashboard.displayPage = function() {
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Address" ) + ":</div>" +
 							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-address' required='true' type='number' min='0' max='255' value='" + data.address + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Register On" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regon' required='true' type='text' pattern='^[0-9A-F]{4}$' value='" + data.regOn + "'>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regon' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.regOn + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Data On" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataon' required='true' type='text' pattern='^[0-9A-F]{4}$' value='" + data.dataOn + "'>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataon' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.dataOn + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Register Off" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regoff' required='true' type='text' pattern='^[0-9A-F]{4}$' value='" + data.regOff + "'>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regoff' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.regOff + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Data Off" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataoff' required='true' type='text' pattern='^[0-9A-F]{4}$' value='" + data.dataOff + "'>"
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataoff' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.dataOff + "'>"
 							).enhanceWithin();
 						}
 					}
@@ -377,22 +377,23 @@ OSApp.Dashboard.displayPage = function() {
 						var hex = "", ip, port;
 						if (OSApp.Firmware.getHWVersion() === "OSPi") {
 							hex = "000000000000"; //ip+port ESP8266 only
-							hex += OSApp.Utils.pad( select.find( "#modbus-device" ).val().toString( 16 ) );
+							hex += OSApp.Utils.lim( parseInt(select.find( "#modbus-device" ).val()).toString( 16 ) );
 						} else {
 							ip = select.find( "#modbus-ip" ).val().split( "." );
 							port = parseInt( select.find( "#modbus-port" ).val() ) || 502;
 							for ( var i = 0; i < 4; i++ ) {
-								hex += OSApp.Utils.pad( parseInt( ip[ i ] ).toString( 16 ) );
+								hex += OSApp.Utils.lim( parseInt( ip[ i ] ).toString( 16 ) );
 							}
-							hex += OSApp.Utils.pad( port.toString( 16 ), 4 );
+							hex += OSApp.Utils.lim( port.toString( 16 ), 4 );
 							hex += "00"; //device OSPi only
 						}
-						hex += OSApp.Utils.pad( select.find( "#modbus-address" ).val().toString( 16 ) );
-						hex += OSApp.Utils.pad( select.find( "#modbus-regon" ).val(), 4 );
-						hex += OSApp.Utils.pad( select.find( "#modbus-dataon" ).val(), 4 );
-						hex += OSApp.Utils.pad( select.find( "#modbus-regoff" ).val(), 4 );
-						hex += OSApp.Utils.pad( select.find( "#modbus-dataoff" ).val(), 4 );
+						hex += OSApp.Utils.lim( parseInt(select.find( "#modbus-address" ).val()).toString( 16 ) );
+						hex += OSApp.Utils.lim( select.find( "#modbus-regon" ).val(), 4 );
+						hex += OSApp.Utils.lim( select.find( "#modbus-dataon" ).val(), 4 );
+						hex += OSApp.Utils.lim( select.find( "#modbus-regoff" ).val(), 4 );
+						hex += OSApp.Utils.lim( select.find( "#modbus-dataoff" ).val(), 4 );
 						button.data( "specialData", hex );
+						//000000000000 00 55 0100FF0001000000
 					}
 
 					button.data( "um", select.find( "#um" ).is( ":checked" ) ? 1 : 0 );

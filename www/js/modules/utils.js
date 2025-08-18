@@ -89,6 +89,17 @@ OSApp.Utils.pad = function( number, len=2 ) {
 	return r;
 };
 
+OSApp.Utils.lim = function( number, len=2 ) {
+	var r = String( number );
+	while ( r.length < len ) {
+		r = "0" + r;
+	}
+	if ( r.length > len ) {
+		r = r.substring(r.length-len);
+	}
+	return r;
+};
+
 // Escape characters for HTML support
 OSApp.Utils.htmlEscape = function( str ) {
 
