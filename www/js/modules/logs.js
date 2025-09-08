@@ -75,7 +75,7 @@ OSApp.Logs.displayPage = function() {
 			}
 
 			$.each( data, function() {
-				var station = this[ 1 ],
+				var station = this[ 1 ], 
                                         duration = parseInt( this[ 2 ] ),
                                         flowRate = ( typeof this[ 4 ] !== "undefined" ) ? OSApp.Utils.flowRateToVolume( parseFloat( this[ 4 ] ) ) : null;
 
@@ -88,15 +88,20 @@ OSApp.Logs.displayPage = function() {
 					utc = new Date( date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(),  date.getUTCHours(),
 						date.getUTCMinutes(), date.getUTCSeconds() );
 
+				var name = station;
 				if ( typeof station === "string" ) {
 					if ( station === "rd" ) {
 						station = stations.length - 1;
+						name = OSApp.Language._( "Rain Delay" );
 					} else if ( station === "s1" ) {
 						station = stations.length - 3;
+						name = OSApp.currentSession.controller.options.sn1t === 3 ? OSApp.Language._( "Soil Sensor" ) : OSApp.Language._( "Rain Sensor" );
 					} else if ( station === "s2" ) {
 						station = stations.length - 2;
+						name = OSApp.currentSession.controller.options.sn2t === 3 ? OSApp.Language._( "Soil Sensor" ) : OSApp.Language._( "Rain Sensor" );
 					} else if ( station === "rs" ) {
 						station = stations.length - 2;
+						name = OSApp.Language._( "Rain Sensor" );
 					} else {
 						return;
 					}
@@ -114,12 +119,12 @@ OSApp.Logs.displayPage = function() {
 				if ( type === "table" ) {
 					switch ( grouping ) {
 						case "station":
-                                                        var stationItem = [ utc, OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( duration ) ), station, new Date( utc.getTime() + ( duration * 1000 ) ), flowRate ];
+                                                        var stationItem = [ utc, OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( duration ) ), name, new Date( utc.getTime() + ( duration * 1000 ) ), flowRate ];
 							sortedData[ station ].push( stationItem );
 							break;
 						case "day":
 							var day = Math.floor( date.getTime() / 1000 / 60 / 60 / 24 ),
-                                                                item = [ utc, OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( duration ) ), station, new Date( utc.getTime() + ( duration * 1000 ) ), flowRate ];
+                                                                item = [ utc, OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( duration ) ), name, new Date( utc.getTime() + ( duration * 1000 ) ), flowRate ];
 
                                                         // Item structure: [startDate, runtime, station, endDate, flowRate]
 
@@ -335,7 +340,7 @@ OSApp.Logs.displayPage = function() {
 				flSorted = extraData[ 1 ],
 				stats = extraData[ 2 ],
 				tableHeader = "<table class=\"table-logs-datatables\"><thead><tr>" +
-					"<th data-priority='1'>" + OSApp.Language._( "Station" ) + "</th>" +
+					"<th " + ( grouping === "day"?"":"style='display:none;'" ) + " data-priority='1'>" + OSApp.Language._( "Station" ) + "</th>" +
 					"<th data-priority='2'>" + OSApp.Language._( "Runtime" ) + "</th>" +
 					"<th data-priority='3'>" + OSApp.Language._( "Start Time" ) + "</th>" +
 					"<th data-priority='4'>" + OSApp.Language._( "End Time" ) + "</th>" +
@@ -382,7 +387,7 @@ OSApp.Logs.displayPage = function() {
 
 					for ( k = 0; k < sortedData[ group ].length; k++ ) {
 						var sid = ( grouping === 'station' ) ? group  : sortedData[group][k][2];
-						var stationName = OSApp.Stations.getName(sid);
+						var stationName = ( typeof sid === "string" ) ? sid : OSApp.Stations.getName(sid);
 						var runTime = sortedData[ group ][ k ][ 1 ];
 						var startTime = formatTime( sortedData[ group ][ k ][ 0 ], grouping ) ;
 						var endTime = formatTime( sortedData[ group ][ k ][ 3 ], grouping );
@@ -390,7 +395,7 @@ OSApp.Logs.displayPage = function() {
                                                 var flowDisplay = ( typeof fRate === "number" ) ? fRate.toFixed( 2 ) + " L/min" : "";
 
 						groupArray[ i ] += "<tr>" +
-							"<td>" + stationName + "</td>" + // Station name
+							"<td " + ( grouping === "day"?"":"style='display:none;'" ) + ">" + stationName + "</td>" + // Station name
 							"<td>" + runTime + "</td>" + // Runtime
 							"<td>" + startTime + "</td>" + // Startdate
 							"<td>" + endTime + "</td>" + // Enddate
