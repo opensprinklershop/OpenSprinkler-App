@@ -2376,3 +2376,41 @@ msgstr ""
 msgid "Reset status after (s)"
 msgstr ""
 
+msgid "Setup FYTA credentials"
+msgstr ""
+
+msgid "API Token - get your Token from "
+msgstr ""
+
+msgid "Alternatively, you can enter your user login details"
+msgstr ""
+
+msgid "Leave empty if you have a token!"
+msgstr ""
+
+msgid "Soil Moisture"
+msgstr ""
+
+msgid "Temperature"
+msgstr ""
+
+msgid "Select FYTA plant and sensor"
+msgstr ""
+
+msgid "Are you sure you want to delete the log?"
+msgstr ""
+
+msgid "Error calling rest service: "
+msgstr ""
+
+msgid "Deleted log values: "
+msgstr ""
+
+msgid "Are you sure you want to delete the sensor?"
+msgstr ""
+
+msgid "Are you sure you want to clear the sensor log?"
+msgstr ""
+
+msgid "Please update firmware to "
+msgstr ""

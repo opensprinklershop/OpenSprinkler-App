@@ -80,6 +80,9 @@ OSApp.Analog = {
 		SENSOR_OSPI_ANALOG_SMT50_TEMP   : 53, // Old OSPi analog input - SMT50 T [°C] = (U – 0,5) * 100
 		SENSOR_OSPI_INTERNAL_TEMP       : 54, // Internal OSPI Temperature
 
+		SENSOR_FYTA_MOISTURE            : 60,  // FYTA moisture sensor
+                SENSOR_FYTA_TEMPERATURE         : 61,  // FYTA temperature sensor
+                
 		SENSOR_MQTT                     : 90, // subscribe to a MQTT server and query a value
 
 		SENSOR_REMOTE                   : 100, // Remote sensor of an remote opensprinkler
@@ -668,8 +671,8 @@ OSApp.Analog.sendToOsObj = function(params, obj) {
 	for (var key in obj) {
 		if (Object.prototype.hasOwnProperty.call(obj, key)) {
 			var value = obj[key];
-			if (key == "name" || key == "unit" || key == "topic" || key == "filter")
-				value = OSApp.Analog.enc(value);
+			if (typeof value == "object") value = JSON.stringify(obj[key]);
+			if (typeof value == "string") value = OSApp.Analog.enc(value);
 			params += "&"+key+"="+value;
 		}
 	}
@@ -1514,7 +1517,9 @@ OSApp.Analog.isIPSensor = function(sensorType) {
 }
 
 OSApp.Analog.isIDNeeded = function(sensorType) {
-	return sensorType < OSApp.Analog.Constants.SENSOR_OSPI_INTERNAL_TEMP || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE;
+	return sensorType < OSApp.Analog.Constants.SENSOR_OSPI_INTERNAL_TEMP || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE ||
+		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE ||
+		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE;
 }
 
 //show and hide sensor editor fields
@@ -1542,6 +1547,13 @@ OSApp.Analog.updateSensorVisibility = function(popup, type) {
 	} else {
 		popup.find("#smt100id").hide();
 	}
+	
+	if (type == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE || type == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE) {
+		popup.find("#fytasel").show();
+	} else {
+		popup.find("#fytasel").hide();
+	}
+	
 	if (type == OSApp.Analog.Constants.SENSOR_USERDEF) {
 		popup.find(".fac_label").show();
 		popup.find(".fac").show();
@@ -1659,11 +1671,15 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 		for (i = 0; i < supportedSensorTypes.length; i++) {
 			list += "<option " + ((sensor.type === supportedSensorTypes[i].type) ? "selected" : "") +
 				" value='" + supportedSensorTypes[i].type + "'>" +
-				supportedSensorTypes[i].name + "</option>";
+				OSApp.Language._(supportedSensorTypes[i].name) + "</option>";
 		}
 		list += "</select></div>";
 
+		//SMT 100 Edit ID Button:
 		list += "<button data-mini='true' class='center-div' id='smt100id'>" + OSApp.Language._("Set SMT100 Modbus ID") + "</button>";
+		
+		//FYTA edit credentials button:
+		list += "<button data-mini='true' class='center-div' id='fytasel'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>";
 
 		list += "<label>" + OSApp.Language._("Group") +
 			"</label>" +
@@ -1683,7 +1699,7 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 
 			"<label class='id_label'>" + OSApp.Language._("ID") +
 			"</label>" +
-			"<input class='id' type='number' inputmode='decimal' min='0' max='65535' value='" + sensor.id + "'>" +
+			"<input class='id' type='number' inputmode='decimal' min='-2147483647' max='2147483647' value='" + sensor.id + "'>" +
 
 			"<label class='fac_label'>" + OSApp.Language._("Factor") +
 			"</label>" +
@@ -1792,6 +1808,54 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 					});
 				});
 		});
+		
+		//FYTA: Select Sensor
+		popup.find("#fytasel").on("click", function () {
+			
+			return OSApp.Firmware.sendToOS("/fy?pw=", "json").then(function (result) {
+				var token = result.token;
+				var sel = "<ul class='fyta-plants' data-role='listview'>";
+				for (let i = 0; i < result.plants.length; i++) {
+					let plant = result.plants[i];
+					sel += "<li value='" + i + "'><a href='#'>" +
+						"<img id='thumb"+i+"' src='#' class='ui-li-thumb'>" +
+						"<h2>" + plant.nickname + "</h2>" +
+						"<p>" + plant.scientific_name + "</p>" +
+						"</a></li>";
+					var request = new XMLHttpRequest();
+					request.open('GET', plant.thumb, true);
+					request.setRequestHeader('Authorization', 'Bearer ' + token);
+					request.responseType = 'arraybuffer';
+					request.onload = function(e) {
+					    var data = new Uint8Array(this.response);
+					    var raw = String.fromCharCode.apply(null, data);
+					    var base64 = btoa(raw);
+					    var src = "data:image;base64," + base64;
+					    $("#thumb"+i).attr("src", src);
+					};
+					request.send();
+				}
+				sel += "</ul>";
+				popup.find("#fytasel").html(sel).enhanceWithin();
+				$("ul.fyta-plants li").click(function(e) {
+					let plant = result.plants[this.value];
+					popup.find(".id").val(plant.id);
+					var type = parseInt(popup.find("#type").val());
+					var str = plant.nickname;
+					switch(type) {
+					case OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE: 
+						str += " " + OSApp.Language._("Soil Moisture");
+						break;
+					case OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE:
+						str += " " + OSApp.Language._("Temperature");
+						break;
+					}
+					popup.find(".name").val( str );
+					popup.find(".name").focus();
+				});
+			});
+		});
+		
 		popup.find("#type").change(function () {
 			var type = parseInt(popup.find("#type").val());
 			document.getElementById("smt100id").style.display = OSApp.Analog.isSmt100(type) ? "block" : "none";
@@ -2097,6 +2161,12 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			OSApp.UIDom.changePage("#analogsensorchart");
 			return false;
 		});
+		
+		list.find(".fytasetup").on("click", function () {
+			OSApp.Analog.expandItem.add("fytasetup");
+			OSApp.Analog.setupFytaCredentials();
+			return false;
+		});
 
 		list.find(".backup-all").on("click", function () {
 			OSApp.Analog.expandItem.add("backup");
@@ -2170,11 +2240,80 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 	$.mobile.pageContainer.append(page);
 };
+
 OSApp.Analog.checkFirmwareUpdate = function() {
 	if (OSApp.Firmware.checkOSVersion(OSApp.Analog.Constants.CURRENT_FW_ID) && OSApp.currentSession.controller.options.fwm >= OSApp.Analog.Constants.CURRENT_FW_MIN)
 		return "";
 	return OSApp.Language._("Please update firmware to ") + OSApp.Analog.Constants.CURRENT_FW;
 };
+
+OSApp.Analog.setupFytaCredentials = function() {
+
+	OSApp.Firmware.sendToOS("/fc?pw=", "json").then(function (data) {
+		$(".ui-popup-active").find("[data-role='popup']").popup("close");
+
+		var fytacred = data.fyta;
+		var list =
+			"<div data-role='popup' data-theme='a' id='fytacred'>" +
+			"<div data-role='header' data-theme='b'>" +
+			"<a href='#' data-rel='back' data-role='button' data-theme='a' data-icon='delete' data-iconpos='notext' class='ui-btn-right'>"+OSApp.Language._("close")+"</a>"+
+			"<h1>" + OSApp.Language._("Setup FYTA credentials") + "</h1>" +
+			"</div>" +
+
+			"<div class='ui-content'>" +
+
+			"<div class='ui-field-contain'>" +
+
+			"<label>" + OSApp.Language._("API Token - get your Token from ") + 
+			"<a target='_blank' rel='noopener noreferrer' href='https://web.fyta.de/api-token'>The FYTA Site</a></label>" +
+			"<input class='fytatoken' type='text' value='" + (fytacred.token?fytacred.token:"") + "'>" +
+		
+			"<hr>" +
+			"<label>" + OSApp.Language._("Alternatively, you can enter your user login details") + "</label>" +
+			"<label>" + OSApp.Language._("Leave empty if you have a token!") + "</label>" +
+
+			"<label>" + OSApp.Language._("E-Mail") + "</label>" +
+			"<input class='email' type='text' value='" + (fytacred.email?fytacred.email:"") + "'>" +
+		
+			"<label>" + OSApp.Language._("Password") + "</label>" +
+			"<input class='password' type='password' value='" + (fytacred.password?fytacred.password:"") + "'>" +
+			"</div>" +
+                        "<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
+
+                        "</div>" +
+                        "</div>";
+
+                let popup = $(list);
+
+		popup.find(".submit").on("click", function () {
+			var newData = {}, t, e, p;
+			newData.fyta = {};
+			t = popup.find(".fytatoken").val();
+			e = popup.find(".email").val();
+			p = popup.find(".password").val();
+			if (t.length > 0) newData.fyta.token = t;
+			if (e.length > 0) newData.fyta.email = e;
+			if (p.length > 0) newData.fyta.password = p;
+			OSApp.Analog.sendToOsObj("/co?pw=", newData);
+			popup.popup("close");
+			return false;
+		});
+
+		$("#fytacred").remove();
+
+		popup.css("max-width", "580px");
+
+		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
+		popup.find(".fytatoken").focus();
+		
+	}, function(e) {
+		var resetFyta = {};
+		resetFyta.fyta = {};
+		resetFyta.fyta.email = "";
+		resetFyta.fyta.password = "";
+		OSApp.Analog.sendToOsObj("/co?pw=", resetFyta);		
+	});
+};1
 
 OSApp.Analog.buildSensorConfig = function() {
 
@@ -2401,7 +2540,15 @@ OSApp.Analog.buildSensorConfig = function() {
 		"<a data-role='button' data-icon='action' class='download-log' href='#' data-mini='true'>" + OSApp.Language._("Download Log") + "</a>" +
 		"<a data-role='button' data-icon='grid' class='show-log' href='#' data-mini='true'>" + OSApp.Language._("Show Log") + "</a>" +
 
-		"</div></fieldset>";
+		"</fieldset>";
+
+	//FYTA Setup:
+	if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 181) {
+		list += "<fieldset data-role='collapsible'" + (OSApp.Analog.expandItem.has("fytasetup") ? " data-collapsed='false'" : "") + ">" +
+			"<legend>" + OSApp.Language._("FYTA Setup") + "</legend>";
+		list += "<a data-role='button' data-icon='grid' class='fytasetup' href='#' data-mini='true'>" + OSApp.Language._("Setup FYTA credentials") + "</a>" +
+			"</fieldset>";
+	}
 
 	//backup:
 	if (OSApp.Firmware.checkOSVersion(231)) {

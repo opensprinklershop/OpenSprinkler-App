@@ -776,6 +776,13 @@
    "Restore Config": "Wiederherstellung komplett",
    "Backup Monitors": "Überwachung und Kontrolle sichern",
    "Restore Monitors": "Überwachung und Kontrolle wiederherstellen",
-   "Reset status after (s)": "Zurücksetzen nach (s)"
-
+   "Reset status after (s)": "Zurücksetzen nach (s)",
+   "Setup FYTA credentials": "FYTA Zugangsdaten",
+   "API Token - get your Token from ": "API Token - holen Sie ihr Token hier: ",
+   "Alternatively, you can enter your user login details": "Alternativ können Sie auch ihre Zugangsdaten eingeben:",
+   "Leave empty if you have a token!": "Leer lassen, wenn Sie das Token verwenden wollen!",
+   "Soil Moisture": "Bodenfeuchtigkeit",
+   "Temperature": "Temperatur",
+   "Select FYTA plant and sensor": "Wähle deine Pflanze und Sensor",
+   "Please update firmware to ": "Bitte aktualisieren Sie die Firmware auf "   
 }}
