@@ -42,6 +42,7 @@ OSApp.Analog = {
 		RS485_TRUEBNER3 : 0x80,
 		RS485_TRUEBNER4 : 0x100,
 		OSPI_USB_RS485 : 0x200,
+		RS485_I2C      : 0x400,
 
 		NOTIFICATION_COLORS : ["#baffc9", "#faf0be", "#ffb3ba"],
 
@@ -2332,6 +2333,7 @@ OSApp.Analog.buildSensorConfig = function() {
 		if (detected & OSApp.Analog.Constants.RS485_TRUEBNER3) boards.push("RS485-Adapter Truebner 3");
 		if (detected & OSApp.Analog.Constants.RS485_TRUEBNER4) boards.push("RS485-Adapter Truebner 4");
 		if (detected & OSApp.Analog.Constants.OSPI_USB_RS485) boards.push("OSPI USB-RS485-Adapter");
+		if (detected & OSApp.Analog.Constants.RS485_I2C) boards.push("RS485-Adapter");
 		if (detected == 0) boards.push("No Boards detected");
 		if (detected && boards.length == 0) boards.push("Unknown Adapter");
 		detected_boards = ": " + boards.filter(Boolean).join(", ");
