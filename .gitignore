@@ -4,6 +4,9 @@
 # NPM package location
 node_modules/
 
+# Build output
+build/
+
 # Cordova folders
 platforms/
 plugins/
@@ -13,7 +16,6 @@ project.xcworkspace/
 xcuserdata/
 
 # Coverage data
-.coveralls.yml
 coverage
 
 # VS Code
@@ -46,5 +48,6 @@ log.txt
 npm-debug.log*
 .idea/
 DEADJOE
-DEADJOE
 *.sav
+# Firebase
+.firebase

@@ -201,7 +201,7 @@ OSApp.Stations.parseRemoteStationData = function( hex ) {
 
 OSApp.Stations.parseModbusStationData = function( hex ) {
 	var result = {};
-		
+
 	hex = hex.split( "" );
 
 	var ip = [], value;
@@ -266,8 +266,9 @@ OSApp.Stations.convertRemoteToExtender = function( data ) {
 	} );
 };
 
-OSApp.Stations.submitRunonce = function( runonce, interval, repeat ) {
-	let weather;
+OSApp.Stations.submitRunonce = function( runonce, uwt, interval, repeat, annotation, qo ) {
+	// This block is for the Run-Once Page *only*.
+	// It detects if `runonce` is not an array, meaning it's being called from the page.
 	if ( !( runonce instanceof Array ) ) {
 		runonce = [];
 		$( "#runonce" ).find( "[id^='zone-']" ).each( function() {
@@ -276,55 +277,70 @@ OSApp.Stations.submitRunonce = function( runonce, interval, repeat ) {
 		runonce.push( 0 );
 
 		if( OSApp.Supported.repeatedRunonce() ){
-			//Set up all parameters if needed
-			weather = $( "#runonce" ).find( "#uwt-runonce" ).prop( "checked" ) ? 1 : 0;
+			// Set up all parameters if needed
+			if( uwt == null ) {
+				uwt = $( "#runonce" ).find( "#uwt-runonce" ).prop( "checked" ) ? 1 : 0;
+			}
 
-			if( !(typeof interval === "number" ) ) {
+			if( interval == null ) {
 				interval = $( "#runonce" ).find( "#interval-runonce").val() / 60;
 			}
-			if( !(typeof repeat === "number" ) ) {
+			if( repeat == null ) {
 				repeat = $( "#runonce" ).find( "#repeat-runonce").val();
+			}
+		}
+
+		if ( OSApp.Firmware.checkOSVersion ( 2214 ) ) {
+			if ( qo == null ) {
+				qo = $("input[name='qo-runonce']:checked").val();
 			}
 		}
 	}
 
 	var submit = function() {
-			$.mobile.loading( "show" );
-			OSApp.Storage.set( { "runonce": JSON.stringify( runonce ) } );
-			let request = "/cr?pw=&t=" + JSON.stringify( runonce );
-			if ( OSApp.Supported.repeatedRunonce() ) {
-				request += "&int=" + interval + "&cnt=" + repeat + "&uwt=" + weather;
-			}
-			OSApp.Firmware.sendToOS( request ).done( function() {
-				$.mobile.loading( "hide" );
-				$.mobile.document.one( "pageshow", function() {
-					OSApp.Errors.showError( OSApp.Language._( "Run-once program has been scheduled" ) );
-				} );
-				OSApp.Status.refreshStatus();
-				OSApp.UIDom.goBack();
-			} );
-		},
-		isOn = OSApp.StationQueue.isActive();
+		$.mobile.loading( "show" );
+		OSApp.Storage.set( { "runonce": JSON.stringify( runonce ) } );
 
-	if ( interval && interval > 0 && repeat && repeat > 0 ) {
-		OSApp.UIDom.areYouSure(OSApp.Language._( "This will create a single run program to handle the repeat. Do you want to continue?" ), "", function(){
-			if ( isOn !== -1){
+		let request = "/cr?pw=&t=" + JSON.stringify( runonce );
+
+		if ( OSApp.Supported.repeatedRunonce() ) {
+			request += "&int=" + interval + "&cnt=" + repeat + "&uwt=" + uwt;
+			if ( annotation?.length > 0 ) {
+				request += "&anno=" + annotation;
+			}
+		}
+		if ( OSApp.Firmware.checkOSVersion ( 2214 ) ) {
+			if ( qo != null ) {
+				request += "&qo=" + qo;
+			}
+		}
+
+		OSApp.Firmware.sendToOS( request ).done( function() {
+			$.mobile.loading( "hide" );
+			$.mobile.document.one( "pageshow", function() {
+				OSApp.Errors.showError( OSApp.Language._( "Run-once program has been scheduled" ) );
+			} );
+			OSApp.Status.refreshStatus();
+			OSApp.UIDom.goBack();
+		} );
+	},
+	isOn = OSApp.StationQueue.isActive();
+
+	var checkIsOnAndSubmit = function() {
+		if ( !OSApp.Firmware.checkOSVersion ( 2214 ) && isOn !== -1 ){
+			// Add a short delay to allow the first popup to finish closing
+			setTimeout(function() {
 				OSApp.UIDom.areYouSure( OSApp.Language._( "Do you want to stop the currently running program?" ), OSApp.Programs.pidToName( OSApp.Stations.getPID( isOn ) ), function() {
 					$.mobile.loading( "show" );
 					OSApp.Stations.stopStations( submit );
 				} );
-			} else {
-				submit();
-			}
-		})
-	} else if ( isOn !== -1 ) {
-		OSApp.UIDom.areYouSure( OSApp.Language._( "Do you want to stop the currently running program?" ), OSApp.Programs.pidToName( OSApp.Stations.getPID( isOn ) ), function() {
-			$.mobile.loading( "show" );
-			OSApp.Stations.stopStations( submit );
-		} );
-	} else {
-		submit();
-	}
+			}, 100); // 100ms delay is usually enough for the DOM to settle
+		} else {
+			submit();
+		}
+	};
+
+	checkIsOnAndSubmit();
 };
 
 OSApp.Stations.getStationDuration = function( duration, date ) {

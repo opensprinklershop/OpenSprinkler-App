@@ -51,7 +51,9 @@ OSApp.Utils.transformKeysinString = function( co ) {
 };
 
 OSApp.Utils.escapeJSON = function( json ) {
-	return JSON.stringify( json ).replace( /\{|\}/g, "" );
+	const j = JSON.stringify( json );
+	return j.substring(1, j.length-1).replace( /\{|\}/g, "" );
+	 // remove the surrounding brackets for firmware
 };
 
 OSApp.Utils.escapeJSON2 = function( json ) {

@@ -207,7 +207,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 						return true;
 					case "o49":
 						opt.o49 = data & 0xff;
-						opt.o64 = ( data >> 8 ) & 0xff;
+						opt.o65 = ( data >> 8 ) & 0xff;
 						return true;
 					case "o31":
 						if ( parseInt( data ) === 3 && !OSApp.Utils.unescapeJSON( $( "#wto" )[ 0 ].value ).baseETo ) {
@@ -217,8 +217,15 @@ OSApp.Options.showOptions = function( expandItem ) {
 						}
 
 						var restrict = page.find( "#weatherRestriction" );
-						if ( restrict.length ) {
+						if ( restrict.length && !restrict.cali ) {
 							data = OSApp.Weather.setRestriction( parseInt( restrict.val() ), data );
+						}
+						break;
+					case "weatherRestriction":
+						if ( typeof OSApp.currentSession.controller?.settings?.wto !== "undefined" ){
+							if ( OSApp.currentSession.controller.settings.wto && OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) === data ) {
+								return true;
+							}
 						}
 						break;
 					case "weatherSelect":
@@ -226,6 +233,18 @@ OSApp.Options.showOptions = function( expandItem ) {
 							return true;
 						}
 						break;
+					case "mda":
+						if ( OSApp.currentSession.controller.settings.wto && OSApp.currentSession.controller.settings.wto.mda && OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto.mda ) === data ) {
+							return true;
+						}
+						break;
+					case "tpdv":
+						var v = parseFloat( data );
+						if ( isNaN( v ) ) {
+								v = 0;
+						}
+						opt.tpdv = Math.round( v * 10 );
+						return true;
 					case "o18":
 					case "o37":
 						if ( parseInt( data ) > ( parseInt( page.find( "#o15" ).val() ) + 1 ) * 8 ) {
@@ -328,7 +347,15 @@ OSApp.Options.showOptions = function( expandItem ) {
 		timezones, tz, i;
 
 	page.find( ".submit" ).on( "click", submitOptions );
-
+	// Snap Target PD Voltage slider to 0 or ≥5.0 V
+	page.on("input change", "#tpdv", function() {
+		let v = parseFloat(this.value);
+		if (v > 0 && v < 5) {
+			// Decide which side to snap to: closer to 0 or 5
+			this.value = (v < 2.5) ? 0 : 5.0;
+			$(this).slider("refresh"); // update the UI
+		}
+	});
 	list = "<fieldset data-role='collapsible'" + ( typeof expandItem !== "string" || expandItem === "system" ? " data-collapsed='false'" : "" ) + ">" +
 		"<legend>" + OSApp.Language._( "System" ) + "</legend>";
 
@@ -364,28 +391,36 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"<a class='ui-btn btn-no-border ui-btn-icon-notext ui-icon-delete ui-btn-corner-all clear-loc'></a>" +
 		"</button></div>";
 
-	list += "<div class='center' data-role='controlgroup' data-type='horizontal'>";
-		if ( typeof OSApp.currentSession.controller.options.lg !== "undefined" ) {
-			list += "<label for='o36'><input data-mini='true' id='o36' type='checkbox' " + ( ( OSApp.currentSession.controller.options.lg === 1 ) ? "checked='checked'" : "" ) + ">" +
-				OSApp.Language._( "Enable Logging" ) + "</label>";
-		}
+       list += "<div class='center ui-field-contain' data-type='horizontal'>";
+               if ( typeof OSApp.currentSession.controller.options.lg !== "undefined" ) {
+                       list += "<label></label>" +
+					   "<label for='o36'>" + OSApp.Language._( "Enable Logging" ) + "</label>" +
+					   "<input data-mini='true' id='o36' type='checkbox' " + ( ( OSApp.currentSession.controller.options.lg === 1 ) ? "checked='checked'" : "" ) + ">";
+               }
+       list += "</div>";
 
-		list += "<label for='isMetric'><input data-mini='true' class='noselect'id='isMetric' type='checkbox' " + ( OSApp.currentDevice.isMetric ? "checked='checked'" : "" ) + ">" +
-			OSApp.Language._( "Use Metric" ) + "</label>";
+       list += "</fieldset><fieldset data-role='collapsible'" +
+               ( typeof expandItem === "string" && expandItem === "app" ? " data-collapsed='false'" : "" ) + ">" +
+               "<legend>" + OSApp.Language._( "App Settings" ) + "</legend>" +
+               "<p class='small'>" + OSApp.Language._( "These settings are stored locally with the application and do not affect the controller. Changes are saved automatically." ) + "</p>";
+
+       list += "<div class='center' data-role='controlgroup' data-type='horizontal'>";
+               list += "<label for='isMetric'><input data-mini='true' class='noselect' id='isMetric' type='checkbox' " + ( OSApp.currentDevice.isMetric ? "checked='checked'" : "" ) + ">" +
+                       OSApp.Language._( "Use Metric" ) + "</label>";
 
                list += "<label for='is24Hour'><input data-mini='true' class='noselect' id='is24Hour' type='checkbox' " + ( OSApp.uiState.is24Hour ? "checked='checked'" : "" ) + ">" +
-			OSApp.Language._( "Use 24 Hour Time" ) + "</label>";
-	list += "</div>";
+                       OSApp.Language._( "Use 24 Hour Time" ) + "</label>";
+       list += "</div>";
 
-	list += "<div data-role='controlgroup' data-type='horizontal' style='text-align:center'>";
-		if ( OSApp.Supported.groups() ) {
+       list += "<div data-role='controlgroup' data-type='horizontal' style='text-align:center'>";
+               if ( OSApp.Supported.groups() ) {
                        list += "<label for='groupView'><input data-mini='true' class='noselect' id='groupView' type='checkbox' " + ( OSApp.uiState.groupView ? "checked='checked'" : "" ) + ">" +
-			OSApp.Language._( "Order Stations by Groups" ) + "</label>";
-		}
+                       OSApp.Language._( "Order Stations by Groups" ) + "</label>";
+               }
 
                list += "<label for='sortByStationName'><input data-mini='true' class='noselect' id='sortByStationName' type='checkbox' " + ( OSApp.uiState.sortByStationName ? "checked='checked'" : "" ) + ">" +
-		OSApp.Language._( "Order Stations by Name" ) + "</label>";
-	list += "</div>";
+               OSApp.Language._( "Order Stations by Name" ) + "</label>";
+       list += "</div>";
 
        list += "<div data-role='controlgroup' data-type='horizontal' style='text-align:center'>";
                var showDisabled = OSApp.Storage.getItemSync( "showDisabled" ) === "true";
@@ -396,21 +431,6 @@ OSApp.Options.showOptions = function( expandItem ) {
                list += "<label for='showStationNum'><input data-mini='true' class='noselect' id='showStationNum' type='checkbox' " + ( showStationNum ? "checked='checked'" : "" ) + ">" +
                        OSApp.Language._( "Show Station Number" ) + "</label>";
        list += "</div>";
-       
-	//Select Zone/Program display options:
-	var displayOption = OSApp.ProgramView.Constants.SHOW_ZONES;
-	if (localStorage.hasOwnProperty('displayOption'))
-		displayOption = localStorage.displayOption;
-	let sel = new Array(4).fill("");
-	sel[displayOption] = " selected='selected'";
-	list += "<div class='ui-field-contain'>"+
-		"<label for='displayOption'>"+OSApp.Language._( "Mainpage display" )+"</label>" +
-		"<select name='displayOption' id='displayOption' data-mini='true'>"+
-		"<option value='0'"+sel[0]+">"+OSApp.Language._( "Hide all")+"</option>"+
-		"<option value='1'"+sel[1]+">"+OSApp.Language._( "Show Zones")+"</option>"+
-		"<option value='2'"+sel[2]+">"+OSApp.Language._( "Show Programs")+"</option>"+
-		"<option value='3'"+sel[3]+">"+OSApp.Language._( "Show all")+"</option>"+
-		"</select></div>";
 
 	list += "</fieldset><fieldset data-role='collapsible'" +
 		( typeof expandItem === "string" && expandItem === "master" ? " data-collapsed='false'" : "" ) + ">" +
@@ -497,28 +517,25 @@ OSApp.Options.showOptions = function( expandItem ) {
 		list += "</select></div>";
 	}
 
-	if ( typeof OSApp.currentSession.controller.options.sdt !== "undefined" ) {
-		list += "<div class='ui-field-contain duration-field'><label for='o17'>" + OSApp.Language._( "Station Delay" ) + "</label>" +
-			"<button data-mini='true' id='o17' value='" + OSApp.currentSession.controller.options.sdt + "'>" +
-				OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( OSApp.currentSession.controller.options.sdt ) ) +
-			"</button></div>";
-	}
+       if ( typeof OSApp.currentSession.controller.options.sdt !== "undefined" ) {
+               list += "<div class='ui-field-contain duration-field'><label for='o17'>" + OSApp.Language._( "Station Delay" ) + "</label>" +
+                       "<button data-mini='true' id='o17' value='" + OSApp.currentSession.controller.options.sdt + "'>" +
+                               OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( OSApp.currentSession.controller.options.sdt ) ) +
+                       "</button></div>";
+       }
 
-	list += "<label for='showDisabled'><input data-mini='true' class='noselect' id='showDisabled' type='checkbox' " + ( ( localStorage.showDisabled === "true" ) ? "checked='checked'" : "" ) + ">" +
-	OSApp.Language._( "Show Disabled" ) + " " + OSApp.Language._( "(Changes Auto-Saved)" ) + "</label>";
-
-	if ( typeof OSApp.currentSession.controller.options.seq !== "undefined" ) {
-		list += "<label for='o16'><input data-mini='true' id='o16' type='checkbox' " +
-				( ( OSApp.currentSession.controller.options.seq === 1 ) ? "checked='checked'" : "" ) + ">" +
-			OSApp.Language._( "Sequential" ) + "</label>";
-	}
+       if ( typeof OSApp.currentSession.controller.options.seq !== "undefined" ) {
+               list += "<label for='o16'><input data-mini='true' id='o16' type='checkbox' " +
+                               ( ( OSApp.currentSession.controller.options.seq === 1 ) ? "checked='checked'" : "" ) + ">" +
+                       OSApp.Language._( "Sequential" ) + "</label>";
+       }
 
 	list += "</fieldset><fieldset data-role='collapsible'" +
 		( typeof expandItem === "string" && expandItem === "weather" ? " data-collapsed='false'" : "" ) + ">" +
 		"<legend>" + OSApp.Language._( "Weather and Sensors" ) + "</legend>";
 
 	if ( typeof OSApp.currentSession.controller.options.uwt !== "undefined" ) {
-		list += "<div class='ui-field-contain'><label for='o31' class='select'>" + OSApp.Language._( "Weather Adjustment Method" ) +
+		list += "<div class='ui-field-contain'><label for='o31' class='select'>" + OSApp.Language._( "Adjustment Method" ) +
 				"<button data-helptext='" +
 					OSApp.Language._( "Weather adjustment retrieves data from the chosen provider and applies the selected method to determine the watering percentage." ) +
 					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
@@ -535,11 +552,48 @@ OSApp.Options.showOptions = function( expandItem ) {
 		list += "</select></div>";
 
 		if ( typeof OSApp.currentSession.controller?.settings?.wto === "object" ) {
-			list += "<div class='ui-field-contain" + ( OSApp.Weather.getCurrentAdjustmentMethodId() === 0 ? " hidden" : "" ) + "'><label for='wto'>" + OSApp.Language._( "Adjustment Method Options" ) + "</label>" +
+			const method = OSApp.Weather.getCurrentAdjustmentMethodId();
+			if( OSApp.Firmware.checkOSVersion( 2213) ) {
+				list += "<div class='ui-field-contain" + ( method === 3 || method === 1 ? "" : " hidden" ) + "'><label for='historic'></label>" +
+					"<label for='historic' id='mdaLabel'>" +
+					"<button data-helptext='" +
+						OSApp.Language._( "Uses multiple days of historical weather data to calculate ETo or Zimmerman watering percentage for programs that run on a regular interval." ) +
+						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+					"<input data-mini='true' id='mda' type='checkbox' " + ( ( OSApp.currentSession.controller.settings.wto.mda === 100 ) ? "checked='checked'" : "" ) + ">" + OSApp.Language._( "Adjust Interval Programs Using Multiple Days of Weather Data" ) + "</label></div>";
+			}
+			list += "<div class='ui-field-contain" + ( method === 0  ? " hidden" : "" ) + "'><label for='wto'>" + OSApp.Language._( "Adjustment Method Options" ) + "</label>" +
 				"<button data-mini='true' id='wto' value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) + "'>" +
 					OSApp.Language._( "Tap to Configure" ) +
 				"</button></div>";
 		}
+
+		if ( OSApp.Firmware.checkOSVersion( 214 ) ) {
+			if ( OSApp.Supported.restrictions() ) {
+				var wto = OSApp.currentSession.controller.settings.wto;
+				list += "<div class='ui-field-contain'><label for='weatherRestriction' class='select'>" + OSApp.Language._( "Weather Restrictions" ) +
+					"<button data-helptext='" + OSApp.Language._( "Prevents watering when the selected restrictions are met." ) +
+						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+					"</label>" +
+					"<button data-mini='true' id='weatherRestriction' " +
+						( ( ( typeof wto.rainDays !== "undefined" && typeof wto.rainAmt !== "undefined" && wto.rainDays > 0 && wto.rainAmt > 0 ) || ( typeof wto.minTemp !== "undefined" && wto.minTemp !== -40 ) || ( typeof wto.cali !== "undefined" && wto.cali ) ) ? "class='blue' " : "" ) +
+						"value='" + (OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto )) + "'>" +
+							OSApp.Language._( "Tap to Configure" ) +
+					"</button></div>";
+			} else {
+				list += "<div class='ui-field-contain'><label for='weatherRestriction' class='select'>" + OSApp.Language._( "Weather Restrictions" ) +
+						"<button data-helptext='" + OSApp.Language._( "Prevents watering when the selected restriction is met." ) +
+							"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+					"</label>" +
+					"<select data-mini='true' class='noselect' id='weatherRestriction'>";
+
+				for ( i = 0; i < 2; i++ ) {
+					var restrict = OSApp.Weather.getRestriction( i );
+					list += "<option " + ( restrict.isCurrent === true ? "selected" : "" ) + " value='" + i + "'>" + restrict.name + "</option>";
+				}
+				list += "</select></div>";
+			}
+		}
+	}
 
 		if ( typeof OSApp.currentSession.controller?.settings?.wsp !== "undefined" ) {
 			list += "<div class='ui-field-contain'><label for='weatherSelect' class='select'>" + OSApp.Language._( "Weather Data Provider" ) +
@@ -577,21 +631,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 				"</tr>" +
 			"</table></div>";
 		}
-
-		if ( OSApp.Firmware.checkOSVersion( 214 ) ) {
-			list += "<div class='ui-field-contain'><label for='weatherRestriction' class='select'>" + OSApp.Language._( "Weather-Based Restrictions" ) +
-					"<button data-helptext='" + OSApp.Language._( "Prevents watering when the selected restriction is met." ) +
-						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-				"</label>" +
-				"<select data-mini='true' class='noselect' id='weatherRestriction'>";
-
-			for ( i = 0; i < 2; i++ ) {
-				var restrict = OSApp.Weather.getRestriction( i );
-				list += "<option " + ( restrict.isCurrent === true ? "selected" : "" ) + " value='" + i + "'>" + restrict.name + "</option>";
-			}
-			list += "</select></div>";
-		}
-	}
 
 	if ( typeof OSApp.currentSession.controller.options.wl !== "undefined" ) {
 		list += "<div class='ui-field-contain duration-field'><label for='o23'>" + OSApp.Language._( "% Watering" ) +
@@ -848,6 +887,33 @@ OSApp.Options.showOptions = function( expandItem ) {
 					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
 			"</label><button data-mini='true' id='imin' value='" + OSApp.currentSession.controller.options.imin + "'>" + OSApp.currentSession.controller.options.imin + "mA</button></div>";
 	}
+	if ( OSApp.Firmware.checkOSVersion( 2214 ) && typeof OSApp.currentSession.controller.options.tpdv !== "undefined" && typeof OSApp.currentSession.controller.settings.apdv !== "undefined" && OSApp.currentSession.controller.settings.apdv > 0) {
+		list += "<div class='ui-field-contain'><label for='tpdv'>" + OSApp.Language._( "Target PD Voltage" ) +
+			"<button data-helptext='" +
+				OSApp.Language._( "The holding current of your solenoid multiplied by its coil resistance (e.g. 0.25A×30Ω=7.5V). Set to 0 to use system default." ) +
+			"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+			( typeof OSApp.currentSession.controller.settings.apdv !== "undefined" ?
+				"<br><span class='nobr'>(" + OSApp.Language._( "Actual" ) + ": " + ( OSApp.currentSession.controller.settings.apdv / 10 ).toFixed(1) + " V)</span>" :
+				"" ) +
+			"</label>" +
+			"<input type='range' id='tpdv' min='0' max='21' step='0.1' data-highlight='true' value='" + ( OSApp.currentSession.controller.options.tpdv / 10 ) + "'></div>";
+		}
+
+	if ( OSApp.Firmware.checkOSVersion( 2213 ) && typeof OSApp.currentSession.controller.options.imin !== "undefined" ) {
+		list += "<div class='ui-field-contain'><label for='imin'>" + OSApp.Language._( "Undercurrent Threshold" ) +
+			"<button data-helptext='" +
+				OSApp.Language._( "If the current draw (mA) falls below this threshold when a station finishes running, a low-current fault notification is triggered. The recommended value is 100. Set to 0 to disable this feature." ) +
+			"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button></label>" +
+			"<input type='range' id='imin' min='0' max='1000' step='10' data-highlight='true' value='" + ( OSApp.currentSession.controller.options.imin ) + "'></div>";
+	}
+
+	if ( OSApp.Firmware.checkOSVersion( 2213 ) && typeof OSApp.currentSession.controller.options.imax !== "undefined" ) {
+		list += "<div class='ui-field-contain'><label for='imax'>" + OSApp.Language._( "Overcurrent Limit" ) +
+			"<button data-helptext='" +
+				OSApp.Language._( "If the current draw (mA) exceeds this threshold when stations are running, an overcurrent fault notification is triggered. Set to 0 to use the system default. Set to maximum (2550) to disable this feature." ) +
+			"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button></label>" +
+			"<input type='range' id='imax' min='0' max='2550' step='50' data-highlight='true' value='" + ( OSApp.currentSession.controller.options.imax ) + "'></div>";
+	}
 
 	if ( OSApp.Firmware.checkOSVersion( 220 ) && typeof OSApp.currentSession.controller.options.laton !== "undefined" ) {
 		list += "<div class='ui-field-contain'><label for='laton'>" + OSApp.Language._( "Latch On Voltage" ) +
@@ -990,10 +1056,10 @@ OSApp.Options.showOptions = function( expandItem ) {
 		} );
 	} );
 
-	page.find( "#showDisabled" ).on( "change", function() {
-		OSApp.Storage.set( { showDisabled: this.checked } );
-		return false;
-	} );
+        page.find( "#showDisabled" ).on( "change", function() {
+                OSApp.Storage.set( { showDisabled: this.checked } );
+                return false;
+        } );
 
         page.find( "#showStationNum" ).on( "change", function() {
                 OSApp.Storage.set( { showStationNum: this.checked } );
@@ -1078,7 +1144,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 	page.find( "#wto" ).on( "click", function() {
 		var self = this,
 			options = OSApp.Utils.unescapeJSON( this.value ),
-			retainOptions = { pws: options.pws, key: options.key, provider: options.provider },
+			retainOptions = { pws: options.pws, key: options.key, provider: options.provider, mda: options.mda, cali: options.cali, rainAmt: options.rainAmt, rainDays: options.rainDays, minTemp: options.minTemp },
 			method = parseInt( page.find( "#o31" ).val() ),
 			finish = function() {
 				self.value = OSApp.Utils.escapeJSON( $.extend( {}, OSApp.Utils.unescapeJSON( self.value ), retainOptions ) );
@@ -1095,6 +1161,160 @@ OSApp.Options.showOptions = function( expandItem ) {
 		} else if ( method === 4 ) {
 			OSApp.Weather.showMonthlyAdjustmentOptions( this, finish );
 		}
+	} );
+
+	page.find( "#weatherRestriction" ).on( "click", function() {
+		if ( !OSApp.Supported.restrictions() ){
+			return;
+		}
+		var self = this,
+			options = $.extend( {}, {
+				cali: false,
+				rainDays: 0,
+				rainAmt: 0,
+				minTemp: -40
+			}, OSApp.currentSession.controller.settings.wto,
+			OSApp.Utils.unescapeJSON( self.value ) );
+
+		var rainUnit = " in";
+		var tempUnit = " \u00B0F";
+		if ( OSApp.currentDevice.isMetric ) {
+			rainUnit = " mm";
+			tempUnit = " \u00B0C";
+
+			options.rainAmt = Math.round( options.rainAmt * 25.4 * 10 ) / 10;
+			options.minTemp = Math.round( ( ( options.minTemp - 32 ) * 5 / 9 ) * 10 ) / 10;
+		}
+
+		var popup = $( "<div data-role='popup' data-theme='a' id='adjustmentOptions'>" +
+				"<div data-role='header' data-theme='b'>" +
+					"<h1>" + OSApp.Language._( "Weather Restriction Options" ) + "</h1>" +
+				"</div>" +
+				"<div class='ui-content'>" +
+					"<div class='ui-body'>" +
+						"<label class='center' style='font-weight: bold;'>" + OSApp.Language._( "Rain Restriction" )+ "</label>" +
+						"<label class='center'>" + OSApp.Language._( "Disallow watering if:" ) + "</label>" +
+						"<div class='input_with_buttons'>" +
+							"<button id='decr1' class='decr ui-btn ui-btn-icon-notext ui-icon-carat-l btn-no-border'></button>" +
+							"<input id='rainAmt' type='text' value='" + options.rainAmt + rainUnit + "'>" +
+							"<button id='incr1' class='incr ui-btn ui-btn-icon-notext ui-icon-carat-r btn-no-border'></button>" +
+						"</div>" +
+						"<label class='center'>" + OSApp.Language._( "of rain is forecasted in the next:" ) + "</label>" +
+						"<div class='input_with_buttons'>" +
+							"<button id='decr2' class='decr ui-btn ui-btn-icon-notext ui-icon-carat-l btn-no-border'></button>" +
+							"<input id='rainDays' type='text' value='" + options.rainDays + " days'>" +
+							"<button id='incr2' class='incr ui-btn ui-btn-icon-notext ui-icon-carat-r btn-no-border'></button>" +
+							"<p class='pad-top rain-desc center smaller'>" + OSApp.Language._("Set either to 0 to disable.") +
+						"</div><hr>" +
+						"<label class='center' style='font-weight: bold;'>" + OSApp.Language._( "Temperature Restriction" )+ "</label>" +
+						"<label class='center' style='white-space: pre-wrap;'>" + OSApp.Language._("Disallow watering if the current\ntemperature is below:") + "</label>" +
+						"<div class='input_with_buttons'>" +
+							"<button id='decr3' class='decr ui-btn ui-btn-icon-notext ui-icon-carat-l btn-no-border'></button>" +
+							"<input id='minTemp' type='text' value='" + options.minTemp + tempUnit + "'>" +
+							"<button id='incr3' class='incr ui-btn ui-btn-icon-notext ui-icon-carat-r btn-no-border'></button>" +
+							"<p class='pad-top rain-desc center smaller'>" + OSApp.Language._("Set to -40 (either \u00B0F or \u00B0C) to disable.") +
+						"</div><hr>" +
+						"<label for='cali'>" + OSApp.Language._( "Enable California Restriction" ) + "</label>" +
+						"<input class='restriction-input' data-mini='true' data-inconpos='right' id='cali' type='checkbox' " +
+						( ( options.cali ) ? "checked='checked'" : "" ) + ">" +
+					"</div>" +
+					"<button class='submit' data-theme='b'>" + OSApp.Language._( "Submit" ) + "</button>" +
+				"</div>" +
+			"</div>" );
+
+		OSApp.UIDom.holdButton( popup.find( "#incr1" ), function() {
+			const input = popup.find( "#rainAmt" );
+			const value = parseFloat( input.val().match( /[0-9.]+/g )[0] ) + 0.1;
+			if ( value > 100 ) return;
+			input.val( Math.round( value * 100 ) / 100 + rainUnit);
+			return false;
+		} );
+		OSApp.UIDom.holdButton( popup.find( "#decr1" ), function() {
+			const input = popup.find( "#rainAmt" );
+			const value = parseFloat( input.val().match( /[0-9.]+/g )[0] ) - 0.1;
+			if ( value < 0 ) return;
+			input.val( Math.round( value * 100 ) / 100 + rainUnit);
+			return false;
+		} );
+
+		OSApp.UIDom.holdButton( popup.find( "#incr2" ), function() {
+			const input = popup.find( "#rainDays" );
+			const value = parseInt( input.val().match( /\d+/g )[0] ) + 1;
+			if ( value > 10 ) return;
+			input.val( value + " days");
+			return false;
+		} );
+		OSApp.UIDom.holdButton( popup.find( "#decr2" ), function() {
+			const input = popup.find( "#rainDays" );
+			const value = parseInt( input.val().match( /\d+/g )[0] ) - 1;
+			if ( value < 0 ) return;
+			input.val( value + " days");
+			return false;
+		} );
+
+		OSApp.UIDom.holdButton( popup.find( "#incr3" ), function() {
+			const input = popup.find( "#minTemp" );
+			const value = parseInt( input.val().match( /^-?\d+/g )[0] ) + 1;
+			if ( value > 100 ) return;
+			input.val( value + tempUnit);
+			return false;
+		} );
+
+		OSApp.UIDom.holdButton( popup.find( "#decr3" ), function() {
+			const input = popup.find( "#minTemp" );
+			const value = parseInt( input.val().match( /^-?\d+/g )[0] ) - 1;
+			if ( value < -100 ) return;
+			input.val( value + tempUnit);
+			return false;
+		} );
+
+		var old;
+		popup.find( "input[type='text']" ).on( "focus", function() {
+			old = this.value;
+			this.value = "";
+		} ).on( "blur", function() {
+			if ( this.value === "" ) {
+				this.value = old;
+			}
+		} );
+
+		popup.find( ".submit" ).on( "click", function() {
+			options.cali = ( popup.find( "#cali" ).prop( "checked" ) ? 1 : 0 );
+			options.rainAmt = parseFloat(popup.find( "#rainAmt" ).val().match( /[0-9.]+/g )[0]);
+			options.rainDays = parseInt(popup.find( "#rainDays" ).val().match( /\d+/g )[0]);
+			options.minTemp = parseInt(popup.find( "#minTemp" ).val().match( /^-?\d+/g )[0]);
+
+
+			// Do metric conversions
+			if ( OSApp.currentDevice.isMetric ) {
+				options.rainAmt = Math.round( options.rainAmt / 25.4 * 100 ) / 100;
+				options.minTemp = Math.round( ( options.minTemp * 9 / 5 + 32 ) * 100 ) / 100;
+			}
+
+			// Change wto based on new values
+			const wto = OSApp.Utils.unescapeJSON(page.find( "#wto" ).val());
+			page.find( "#wto" ).prop( "value", OSApp.Utils.escapeJSON( options ));
+
+			popup.popup( "close" );
+
+			if ( OSApp.Utils.escapeJSON(options) === OSApp.Utils.escapeJSON(wto) ) {
+				return;
+			} else {
+				self.value = OSApp.Utils.escapeJSON( options );
+				header.eq( 2 ).prop( "disabled", false );
+				page.find( ".submit" ).addClass( "hasChanges" );
+			}
+
+			// Adjust blue if restrictions are now active
+			if (options.cali || (options.rainDays > 0 && options.rainAmt > 0) || options.minTemp !== -40) {
+				page.find("#weatherRestriction").addClass("blue");
+			} else {
+				page.find("#weatherRestriction").removeClass("blue");
+			}
+		} );
+
+		OSApp.UIDom.openPopup( popup );
+
 	} );
 
 	page.find( ".reset-log" ).on( "click", OSApp.Logs.clearLogs );
@@ -1290,6 +1510,17 @@ OSApp.Options.showOptions = function( expandItem ) {
 		page.find( "#wto" ).prop( "value", OSApp.Utils.escapeJSON(curr));
 	} );
 
+	page.find( "#mda" ).on( "click", function() {
+		//change wto value based on selected or not
+		const curr = OSApp.Utils.unescapeJSON(page.find( "#wto" ).val());
+		if ( this.checked ){
+			curr.mda = 100;
+		} else {
+			curr.mda = 0;
+		}
+		page.find( "#wto" ).prop( "value", OSApp.Utils.escapeJSON(curr));
+	} );
+
 	page.find( ".help-icon" ).on( "click", OSApp.UIDom.showHelpText );
 
 	page.find( ".duration-field button:not(.help-icon)" ).on( "click", function() {
@@ -1440,6 +1671,16 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 		// Switch the state of adjustment options based on the selected method
 		page.find( "#wto" ).click().parents( ".ui-field-contain" ).toggleClass( "hidden", parseInt( this.value ) === 0 ? true : false );
+		page.find( "#mda" ).parents( ".ui-field-contain" ).toggleClass("hidden", parseInt( this.value ) === 3 || parseInt( this.value ) === 1 ? false : true );
+
+		// Ensure checkbox display is correct
+		if ( page.find( "#mda" ).is(':checked')) {
+			page.find( "#mdaLabel").removeClass("ui-checkbox-off").addClass("ui-checkbox-on");
+			page.find( "#mda" ).prop("checked", true);
+		} else {
+			page.find( "#mdaLabel").removeClass("ui-checkbox-on").addClass("ui-checkbox-off");
+			page.find( "#mda" ).prop("checked", false);
+		}
 	} );
 
 	page.find( "#wtkey" ).on( "change input", function() {
@@ -1466,13 +1707,14 @@ OSApp.Options.showOptions = function( expandItem ) {
 			warning_low: OSApp.Language._("Monitoring-warnings level low"),
 			warning_med: OSApp.Language._("Monitoring-warnings level medium"),
 			warning_high: OSApp.Language._("Monitoring-warnings level high"),
+			curr_alert: OSApp.Language._( "Under/Overcurrent Fault" ),
 		}, button = this, curr = parseInt( button.value ), inputs = "", a = 0, ife = 0;
 
 		let no_ife2 = typeof OSApp.currentSession.controller.options.ife2 === "undefined";
 		$.each( events, function( i, val ) {
 			inputs += "<label for='notif-" + i + "'><input class='needsclick' data-iconpos='right' id='notif-" + i + "' type='checkbox' " +
 				( OSApp.Utils.getBitFromByte( curr, a ) ? "checked='checked'" : "" ) + ( no_ife2 && a >= 8 ? " disabled" : "" ) + ">" + val +
-			"</label>"
+			"</label>";
 			a++;
 		} );
 
@@ -1553,7 +1795,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"<label for='server' style='padding-top:10px'>" + OSApp.Language._( "Broker/Server" ) + "</label>" +
 							"</div>" +
 							"<div class='ui-block-b' style='width:60%'>" +
-								"<input class='mqtt-input' type='text' id='server' data-mini='true' maxlength='50' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
+								"<input class='mqtt-input' type='text' id='server' data-mini='true' maxlength='64' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
 									( options.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "broker" ) + "' value='" + options.host + "' required />" +
 							"</div>" +
 							"<div class='ui-block-a' style='width:40%'>" +
@@ -1634,7 +1876,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 						} else {
 				page.find( "#mqtt" ).removeClass( "blue" )
 			}
-				
+
 			popup.popup( "close" );
 			if ( curr === OSApp.Utils.escapeJSON( options ) ) {
 				return;
@@ -1830,9 +2072,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 			};
 
 			if ( options.en ) {
-				page.find( "#email" ).addClass( "blue" )
+				page.find( "#email" ).addClass( "blue" );
 			} else {
-				page.find( "#email" ).removeClass( "blue" )
+				page.find( "#email" ).removeClass( "blue" );
 			}
 
 			popup.popup( "close" );
@@ -1919,9 +2161,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 			};
 
 			if ( options.en ) {
-				page.find( "#otc" ).addClass( "blue" )
+				page.find( "#otc" ).addClass( "blue" );
 			} else {
-				page.find( "#otc" ).removeClass("blue")
+				page.find( "#otc" ).removeClass("blue");
 			}
 
 			popup.popup( "close" );

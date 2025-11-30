@@ -82,7 +82,7 @@ OSApp.Analog = {
 
 		SENSOR_FYTA_MOISTURE            : 60,  // FYTA moisture sensor
                 SENSOR_FYTA_TEMPERATURE         : 61,  // FYTA temperature sensor
-                
+
 		SENSOR_MQTT                     : 90, // subscribe to a MQTT server and query a value
 
 		SENSOR_REMOTE                   : 100, // Remote sensor of an remote opensprinkler
@@ -1547,13 +1547,13 @@ OSApp.Analog.updateSensorVisibility = function(popup, type) {
 	} else {
 		popup.find("#smt100id").hide();
 	}
-	
+
 	if (type == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE || type == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE) {
 		popup.find("#fytasel").show();
 	} else {
 		popup.find("#fytasel").hide();
 	}
-	
+
 	if (type == OSApp.Analog.Constants.SENSOR_USERDEF) {
 		popup.find(".fac_label").show();
 		popup.find(".fac").show();
@@ -1677,7 +1677,7 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 
 		//SMT 100 Edit ID Button:
 		list += "<button data-mini='true' class='center-div' id='smt100id'>" + OSApp.Language._("Set SMT100 Modbus ID") + "</button>";
-		
+
 		//FYTA edit credentials button:
 		list += "<button data-mini='true' class='center-div' id='fytasel'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>";
 
@@ -1808,10 +1808,10 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 					});
 				});
 		});
-		
+
 		//FYTA: Select Sensor
 		popup.find("#fytasel").on("click", function () {
-			
+
 			return OSApp.Firmware.sendToOS("/fy?pw=", "json").then(function (result) {
 				var token = result.token;
 				var sel = "<ul class='fyta-plants' data-role='listview'>";
@@ -1826,7 +1826,7 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 					request.open('GET', plant.thumb, true);
 					request.setRequestHeader('Authorization', 'Bearer ' + token);
 					request.responseType = 'arraybuffer';
-					request.onload = function(e) {
+					request.onload = function() {
 					    var data = new Uint8Array(this.response);
 					    var raw = String.fromCharCode.apply(null, data);
 					    var base64 = btoa(raw);
@@ -1837,13 +1837,13 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 				}
 				sel += "</ul>";
 				popup.find("#fytasel").html(sel).enhanceWithin();
-				$("ul.fyta-plants li").click(function(e) {
+				$("ul.fyta-plants li").click(function() {
 					let plant = result.plants[this.value];
 					popup.find(".id").val(plant.id);
 					var type = parseInt(popup.find("#type").val());
 					var str = plant.nickname;
 					switch(type) {
-					case OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE: 
+					case OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE:
 						str += " " + OSApp.Language._("Soil Moisture");
 						break;
 					case OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE:
@@ -1855,7 +1855,7 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 				});
 			});
 		});
-		
+
 		popup.find("#type").change(function () {
 			var type = parseInt(popup.find("#type").val());
 			document.getElementById("smt100id").style.display = OSApp.Analog.isSmt100(type) ? "block" : "none";
@@ -2161,7 +2161,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			OSApp.UIDom.changePage("#analogsensorchart");
 			return false;
 		});
-		
+
 		list.find(".fytasetup").on("click", function () {
 			OSApp.Analog.expandItem.add("fytasetup");
 			OSApp.Analog.setupFytaCredentials();
@@ -2264,17 +2264,17 @@ OSApp.Analog.setupFytaCredentials = function() {
 
 			"<div class='ui-field-contain'>" +
 
-			"<label>" + OSApp.Language._("API Token - get your Token from ") + 
+			"<label>" + OSApp.Language._("API Token - get your Token from ") +
 			"<a target='_blank' rel='noopener noreferrer' href='https://web.fyta.de/api-token'>The FYTA Site</a></label>" +
 			"<input class='fytatoken' type='text' value='" + (fytacred.token?fytacred.token:"") + "'>" +
-		
+
 			"<hr>" +
 			"<label>" + OSApp.Language._("Alternatively, you can enter your user login details") + "</label>" +
 			"<label>" + OSApp.Language._("Leave empty if you have a token!") + "</label>" +
 
 			"<label>" + OSApp.Language._("E-Mail") + "</label>" +
 			"<input class='email' type='text' value='" + (fytacred.email?fytacred.email:"") + "'>" +
-		
+
 			"<label>" + OSApp.Language._("Password") + "</label>" +
 			"<input class='password' type='password' value='" + (fytacred.password?fytacred.password:"") + "'>" +
 			"</div>" +
@@ -2305,13 +2305,13 @@ OSApp.Analog.setupFytaCredentials = function() {
 
 		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
 		popup.find(".fytatoken").focus();
-		
-	}, function(e) {
+
+	}, function() {
 		var resetFyta = {};
 		resetFyta.fyta = {};
 		resetFyta.fyta.email = "";
 		resetFyta.fyta.password = "";
-		OSApp.Analog.sendToOsObj("/co?pw=", resetFyta);		
+		OSApp.Analog.sendToOsObj("/co?pw=", resetFyta);
 	});
 };1
 

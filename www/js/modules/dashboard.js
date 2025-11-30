@@ -20,29 +20,31 @@ OSApp.Dashboard = OSApp.Dashboard || {};
 OSApp.Dashboard.displayPage = function() {
 	// Display the home dasbhoard main view
 	var cards, siteSelect, currentSite, i, sites;
-	var page = $(`
-		<div data-role="page" id="sprinklers">
-			<div class="ui-panel-wrapper">
-				<div class="ui-content" role="main">
-					<div class="ui-grid-a ui-body ui-corner-all info-card noweather">
-						<div class="ui-block-a">
-							<div id="weather" class="pointer"></div>
-						</div>
-						<div class="ui-block-b center home-info pointer">
-							<div class="sitename bold"></div>
-							<div id="clock-s" class="nobr"></div>
-							<div id="water-level">
-								${OSApp.Language._("Water Level")}: <span class="waterlevel"></span>%
-							</div>
-						</div>
-					</div>
-					<div id='os-program-show' class='card-group center'></div>
-					<div id="os-stations-list" class="card-group center"></div>
-					<div id="os-sensor-show" class="card-group center"></div>
-				</div>
-			</div>
-		</div>
-	`),
+	var content = '<div data-role="page" id="sprinklers">' +
+			'<div class="ui-panel-wrapper">' +
+				'<div class="ui-content" role="main">' +
+					'<div class="ui-grid-a ui-body ui-corner-all info-card noweather">' +
+						'<div class="ui-block-a center">' +
+							'<div id="weather" class="pointer"></div>' +
+							'<div id="restr-active" class="pointer settings-weather' + (( OSApp.currentSession.controller.settings?.wtrestr || 0 > 0 ) ? '' : ' hidden') + '">' +
+								'<span class="bold blue-text">' + OSApp.Language._("Weather Restriction Active") + '</span>' +
+							'</div>' +
+						'</div>' +
+						'<div class="ui-block-b center settings-weather home-info pointer">' +
+							'<div class="sitename bold"></div>' +
+							'<div id="clock-s" class="nobr"></div>' +
+							'<div id="water-level">' +
+								OSApp.Language._("Water Level") + ': <span class="waterlevel"></span>%' +
+							'</div>' +
+						'</div>' +
+					'</div>' +
+					'<div id="os-stations-list" class="card-group center"></div>' +
+					'<div id="os-sensor-show" class="card-group center"></div>' +
+				'</div>' +
+			'</div>' +
+		'</div>';
+
+	var page = $(content),
 		addTimer = function( station, rem ) {
 			OSApp.uiState.timers[ "station-" + station ] = {
 				val: rem,
@@ -56,8 +58,7 @@ OSApp.Dashboard.displayPage = function() {
 			};
 		},
 		addCard = function( sid ) {
-			var station = OSApp.Stations.getName( sid ),
-				isScheduled = OSApp.Stations.getPID( sid ) > 0,
+			var isScheduled = OSApp.Stations.getPID( sid ) > 0,
 				isRunning = OSApp.Stations.isRunning( sid ),
 				pname = isScheduled ? OSApp.Programs.pidToName( OSApp.Stations.getPID( sid ) ) : "",
 				rem = OSApp.Stations.getRemainingRuntime( sid ),
@@ -76,9 +77,9 @@ OSApp.Dashboard.displayPage = function() {
 
 			cards += "<img src='" + ( hasImage ? "data:image/jpeg;base64," + sites[ currentSite ].images[ sid ] : OSApp.UIDom.getAppURLPath() + "img/placeholder.png" ) + "' />";
 
-			cards += "<p class='station-name center inline-icon' id='station_" + sid + "'>" + station + "</p>";
 
-			cards += "<span class='btn-no-border ui-btn ui-btn-icon-notext ui-corner-all card-icon station-status " +
+			cards += "<p class='station-name center inline-icon' id='station_" + sid + "'>" + OSApp.Stations.getName( sid) + "</p>";
+			cards += "<span class='bno-border ui-btn ui-btn-icon-notext ui-corner-all card-icon station-status " +
 				( isRunning ? "on" : ( isScheduled ? "wait" : "off" ) ) + "'></span>";
 
 			cards += "<span class='btn-no-border ui-btn ui-btn-icon-notext ui-icon-wifi card-icon special-station " +
@@ -155,7 +156,6 @@ OSApp.Dashboard.displayPage = function() {
 
 						opts.append(
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Remote Address" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='remote-address' required='true' type='text' pattern='^(?:[0-9]{1,3}.){3}[0-9]{1,3}$' value='" + data.ip + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Remote Port" ) + ":</div>" +
 							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='remote-port' required='true' type='number' placeholder='80' min='0' max='65535' value='" + data.port + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Remote Station" ) + ":</div>" +
@@ -293,7 +293,7 @@ OSApp.Dashboard.displayPage = function() {
 							for ( var i = 0; i < 4; i++ ) {
 								hex += OSApp.Utils.pad( parseInt( ip[ i ] ).toString( 16 ) );
 							}
-							hex += ( port < 256 ? "00" : "" ) + OSApp.Utils.pad( port.toString( 16 ) );
+							hex += OSApp.Utils.pad( (port>>8).toString( 16 ) ) + OSApp.Utils.pad( (port & 0xff).toString( 16 ) );
 							hex += OSApp.Utils.pad( station.toString( 16 ) );
 						} else {
 							otc = select.find( "#remote-otc" ).val();
@@ -374,15 +374,15 @@ OSApp.Dashboard.displayPage = function() {
 						sdata += "," + select.find( "#http-off" ).val();
 						button.data( "specialData", sdata );
 					} else if ( hs === 7 ) { //RS485 Modbus
-						var hex = "", ip, port;
+						hex = "";
 						if (OSApp.Firmware.getHWVersion() === "OSPi") {
 							hex = "000000000000"; //ip+port ESP8266 only
 							hex += OSApp.Utils.lim( parseInt(select.find( "#modbus-device" ).val()).toString( 16 ) );
 						} else {
 							ip = select.find( "#modbus-ip" ).val().split( "." );
 							port = parseInt( select.find( "#modbus-port" ).val() ) || 502;
-							for ( var i = 0; i < 4; i++ ) {
-								hex += OSApp.Utils.lim( parseInt( ip[ i ] ).toString( 16 ) );
+							for ( var j = 0; j < 4; j++ ) {
+								hex += OSApp.Utils.lim( parseInt( ip[ j ] ).toString( 16 ) );
 							}
 							hex += OSApp.Utils.lim( port.toString( 16 ), 4 );
 							hex += "00"; //device OSPi only
@@ -981,7 +981,7 @@ OSApp.Dashboard.displayPage = function() {
 
 			// New view: Show program instead of zones
 			var displayOption = OSApp.ProgramView.Constants.SHOW_ZONES;
-			if (localStorage.hasOwnProperty('displayOption'))
+			if (Object.hasOwn(localStorage, 'displayOption'))
 				displayOption = localStorage.displayOption;
 			OSApp.ProgramView.updateProgramShowArea( page, displayOption & OSApp.ProgramView.Constants.SHOW_PROGRAMS );
 
@@ -1046,8 +1046,14 @@ OSApp.Dashboard.displayPage = function() {
 
 							// Show the remaining time if it's greater than 0
 							line += " <span id=" + ( qPause ? "'pause" : "'countdown-" ) + sid + "' class='nobr'>(" + OSApp.Dates.sec2hms( rem ) + " " + OSApp.Language._( "remaining" ) + ")</span>";
-							if ( OSApp.currentSession.controller.status[ sid ] ) {
+
+							if ( isRunning ) {
 								addTimer( sid, rem );
+							} else {
+								// Station is scheduled/paused but not running - remove timer if it exists
+								if ( OSApp.uiState.timers[ "station-" + sid ] ) {
+									delete OSApp.uiState.timers[ "station-" + sid ];
+								}
 							}
 						}
 						if ( card.find( ".rem" ).length === 0 ) {
@@ -1106,7 +1112,7 @@ OSApp.Dashboard.displayPage = function() {
 		siteSelect = $( "#site-selector" );
 
 		var displayOption = OSApp.ProgramView.Constants.SHOW_ZONES;
-		if (localStorage.hasOwnProperty('displayOption'))
+		if (Object.hasOwn(localStorage, 'displayOption'))
 			displayOption = localStorage.displayOption;
 		OSApp.ProgramView.updateProgramShowArea( page, displayOption & OSApp.ProgramView.Constants.SHOW_PROGRAMS );
 
@@ -1121,7 +1127,8 @@ OSApp.Dashboard.displayPage = function() {
 			reorderCards();
 		} );
 
-		page.find( ".sitename" ).toggleClass( "hidden", OSApp.currentSession.local ? true : false ).text( siteSelect.val() );
+		page.find( ".sitename" ).toggleClass( "hidden", OSApp.currentSession.local ? (OSApp.currentSession.controller.settings?.dname ? false : true) : false );
+		page.find( ".sitename" ).text( OSApp.currentSession.local ? OSApp.currentSession.controller.settings?.dname || "" : siteSelect.val() );
 		page.find( ".waterlevel" ).text( OSApp.currentSession.controller.options.wl );
 
 		OSApp.Analog.updateSensorShowArea( page );
@@ -1129,7 +1136,7 @@ OSApp.Dashboard.displayPage = function() {
 
 		page.on( "click", ".station-settings", showAttributes );
 
-		page.on( "click", ".home-info", function() {
+		page.on( "click", ".settings-weather", function() {
 			OSApp.UIDom.changePage( "#os-options", {
 				expandItem: "weather"
 			} );
@@ -1170,8 +1177,10 @@ OSApp.Dashboard.displayPage = function() {
 						maximum: 64800,
 						seconds: sites[ currentSite ].lastRunTime[ sid ] > 0 ? sites[ currentSite ].lastRunTime[ sid ] : 0,
 						helptext: OSApp.Language._( "Enter a duration to manually run " ) + name,
-						callback: function( duration ) {
-							OSApp.Firmware.sendToOS( "/cm?sid=" + sid + "&en=1&t=" + duration + "&pw=", "json" ).done( function() {
+						showQOCheckbox: OSApp.Groups.canPreempt( stationGID ) && OSApp.Stations.isSequential( sid ),
+						callback: function( duration, qo ) {
+							var preParam = qo ? "&qo=1" : "";
+							OSApp.Firmware.sendToOS( "/cm?sid=" + sid + "&en=1&t=" + duration + preParam + "&pw=", "json" ).done( function() {
 
 								// Update local state until next device refresh occurs
 								OSApp.Stations.setPID( sid, OSApp.Constants.options.MANUAL_STATION_PID );
@@ -1274,8 +1283,20 @@ OSApp.Dashboard.displayPage = function() {
 
 OSApp.Dashboard.updateWaterLevel = function() {
 	// Update the water level displayed on the dashboard
-	if (!OSApp.currentSession.controller.options) {
+	if ( !OSApp.currentSession.controller.options ) {
 		return;
 	}
 	$( "#water-level" ).html(OSApp.Language._( "Water Level" ) + ": <span class='waterlevel'>" + OSApp.currentSession.controller.options.wl + "</span>%");
+};
+
+OSApp.Dashboard.updateRestrictNotice = function() {
+	// Swap the restriction notice displayed on the dashboard
+	if ( !OSApp.currentSession.controller.settings ) {
+		return;
+	}
+	if ( OSApp.currentSession.controller.settings?.wtrestr > 0 ) {
+		$( "#restr-active" ).removeClass("hidden");
+	} else {
+		$( "#restr-active" ).addClass("hidden");
+	}
 };
