@@ -741,12 +741,11 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"</div>" +
 
 			"<div class='ui-content'>" +
+			"<form>" +
 			"<p class='rain-desc center smaller'>" +
 			OSApp.Language._("Notice: If you want to combine multiple sensors, then build a sensor group. ") +
 			OSApp.Language._("See help documentation for details.") +
 			"</p>" +
-
-			"<div class='ui-field-contain'>" +
 
 			//Adjustment-Nr:
 			"<label>" +
@@ -765,7 +764,7 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			}
 
 			//Select Type:
-			list += "<div class='ui-field-contain'><label for='type' class='select'>" +
+			list += "<label for='type' class='select'>" +
 			OSApp.Language._("Type") +
 			"</label><select data-mini='true' id='type'>";
 
@@ -774,10 +773,10 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 				" value='" + supportedAdjustmentTypes[i].type + "'>" +
 				OSApp.Language._(supportedAdjustmentTypes[i].name) + "</option>";
 		}
-		list += "</select></div>" +
+		list += "</select>" +
 
 			//Select Sensor:
-			"<div class='ui-field-contain'><label for='sensor' class='select'>" +
+			"<label for='sensor' class='select'>" +
 			OSApp.Language._("Sensor") +
 			"</label><select data-mini='true' id='sensor'>";
 
@@ -786,10 +785,10 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 				" value='" + OSApp.Analog.analogSensors[i].nr + "'>" +
 				OSApp.Analog.analogSensors[i].nr + " - " + OSApp.Analog.analogSensors[i].name + "</option>";
 		}
-		list += "</select></div>" +
+		list += "</select>" +
 
 			//Select Program:
-			"<div class='ui-field-contain'><label for='prog' class='select'>" +
+			"<label for='prog' class='select'>" +
 			OSApp.Language._("Program to adjust") +
 			"</label><select data-mini='true' id='prog'>";
 
@@ -801,7 +800,7 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 				" value='" + progNr + "'>" +
 				progName + "</option>";
 		}
-		list += "</select></div>" +
+		list += "</select>" +
 
 			"<label>" +
 			OSApp.Language._("Factor 1 in % (adjustment for min)") +
@@ -831,6 +830,7 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 				OSApp.Language._("Delete") + "</a>")) +
 
 			"</div>" +
+			"</form>" +
 			"</div>";
 
 		let popup = $(list),
@@ -1225,7 +1225,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			OSApp.Language._("See help documentation for details.") +
 			"</p>" +
 
-			"<div class='ui-field-contain'>" +
+			"<form>" +
 
 			//Monitor-Nr:
 			"<label for='id'>" +
@@ -1306,7 +1306,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 		for (i = 0; i < 3; i++) {
 			list += "<option " + (monitor.prio == i ? "selected" : "") + " value='" + i + "'>" + prios[i] + "</option>";
 		}
-		list += "</select></div>";
+		list += "</select>";
 
 		//reset seconds (rs)
 		if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 178) {
@@ -1393,6 +1393,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			((row < 0) ? "" : ("<a data-role='button' class='black delete-monitor' value='" + monitor.nr + "' row='" + row + "' href='#' data-icon='delete'>" +
 				OSApp.Language._("Delete") + "</a>")) +
 
+			"</form>" +
 			"</div>" +
 			"</div>";
 
@@ -1556,34 +1557,22 @@ OSApp.Analog.updateSensorVisibility = function(popup, type) {
 	}
 
 	if (type == OSApp.Analog.Constants.SENSOR_USERDEF) {
-		popup.find(".fac_label").show();
-		popup.find(".fac").show();
-		popup.find(".div_label").show();
-		popup.find(".div").show();
-		popup.find(".offset_label").show();
-		popup.find(".offset").show();
+		popup.find(".fac_container").show();
+		popup.find(".div_container").show();
+		popup.find(".offset_container").show();
 	} else {
-		popup.find(".fac_label").hide();
-		popup.find(".fac").hide();
-		popup.find(".div_label").hide();
-		popup.find(".div").hide();
-		popup.find(".offset_label").hide();
-		popup.find(".offset").hide();
+		popup.find(".fac_container").hide();
+		popup.find(".div_container").hide();
+		popup.find(".offset_container").hide();
 	}
 	if (type == OSApp.Analog.Constants.SENSOR_MQTT) {
-		popup.find(".unit_label").show();
-		popup.find(".unit").show();
-		popup.find(".topic_label").show();
-		popup.find(".topic").show();
-		popup.find(".filter_label").show();
-		popup.find(".filter").show();
+		popup.find(".unit_container").show();
+		popup.find(".topic_container").show();
+		popup.find(".filter_container").show();
 	} else {
-		popup.find(".unit_label").hide();
-		popup.find(".unit").hide();
-		popup.find(".topic_label").hide();
-		popup.find(".topic").hide();
-		popup.find(".filter_label").hide();
-		popup.find(".filter").hide();
+		popup.find(".unit_container").hide();
+		popup.find(".topic_container").hide();
+		popup.find(".filter_container").hide();
 	}
 
 	var unitid = popup.find("#unitid").val();
@@ -1616,16 +1605,16 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	OSApp.Analog.addToObjectInt(popup, ".port", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, ".id", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, ".ri", sensorOut);
-	OSApp.Analog.addToObjectInt(popup, ".fac", sensorOut);
-	OSApp.Analog.addToObjectInt(popup, ".div", sensorOut);
-	OSApp.Analog.addToObjectInt(popup, ".offset", sensorOut);
-	OSApp.Analog.addToObjectStr(popup, ".unit", sensorOut);
+	OSApp.Analog.addToObjectInt(popup, "#factor", sensorOut);
+	OSApp.Analog.addToObjectInt(popup, "#divider", sensorOut);
+	OSApp.Analog.addToObjectInt(popup, "#offset", sensorOut);
+	OSApp.Analog.addToObjectStr(popup, "#unit", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#unitid", sensorOut);
 	OSApp.Analog.addToObjectChk(popup, "#enable", sensorOut);
 	OSApp.Analog.addToObjectChk(popup, "#log", sensorOut);
 	OSApp.Analog.addToObjectChk(popup, "#show", sensorOut);
-	OSApp.Analog.addToObjectStr(popup, ".topic", sensorOut);
-	OSApp.Analog.addToObjectStr(popup, ".filter", sensorOut);
+	OSApp.Analog.addToObjectStr(popup, "#topic", sensorOut);
+	OSApp.Analog.addToObjectStr(popup, "#filter", sensorOut);
 
 	if (sensorOut.missingValue) {
 		OSApp.Errors.showError(OSApp.Language._('Please fill the required fields'));
@@ -1653,69 +1642,65 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			"<h1>" + (sensor.nr > 0 ? OSApp.Language._("Edit Sensor") : OSApp.Language._("New Sensor")) + "</h1>" +
 			"</div>" +
 			"<div class='ui-content'>" +
+			"<form>" +
 			"<p class='rain-desc center smaller'>" +
 			OSApp.Language._("Edit Sensor Configuration. ") +
 			OSApp.Language._("See help documentation for details.") +
 			"<br>" +
 			OSApp.Language._("Last") + ": " + (sensor.last === undefined ? "" : OSApp.Dates.dateToString(new Date(sensor.last * 1000))) +
 			"</p>" +
-			"<div class='ui-field-contain'>" +
-			"<label>" +
-			OSApp.Language._("Sensor-Nr") +
-			"</label>" +
+			"<label>" +	OSApp.Language._("Sensor-Nr") +	"</label>" +
 			"<input class='nr' type='number' inputmode='decimal' min='1' max='99999' required value='" + sensor.nr + (sensor.nr > 0 ? "' disabled='disabled'>" : "'>") +
 
-			"<div class='ui-field-contain'><label for='type' class='select'>" +
-			OSApp.Language._("Type") +
-			"</label><select data-mini='true' id='type' required>";
+			"<fieldset data-role='controlgroup' data-mini='true'>" +
+			"<label for='type'>" + OSApp.Language._("Type") + "</label>" +
+			"<select id='type' required>";
 
 		for (i = 0; i < supportedSensorTypes.length; i++) {
 			list += "<option " + ((sensor.type === supportedSensorTypes[i].type) ? "selected" : "") +
 				" value='" + supportedSensorTypes[i].type + "'>" +
 				OSApp.Language._(supportedSensorTypes[i].name) + "</option>";
 		}
-		list += "</select></div>";
+		list += "</select>" +
 
 		//SMT 100 Edit ID Button:
-		list += "<button data-mini='true' class='center-div' id='smt100id'>" + OSApp.Language._("Set SMT100 Modbus ID") + "</button>";
+			"<button class='center-div' id='smt100id'>" + OSApp.Language._("Set SMT100 Modbus ID") + "</button>" +
 
 		//FYTA edit credentials button:
-		list += "<button data-mini='true' class='center-div' id='fytasel'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>";
+			"<button class='center-div' id='fytasel'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>" +
+			"</fieldset>" +
 
-		list += "<label>" + OSApp.Language._("Group") +
-			"</label>" +
+			"<label>" + OSApp.Language._("Group") + "</label>" +
 			"<input class='group' type='number'  inputmode='decimal' min='0' max='99999' value='" + sensor.group + "'>" +
 
-			"<label>" + OSApp.Language._("Name") +
-			"</label>" +
+			"<label>" + OSApp.Language._("Name") + "</label>" +
 			"<input class='name' type='text' maxlength='29' value='" + sensor.name + "' required>" +
 
-			"<label class='ip_label'>" + OSApp.Language._("IP Address") +
-			"</label>" +
+			"<label class='ip_label'>" + OSApp.Language._("IP Address") + "</label>" +
 			"<input class='ip' type='text'  value='" + (sensor.ip ? OSApp.Analog.toByteArray(sensor.ip).join(".") : "") + "'>" +
 
-			"<label class='port_label'>" + OSApp.Language._("Port") +
-			"</label>" +
+			"<label class='port_label'>" + OSApp.Language._("Port") + "</label>" +
 			"<input class='port' type='number' inputmode='decimal' min='0' max='65535' value='" + sensor.port + "'>" +
 
-			"<label class='id_label'>" + OSApp.Language._("ID") +
-			"</label>" +
+			"<label class='id_label'>" + OSApp.Language._("ID") + "</label>" +
 			"<input class='id' type='number' inputmode='decimal' min='-2147483647' max='2147483647' value='" + sensor.id + "'>" +
 
-			"<label class='fac_label'>" + OSApp.Language._("Factor") +
-			"</label>" +
-			"<input class='fac' type='number' inputmode='decimal' min='-32768' max='32767' value='" + sensor.fac + "'>" +
+			"<div class='fac_container'>" +
+			"<label>" + OSApp.Language._("Factor") + "</label>" +
+			"<input type='number' id='factor' inputmode='decimal' min='-32768' max='32767' value='" + sensor.fac + "'>" +
+			"</div>" +
 
-			"<label class='div_label'>" + OSApp.Language._("Divider") +
-			"</label>" +
-			"<input class='div' type='number' inputmode='decimal' min='-32768' max='32767' value='" + sensor.div + "'>" +
+			"<div class='div_container'>" +
+			"<label'>" + OSApp.Language._("Divider") + "</label>" +
+			"<input type='number' id='divider' inputmode='decimal' min='-32768' max='32767' value='" + sensor.div + "'>" +
+			"</div>" +
 
-			"<label class='offset_label'>" + OSApp.Language._("Offset in millivolt") +
-			"</label>" +
-			"<input class='offset' type='number' inputmode='decimal' min='-32768' max='32767' value='" + sensor.offset + "'>" +
+			"<div class='offset_container'>" +
+			"<label>" + OSApp.Language._("Offset in millivolt") + "</label>" +
+			"<input type='number' id='offset' inputmode='decimal' min='-32768' max='32767' value='" + sensor.offset + "'>" +
+			"</div>" +
 
-			"<label class='chartunit_label'>" + OSApp.Language._("Chart Unit") +
-			"</label>" +
+			"<label class='chartunit_label'>" + OSApp.Language._("Chart Unit") + "</label>" +
 			"<select data-mini='true' id='unitid'>" +
 			"<option value='0'>" + OSApp.Language._("Default") + "</option>" +
 			"<option value='1'>" + OSApp.Language._("Soil Moisture %") + "</option>" +
@@ -1734,25 +1719,26 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			"<option value='99'>" + OSApp.Language._("Own Unit") + "</option>" +
 			"</select>" +
 
-			"<label class='unit_label'>" + OSApp.Language._("Unit") +
-			"</label>" +
-			"<input class='unit' type='text'  value='" + (sensor.unit ? sensor.unit : "") + "'>" +
+			"<div class='unit_container'>" +
+			"<label>" + OSApp.Language._("Unit") + "</label>" +
+			"<input type='text' id='unit' value='" + (sensor.unit ? sensor.unit : "") + "'>" +
+			"</div>" +
 
-			"<label class='topic_label'>" + OSApp.Language._("MQTT Topic") +
-			"</label>" +
-			"<input class='topic' type='text'  value='" + (sensor.topic ? sensor.topic : "") + "'>" +
+			"<div class='topic_container'>" +
+			"<label>" + OSApp.Language._("MQTT Topic") + "</label>" +
+			"<input type='text' id='topic' value='" + (sensor.topic ? sensor.topic : "") + "'>" +
+			"</div>" +
 
-			"<label class='filter_label'>" + OSApp.Language._("MQTT Filter") +
-			"</label>" +
-			"<input class='filter' type='text'  value='" + (sensor.filter ? sensor.filter : "") + "'>" +
+			"<div class='filter_container'>" +
+			"<label>" + OSApp.Language._("MQTT Filter") + "</label>" +
+			"<input type='text' id='filter' value='" + (sensor.filter ? sensor.filter : "") + "'>" +
+			"</div>" +
 
-			"<label>" + OSApp.Language._("Read Interval (s)") +
-			"</label>" +
+			"<label>" + OSApp.Language._("Read Interval (s)") + "</label>" +
 			"<input class='ri' type='number' inputmode='decimal' min='1' max='999999' value='" + sensor.ri + "'>" +
 
 			"<label for='enable'><input data-mini='true' id='enable' type='checkbox' " + ((sensor.enable === 1) ? "checked='checked'" : "") + ">" +
-			OSApp.Language._("Sensor Enabled") +
-			"</label>" +
+			OSApp.Language._("Sensor Enabled") + "</label>" +
 
 			"<label for='log'><input data-mini='true' id='log' type='checkbox' " + ((sensor.log === 1) ? "checked='checked'" : "") + ">" +
 			OSApp.Language._("Enable Data Logging") +
@@ -1765,10 +1751,9 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			"</label>" +
 
 			"<label for='show'><input data-mini='true' id='show' type='checkbox' " + ((sensor.show === 1) ? "checked='checked'" : "") + ">" +
-			OSApp.Language._("Show on Mainpage") +
-			"</label>" +
+			OSApp.Language._("Show on Mainpage") +	"</label>" +
 
-			"</div>" +
+			"</form>" +
 
 			"<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
 
@@ -2262,9 +2247,7 @@ OSApp.Analog.setupFytaCredentials = function() {
 			"</div>" +
 
 			"<div class='ui-content'>" +
-
-			"<div class='ui-field-contain'>" +
-
+			"<form>" +
 			"<label>" + OSApp.Language._("API Token - get your Token from ") +
 			"<a target='_blank' rel='noopener noreferrer' href='https://web.fyta.de/api-token'>The FYTA Site</a></label>" +
 			"<input class='fytatoken' type='text' value='" + (fytacred.token?fytacred.token:"") + "'>" +
@@ -2279,10 +2262,10 @@ OSApp.Analog.setupFytaCredentials = function() {
 			"<label>" + OSApp.Language._("Password") + "</label>" +
 			"<input class='password' type='password' value='" + (fytacred.password?fytacred.password:"") + "'>" +
 			"</div>" +
-                        "<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
+            "<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
 
-                        "</div>" +
-                        "</div>";
+            "</form" +
+            "</div>";
 
                 let popup = $(list);
 

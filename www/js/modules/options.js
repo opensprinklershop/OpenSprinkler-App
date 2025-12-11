@@ -432,6 +432,22 @@ OSApp.Options.showOptions = function( expandItem ) {
                        OSApp.Language._( "Show Station Number" ) + "</label>";
        list += "</div>";
 
+
+	//Select Zone/Program display options:
+	var displayOption = OSApp.ProgramView.Constants.SHOW_ZONES;
+	if (localStorage.hasOwnProperty('displayOption'))
+		displayOption = localStorage.displayOption;
+	let sel = new Array(4).fill("");
+	sel[displayOption] = " selected='selected'";
+	list += "<div class='ui-field-contain'>"+
+		"<label for='displayOption'>"+OSApp.Language._( "Mainpage display" )+"</label>" +
+		"<select name='displayOption' id='displayOption' data-mini='true'>"+
+		"<option value='0'"+sel[0]+">"+OSApp.Language._( "Hide all")+"</option>"+
+		"<option value='1'"+sel[1]+">"+OSApp.Language._( "Show Zones")+"</option>"+
+		"<option value='2'"+sel[2]+">"+OSApp.Language._( "Show Programs")+"</option>"+
+		"<option value='3'"+sel[3]+">"+OSApp.Language._( "Show all")+"</option>"+
+		"</select></div>";
+
 	list += "</fieldset><fieldset data-role='collapsible'" +
 		( typeof expandItem === "string" && expandItem === "master" ? " data-collapsed='false'" : "" ) + ">" +
 		"<legend>" + OSApp.Language._( "Configure Master" ) + "</legend>";
@@ -2212,7 +2228,9 @@ OSApp.Options.coordsToLocation = function( lat, lon, callback, fallback ) {
 	callback = callback || function() {};
 	fallback = fallback || lat + "," + lon;
 
-	$.getJSON( "https://maps.googleapis.com/maps/api/geocode/json?latlng=" + lat + "," + lon + "&key=AIzaSyDaT_HTZwFojXmvYIhwWudK00vFXzMmOKc&result_type=locality|sublocality|administrative_area_level_1|country", function( data ) {
+	$.getJSON( "https://maps.googleapis.com/maps/api/geocode/json?latlng=" + lat + "," + lon + "&key="+
+		"GOOGLEMAPSAPIKEY"+
+		"&result_type=locality|sublocality|administrative_area_level_1|country", function( data ) {
 		if ( data.results.length === 0 ) {
 			callback( fallback );
 			return;
