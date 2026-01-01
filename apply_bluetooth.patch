@@ -1,0 +1,11 @@
+--- a/www/js/modules/analog.js
++++ b/www/js/modules/analog.js
+@@ -59,6 +59,8 @@ OSApp.Analog = {
+ SENSOR_FYTA_MOISTURE            : 60,  // FYTA moisture sensor
+                 SENSOR_FYTA_TEMPERATURE         : 61,  // FYTA temperature sensor
+ 
++SENSOR_ZIGBEE                   : 80, // ZigBee sensor
++SENSOR_BLUETOOTH                : 81, // Bluetooth sensor
+ SENSOR_MQTT                     : 90, // subscribe to a MQTT server and query a value
+ 
+ SENSOR_REMOTE                   : 100, // Remote sensor of an remote opensprinkler

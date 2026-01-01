@@ -6,7 +6,8 @@ rm ./www/locale/*~
 #export JAVA_HOME=/usr/lib64/jvm/jre-21-openjdk/
 #export JAVA_HOME=/etc/alternatives/java_sdk_21/
 
-grunt prepareFW
+./scripts/appGMK.sh
+grunt makeFW
 cordova build browser --release
 #cp build.json platforms/android/build.json
 #cp network_security_config.xml /srv/www/htdocs/ui/platforms/android/app/src/main/res/xml/
@@ -56,7 +57,7 @@ cordova run android --release -- --packageType=apk
 
 cp build/modules.json platforms/browser/www
 chown stefan:www platforms/* -R
-#./scripts/appGMK2.sh
+./scripts/appGMK2.sh
 
 rm ./platforms/browser/platform_www/plugins/* -R 2>/dev/null
 rm ./platforms/browser/www/*.js 2>/dev/null

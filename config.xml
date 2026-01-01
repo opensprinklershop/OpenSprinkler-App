@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget android-versionCode="166" version="2.3.166" versionCode="166" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="de.opensprinklershop.sprinklers" >
+<widget android-versionCode="180" version="2.3.180" versionCode="180" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="de.opensprinklershop.sprinklers" >
   <name>OpenSprinklerASB</name>
   <description>
             Designed to allow intuitive control of the OpenSprinkler irrigation controller.
@@ -100,6 +100,9 @@
                 <action android:name="android.intent.action.GET_CONTENT" />
             </intent>
         </config-file>
+        <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
+        	<application android:debuggable="true" />
+	</edit-config>
         <preference name="Scheme" value="http" />
         <preference name="android-minSdkVersion" value="24" />
         <preference name="android-targetSdkVersion" value="35" />

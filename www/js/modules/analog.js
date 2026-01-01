@@ -42,15 +42,7 @@ OSApp.Analog = {
 		RS485_TRUEBNER3 : 0x80,
 		RS485_TRUEBNER4 : 0x100,
 		OSPI_USB_RS485 : 0x200,
-		RS485_I2C      : 0x400,
 
-		NOTIFICATION_COLORS : ["#baffc9", "#faf0be", "#ffb3ba"],
-
-		MONITOR_DELETE   : 0,
-		MONITOR_MIN      : 1,
-		MONITOR_MAX      : 2,
-		MONITOR_SENSOR12 : 3, //Digital OS Sensors
-		MONITOR_SET_SENSOR12 : 4, //Set Digital OS Sensors
 		MONITOR_AND      : 10,
 		MONITOR_OR       : 11,
 		MONITOR_XOR      : 12,
@@ -82,23 +74,30 @@ OSApp.Analog = {
 		SENSOR_OSPI_INTERNAL_TEMP       : 54, // Internal OSPI Temperature
 
 		SENSOR_FYTA_MOISTURE            : 60,  // FYTA moisture sensor
-                SENSOR_FYTA_TEMPERATURE         : 61,  // FYTA temperature sensor
+	SENSOR_FYTA_TEMPERATURE         : 61,  // FYTA temperature sensor
 
-		SENSOR_MQTT                     : 90, // subscribe to a MQTT server and query a value
+	SENSOR_ZIGBEE                   : 80, // ZigBee sensor
+	SENSOR_BLUETOOTH                : 81, // Bluetooth sensor
+	SENSOR_MQTT                     : 90, // subscribe to a MQTT server and query a value
 
-		SENSOR_REMOTE                   : 100, // Remote sensor of an remote opensprinkler
-		SENSOR_WEATHER_TEMP_F           : 101, // Weather service - temperature (Fahrenheit)
-		SENSOR_WEATHER_TEMP_C           : 102, // Weather service - temperature (Celcius)
-		SENSOR_WEATHER_HUM              : 103, // Weather service - humidity (%)
-		SENSOR_WEATHER_PRECIP_IN        : 105, // Weather service - precip (inch)
-		SENSOR_WEATHER_PRECIP_MM        : 106, // Weather service - precip (mm)
-		SENSOR_WEATHER_WIND_MPH         : 107, // Weather service - wind (mph)
-		SENSOR_WEATHER_WIND_KMH         : 108, // Weather service - wind (kmh)
+	SENSOR_REMOTE                   : 100, // Remote sensor of an remote opensprinkler
+	SENSOR_WEATHER_TEMP_F           : 101, // Weather service - temperature (Fahrenheit)
+	SENSOR_WEATHER_TEMP_C           : 102, // Weather service - temperature (Celcius)
+	SENSOR_WEATHER_HUM              : 103, // Weather service - humidity (%)
+	SENSOR_WEATHER_PRECIP_IN        : 105, // Weather service - precip (inch)
+	SENSOR_WEATHER_PRECIP_MM        : 106, // Weather service - precip (mm)
+	SENSOR_WEATHER_WIND_MPH         : 107, // Weather service - wind (mph)
+	SENSOR_WEATHER_WIND_KMH         : 108, // Weather service - wind (kmh)
+	SENSOR_WEATHER_ETO              : 109, // Weather service - ETO
+	SENSOR_WEATHER_RADIATION        : 110, // Weather service - radiation
 
-		SENSOR_GROUP_MIN                : 1000,  // Sensor group with min value
-		SENSOR_GROUP_MAX                : 1001,  // Sensor group with max value
-		SENSOR_GROUP_AVG                : 1002,  // Sensor group with avg value
-		SENSOR_GROUP_SUM                : 1003,  // Sensor group with sum value
+	SENSOR_GROUP_MIN                : 1000,  // Sensor group with min value
+	SENSOR_GROUP_MAX                : 1001,  // Sensor group with max value
+	SENSOR_GROUP_AVG                : 1002,  // Sensor group with avg value
+	SENSOR_GROUP_SUM                : 1003,  // Sensor group with sum value
+
+	SENSOR_FREE_MEMORY              : 10000, // Free memory
+	SENSOR_FREE_STORE               : 10001,  // Free storage
 
 		PROG_LINEAR                     : 1, //formula see above
 		PROG_DIGITAL_MIN                : 2, //under or equal min : factor1 else factor2
@@ -191,6 +190,11 @@ OSApp.Analog.asb_init = function() {
 OSApp.Analog.checkAnalogSensorAvail = function() {
 	return OSApp.currentSession.controller.options && OSApp.currentSession.controller.options.feature.includes("ASB");
 };
+
+OSApp.Analog.isESP32 = function() {
+	return OSApp.currentSession.controller.options && OSApp.currentSession.controller.options.feature.includes("ESP32");
+};
+
 
 OSApp.Analog.refresh = function() {
 	setTimeout( function() {
@@ -1513,6 +1517,9 @@ OSApp.Analog.isSmt100 = function( sensorType ) {
 	return sensorType >= OSApp.Analog.Constants.SENSOR_SMT100_MOIS && sensorType <= OSApp.Analog.Constants.SENSOR_TH100_TEMP;
 };
 
+OSApp.Analog.isRS485Sensor = function( sensorType ) {
+	return OSApp.Analog.isSmt100(sensorType);
+};
 
 OSApp.Analog.isIPSensor = function(sensorType) {
 	return OSApp.Analog.isSmt100(sensorType) || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE;
@@ -1526,24 +1533,54 @@ OSApp.Analog.isIDNeeded = function(sensorType) {
 
 //show and hide sensor editor fields
 OSApp.Analog.updateSensorVisibility = function(popup, type) {
-	if (OSApp.Analog.isIPSensor(type)) {
+	// First hide ALL labels and fields
+	popup.find(".sensor_nr_label, .nr, .name_label, .name, .group_label, .group, .type_label").hide();
+	popup.find(".ip_label, .ip, .port_label, .port, .id_label, .id").hide();
+	popup.find(".rs485_port_label, .rs485_port, .rs485_id_label, .rs485_id, .rs485_help").hide();
+	popup.find(".chartunit_label, #unitid, .ri_label, .ri").hide();
+
+	// RS485-spezifische Felder
+	if (OSApp.Analog.isRS485Sensor(type)) {
+		popup.find(".rs485_port_label").show();
+		popup.find(".rs485_port").show();
+		popup.find(".rs485_id_label").show();
+		popup.find(".rs485_id").show();
+		popup.find(".rs485_help").show();
+		// IP/Port nur für TCP/IP-basierte RS485-Adapter anzeigen
 		popup.find(".ip_label").show();
 		popup.find(".port_label").show();
 		popup.find(".ip").show();
 		popup.find(".port").show();
-	} else {
-		popup.find(".ip_label").hide();
-		popup.find(".port_label").hide();
-		popup.find(".ip").hide();
-		popup.find(".port").hide();
-	}
-	if (OSApp.Analog.isIDNeeded(type)) {
-		popup.find(".id_label").show();
-		popup.find(".id").show();
-	} else {
+		// ID-Feld verstecken, da wir rs485_id verwenden
 		popup.find(".id_label").hide();
 		popup.find(".id").hide();
+	} else {
+		popup.find(".rs485_port_label").hide();
+		popup.find(".rs485_port").hide();
+		popup.find(".rs485_id_label").hide();
+		popup.find(".rs485_id").hide();
+		popup.find(".rs485_help").hide();
+		// Normale IP-Sensor-Logik
+		if (OSApp.Analog.isIPSensor(type)) {
+			popup.find(".ip_label").show();
+			popup.find(".port_label").show();
+			popup.find(".ip").show();
+			popup.find(".port").show();
+		} else {
+			popup.find(".ip_label").hide();
+			popup.find(".port_label").hide();
+			popup.find(".ip").hide();
+			popup.find(".port").hide();
+		}
+		if (OSApp.Analog.isIDNeeded(type)) {
+			popup.find(".id_label").show();
+			popup.find(".id").show();
+		} else {
+			popup.find(".id_label").hide();
+			popup.find(".id").hide();
+		}
 	}
+
 	if (OSApp.Analog.isSmt100(type)) {
 		popup.find("#smt100id").show();
 	} else {
@@ -1556,32 +1593,76 @@ OSApp.Analog.updateSensorVisibility = function(popup, type) {
 		popup.find("#fytasel").hide();
 	}
 
+	if (type == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
+		popup.find("#zigbeesel").show();
+	} else {
+		popup.find("#zigbeesel").hide();
+	}
+
+	if (type == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
+		popup.find("#bluetoothsel").show();
+	} else {
+		popup.find("#bluetoothsel").hide();
+	}
+
+	// Hide all optional containers
+	popup.find(".fac_container").hide();
+	popup.find(".div_container").hide();
+	popup.find(".offset_container").hide();
+	popup.find(".unit_container").hide();
+	popup.find(".topic_container").hide();
+	popup.find(".filter_container").hide();
+	popup.find(".zigbee_device_ieee_container").hide();
+	popup.find(".zigbee_endpoint_container").hide();
+	popup.find(".zigbee_cluster_id_container").hide();
+	popup.find(".zigbee_attribute_id_container").hide();
+	popup.find(".zigbee_poll_interval_container").hide();
+	popup.find(".bluetooth_device_mac_container").hide();
+	popup.find(".bluetooth_service_uuid_container").hide();
+	popup.find(".bluetooth_char_uuid_container").hide();
+	popup.find(".bluetooth_poll_interval_container").hide();
+
+	// Show standard fields that should always be visible
+	popup.find(".sensor_nr_label").show();
+	popup.find(".nr").show();
+	popup.find(".name_label").show();
+	popup.find(".name").show();
+	popup.find(".group_label").show();
+	popup.find(".group").show();
+	popup.find(".type_label").show();
+	popup.find("#type").show();
+	popup.find(".chartunit_label").show();
+	popup.find("#unitid").show();
+	popup.find(".ri_label").show();
+	popup.find(".ri").show();
+
+	var unitid = popup.find("#unitid").val();
+
 	if (type == OSApp.Analog.Constants.SENSOR_USERDEF) {
 		popup.find(".fac_container").show();
 		popup.find(".div_container").show();
 		popup.find(".offset_container").show();
-	} else {
-		popup.find(".fac_container").hide();
-		popup.find(".div_container").hide();
-		popup.find(".offset_container").hide();
-	}
-	if (type == OSApp.Analog.Constants.SENSOR_MQTT) {
+		popup.find(".unit_container").show();
+	} else if (type == OSApp.Analog.Constants.SENSOR_MQTT) {
 		popup.find(".unit_container").show();
 		popup.find(".topic_container").show();
 		popup.find(".filter_container").show();
-	} else {
-		popup.find(".unit_container").hide();
-		popup.find(".topic_container").hide();
-		popup.find(".filter_container").hide();
+	} else if (type == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
+		popup.find(".zigbee_device_ieee_container").show();
+		popup.find(".zigbee_endpoint_container").show();
+		popup.find(".zigbee_cluster_id_container").show();
+		popup.find(".zigbee_attribute_id_container").show();
+		popup.find(".zigbee_poll_interval_container").show();
+	} else if (type == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
+		popup.find(".bluetooth_device_mac_container").show();
+		popup.find(".bluetooth_service_uuid_container").show();
+		popup.find(".bluetooth_char_uuid_container").show();
+		popup.find(".bluetooth_poll_interval_container").show();
 	}
 
-	var unitid = popup.find("#unitid").val();
-	if (type == OSApp.Analog.Constants.SENSOR_MQTT || type == OSApp.Analog.Constants.SENSOR_USERDEF || unitid == OSApp.Analog.Constants.USERDEF_UNIT) {
-		popup.find(".unit_label").show();
-		popup.find(".unit").show();
-	} else {
-		popup.find(".unit_label").hide();
-		popup.find(".unit").hide();
+	// Show unit container for custom unit selection (independent of sensor type)
+	if (unitid == OSApp.Analog.Constants.USERDEF_UNIT && type != OSApp.Analog.Constants.SENSOR_USERDEF && type != OSApp.Analog.Constants.SENSOR_MQTT) {
+		popup.find(".unit_container").show();
 	}
 };
 
@@ -1601,9 +1682,27 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	OSApp.Analog.addToObjectInt(popup, "#type", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, ".group", sensorOut);
 	OSApp.Analog.addToObjectStr(popup, ".name", sensorOut);
-	OSApp.Analog.addToObjectIPs(popup, ".ip", sensorOut);
-	OSApp.Analog.addToObjectInt(popup, ".port", sensorOut);
-	OSApp.Analog.addToObjectInt(popup, ".id", sensorOut);
+
+	// Für RS485-Sensoren: Verwende rs485_port und rs485_id statt port und id
+	if (OSApp.Analog.isRS485Sensor(parseInt(popup.find("#type").val()))) {
+		OSApp.Analog.addToObjectIPs(popup, ".ip", sensorOut);
+		OSApp.Analog.addToObjectInt(popup, ".rs485_port", sensorOut);
+		OSApp.Analog.addToObjectInt(popup, ".rs485_id", sensorOut);
+		// Kopiere rs485_port nach port und rs485_id nach id für Backend-Kompatibilität
+		if (sensorOut.rs485_port !== undefined) {
+			sensorOut.port = sensorOut.rs485_port;
+			delete sensorOut.rs485_port;
+		}
+		if (sensorOut.rs485_id !== undefined) {
+			sensorOut.id = sensorOut.rs485_id;
+			delete sensorOut.rs485_id;
+		}
+	} else {
+		OSApp.Analog.addToObjectIPs(popup, ".ip", sensorOut);
+		OSApp.Analog.addToObjectInt(popup, ".port", sensorOut);
+		OSApp.Analog.addToObjectInt(popup, ".id", sensorOut);
+	}
+
 	OSApp.Analog.addToObjectInt(popup, ".ri", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#factor", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#divider", sensorOut);
@@ -1616,6 +1715,33 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	OSApp.Analog.addToObjectStr(popup, "#topic", sensorOut);
 	OSApp.Analog.addToObjectStr(popup, "#filter", sensorOut);
 
+	// ZigBee-specific fields
+	if (parseInt(popup.find("#type").val()) == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
+		OSApp.Analog.addToObjectStr(popup, "#device_ieee", sensorOut);
+		OSApp.Analog.addToObjectInt(popup, "#endpoint", sensorOut);
+
+		// Convert hex strings to integers for cluster_id and attribute_id
+		var clusterIdStr = popup.find("#cluster_id").val();
+		if (clusterIdStr) {
+			sensorOut.cluster_id = parseInt(clusterIdStr, 16);
+		}
+
+		var attributeIdStr = popup.find("#attribute_id").val();
+		if (attributeIdStr) {
+			sensorOut.attribute_id = parseInt(attributeIdStr, 16);
+		}
+
+		OSApp.Analog.addToObjectInt(popup, "#poll_interval", sensorOut);
+	}
+
+	// Bluetooth-specific fields
+	if (parseInt(popup.find("#type").val()) == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
+		OSApp.Analog.addToObjectStr(popup, "#device_mac", sensorOut);
+		OSApp.Analog.addToObjectStr(popup, "#service_uuid", sensorOut);
+		OSApp.Analog.addToObjectStr(popup, "#char_uuid", sensorOut);
+		OSApp.Analog.addToObjectInt(popup, "#poll_interval", sensorOut);
+	}
+
 	if (sensorOut.missingValue) {
 		OSApp.Errors.showError(OSApp.Language._('Please fill the required fields'));
 		sensorOut.missingValue.focus();
@@ -1624,6 +1750,24 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 		popup.popup("close");
 	}
 	return false;
+};
+
+// ZigBee device scanner
+// ZigBee and Bluetooth scanner functions are now in analog-util.js
+OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback) {
+	if (OSApp.AnalogUtil && OSApp.AnalogUtil.showZigBeeDeviceScanner) {
+		OSApp.AnalogUtil.showZigBeeDeviceScanner(popup, callback);
+	} else {
+		OSApp.Errors.showError("analog-util.js not loaded");
+	}
+};
+
+OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback) {
+	if (OSApp.AnalogUtil && OSApp.AnalogUtil.showBluetoothDeviceScanner) {
+		OSApp.AnalogUtil.showBluetoothDeviceScanner(popup, callback);
+	} else {
+		OSApp.Errors.showError("analog-util.js not loaded");
+	}
 }
 
 
@@ -1649,35 +1793,41 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			"<br>" +
 			OSApp.Language._("Last") + ": " + (sensor.last === undefined ? "" : OSApp.Dates.dateToString(new Date(sensor.last * 1000))) +
 			"</p>" +
-			"<label>" +	OSApp.Language._("Sensor-Nr") +	"</label>" +
+			"<label class='sensor_nr_label'>" +	OSApp.Language._("Sensor-Nr") +	"</label>" +
 			"<input class='nr' type='number' inputmode='decimal' min='1' max='99999' required value='" + sensor.nr + (sensor.nr > 0 ? "' disabled='disabled'>" : "'>") +
 
-			"<fieldset data-role='controlgroup' data-mini='true'>" +
-			"<label for='type'>" + OSApp.Language._("Type") + "</label>" +
-			"<select id='type' required>";
+		"<label class='name_label'>" + OSApp.Language._("Name") + "</label>" +
+		"<input class='name' type='text' maxlength='40' value='" + (sensor.name ? sensor.name : "") + "'>" +
 
-		for (i = 0; i < supportedSensorTypes.length; i++) {
-			list += "<option " + ((sensor.type === supportedSensorTypes[i].type) ? "selected" : "") +
-				" value='" + supportedSensorTypes[i].type + "'>" +
-				OSApp.Language._(supportedSensorTypes[i].name) + "</option>";
-		}
-		list += "</select>" +
+		"<label class='group_label'>" + OSApp.Language._("Group") + "</label>" +
+		"<input class='group' type='number' inputmode='decimal' min='0' max='255' value='" + (sensor.group ? sensor.group : "0") + "'>" +
+
+		"<fieldset data-role='controlgroup' data-mini='true'>" +
+		"<label for='type' class='type_label'>" + OSApp.Language._("Type") + "</label>" +
+		"<select id='type' required>";
+
+	for (i = 0; i < supportedSensorTypes.length; i++) {
+		list += "<option " + ((sensor.type === supportedSensorTypes[i].type) ? "selected" : "") +
+			" value='" + supportedSensorTypes[i].type + "'>" +
+			OSApp.Language._(supportedSensorTypes[i].name) + "</option>";
+	}
+	list += "</select>" +
+		"</fieldset>" +
 
 		//SMT 100 Edit ID Button:
-			"<button class='center-div' id='smt100id'>" + OSApp.Language._("Set SMT100 Modbus ID") + "</button>" +
+		"<button class='center-div' id='smt100id'>" + OSApp.Language._("Set SMT100 Modbus ID") + "</button>" +
 
 		//FYTA edit credentials button:
-			"<button class='center-div' id='fytasel'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>" +
-			"</fieldset>" +
+		"<button class='center-div' id='fytasel'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>" +
 
-			"<label>" + OSApp.Language._("Group") + "</label>" +
-			"<input class='group' type='number'  inputmode='decimal' min='0' max='99999' value='" + sensor.group + "'>" +
+		//ZigBee device scanner button:
+		"<button class='center-div' id='zigbeesel'>" + OSApp.Language._("Scan for ZigBee Devices") + "</button>" +
 
-			"<label>" + OSApp.Language._("Name") + "</label>" +
-			"<input class='name' type='text' maxlength='29' value='" + sensor.name + "' required>" +
+		//Bluetooth device scanner button:
+		"<button class='center-div' id='bluetoothsel'>" + OSApp.Language._("Scan for Bluetooth Devices") + "</button>" +
 
-			"<label class='ip_label'>" + OSApp.Language._("IP Address") + "</label>" +
-			"<input class='ip' type='text'  value='" + (sensor.ip ? OSApp.Analog.toByteArray(sensor.ip).join(".") : "") + "'>" +
+		"<label class='ip_label'>" + OSApp.Language._("IP Address") + "</label>" +
+		"<input class='ip' type='text'  value='" + (sensor.ip ? OSApp.Analog.toByteArray(sensor.ip).join(".") : "") + "'>" +
 
 			"<label class='port_label'>" + OSApp.Language._("Port") + "</label>" +
 			"<input class='port' type='number' inputmode='decimal' min='0' max='65535' value='" + sensor.port + "'>" +
@@ -1685,23 +1835,36 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			"<label class='id_label'>" + OSApp.Language._("ID") + "</label>" +
 			"<input class='id' type='number' inputmode='decimal' min='-2147483647' max='2147483647' value='" + sensor.id + "'>" +
 
-			"<div class='fac_container'>" +
-			"<label>" + OSApp.Language._("Factor") + "</label>" +
-			"<input type='number' id='factor' inputmode='decimal' min='-32768' max='32767' value='" + sensor.fac + "'>" +
+			"<div class='rs485_help' style='display:none; margin: 10px 0; padding: 10px; background-color: #f0f0f0; border-radius: 5px;'>" +
+			"<p style='margin: 0; font-size: 0.9em;'>" + OSApp.Language._("RS485 Configuration Help:") + "<br>" +
+			OSApp.Language._("For TCP/IP RS485 adapter: Enter IP address and port (e.g., 192.168.1.100:502)") + "<br>" +
+			OSApp.Language._("For I2C/USB RS485 adapter: Leave IP empty and set Port to device number (0-3)") + "<br>" +
+			OSApp.Language._("Modbus ID: The sensor's Modbus address (1-247)") + "</p>" +
 			"</div>" +
 
-			"<div class='div_container'>" +
-			"<label'>" + OSApp.Language._("Divider") + "</label>" +
-			"<input type='number' id='divider' inputmode='decimal' min='-32768' max='32767' value='" + sensor.div + "'>" +
-			"</div>" +
+			"<label class='rs485_port_label'>" + OSApp.Language._("RS485 Device/Port") + "</label>" +
+			"<input class='rs485_port' type='number' inputmode='decimal' min='0' max='65535' value='" + (sensor.port ? sensor.port : 0) + "'>" +
 
-			"<div class='offset_container'>" +
-			"<label>" + OSApp.Language._("Offset in millivolt") + "</label>" +
-			"<input type='number' id='offset' inputmode='decimal' min='-32768' max='32767' value='" + sensor.offset + "'>" +
-			"</div>" +
+			"<label class='rs485_id_label'>" + OSApp.Language._("Modbus ID") + "</label>" +
+			"<input class='rs485_id' type='number' inputmode='decimal' min='1' max='247' value='" + (sensor.id ? sensor.id : 1) + "'>" +
 
-			"<label class='chartunit_label'>" + OSApp.Language._("Chart Unit") + "</label>" +
-			"<select data-mini='true' id='unitid'>" +
+		"<div class='fac_container' style='display:none'>" +
+		"<label>" + OSApp.Language._("Factor") + "</label>" +
+		"<input type='number' id='factor' inputmode='decimal' min='-32768' max='32767' value='" + sensor.fac + "'>" +
+		"</div>" +
+
+		"<div class='div_container' style='display:none'>" +
+		"<label>" + OSApp.Language._("Divider") + "</label>" +
+		"<input type='number' id='divider' inputmode='decimal' min='-32768' max='32767' value='" + sensor.div + "'>" +
+	"</div>" +
+
+	"<div class='offset_container' style='display:none'>" +
+	"<label>" + OSApp.Language._("Offset in millivolt") + "</label>" +
+	"<input type='number' id='offset' inputmode='decimal' min='-32768' max='32767' value='" + sensor.offset + "'>" +
+	"</div>" +
+
+		"<label class='chartunit_label'>" + OSApp.Language._("Chart Unit") + "</label>" +
+		"<select data-mini='true' id='unitid'>" +
 			"<option value='0'>" + OSApp.Language._("Default") + "</option>" +
 			"<option value='1'>" + OSApp.Language._("Soil Moisture %") + "</option>" +
 			"<option value='2'>" + OSApp.Language._("Degree Celcius " + String.fromCharCode(176) + "C") + "</option>" +
@@ -1719,22 +1882,67 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			"<option value='99'>" + OSApp.Language._("Own Unit") + "</option>" +
 			"</select>" +
 
-			"<div class='unit_container'>" +
-			"<label>" + OSApp.Language._("Unit") + "</label>" +
-			"<input type='text' id='unit' value='" + (sensor.unit ? sensor.unit : "") + "'>" +
+		"<div class='unit_container' style='display:none'>" +
+	"<label>" + OSApp.Language._("Unit") + "</label>" +
+	"<input type='text' id='unit' maxlength='10' value='" + (sensor.unit ? sensor.unit : "") + "'>" +
+	"</div>" +
+
+		"<div class='topic_container' style='display:none'>" +
+	"<label>" + OSApp.Language._("MQTT Topic") + "</label>" +
+	"<input type='text' id='topic' maxlength='100' value='" + (sensor.topic ? sensor.topic : "") + "'>" +
+	"</div>" +
+
+		"<div class='filter_container' style='display:none'>" +
+	"<label>" + OSApp.Language._("MQTT Filter") + "</label>" +
+	"<input type='text' id='filter' maxlength='100' value='" + (sensor.filter ? sensor.filter : "") + "'>" +
+	"</div>" +
+
+			"<div class='zigbee_device_ieee_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("ZigBee Device IEEE Address") + "</label>" +
+			"<input type='text' id='device_ieee' value='" + (sensor.device_ieee ? sensor.device_ieee : "") + "' readonly>" +
 			"</div>" +
 
-			"<div class='topic_container'>" +
-			"<label>" + OSApp.Language._("MQTT Topic") + "</label>" +
-			"<input type='text' id='topic' value='" + (sensor.topic ? sensor.topic : "") + "'>" +
+			"<div class='zigbee_endpoint_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("Endpoint") + "</label>" +
+			"<input type='number' id='endpoint' inputmode='decimal' min='1' max='255' value='" + (sensor.endpoint ? sensor.endpoint : "1") + "'>" +
 			"</div>" +
 
-			"<div class='filter_container'>" +
-			"<label>" + OSApp.Language._("MQTT Filter") + "</label>" +
-			"<input type='text' id='filter' value='" + (sensor.filter ? sensor.filter : "") + "'>" +
+			"<div class='zigbee_cluster_id_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("Cluster ID (hex)") + "</label>" +
+			"<input type='text' id='cluster_id' value='" + (sensor.cluster_id ? "0x" + sensor.cluster_id.toString(16).toUpperCase().padStart(4, '0') : "0x0408") + "'>" +
 			"</div>" +
 
-			"<label>" + OSApp.Language._("Read Interval (s)") + "</label>" +
+			"<div class='zigbee_attribute_id_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("Attribute ID (hex)") + "</label>" +
+			"<input type='text' id='attribute_id' value='" + (sensor.attribute_id ? "0x" + sensor.attribute_id.toString(16).toUpperCase().padStart(4, '0') : "0x0000") + "'>" +
+			"</div>" +
+
+			"<div class='zigbee_poll_interval_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("Poll Interval (ms)") + "</label>" +
+			"<input type='number' id='poll_interval' inputmode='decimal' min='0' max='999999' value='" + (sensor.poll_interval ? sensor.poll_interval : "60000") + "'>" +
+			"</div>" +
+
+			"<div class='bluetooth_device_mac_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("Bluetooth Device MAC Address") + "</label>" +
+			"<input type='text' id='device_mac' value='" + (sensor.device_mac ? sensor.device_mac : "") + "' readonly>" +
+			"</div>" +
+
+			"<div class='bluetooth_service_uuid_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("Service UUID") + "</label>" +
+			"<input type='text' id='service_uuid' value='" + (sensor.service_uuid ? sensor.service_uuid : "") + "'>" +
+			"</div>" +
+
+			"<div class='bluetooth_char_uuid_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("Characteristic UUID") + "</label>" +
+			"<input type='text' id='char_uuid' value='" + (sensor.char_uuid ? sensor.char_uuid : "") + "'>" +
+			"</div>" +
+
+			"<div class='bluetooth_poll_interval_container' style='display:none'>" +
+			"<label>" + OSApp.Language._("Poll Interval (ms)") + "</label>" +
+			"<input type='number' id='poll_interval' inputmode='decimal' min='0' max='999999' value='" + (sensor.poll_interval ? sensor.poll_interval : "60000") + "'>" +
+			"</div>" +
+
+			"<label class='ri_label'>" + OSApp.Language._("Read Interval (s)") + "</label>" +
 			"<input class='ri' type='number' inputmode='decimal' min='1' max='999999' value='" + sensor.ri + "'>" +
 
 			"<label for='enable'><input data-mini='true' id='enable' type='checkbox' " + ((sensor.enable === 1) ? "checked='checked'" : "") + ">" +
@@ -1781,6 +1989,11 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			OSApp.Analog.updateSensorVisibility(popup, type);
 		});
 
+		popup.find("#unitid").change(function () {
+			var type = popup.find("#type").val();
+			OSApp.Analog.updateSensorVisibility(popup, type);
+		});
+
 		//SMT 100 Toolbox function: SET ID
 		popup.find("#smt100id").on("click", function () {
 			var nr = parseInt(popup.find(".nr").val()),
@@ -1793,6 +2006,55 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 						OSApp.Analog.updateAnalogSensor(callbackCancel);
 					});
 				});
+		});
+
+		//ZigBee: Scan for devices
+		popup.find("#zigbeesel").on("click", function (e) {
+			e.preventDefault();
+			OSApp.Analog.showZigBeeDeviceScanner(popup, function (device) {
+				// Set the IEEE address
+				popup.find("#device_ieee").val(device.ieee);
+
+				// Update the sensor name with the device model
+				var currentName = popup.find(".name").val();
+				if (!currentName || currentName.trim() === "") {
+					popup.find(".name").val(device.model);
+				}
+
+				// Set default values for typical ZigBee sensors
+				// These can be adjusted by the user afterward
+				if (device.model.toLowerCase().includes("temp")) {
+					popup.find("#cluster_id").val("0x0402"); // Temperature cluster
+					popup.find("#attribute_id").val("0x0000"); // Measured value
+				} else if (device.model.toLowerCase().includes("humid")) {
+					popup.find("#cluster_id").val("0x0405"); // Humidity cluster
+					popup.find("#attribute_id").val("0x0000"); // Measured value
+				} else if (device.model.toLowerCase().includes("soil") || device.model.toLowerCase().includes("moist")) {
+					popup.find("#cluster_id").val("0x0408"); // Soil moisture cluster
+					popup.find("#attribute_id").val("0x0000"); // Measured value
+				}
+
+				popup.find(".name").focus();
+			});
+			return false;
+		});
+
+		//Bluetooth: Scan for devices
+		popup.find("#bluetoothsel").on("click", function (e) {
+			e.preventDefault();
+			OSApp.Analog.showBluetoothDeviceScanner(popup, function (device) {
+				// Set the MAC address
+				popup.find("#device_mac").val(device.mac);
+
+				// Update the sensor name with the device name
+				var currentName = popup.find(".name").val();
+				if (!currentName || currentName.trim() === "") {
+					popup.find(".name").val(device.name);
+				}
+
+				popup.find(".name").focus();
+			});
+			return false;
 		});
 
 		//FYTA: Select Sensor
@@ -1844,7 +2106,11 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 
 		popup.find("#type").change(function () {
 			var type = parseInt(popup.find("#type").val());
+			// Update button visibility based on sensor type
 			document.getElementById("smt100id").style.display = OSApp.Analog.isSmt100(type) ? "block" : "none";
+			document.getElementById("fytasel").style.display = (type == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE || type == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE) ? "block" : "none";
+			document.getElementById("zigbeesel").style.display = (type == OSApp.Analog.Constants.SENSOR_ZIGBEE) ? "block" : "none";
+			document.getElementById("bluetoothsel").style.display = (type == OSApp.Analog.Constants.SENSOR_BLUETOOTH) ? "block" : "none";
 		});
 
 		//download log:
@@ -1997,7 +2263,15 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 		// Add a new analog sensor:
 		list.find(".add-sensor").on("click", function () {
+			// Find highest sensor number and add 1
+			var maxNr = 0;
+			for (var i = 0; i < OSApp.Analog.analogSensors.length; i++) {
+				if (OSApp.Analog.analogSensors[i].nr > maxNr) {
+					maxNr = OSApp.Analog.analogSensors[i].nr;
+				}
+			}
 			var sensor = {
+				nr: maxNr + 1,
 				name: "new sensor",
 				type: 1,
 				ri: 600,
@@ -2297,7 +2571,7 @@ OSApp.Analog.setupFytaCredentials = function() {
 		resetFyta.fyta.password = "";
 		OSApp.Analog.sendToOsObj("/co?pw=", resetFyta);
 	});
-};1
+};
 
 OSApp.Analog.buildSensorConfig = function() {
 
@@ -2316,7 +2590,6 @@ OSApp.Analog.buildSensorConfig = function() {
 		if (detected & OSApp.Analog.Constants.RS485_TRUEBNER3) boards.push("RS485-Adapter Truebner 3");
 		if (detected & OSApp.Analog.Constants.RS485_TRUEBNER4) boards.push("RS485-Adapter Truebner 4");
 		if (detected & OSApp.Analog.Constants.OSPI_USB_RS485) boards.push("OSPI USB-RS485-Adapter");
-		if (detected & OSApp.Analog.Constants.RS485_I2C) boards.push("RS485-Adapter");
 		if (detected == 0) boards.push("No Boards detected");
 		if (detected && boards.length == 0) boards.push("Unknown Adapter");
 		detected_boards = ": " + boards.filter(Boolean).join(", ");
@@ -2656,14 +2929,17 @@ OSApp.Analog.updateCharts = function(limit2sensor) {
 		chart2 = new Array(OSApp.Analog.Constants.CHARTS),
 		chart3 = new Array(OSApp.Analog.Constants.CHARTS);
 
-	var limit = OSApp.currentSession.token ? "&max=5500" : ""; //download limit is 140kb, 5500 lines ca 137kb
+	var esp32 = OSApp.Analog.isESP32();
+	var limit = (OSApp.currentSession.token && !esp32) ? "&max=5500" : ""; //download limit is 140kb, 5500 lines ca 137kb
+	var lvl0 = esp32 ? "/so?pw=&lasthours=96&csv=2" : "/so?pw=&lasthours=48&csv=2";
+	var lvl0text = esp32 ? OSApp.Language._("last 96h") : OSApp.Language._("last 48h");
 	var tzo = OSApp.Dates.getTimezoneOffsetOS() * 60;
 	if (limit2sensor)
 		limit += "&nr="+limit2sensor;
 
 	OSApp.UIDom.showLoading( "#myChart0" );
-	OSApp.Firmware.sendToOS("/so?pw=&lasthours=48&csv=2" + limit, "text", 90000).then(function (csv1) {
-		OSApp.Analog.buildGraph("#myChart", chart1, csv1, OSApp.Language._("last 48h"), "HH:mm", tzo, 0);
+	OSApp.Firmware.sendToOS( lvl0 + limit, "text", 90000).then(function (csv1) {
+		OSApp.Analog.buildGraph("#myChart", chart1, csv1, lvl0text, "HH:mm", tzo, 0);
 
 		OSApp.UIDom.showLoading( "#myChartW0" );
 		OSApp.Firmware.sendToOS("/so?pw=&csv=2&log=1" + limit, "text", 90000).then(function (csv2) {
@@ -2682,7 +2958,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 
 	var legends = [], opacities = [], widths = [], colors = [], coloridx = 0;
 	let canExport = !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS;
-    let combine = 0;//lvl==0;
+	let combine = 0;//lvl==0;
 	let AllOptions = [];
 	for (var j = 0; j < OSApp.Analog.analogSensors.length; j++) {
 		var sensor = OSApp.Analog.analogSensors[j];
@@ -2712,7 +2988,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 				else {
 					var key;
 					var fac;
-					if (lvl == 1) //week values
+					if (lvl === 1) //week values
 						fac = 7 * 24 * 60 * 60;
 					else //month values
 						fac = 30 * 24 * 60 * 60;
@@ -2735,7 +3011,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 			}
 		}
 
-		if (logdata.length < 3) continue;
+		if (logdata.length < 2) continue;
 
 		//add current value as forecast data:
 		let date = new Date();

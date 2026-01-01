@@ -72,7 +72,8 @@ OSApp.About.displayPage = function() {
 		page.find( ".hardware" ).toggleClass( "hidden", showHardware ).text( OSApp.Firmware.getHWVersion() + OSApp.Firmware.getHWType() );
 		page.find( ".hardwareLabel" ).toggleClass( "hidden", showHardware );
 
-		page.find( ".firmware" ).text( OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion() + ( OSApp.Analog.checkAnalogSensorAvail() ? " - ASB" : "" ) );
+		page.find( ".firmware" ).text( OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion() + 
+		(  OSApp.currentSession.controller.options? (" - "+OSApp.currentSession.controller.options.feature) : "" ) );
 
 		page.one( "pagehide", function() {
 			page.detach();

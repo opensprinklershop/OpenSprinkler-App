@@ -2510,3 +2510,289 @@ msgstr ""
 
 msgid "Please update firmware to "
 msgstr ""
+
+msgid "ZigBee Device Scanner"
+msgstr ""
+
+msgid "Scanning for ZigBee devices..."
+msgstr ""
+
+msgid "Please pair your device now (60 seconds)."
+msgstr ""
+
+msgid "No devices found yet. Please pair your device."
+msgstr ""
+
+msgid "Scan for ZigBee Devices"
+msgstr ""
+
+msgid "ZigBee Device IEEE Address"
+msgstr ""
+
+msgid "Endpoint"
+msgstr ""
+
+msgid "Cluster ID (hex)"
+msgstr ""
+
+msgid "Attribute ID (hex)"
+msgstr ""
+
+msgid "Poll Interval (ms)"
+msgstr ""
+
+msgid "NEW"
+msgstr ""
+
+msgid "Manufacturer"
+msgstr ""
+
+msgid "Short Address"
+msgstr ""
+
+msgid "Failed to start ZigBee scanning. Please ensure ZigBee is supported."
+msgstr ""
+
+msgid "Activated"
+msgstr ""
+
+msgid "Add monitor"
+msgstr ""
+
+msgid "Adjustment-Name"
+msgstr ""
+
+msgid "Adjustment preview"
+msgstr ""
+
+msgid "Adjustments in %"
+msgstr ""
+
+msgid "Air Humidity %"
+msgstr ""
+
+msgid "Are you sure you want to delete this monitor?"
+msgstr ""
+
+msgid "Chart Unit"
+msgstr ""
+
+msgid "Default"
+msgstr ""
+
+msgid "Degree Celcius °C"
+msgstr ""
+
+msgid "Degree Fahrenheit °F"
+msgstr ""
+
+msgid "Digital Sensor Port"
+msgstr ""
+
+msgid "display log"
+msgstr ""
+
+msgid "DK"
+msgstr ""
+
+msgid "Edit monitor and control"
+msgstr ""
+
+msgid "E-Mail"
+msgstr ""
+
+msgid "Factor 1 in % (adjustment for min)"
+msgstr ""
+
+msgid "Factor 2 in % (adjustment for max)"
+msgstr ""
+
+msgid "For I2C/USB RS485 adapter: Leave IP empty and set Port to device number (0-3)"
+msgstr ""
+
+msgid "For TCP/IP RS485 adapter: Enter IP address and port (e.g., 192.168.1.100:502)"
+msgstr ""
+
+msgid "From"
+msgstr ""
+
+msgid "FYTA Setup"
+msgstr ""
+
+msgid "Inch in"
+msgstr ""
+
+msgid "IP"
+msgstr ""
+
+msgid "KM/H"
+msgstr ""
+
+msgid "last 48h"
+msgstr ""
+
+msgid "last 96h"
+msgstr ""
+
+msgid "Level %"
+msgstr ""
+
+msgid "lm"
+msgstr ""
+
+msgid "Log"
+msgstr ""
+
+msgid "Lumen"
+msgstr ""
+
+msgid "Lumen (lm)"
+msgstr ""
+
+msgid "LUX"
+msgstr ""
+
+msgid "LUX (lx)"
+msgstr ""
+
+msgid "lx"
+msgstr ""
+
+msgid "Max runtime (s)"
+msgstr ""
+
+msgid "Medium"
+msgstr ""
+
+msgid "Millimeter mm"
+msgstr ""
+
+msgid "Modbus ID"
+msgstr ""
+
+msgid "Modbus ID: The sensor's Modbus address (1-247)"
+msgstr ""
+
+msgid "Monitor"
+msgstr ""
+
+msgid "Monitor 1"
+msgstr ""
+
+msgid "Monitor 2"
+msgstr ""
+
+msgid "Monitor 3"
+msgstr ""
+
+msgid "Monitor 4"
+msgstr ""
+
+msgid "Monitor-Name"
+msgstr ""
+
+msgid "Monitor-Nr"
+msgstr ""
+
+msgid "MPH"
+msgstr ""
+
+msgid "MQTT Filter"
+msgstr ""
+
+msgid "MQTT Topic"
+msgstr ""
+
+msgid "Nr"
+msgstr ""
+
+msgid "Offset in millivolt"
+msgstr ""
+
+msgid "Own Unit"
+msgstr ""
+
+msgid "Program to start"
+msgstr ""
+
+msgid "Remote Monitor nr"
+msgstr ""
+
+msgid "RS485 Configuration Help:"
+msgstr ""
+
+msgid "RS485 Device/Port"
+msgstr ""
+
+msgid "Sensor 1"
+msgstr ""
+
+msgid "Sensor 2"
+msgstr ""
+
+msgid "S.Nr"
+msgstr ""
+
+msgid "Soil Moisture %"
+msgstr ""
+
+msgid "TIME"
+msgstr ""
+
+msgid "To"
+msgstr ""
+
+msgid "Value 1"
+msgstr ""
+
+msgid "Value 2"
+msgstr ""
+
+msgid "Value for activate"
+msgstr ""
+
+msgid "Value for deactivate"
+msgstr ""
+
+msgid "Volt V"
+msgstr ""
+
+msgid "Weekdays"
+msgstr ""
+
+msgid "Zone"
+msgstr ""
+
+msgid "Zone to start"
+msgstr ""
+
+# Bluetooth Sensor Strings
+msgid "Bluetooth Device Scanner"
+msgstr ""
+
+msgid "Scanning for Bluetooth devices..."
+msgstr ""
+
+msgid "Please activate your device now (60 seconds)."
+msgstr ""
+
+msgid "No devices found yet. Please activate your device."
+msgstr ""
+
+msgid "Failed to start Bluetooth scanning. Please ensure Bluetooth is supported."
+msgstr ""
+
+msgid "Scan for Bluetooth Devices"
+msgstr ""
+
+msgid "Bluetooth Device MAC Address"
+msgstr ""
+
+msgid "Service UUID"
+msgstr ""
+
+msgid "Characteristic UUID"
+msgstr ""
+
+msgid "Unknown Device"
+msgstr ""
