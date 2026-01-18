@@ -544,6 +544,11 @@ OSApp.UIDom.initAppData = function() {
 	// Initialize external panel
 	OSApp.UIDom.bindPanel();
 
+	// Apply theme mode after UI is ready
+	OSApp.Storage.get( "uiTheme", function( data ) {
+		OSApp.UIDom.setThemeMode( data.uiTheme || OSApp.uiState.theme.mode || "light", false );
+	} );
+
 	// Update the IP address of the device running the app
 	if ( !OSApp.currentSession.local  && typeof window.cordova === "undefined" ) {
 		OSApp.Network.updateDeviceIP();
@@ -613,6 +618,11 @@ OSApp.UIDom.bindPanel = function() {
 	panel.find( "a[href='#debugWU']" ).on( "click", OSApp.SystemDiagnostics.showDiagnostics );
 
 	panel.find( "a[href='#localization']" ).on( "click", OSApp.Language.languageSelect );
+
+	panel.find( ".theme-toggle" ).on( "click", function() {
+		OSApp.UIDom.showThemeSelector( $( this ) );
+		return false;
+	} );
 
 	panel.find( ".export_config" ).on( "click", function() {
 
@@ -804,6 +814,34 @@ OSApp.UIDom.insertStyle = function( style ) {
 
 // Transition to home page after successful load
 OSApp.UIDom.goHome = function( firstLoad ) {
+	if ( firstLoad === true ) {
+		var hash = window.location.hash || "";
+		var allowed = {
+			"#sprinklers": true,
+			"#site-control": true,
+			"#programs": true,
+			"#addprogram": true,
+			"#manual": true,
+			"#runonce": true,
+			"#os-options": true,
+			"#logs": true,
+			"#forecast": true,
+			"#preview": true,
+			"#about": true,
+			"#analogsensorconfig": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail(),
+			"#analogsensorchart": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail()
+		};
+
+		if ( hash && allowed[ hash ] ) {
+			OSApp.UIDom.changePage( hash, {
+				"firstLoad": true,
+				"OSApp.UIDom.showLoading": false,
+				"transition": "none"
+			} );
+			return;
+		}
+	}
+
 	if ( $( ".ui-page-active" ).attr( "id" ) !== "sprinklers" ) {
 		$.mobile.document.one( "pageshow", function() {
 
@@ -847,7 +885,11 @@ OSApp.UIDom.goBack = function() {
 
 	if ( page === "sprinklers" || page === "start" || managerStart ) {
 		try {
-			navigator.app.exitApp();
+			if ( navigator && navigator.app && typeof navigator.app.exitApp === "function" ) {
+				navigator.app.exitApp();
+			} else {
+				window.location.hash = "#sprinklers";
+			}
 			//eslint-disable-next-line
 		} catch ( err ) {}
 	} else {
@@ -856,7 +898,11 @@ OSApp.UIDom.goBack = function() {
 		}
 
 		if ( OSApp.uiState.pageHistoryCount === 0 ) {
-			navigator.app.exitApp();
+			if ( navigator && navigator.app && typeof navigator.app.exitApp === "function" ) {
+				navigator.app.exitApp();
+			} else {
+				window.location.hash = "#sprinklers";
+			}
 		} else {
 			OSApp.uiState.goingBack = true;
 			$.mobile.back();
@@ -942,6 +988,72 @@ OSApp.UIDom.getPageTop = function() {
 		x: ( theWindow[ 0 ].innerWidth || theWindow.width() ) / 2 + theWindow.scrollLeft(),
 		y: theWindow.scrollTop() + 22.5
 	};
+};
+
+OSApp.UIDom.setThemeMode = function( mode, persist ) {
+	var themes = OSApp.uiState.theme && OSApp.uiState.theme.presets ? OSApp.uiState.theme.presets : {};
+
+	if ( !themes[ mode ] ) {
+		mode = "light";
+	}
+
+	OSApp.uiState.theme.mode = mode;
+	if ( themes[ mode ] ) {
+		OSApp.uiState.theme.statusBarPrimary = themes[ mode ].statusBarPrimary;
+		OSApp.uiState.theme.statusBarOverlay = themes[ mode ].statusBarOverlay;
+	}
+
+	var root = document.documentElement;
+	root.classList.remove( "theme-dark", "theme-colorful" );
+	if ( mode === "dark" ) {
+		root.classList.add( "theme-dark" );
+	} else if ( mode === "colorful" ) {
+		root.classList.add( "theme-colorful" );
+	}
+
+	if ( persist !== false ) {
+		OSApp.Storage.set( { uiTheme: mode } );
+	}
+
+	try {
+		StatusBar.backgroundColorByHexString( OSApp.uiState.theme.statusBarPrimary );
+		//eslint-disable-next-line
+	} catch ( err ) {}
+};
+
+OSApp.UIDom.showThemeSelector = function( button ) {
+	$( "#themeSelect" ).popup( "destroy" ).remove();
+
+	var popup = $( "<div data-role='popup' data-theme='a' id='themeSelect'>" +
+			"<ul data-role='listview' data-inset='true' data-corners='false'>" +
+				"<li data-role='list-divider'>" + OSApp.Language._( "Theme" ) + "</li>" +
+				"<li><a href='#' data-theme-mode='light'>" + OSApp.Language._( "Light Mode" ) + "</a></li>" +
+				"<li><a href='#' data-theme-mode='dark'>" + OSApp.Language._( "Dark Mode" ) + "</a></li>" +
+				"<li><a href='#' data-theme-mode='colorful'>" + OSApp.Language._( "Colorful Mode" ) + "</a></li>" +
+			"</ul>" +
+		"</div>" ),
+		updateSelection = function() {
+			popup.find( "a" ).each( function() {
+				var item = $( this );
+				if ( item.data( "theme-mode" ) === OSApp.uiState.theme.mode ) {
+					item.removeClass( "ui-icon-carat-r" ).addClass( "ui-icon-check" );
+				} else {
+					item.removeClass( "ui-icon-check" ).addClass( "ui-icon-carat-r" );
+				}
+			} );
+		};
+
+	popup.on( "click", "a", function() {
+		var mode = $( this ).data( "theme-mode" );
+		OSApp.UIDom.setThemeMode( mode );
+		popup.popup( "close" );
+		return false;
+	} );
+
+	OSApp.UIDom.openPopup( popup, { positionTo: button || "window" } );
+	updateSelection();
+
+	return false;
 };
 
 // Show loading indicator within element(s)
@@ -1875,7 +1987,7 @@ OSApp.UIDom.showPause = function() {
 		popup.find("#extend-pause").on("click", function() {
 			popup.popup( "close" );
 			OSApp.UIDom.showDurationBox( {
-				title: "Extend Current Pause By",
+				title: OSApp.Language._( "Extend Current Pause By" ),
 				incrementalUpdate: false,
 				maximum: 65535,
 				callback: function( duration ) {
@@ -1891,7 +2003,7 @@ OSApp.UIDom.showPause = function() {
 		popup.find("#new-pause").on("click", function() {
 			popup.popup( "close" );
 			OSApp.UIDom.showDurationBox( {
-				title: "Replace Current Pause By",
+				title: OSApp.Language._( "Replace Current Pause By" ),
 				incrementalUpdate: false,
 				maximum: 65535,
 				callback: function( duration ) {
@@ -1914,7 +2026,7 @@ OSApp.UIDom.showPause = function() {
 		OSApp.UIDom.openPopup( $( popup ) );
 	} else {
 		OSApp.UIDom.showDurationBox( {
-			title: "Pause Station Runs For",
+			title: OSApp.Language._( "Pause Station Runs For" ),
 			incrementalUpdate: false,
 			maximum: 65535,
 			callback: function( duration ) {

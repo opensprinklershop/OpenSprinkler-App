@@ -148,4 +148,14 @@ OSApp.Storage.loadLocalSettings = function() {
 			default:
 		}
 	} );
+        OSApp.Storage.get( "uiTheme", function( data ) {
+                if ( typeof data.uiTheme === "string" && data.uiTheme ) {
+                        OSApp.uiState.theme.mode = data.uiTheme;
+                        if ( OSApp.UIDom && typeof OSApp.UIDom.setThemeMode === "function" ) {
+                                OSApp.UIDom.setThemeMode( data.uiTheme, false );
+                        }
+                } else if ( OSApp.UIDom && typeof OSApp.UIDom.setThemeMode === "function" ) {
+                        OSApp.UIDom.setThemeMode( OSApp.uiState.theme.mode || "light", false );
+                }
+        } );
 };

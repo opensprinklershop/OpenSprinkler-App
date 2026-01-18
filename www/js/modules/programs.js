@@ -416,8 +416,6 @@ OSApp.Programs.displayPageRunOnce = function() {
 
 			// Show repeating start time options
 			list += "<div id='input_stype_repeat-runonce'>";
-			// Show repeating start time options
-			list += "<div id='input_stype_repeat-runonce'>";
 			list += "<div class='ui-grid-a'>";
 			list += "<div class='ui-block-a'><label class='pad_buttons center' for='interval-runonce'>" + OSApp.Language._( "Repeat Every" ) + "</label>" +
 				"<button class='pad_buttons' data-mini='true' name='interval-runonce' id='interval-runonce' " +
@@ -506,7 +504,7 @@ OSApp.Programs.displayPageRunOnce = function() {
 				OSApp.UIDom.showDurationBox( {
 					incrementalUpdate: false,
 					seconds: 60,
-					title: "Set Duration",
+					title: OSApp.Language._( "Set Duration" ),
 					callback: function( result ) {
 						fillRunonce( Array.apply( null, Array( OSApp.currentSession.controller.stations.snames.length ) ).map( function() {return result;} ) );
 					},
@@ -2307,7 +2305,7 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 		var displayRuntime = "" + (hours/10>>0) + (hours%10);
 		displayRuntime += ":" + (minutes/10>>0) + (minutes%10);
 		displayRuntime += ":" + (seconds/10>>0) + (seconds%10);
-		page.find( "#station-head" ).text("Stations (Total Program Run Time: " + displayRuntime + ")");
+		page.find( "#station-head" ).text( OSApp.Language._( "Stations" ) + " (" + OSApp.Language._( "Total Program Run Time" ) + ": " + displayRuntime + ")" );
 	}
 
 	updateProgramTime();
@@ -2379,7 +2377,7 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 	page.find( "#set-all" ).on( "click", function (){
 		OSApp.UIDom.showDurationBox( {
 			seconds: 60,
-			title: "Set Duration",
+			title: OSApp.Language._( "Set Duration" ),
 			incrementalUpdate: false,
 			callback: function( result ) {
 				page.find( "[id^=station_]" ).each( function() {

@@ -172,7 +172,7 @@ OSApp.Sites.displayPage = function() {
 				} );
 
 				list.find( ".connectnow" ).on( "click", function() {
-					OSApp.Sites.updateSite( siteNames[ $( this ).data( "site" ) ] );
+					OSApp.Sites.updateSite( siteNames[ $( this ).data( "site" ) ], { goSprinklers: true } );
 					return false;
 				} );
 
@@ -1356,11 +1356,15 @@ OSApp.Sites.updateControllerStationSpecial = function( callback ) {
 };
 
 // Change the current site (needs to be defined AFTER OSApp.Sites.checkConfigured!)
-OSApp.Sites.updateSite = function( newsite ) {
+OSApp.Sites.updateSite = function( newsite, opts ) {
+	opts = opts || {};
 	OSApp.Storage.get( "sites", function( data ) {
 		var sites = OSApp.Sites.parseSites( data.sites );
 		if ( newsite in sites ) {
 			OSApp.UIDom.closePanel( function() {
+				if ( opts.goSprinklers ) {
+					window.location.hash = "#sprinklers";
+				}
 				OSApp.Storage.set( { "current_site":newsite }, () => OSApp.Sites.checkConfigured() );
 			} );
 		}

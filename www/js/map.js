@@ -15,7 +15,7 @@
 
 // Create the script tag, set the appropriate attributes
 var script = document.createElement( "script" );
-script.src = "https://maps.googleapis.com/maps/api/js?key=GOOGLEMAPSAPIKEY&libraries=places&callback=initMap";
+script.src = "https://maps.googleapis.com/maps/api/js?key=&libraries=places,marker&callback=initMap&loading=async";
 script.async = true;
 
 // Attach your callback function to the `window` object
@@ -47,6 +47,7 @@ window.initMap = function() {
                 streetViewControl: false,
                 mapTypeControl: false,
                 mapTypeId: google.maps.MapTypeId.ROADMAP,
+                mapId: "DEMO_MAP_ID",
                 zoomControl: true,
                 zoomControlOptions: {
                     position: google.maps.ControlPosition.LEFT_BOTTOM
@@ -60,23 +61,21 @@ window.initMap = function() {
             map = new google.maps.Map( document.getElementById( "map_canvas" ), myOptions );
             infoWindow = new google.maps.InfoWindow();
 
-            // Setup SearchBox for auto completion
+            // Setup Autocomplete for auto completion
             var controlBox = document.getElementById( "customControls" ),
                 searchField = document.getElementById( "pac-input" ),
-                searchBox = new google.maps.places.SearchBox( searchField );
+                autocomplete = new google.maps.places.Autocomplete( searchField );
 
             controlBox.style.display = "block";
 
             map.controls[ google.maps.ControlPosition.TOP_LEFT ].push( controlBox );
 
-            // Bias the SearchBox results towards current map's viewport.
-            map.addListener( "bounds_changed", function() {
-                searchBox.setBounds( map.getBounds() );
-            } );
+            // Bias the Autocomplete results towards current map's viewport.
+            autocomplete.bindTo( "bounds", map );
 
-            searchBox.addListener( "places_changed", function() {
-                var places = searchBox.getPlaces();
-                if ( places.length === 0 ) {
+            autocomplete.addListener( "place_changed", function() {
+                var place = autocomplete.getPlace();
+                if ( !place.geometry || !place.geometry.location ) {
                     return;
                 }
 
@@ -84,8 +83,8 @@ window.initMap = function() {
                     droppedPin.setMap( null );
                     droppedPin = null;
                 }
-                droppedPin = plotMarker( "origin", { message: "Selected Location" }, places[ 0 ].geometry.location.lat(), places[ 0 ].geometry.location.lng() );
-                map.setCenter( droppedPin.getPosition() );
+                droppedPin = plotMarker( "origin", { message: "Selected Location" }, place.geometry.location.lat(), place.geometry.location.lng() );
+                map.setCenter( droppedPin.position );
             } );
 
             var jumpToCurrent = document.getElementById( "jumpCurrent" );
@@ -184,13 +183,21 @@ window.initMap = function() {
 
     // Plot an individual station on the map
     function plotMarker( type, data, lat, lon ) {
-        var marker = new google.maps.Marker( {
-            position: new google.maps.LatLng( lat, lon ),
-            map: map,
-            icon: type === "origin" ? "https://maps.google.com/mapfiles/ms/icons/red-dot.png" : "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+        // Create custom pin element for AdvancedMarkerElement
+        var pinElement = new google.maps.marker.PinElement( {
+            background: type === "origin" ? "#EA4335" : "#4285F4",
+            borderColor: "#FFFFFF",
+            glyphColor: "#FFFFFF"
         } );
 
-        google.maps.event.addListener( marker, "click", function() {
+        var marker = new google.maps.marker.AdvancedMarkerElement( {
+            position: { lat: lat, lng: lon },
+            map: map,
+            content: pinElement.element,
+            title: data.message || ""
+        } );
+
+        marker.addListener( "click", function() {
             infoWindow.close();
             var html = createInfoWindow( type, data, lat + "," + lon );
             infoWindow = new google.maps.InfoWindow( {
@@ -202,7 +209,17 @@ window.initMap = function() {
         markers[ type ].push( marker );
 
         if ( data.message === "Selected Location" ) {
-            google.maps.event.trigger( marker, "click" );
+            marker.addListener( "click", function() {
+                infoWindow.close();
+                var html = createInfoWindow( type, data, lat + "," + lon );
+                infoWindow = new google.maps.InfoWindow( {
+                    content: html
+                } );
+                infoWindow.open( map, marker );
+            } );
+            // Trigger click event
+            var clickEvent = new Event( "click" );
+            marker.content.dispatchEvent( clickEvent );
         }
 
         return marker;
@@ -227,9 +244,10 @@ window.initMap = function() {
         if ( current.lat() !== -90 && current.lng() !== 81 ) {
             current = plotMarker( "origin", { message: "Current Location" }, current.lat(), current.lng() );
 
-            map.setCenter( { lat: current.getPosition().lat(), lng: current.getPosition().lng() } );
+            map.setCenter( { lat: current.position.lat, lng: current.position.lng } );
             infoWindow.close();
-            google.maps.event.trigger( current, "click" );
+            var clickEvent = new Event( "click" );
+            current.content.dispatchEvent( clickEvent );
         }
     }
 

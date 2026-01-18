@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f2ff"/>
+      <stop offset="1" stop-color="#fff6f1"/>
+    </linearGradient>
+    <radialGradient id="petalPink" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#ffd1dc" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffb3c6" stop-opacity="0.7"/>
+    </radialGradient>
+    <radialGradient id="petalBlue" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#cfe9ff" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#a5d8ff" stop-opacity="0.7"/>
+    </radialGradient>
+    <radialGradient id="petalYellow" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fff3b0" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#ffe066" stop-opacity="0.7"/>
+    </radialGradient>
+    <filter id="softBlur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#bg)"/>
+
+  <!-- Soft floral clusters -->
+  <g filter="url(#softBlur)" opacity="0.65">
+    <g transform="translate(220 180)">
+      <circle r="70" cx="0" cy="0" fill="url(#petalPink)"/>
+      <circle r="55" cx="0" cy="-85" fill="url(#petalPink)"/>
+      <circle r="55" cx="80" cy="-45" fill="url(#petalBlue)"/>
+      <circle r="55" cx="80" cy="45" fill="url(#petalPink)"/>
+      <circle r="55" cx="0" cy="85" fill="url(#petalBlue)"/>
+      <circle r="55" cx="-80" cy="45" fill="url(#petalPink)"/>
+      <circle r="55" cx="-80" cy="-45" fill="url(#petalBlue)"/>
+      <circle r="30" cx="0" cy="0" fill="url(#petalYellow)"/>
+    </g>
+
+    <g transform="translate(1220 260)">
+      <circle r="60" cx="0" cy="0" fill="url(#petalBlue)"/>
+      <circle r="45" cx="0" cy="-70" fill="url(#petalPink)"/>
+      <circle r="45" cx="65" cy="-35" fill="url(#petalBlue)"/>
+      <circle r="45" cx="65" cy="35" fill="url(#petalPink)"/>
+      <circle r="45" cx="0" cy="70" fill="url(#petalBlue)"/>
+      <circle r="45" cx="-65" cy="35" fill="url(#petalPink)"/>
+      <circle r="45" cx="-65" cy="-35" fill="url(#petalBlue)"/>
+      <circle r="26" cx="0" cy="0" fill="url(#petalYellow)"/>
+    </g>
+
+    <g transform="translate(520 760)">
+      <circle r="75" cx="0" cy="0" fill="url(#petalPink)"/>
+      <circle r="55" cx="0" cy="-90" fill="url(#petalBlue)"/>
+      <circle r="55" cx="85" cy="-45" fill="url(#petalPink)"/>
+      <circle r="55" cx="85" cy="45" fill="url(#petalBlue)"/>
+      <circle r="55" cx="0" cy="90" fill="url(#petalPink)"/>
+      <circle r="55" cx="-85" cy="45" fill="url(#petalBlue)"/>
+      <circle r="55" cx="-85" cy="-45" fill="url(#petalPink)"/>
+      <circle r="32" cx="0" cy="0" fill="url(#petalYellow)"/>
+    </g>
+  </g>
+
+  <!-- Subtle petals scatter -->
+  <g opacity="0.25">
+    <ellipse cx="980" cy="720" rx="220" ry="90" fill="#ffe5ec"/>
+    <ellipse cx="360" cy="520" rx="240" ry="100" fill="#e7f5ff"/>
+    <ellipse cx="1180" cy="520" rx="260" ry="110" fill="#fff3bf"/>
+  </g>
+</svg>

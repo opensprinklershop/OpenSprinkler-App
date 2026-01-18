@@ -994,9 +994,9 @@ OSApp.Weather.getWeatherError = function( err ) {
 	var errType = Math.floor( err / 10 );
 
 	if ( err in OSApp.Weather.Constants.weatherErrors ) {
-		return OSApp.Weather.Constants.weatherErrors[ err ];
+		return OSApp.Language._( OSApp.Weather.Constants.weatherErrors[ err ] );
 	} else if ( err <= 59 && err >= 10 && errType in OSApp.Weather.Constants.weatherErrors ) {
-		return OSApp.Weather.Constants.weatherErrors[ errType ];
+		return OSApp.Language._( OSApp.Weather.Constants.weatherErrors[ errType ] );
 	}
 
 	return OSApp.Language._( "Unrecognised" ) + " (" + err + ")";

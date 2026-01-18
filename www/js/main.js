@@ -101,6 +101,21 @@ OSApp.uiState = {
 	showWeatherOptionsCorruptedNotification: false,
 	switching: false,
 	theme: { // Define the status bar color(s) and use a darker color for Android
+		mode: "light",
+		presets: {
+			light: {
+				statusBarPrimary: OSApp.currentDevice.isAndroid ? "#121212" : "#1D1D1D",
+				statusBarOverlay: OSApp.currentDevice.isAndroid ? "#151515" : "#202020"
+			},
+			dark: {
+				statusBarPrimary: OSApp.currentDevice.isAndroid ? "#0A0A0A" : "#0F1115",
+				statusBarOverlay: OSApp.currentDevice.isAndroid ? "#0F0F0F" : "#151A22"
+			},
+			colorful: {
+				statusBarPrimary: "#6D5BFF",
+				statusBarOverlay: "#7FD5FF"
+			}
+		},
 		statusBarPrimary: OSApp.currentDevice.isAndroid ? "#121212" : "#1D1D1D",
 		statusBarOverlay: OSApp.currentDevice.isAndroid ? "#151515" : "#202020"
 	},

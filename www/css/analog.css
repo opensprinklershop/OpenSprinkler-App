@@ -39,6 +39,34 @@
 	background: lightskyblue;
 }
 
+/* Theme overrides for analog sensor table */
+html.theme-dark #analogsensorlist table,
+html.theme-dark #analogsensorlist table tr,
+html.theme-dark #analogsensorlist table th,
+html.theme-dark #analogsensorlist table td {
+	background: #000000 !important;
+	color: #e6e6e6 !important;
+	border-color: #2b3340 !important;
+}
+html.theme-dark #analogsensorlist table th {
+	background: #1b212b !important;
+	color: #e6e6e6 !important;
+}
+
+html.theme-colorful #analogsensorlist table,
+html.theme-colorful #analogsensorlist table tr {
+	background: transparent !important;
+}
+html.theme-colorful #analogsensorlist table th,
+html.theme-colorful #analogsensorlist table td {
+	background: rgba( 255, 245, 252, 0.92 ) !important;
+	color: #1b1b1b !important;
+	border-color: rgba( 156, 140, 255, 0.25 ) !important;
+}
+html.theme-colorful #analogsensorlist table th {
+	background: rgba( 196, 186, 255, 0.35 ) !important;
+}
+
 .wraptext {
 	white-space: pre-wrap;
 	word-wrap: break-word;

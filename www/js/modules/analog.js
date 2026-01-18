@@ -19,6 +19,7 @@ OSApp.Analog = {
 	timer : null,
 
 	lastSensorHtml : "",
+	zigbeeClusterData : null,
 
 	Constants: {
 		CHARTS: 14,
@@ -76,9 +77,10 @@ OSApp.Analog = {
 		SENSOR_FYTA_MOISTURE            : 60,  // FYTA moisture sensor
 	SENSOR_FYTA_TEMPERATURE         : 61,  // FYTA temperature sensor
 
-	SENSOR_ZIGBEE                   : 80, // ZigBee sensor
-	SENSOR_BLUETOOTH                : 81, // Bluetooth sensor
 	SENSOR_MQTT                     : 90, // subscribe to a MQTT server and query a value
+
+	SENSOR_ZIGBEE                   : 95, // ZigBee sensor
+	SENSOR_BLUETOOTH                : 96, // Bluetooth sensor
 
 	SENSOR_REMOTE                   : 100, // Remote sensor of an remote opensprinkler
 	SENSOR_WEATHER_TEMP_F           : 101, // Weather service - temperature (Fahrenheit)
@@ -583,7 +585,7 @@ OSApp.Analog.getImportMethodSensors = function(restore_type, callback) {
 							var obj = JSON.parse($.trim(e.target.result));
 							OSApp.Analog.importConfigSensors(obj, restore_type, callback);
 						} catch (err) {
-							OSApp.Errors.showError(OSApp.Language._("Unable to read the configuration file. Please check the file and try again.", err));
+							OSApp.Errors.showError(OSApp.Language._("Unable to read the configuration file. Please check the file and try again.") + " " + err);
 						}
 					};
 
@@ -1532,15 +1534,11 @@ OSApp.Analog.isIDNeeded = function(sensorType) {
 }
 
 //show and hide sensor editor fields
-OSApp.Analog.updateSensorVisibility = function(popup, type) {
-	// First hide ALL labels and fields
-	popup.find(".sensor_nr_label, .nr, .name_label, .name, .group_label, .group, .type_label").hide();
-	popup.find(".ip_label, .ip, .port_label, .port, .id_label, .id").hide();
-	popup.find(".rs485_port_label, .rs485_port, .rs485_id_label, .rs485_id, .rs485_help").hide();
-	popup.find(".chartunit_label, #unitid, .ri_label, .ri").hide();
-
-	// RS485-spezifische Felder
-	if (OSApp.Analog.isRS485Sensor(type)) {
+OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
+	// First hide IP/Port/ID related fields (but NOT the always-visible standard fields)
+	popup.find(".ip_label, .port_label, .id_label").hide();
+	popup.find(".mac_label").hide();
+	if (OSApp.Analog.isRS485Sensor(sensortype)) {
 		popup.find(".rs485_port_label").show();
 		popup.find(".rs485_port").show();
 		popup.find(".rs485_id_label").show();
@@ -1561,7 +1559,7 @@ OSApp.Analog.updateSensorVisibility = function(popup, type) {
 		popup.find(".rs485_id").hide();
 		popup.find(".rs485_help").hide();
 		// Normale IP-Sensor-Logik
-		if (OSApp.Analog.isIPSensor(type)) {
+		if (OSApp.Analog.isIPSensor(sensortype)) {
 			popup.find(".ip_label").show();
 			popup.find(".port_label").show();
 			popup.find(".ip").show();
@@ -1572,7 +1570,7 @@ OSApp.Analog.updateSensorVisibility = function(popup, type) {
 			popup.find(".ip").hide();
 			popup.find(".port").hide();
 		}
-		if (OSApp.Analog.isIDNeeded(type)) {
+		if (OSApp.Analog.isIDNeeded(sensortype)) {
 			popup.find(".id_label").show();
 			popup.find(".id").show();
 		} else {
@@ -1581,26 +1579,28 @@ OSApp.Analog.updateSensorVisibility = function(popup, type) {
 		}
 	}
 
-	if (OSApp.Analog.isSmt100(type)) {
+	if (OSApp.Analog.isSmt100(sensortype)) {
 		popup.find("#smt100id").show();
 	} else {
 		popup.find("#smt100id").hide();
 	}
 
-	if (type == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE || type == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE) {
+	if (sensortype == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE || sensortype == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE) {
 		popup.find("#fytasel").show();
 	} else {
 		popup.find("#fytasel").hide();
 	}
 
-	if (type == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
+	if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
 		popup.find("#zigbeesel").show();
 	} else {
 		popup.find("#zigbeesel").hide();
 	}
 
-	if (type == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
+	if (sensortype == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
 		popup.find("#bluetoothsel").show();
+		popup.find(".mac_label").show();
+		popup.find(".mac").show();
 	} else {
 		popup.find("#bluetoothsel").hide();
 	}
@@ -1612,56 +1612,52 @@ OSApp.Analog.updateSensorVisibility = function(popup, type) {
 	popup.find(".unit_container").hide();
 	popup.find(".topic_container").hide();
 	popup.find(".filter_container").hide();
+	popup.find(".zigbee_scan_select_container").hide();
+	popup.find(".bluetooth_scan_select_container").hide();
 	popup.find(".zigbee_device_ieee_container").hide();
+	popup.find(".zigbee_known_sensors_container").hide();
 	popup.find(".zigbee_endpoint_container").hide();
 	popup.find(".zigbee_cluster_id_container").hide();
 	popup.find(".zigbee_attribute_id_container").hide();
 	popup.find(".zigbee_poll_interval_container").hide();
-	popup.find(".bluetooth_device_mac_container").hide();
-	popup.find(".bluetooth_service_uuid_container").hide();
 	popup.find(".bluetooth_char_uuid_container").hide();
-	popup.find(".bluetooth_poll_interval_container").hide();
+	popup.find(".bluetooth_format_container").hide();
 
-	// Show standard fields that should always be visible
-	popup.find(".sensor_nr_label").show();
-	popup.find(".nr").show();
-	popup.find(".name_label").show();
-	popup.find(".name").show();
-	popup.find(".group_label").show();
-	popup.find(".group").show();
-	popup.find(".type_label").show();
-	popup.find("#type").show();
-	popup.find(".chartunit_label").show();
-	popup.find("#unitid").show();
-	popup.find(".ri_label").show();
-	popup.find(".ri").show();
+	// Standard fields are already visible (never hidden), no need to show them again
 
 	var unitid = popup.find("#unitid").val();
 
-	if (type == OSApp.Analog.Constants.SENSOR_USERDEF) {
+	if (sensortype == OSApp.Analog.Constants.SENSOR_USERDEF) {
 		popup.find(".fac_container").show();
 		popup.find(".div_container").show();
 		popup.find(".offset_container").show();
 		popup.find(".unit_container").show();
-	} else if (type == OSApp.Analog.Constants.SENSOR_MQTT) {
+	} else if (sensortype == OSApp.Analog.Constants.SENSOR_MQTT) {
 		popup.find(".unit_container").show();
 		popup.find(".topic_container").show();
 		popup.find(".filter_container").show();
-	} else if (type == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
+	} else if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
 		popup.find(".zigbee_device_ieee_container").show();
+		popup.find(".zigbee_known_sensors_container").show();
 		popup.find(".zigbee_endpoint_container").show();
 		popup.find(".zigbee_cluster_id_container").show();
 		popup.find(".zigbee_attribute_id_container").show();
 		popup.find(".zigbee_poll_interval_container").show();
-	} else if (type == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
-		popup.find(".bluetooth_device_mac_container").show();
-		popup.find(".bluetooth_service_uuid_container").show();
+		popup.find(".fac_container").show();
+		popup.find(".div_container").show();
+		popup.find(".offset_container").show();
+	} else if (sensortype == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
 		popup.find(".bluetooth_char_uuid_container").show();
-		popup.find(".bluetooth_poll_interval_container").show();
+		popup.find(".bluetooth_format_container").show();
 	}
 
 	// Show unit container for custom unit selection (independent of sensor type)
-	if (unitid == OSApp.Analog.Constants.USERDEF_UNIT && type != OSApp.Analog.Constants.SENSOR_USERDEF && type != OSApp.Analog.Constants.SENSOR_MQTT) {
+	if (unitid == OSApp.Analog.Constants.USERDEF_UNIT && sensortype != OSApp.Analog.Constants.SENSOR_USERDEF && sensortype != OSApp.Analog.Constants.SENSOR_MQTT) {
+		popup.find(".unit_container").show();
+	}
+
+	// Also show unit container for ZigBee sensors with custom unit
+	if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE && unitid == OSApp.Analog.Constants.USERDEF_UNIT) {
 		popup.find(".unit_container").show();
 	}
 };
@@ -1731,15 +1727,30 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 			sensorOut.attribute_id = parseInt(attributeIdStr, 16);
 		}
 
-		OSApp.Analog.addToObjectInt(popup, "#poll_interval", sensorOut);
+		var zigbeePollIntervalField = popup.find("#zigbee_poll_interval");
+		if (zigbeePollIntervalField && zigbeePollIntervalField.length) {
+			var zigbeePollInterval = parseInt(zigbeePollIntervalField.val(), 10);
+			if (!isNaN(zigbeePollInterval)) {
+				sensorOut.poll_interval = zigbeePollInterval;
+			}
+		}
 	}
 
 	// Bluetooth-specific fields
 	if (parseInt(popup.find("#type").val()) == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
-		OSApp.Analog.addToObjectStr(popup, "#device_mac", sensorOut);
-		OSApp.Analog.addToObjectStr(popup, "#service_uuid", sensorOut);
+		OSApp.Analog.addToObjectStr(popup, ".mac", sensorOut);
 		OSApp.Analog.addToObjectStr(popup, "#char_uuid", sensorOut);
-		OSApp.Analog.addToObjectInt(popup, "#poll_interval", sensorOut);
+		var bleFormatField = popup.find("#format");
+		if (bleFormatField && bleFormatField.length) {
+			var bleFormat = parseInt(bleFormatField.val(), 10);
+			if (!isNaN(bleFormat)) {
+				sensorOut.format = bleFormat;
+			}
+		}
+		// poll_interval (ms) is derived from sensor read interval (ri seconds)
+		if (sensorOut.ri !== undefined && sensorOut.ri !== null && !isNaN(sensorOut.ri)) {
+			sensorOut.poll_interval = sensorOut.ri * 1000;
+		}
 	}
 
 	if (sensorOut.missingValue) {
@@ -1752,23 +1763,552 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	return false;
 };
 
-// ZigBee device scanner
-// ZigBee and Bluetooth scanner functions are now in analog-util.js
-OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback) {
-	if (OSApp.AnalogUtil && OSApp.AnalogUtil.showZigBeeDeviceScanner) {
-		OSApp.AnalogUtil.showZigBeeDeviceScanner(popup, callback);
-	} else {
-		OSApp.Errors.showError("analog-util.js not loaded");
+// Load ZigBee cluster definitions from online source
+OSApp.Analog.loadZigBeeClusterData = function() {
+	if (OSApp.Analog.zigbeeClusterData !== undefined) {
+		return Promise.resolve(OSApp.Analog.zigbeeClusterData);
 	}
+
+	// Try to load from external source first, then fallback to local
+	return fetch('https://opensprinklershop.de/zigbeeclusterids.json')
+		.then(response => {
+			if (!response.ok) {
+				// If external source fails, try local fallback
+				return fetch('zigbeeclusterids.json');
+			}
+			return response;
+		})
+		.then(response => {
+			if (!response.ok) {
+				console.warn('ZigBee cluster database not available (HTTP ' + response.status + ')');
+				return null;
+			}
+			return response.json();
+		})
+		.then(data => {
+			if (data && Array.isArray(data)) {
+				OSApp.Analog.zigbeeClusterData = data;
+				return data;
+			} else {
+				// Cache empty result to avoid repeated requests
+				OSApp.Analog.zigbeeClusterData = [];
+				return [];
+			}
+		})
+		.catch(error => {
+			console.warn('ZigBee cluster database not available:', error.message);
+			// Cache the failure to avoid repeated requests
+			OSApp.Analog.zigbeeClusterData = [];
+			// Return empty array as fallback - manual entry still possible
+			return [];
+		});
 };
 
-OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback) {
-	if (OSApp.AnalogUtil && OSApp.AnalogUtil.showBluetoothDeviceScanner) {
-		OSApp.AnalogUtil.showBluetoothDeviceScanner(popup, callback);
-	} else {
-		OSApp.Errors.showError("analog-util.js not loaded");
+// ZigBee device scanner
+OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, scanButton, originalButtonText) {
+	// First, open the ZigBee network for pairing
+	OSApp.Firmware.sendToOS("/zo?pw=&duration=10", "json").then(function () {
+		var scanDialog = $("<div data-role='popup' data-theme='a' id='zigbeeScanner' data-dismissible='false'>" +
+			"<div data-role='header' data-theme='b'>" +
+			"<h1>" + OSApp.Language._("ZigBee Device Scanner") + "</h1>" +
+			"</div>" +
+			"<div class='ui-content'>" +
+			"<p class='rain-desc center smaller'>" +
+			OSApp.Language._("Scanning for ZigBee devices...") + "<br>" +
+			OSApp.Language._("Please pair your device now.") +
+			"</p>" +
+			"<div id='scanTimer' class='center' style='font-size: 18px; font-weight: bold; margin: 10px 0; color: #2196F3;'></div>" +
+			"<div id='lastDevice' class='center smaller' style='margin: 10px 0; padding: 10px; background-color: #f0f0f0; border-radius: 5px; display: none;'></div>" +
+			"<div class='zigbee-device-select-container'>" +
+			"<label for='zigbeeDeviceSelectScanner'>" + OSApp.Language._("Discovered devices") + "</label>" +
+			"<select data-mini='true' id='zigbeeDeviceSelectScanner'></select>" +
+			"</div>" +
+			"<button class='close-scanner' data-theme='a'>" + OSApp.Language._("Cancel") + "</button>" +
+			"</div>" +
+			"</div>");
+
+		var scanInterval = null;
+		var scanTimeout = null;
+		var selectedDevice = null;
+		var scanStartTime = Date.now();
+		var scanDuration = 10;
+		var lastFoundDevice = null;
+
+		// Initialize select
+		(function initSelect() {
+			var sel = scanDialog.find("#zigbeeDeviceSelectScanner");
+			sel.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+			try {
+				sel.selectmenu("refresh", true);
+			} catch (e) {
+				// ignore
+			}
+		})();
+
+		function updateDeviceList() {
+			var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
+			var remaining = Math.max(0, scanDuration - elapsed);
+
+			OSApp.Firmware.sendToOS("/zd?pw=", "json").then(function (data) {
+				var devices = (data && Array.isArray(data.devices)) ? data.devices : [];
+				var deviceCount = devices.length;
+				scanDialog.data("zigbeeDevices", devices);
+
+				// Update button text with device count
+				if (scanButton && originalButtonText) {
+					scanButton.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + deviceCount + ")");
+				}
+				var sel = scanDialog.find("#zigbeeDeviceSelectScanner");
+				if (devices.length > 0) {
+					sel.empty();
+					sel.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
+					for (var i = 0; i < devices.length; i++) {
+						var device = devices[i] || {};
+						var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
+						var shortAddr = device.short_addr || "0x0000";
+						var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
+						var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
+
+						var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
+						sel.append($("<option>").val(String(i)).text(label));
+
+						// Track last found device
+						if (device.is_new && !lastFoundDevice) {
+							lastFoundDevice = {
+								model: modelId,
+								ieee: ieeeAddr,
+								manufacturer: manufacturer
+							};
+							scanDialog.find("#lastDevice").html(
+								"<strong style='color: green;'>" + OSApp.Language._("Last found") + ":</strong> " +
+								modelId + " (" + manufacturer + ")<br>" +
+								"<small>IEEE: " + ieeeAddr + "</small>"
+							).show();
+						}
+					}
+					try {
+						sel.selectmenu("refresh", true);
+					} catch (e) {
+						// ignore
+					}
+				} else {
+					sel.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+					try {
+						sel.selectmenu("refresh", true);
+					} catch (e) {
+						// ignore
+					}
+				}
+			});
+		}
+
+		// Immediately apply selected device on combobox change
+		scanDialog.find("#zigbeeDeviceSelectScanner").off("change").on("change", function () {
+			var idxStr = scanDialog.find("#zigbeeDeviceSelectScanner").val();
+			var idx = parseInt(idxStr, 10);
+			if (idxStr === "" || isNaN(idx)) {
+				return;
+			}
+			var devices = scanDialog.data("zigbeeDevices") || [];
+			if (!devices || idx < 0 || idx >= devices.length) {
+				return;
+			}
+			var dev = devices[idx] || null;
+			if (!dev) {
+				return;
+			}
+			selectedDevice = {
+				ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
+				short_addr: dev.short_addr || "0x0000",
+				model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
+				manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
+			};
+
+			if (scanInterval) {
+				clearInterval(scanInterval);
+				scanInterval = null;
+			}
+			if (scanTimeout) {
+				clearTimeout(scanTimeout);
+				scanTimeout = null;
+			}
+
+			OSApp.Firmware.sendToOS("/zc?pw=", "json").always(function () {
+				scanDialog.popup("close");
+				$("#zigbeeScanner").remove();
+				if (callback) {
+					callback(selectedDevice);
+				}
+			});
+		});
+
+		function cleanupScanner() {
+			if (scanInterval) {
+				clearInterval(scanInterval);
+				scanInterval = null;
+			}
+			if (scanTimeout) {
+				clearTimeout(scanTimeout);
+				scanTimeout = null;
+			}
+			if (scanButton && originalButtonText) {
+				scanButton.text(originalButtonText).prop("disabled", false);
+			}
+			// Best-effort: close/clear pairing window on backend
+			try {
+				OSApp.Firmware.sendToOS("/zc?pw=", "json");
+			} catch (e) {
+				// ignore
+			}
+		}
+
+		scanDialog.find(".close-scanner").on("click", function () {
+			cleanupScanner();
+			scanDialog.popup("close");
+			$("#zigbeeScanner").remove();
+			if (errorCallback && typeof errorCallback === 'function') {
+				errorCallback();
+			}
+		});
+
+	scanDialog.on("popupafterclose", function () {
+		cleanupScanner();
+		$("#zigbeeScanner").remove();
+		if (!selectedDevice && errorCallback && typeof errorCallback === 'function') {
+			errorCallback();
+		}
+	});
+
+	$("#zigbeeScanner").remove();
+	scanDialog.css("max-width", "580px");
+	OSApp.UIDom.openPopup(scanDialog, { positionTo: "window" });
+	// Countdown is already shown in the scan button; hide the extra timer line
+	scanDialog.find("#scanTimer").hide();
+
+	// Update device list immediately
+	updateDeviceList();
+
+	// Update device list every second
+	scanInterval = setInterval(updateDeviceList, 1000);
+
+	// Stop scanning after 10 seconds, keep results visible
+	scanTimeout = setTimeout(function() {
+		if (scanInterval) {
+			clearInterval(scanInterval);
+			scanInterval = null;
+		}
+		scanDialog.find("#scanTimer").text(OSApp.Language._("Scan finished"));
+		scanDialog.find("#scanTimer").show();
+		// Best-effort: close/clear pairing window on backend (do not touch UI list)
+		try {
+			OSApp.Firmware.sendToOS("/zc?pw=", "json");
+		} catch (e) {
+			// ignore
+		}
+		if (scanButton && originalButtonText) {
+			scanButton.text(originalButtonText).prop("disabled", false);
+		}
+		scanTimeout = null;
+	}, 10000);
+}, function () {
+	// Error handler - reset button text on failure
+	if (scanButton && originalButtonText) {
+		scanButton.text(originalButtonText).prop("disabled", false);
 	}
-}
+	OSApp.Errors.showError(OSApp.Language._("Failed to start ZigBee scanning. Please ensure ZigBee is supported."));
+});
+};
+
+// Bluetooth device scanner
+OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallback, scanButton, originalButtonText) {
+	// Start Bluetooth scanning (10 seconds)
+	OSApp.Firmware.sendToOS("/bs?pw=&duration=10", "json").then(function () {
+		var scanDialog = $("<div data-role='popup' data-theme='a' id='bluetoothScanner' data-dismissible='false'>" +
+			"<div data-role='header' data-theme='b'>" +
+			"<h1>" + OSApp.Language._("Bluetooth Device Scanner") + "</h1>" +
+			"</div>" +
+			"<div class='ui-content'>" +
+			"<p class='rain-desc center smaller'>" +
+			OSApp.Language._("Scanning for Bluetooth devices...") + "<br>" +
+			OSApp.Language._("Please activate your device now.") +
+			"</p>" +
+			"<div id='scanTimer' class='center' style='font-size: 18px; font-weight: bold; margin: 10px 0; color: #2196F3;'></div>" +
+			"<div id='lastDevice' class='center smaller' style='margin: 10px 0; padding: 10px; background-color: #f0f0f0; border-radius: 5px; display: none;'></div>" +
+			"<div class='bluetooth-device-select-container'>" +
+			"<label for='bluetoothDeviceSelectScanner'>" + OSApp.Language._("Discovered devices") + "</label>" +
+			"<select data-mini='true' id='bluetoothDeviceSelectScanner'></select>" +
+			"</div>" +
+			"<button class='close-scanner' data-theme='a'>" + OSApp.Language._("Cancel") + "</button>" +
+			"</div>" +
+			"</div>");
+
+		var scanInterval = null;
+		var uiInterval = null;
+		var scanTimeout = null;
+		var selectedDevice = null;
+		var scanStartTime = Date.now();
+		var scanDuration = 10;
+		var lastFoundDevice = null;
+		var requestInFlight = false;
+		var didCleanup = false;
+		var lastDeviceCount = 0;
+
+		function normalizeBluetoothDevices(data) {
+			if (Array.isArray(data)) {
+				return data;
+			}
+			if (data && Array.isArray(data.devices)) {
+				return data.devices;
+			}
+			if (data && data.devices && typeof data.devices === "object") {
+				return Object.values(data.devices);
+			}
+			return [];
+		}
+
+		function normalizeBluetoothCount(data, devices) {
+			if (data && typeof data.count === "number") {
+				return data.count;
+			}
+			if (data && typeof data.count === "string") {
+				var parsed = parseInt(data.count, 10);
+				if (!isNaN(parsed)) {
+					return parsed;
+				}
+			}
+			return (devices || []).length;
+		}
+
+		// Initialize select
+		(function initSelect() {
+			var sel = scanDialog.find("#bluetoothDeviceSelectScanner");
+			sel.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please activate your device.")));
+			try {
+				sel.selectmenu("refresh", true);
+			} catch (e) {
+				// ignore
+			}
+		})();
+
+		function updateScanUi() {
+			var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
+			var remaining = Math.max(0, scanDuration - elapsed);
+			if (scanButton && originalButtonText) {
+				scanButton.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + lastDeviceCount + ")");
+			}
+		}
+
+		function updateDeviceList() {
+			if (requestInFlight) {
+				return;
+			}
+			// Timer + button countdown UI is handled by updateScanUi() so it keeps updating even if /bd is slow.
+
+			requestInFlight = true;
+			OSApp.Firmware.sendToOS("/bd?pw=", "json").then(function (data) {
+				requestInFlight = false;
+				var devices = normalizeBluetoothDevices(data);
+				var deviceCount = normalizeBluetoothCount(data, devices);
+				lastDeviceCount = deviceCount;
+				scanDialog.data("bluetoothDevices", devices);
+
+				// Button countdown text is updated by updateScanUi().
+				var sel = scanDialog.find("#bluetoothDeviceSelectScanner");
+				if (devices && devices.length > 0) {
+					sel.empty();
+					sel.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
+					for (var i = 0; i < devices.length; i++) {
+						var device = devices[i] || {};
+						var macAddr = device.address || device.mac_addr || device.mac || "00:00:00:00:00:00";
+						var name = device.name || OSApp.Language._("Unknown Device");
+						var rssi = (device.rssi === undefined || device.rssi === null) ? "N/A" : device.rssi;
+						var serviceUuid = device.service_uuid || "";
+						var serviceName = device.service_name || "";
+
+						var label = name + " | " + macAddr + " | RSSI: " + rssi;
+						if (serviceUuid) {
+							label += " | " + (serviceName || OSApp.Language._("Unknown")) + " (" + serviceUuid + ")";
+						}
+						sel.append($("<option>").val(String(i)).text(label));
+
+						// Track last found device
+						var isNew = (device.is_new === true || device.is_new === 1 || device.is_new === "1");
+						if (isNew && !lastFoundDevice) {
+							lastFoundDevice = {
+								name: name,
+								mac: macAddr,
+								rssi: rssi
+							};
+							scanDialog.find("#lastDevice").html(
+								"<strong style='color: green;'>" + OSApp.Language._("Last found") + ":</strong> " +
+								OSApp.Utils.htmlEscape(name) + "<br>" +
+								"<small>MAC: " + OSApp.Utils.htmlEscape(macAddr) + " | RSSI: " + OSApp.Utils.htmlEscape(rssi) + " dBm</small>"
+							).show();
+						}
+					}
+					try {
+						sel.selectmenu("refresh", true);
+					} catch (e) {
+						// ignore
+					}
+				} else {
+					sel.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please activate your device.")));
+					try {
+						sel.selectmenu("refresh", true);
+					} catch (e) {
+						// ignore
+					}
+				}
+			}, function () {
+				requestInFlight = false;
+				var sel = scanDialog.find("#bluetoothDeviceSelectScanner");
+				sel.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please activate your device.")));
+				try {
+					sel.selectmenu("refresh", true);
+				} catch (e) {
+					// ignore
+				}
+			});
+		}
+
+		// Immediately apply selected device on combobox change
+		scanDialog.find("#bluetoothDeviceSelectScanner").off("change").on("change", function () {
+			var idxStr = scanDialog.find("#bluetoothDeviceSelectScanner").val();
+			var idx = parseInt(idxStr, 10);
+			if (idxStr === "" || isNaN(idx)) {
+				return;
+			}
+			var devices = scanDialog.data("bluetoothDevices") || [];
+			if (!devices || idx < 0 || idx >= devices.length) {
+				return;
+			}
+			var dev = devices[idx] || null;
+			if (!dev) {
+				return;
+			}
+			var charUuid = dev.char_uuid || dev.characteristic_uuid || dev.charUuid || dev.characteristicUuid || "";
+			selectedDevice = {
+				mac: dev.address || dev.mac_addr || dev.mac || "00:00:00:00:00:00",
+				name: dev.name || OSApp.Language._("Unknown Device"),
+				rssi: (dev.rssi === undefined || dev.rssi === null) ? "N/A" : dev.rssi,
+				service_uuid: dev.service_uuid || "",
+				service_name: dev.service_name || "",
+				char_uuid: charUuid
+			};
+
+			if (scanInterval) {
+				clearInterval(scanInterval);
+				scanInterval = null;
+			}
+			if (uiInterval) {
+				clearInterval(uiInterval);
+				uiInterval = null;
+			}
+			if (scanTimeout) {
+				clearTimeout(scanTimeout);
+				scanTimeout = null;
+			}
+
+			OSApp.Firmware.sendToOS("/bc?pw=", "json").always(function () {
+				scanDialog.popup("close");
+				$("#bluetoothScanner").remove();
+				if (callback) {
+					callback(selectedDevice);
+				}
+			});
+		});
+
+		function cleanupScanner() {
+			if (didCleanup) {
+				return;
+			}
+			didCleanup = true;
+			if (scanInterval) {
+				clearInterval(scanInterval);
+				scanInterval = null;
+			}
+			if (uiInterval) {
+				clearInterval(uiInterval);
+				uiInterval = null;
+			}
+			if (scanTimeout) {
+				clearTimeout(scanTimeout);
+				scanTimeout = null;
+			}
+			if (scanButton && originalButtonText) {
+				scanButton.text(originalButtonText).prop("disabled", false);
+			}
+			// Clear scan flags on the backend (ignore failures)
+			try {
+				OSApp.Firmware.sendToOS("/bc?pw=", "json");
+			} catch (e) {
+				// ignore
+			}
+		}
+
+		scanDialog.find(".close-scanner").on("click", function () {
+			cleanupScanner();
+			scanDialog.popup("close");
+			$("#bluetoothScanner").remove();
+			if (errorCallback && typeof errorCallback === 'function') {
+				errorCallback();
+			}
+		});
+
+	scanDialog.on("popupafterclose", function () {
+		cleanupScanner();
+		$("#bluetoothScanner").remove();
+		if (!selectedDevice && errorCallback && typeof errorCallback === 'function') {
+			errorCallback();
+		}
+	});
+
+	$("#bluetoothScanner").remove();
+	scanDialog.css("max-width", "580px");
+	OSApp.UIDom.openPopup(scanDialog, { positionTo: "window" });
+	// Countdown is already shown in the scan button; hide the extra timer line
+	scanDialog.find("#scanTimer").hide();
+
+	// Update device list immediately
+	updateDeviceList();
+	updateScanUi();
+	uiInterval = setInterval(updateScanUi, 250);
+
+	// Update device list every second
+	scanInterval = setInterval(updateDeviceList, 1000);
+
+	// Stop scanning after 10 seconds, keep results visible
+	scanTimeout = setTimeout(function() {
+		if (scanInterval) {
+			clearInterval(scanInterval);
+			scanInterval = null;
+		}
+		if (uiInterval) {
+			clearInterval(uiInterval);
+			uiInterval = null;
+		}
+		scanDialog.find("#scanTimer").text(OSApp.Language._("Scan finished"));
+		scanDialog.find("#scanTimer").show();
+		// Best-effort: clear scan flags on backend (do not touch UI list)
+		try {
+			OSApp.Firmware.sendToOS("/bc?pw=", "json");
+		} catch (e) {
+			// ignore
+		}
+		if (scanButton && originalButtonText) {
+			scanButton.text(originalButtonText).prop("disabled", false);
+		}
+		scanTimeout = null;
+	}, 10000);
+}, function () {
+	// Error handler - reset button text on failure
+	if (scanButton && originalButtonText) {
+		scanButton.text(originalButtonText).prop("disabled", false);
+	}
+	OSApp.Errors.showError(OSApp.Language._("Failed to start Bluetooth scanning. Please ensure Bluetooth is supported."));
+});
+};
+
 
 
 // Analog sensor editor
@@ -1777,6 +2317,10 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 	OSApp.Firmware.sendToOS("/sf?pw=", "json").then(function (data) {
 		var supportedSensorTypes = data.sensorTypes;
 		var i;
+		var sensorFormat = parseInt(sensor.format, 10);
+		if (isNaN(sensorFormat)) {
+			sensorFormat = 0;
+		}
 
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
 
@@ -1786,54 +2330,71 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			"<h1>" + (sensor.nr > 0 ? OSApp.Language._("Edit Sensor") : OSApp.Language._("New Sensor")) + "</h1>" +
 			"</div>" +
 			"<div class='ui-content'>" +
-			"<form>" +
-			"<p class='rain-desc center smaller'>" +
-			OSApp.Language._("Edit Sensor Configuration. ") +
-			OSApp.Language._("See help documentation for details.") +
-			"<br>" +
-			OSApp.Language._("Last") + ": " + (sensor.last === undefined ? "" : OSApp.Dates.dateToString(new Date(sensor.last * 1000))) +
-			"</p>" +
-			"<label class='sensor_nr_label'>" +	OSApp.Language._("Sensor-Nr") +	"</label>" +
-			"<input class='nr' type='number' inputmode='decimal' min='1' max='99999' required value='" + sensor.nr + (sensor.nr > 0 ? "' disabled='disabled'>" : "'>") +
 
-		"<label class='name_label'>" + OSApp.Language._("Name") + "</label>" +
-		"<input class='name' type='text' maxlength='40' value='" + (sensor.name ? sensor.name : "") + "'>" +
+		OSApp.Language._("Edit Sensor Configuration. ") +
+		OSApp.Language._("See help documentation for details.") +
+		"<br>" +
+		OSApp.Language._("Last") + ": " + (sensor.last === undefined ? "" : OSApp.Dates.dateToString(new Date(sensor.last * 1000))) +
+		"</p>" +
 
-		"<label class='group_label'>" + OSApp.Language._("Group") + "</label>" +
-		"<input class='group' type='number' inputmode='decimal' min='0' max='255' value='" + (sensor.group ? sensor.group : "0") + "'>" +
+"<div class='sensor_nr_label'><label for='sensor_nr'>" + OSApp.Language._("Sensor Nr.") + "</label>" +
+	"<input class='nr' id='sensor_nr' data-mini='true' type='number' inputmode='decimal' min='1' max='99999' required value='" + sensor.nr + (sensor.nr > 0 ? "' disabled='disabled'></div>" : "'></div>") +
 
-		"<fieldset data-role='controlgroup' data-mini='true'>" +
-		"<label for='type' class='type_label'>" + OSApp.Language._("Type") + "</label>" +
-		"<select id='type' required>";
+	"<div class='name_label'><label for='sensor_name'>" + OSApp.Language._("Name") + "</label>" +
+	"<input class='name' id='sensor_name' data-mini='true' type='text' maxlength='40' value='" + (sensor.name ? sensor.name : "") + "'></div>" +
 
-	for (i = 0; i < supportedSensorTypes.length; i++) {
-		list += "<option " + ((sensor.type === supportedSensorTypes[i].type) ? "selected" : "") +
-			" value='" + supportedSensorTypes[i].type + "'>" +
-			OSApp.Language._(supportedSensorTypes[i].name) + "</option>";
-	}
-	list += "</select>" +
-		"</fieldset>" +
+	"<div class='group_label'><label for='sensor_group'>" + OSApp.Language._("Group") + "</label>" +
+	"<input class='group' id='sensor_group' data-mini='true' type='number' inputmode='decimal' min='0' max='255' value='" + (sensor.group ? sensor.group : "0") + "'></div>" +
+
+	"<div class='type_label'><label for='type'>" + OSApp.Language._("Type") + "</label>" +
+	"<select id='type' data-mini='true' required>";
+
+for (i = 0; i < supportedSensorTypes.length; i++) {
+	list += "<option" + (sensor.type === supportedSensorTypes[i].type ? " selected" : "") +
+	" value='" + supportedSensorTypes[i].type + "'>" +
+		OSApp.Language._(supportedSensorTypes[i].name) + "</option>";
+}
+list += "</select></div>" +
 
 		//SMT 100 Edit ID Button:
-		"<button class='center-div' id='smt100id'>" + OSApp.Language._("Set SMT100 Modbus ID") + "</button>" +
+		"<button data-mini='true' id='smt100id' style='margin:5px 0;'>" + OSApp.Language._("Set SMT100 Modbus ID") + "</button>" +
 
 		//FYTA edit credentials button:
-		"<button class='center-div' id='fytasel'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>" +
+		"<button data-mini='true' id='fytasel' style='margin:5px 0;'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>" +
 
 		//ZigBee device scanner button:
-		"<button class='center-div' id='zigbeesel'>" + OSApp.Language._("Scan for ZigBee Devices") + "</button>" +
-
+	"<button data-mini='true' id='zigbeesel' style='display:none;margin:5px 0;'>" + OSApp.Language._("Scan for ZigBee Devices") + "</button>" +
+	"<div class='zigbee_scan_select_container' style='display:none; margin: 10px 0;'>" +
+	"<div class='zigbee-device-select-container'>" +
+	"<label for='zigbeeDeviceSelect'>" + OSApp.Language._("Discovered devices") + "</label>" +
+	"<select data-mini='true' id='zigbeeDeviceSelect'></select>" +
+	"</div>" +
+	"</div>" +
+	"<div id='zigbeeScanArea' style='display:none; margin: 10px 0; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'>" +
+	"<div id='zigbeeScanTimer' class='center' style='font-size: 16px; font-weight: bold; margin: 5px 0; color: #2196F3;'></div>" +
+	"</div>" +
 		//Bluetooth device scanner button:
-		"<button class='center-div' id='bluetoothsel'>" + OSApp.Language._("Scan for Bluetooth Devices") + "</button>" +
+	"<button data-mini='true' id='bluetoothsel' style='display:none;margin:5px 0;'>" + OSApp.Language._("Scan for Bluetooth Devices") + "</button>" +
+	"<div class='bluetooth_scan_select_container' style='display:none; margin: 10px 0;'>" +
+	"<div class='bluetooth-device-select-container'>" +
+	"<label for='bluetoothDeviceSelect'>" + OSApp.Language._("Discovered devices") + "</label>" +
+	"<select data-mini='true' id='bluetoothDeviceSelect'></select>" +
+	"</div>" +
+	"</div>" +
+	"<div id='bluetoothScanArea' style='display:none; margin: 10px 0; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'>" +
+	"<div id='bluetoothScanTimer' class='center' style='font-size: 16px; font-weight: bold; margin: 5px 0; color: #2196F3;'></div>" +
+	"</div>" +
+"<div class='ip_label'><label for='sensor_ip'>" + OSApp.Language._("IP Address") + "</label>" +
+	"<input class='ip' id='sensor_ip' data-mini='true' type='text' value='" + (sensor.ip ? OSApp.Analog.toByteArray(sensor.ip).join(".") : "") + "'></div>" +
 
-		"<label class='ip_label'>" + OSApp.Language._("IP Address") + "</label>" +
-		"<input class='ip' type='text'  value='" + (sensor.ip ? OSApp.Analog.toByteArray(sensor.ip).join(".") : "") + "'>" +
+"<div class='port_label'><label for='sensor_port'>" + OSApp.Language._("Port") + "</label>" +
+	"<input class='port' id='sensor_port' data-mini='true' type='number' inputmode='decimal' min='0' max='65535' value='" + sensor.port + "'></div>" +
 
-			"<label class='port_label'>" + OSApp.Language._("Port") + "</label>" +
-			"<input class='port' type='number' inputmode='decimal' min='0' max='65535' value='" + sensor.port + "'>" +
+"<div class='id_label'><label for='sensor_id'>" + OSApp.Language._("ID") + "</label>" +
+	"<input class='id' id='sensor_id' data-mini='true' type='number' inputmode='decimal' min='-2147483647' max='2147483647' value='" + sensor.id + "'></div>" +
 
-			"<label class='id_label'>" + OSApp.Language._("ID") + "</label>" +
-			"<input class='id' type='number' inputmode='decimal' min='-2147483647' max='2147483647' value='" + sensor.id + "'>" +
+"<div class='mac_label'><label for='sensor_mac'>" + OSApp.Language._("MAC Address") + "</label>" +
+	"<input class='mac' id='sensor_mac' data-mini='true' type='text' value='" + (sensor.mac ? sensor.mac : "") + "'></div>" +
 
 			"<div class='rs485_help' style='display:none; margin: 10px 0; padding: 10px; background-color: #f0f0f0; border-radius: 5px;'>" +
 			"<p style='margin: 0; font-size: 0.9em;'>" + OSApp.Language._("RS485 Configuration Help:") + "<br>" +
@@ -1842,32 +2403,26 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			OSApp.Language._("Modbus ID: The sensor's Modbus address (1-247)") + "</p>" +
 			"</div>" +
 
-			"<label class='rs485_port_label'>" + OSApp.Language._("RS485 Device/Port") + "</label>" +
-			"<input class='rs485_port' type='number' inputmode='decimal' min='0' max='65535' value='" + (sensor.port ? sensor.port : 0) + "'>" +
+"<div class='rs485_port_label'><label for='rs485_port'>" + OSApp.Language._("RS485 Device/Port") + "</label>" +
+	"<input class='rs485_port' id='rs485_port' data-mini='true' type='number' inputmode='decimal' min='0' max='65535' value='" + (sensor.port ? sensor.port : 0) + "'></div>" +
 
-			"<label class='rs485_id_label'>" + OSApp.Language._("Modbus ID") + "</label>" +
-			"<input class='rs485_id' type='number' inputmode='decimal' min='1' max='247' value='" + (sensor.id ? sensor.id : 1) + "'>" +
+"<div class='rs485_id_label'><label for='rs485_id'>" + OSApp.Language._("Modbus ID") + "</label>" +
+	"<input class='rs485_id' id='rs485_id' data-mini='true' type='number' inputmode='decimal' min='1' max='247' value='" + (sensor.id ? sensor.id : 1) + "'></div>" +
 
-		"<div class='fac_container' style='display:none'>" +
-		"<label>" + OSApp.Language._("Factor") + "</label>" +
-		"<input type='number' id='factor' inputmode='decimal' min='-32768' max='32767' value='" + sensor.fac + "'>" +
-		"</div>" +
+"<div class='fac_container' style='display:none;'><label for='factor'>" + OSApp.Language._("Factor") + "</label>" +
+	"<input type='number' id='factor' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.fac + "'></div>" +
 
-		"<div class='div_container' style='display:none'>" +
-		"<label>" + OSApp.Language._("Divider") + "</label>" +
-		"<input type='number' id='divider' inputmode='decimal' min='-32768' max='32767' value='" + sensor.div + "'>" +
-	"</div>" +
+"<div class='div_container' style='display:none;'><label for='divider'>" + OSApp.Language._("Divider") + "</label>" +
+	"<input type='number' id='divider' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.div + "'></div>" +
 
-	"<div class='offset_container' style='display:none'>" +
-	"<label>" + OSApp.Language._("Offset in millivolt") + "</label>" +
-	"<input type='number' id='offset' inputmode='decimal' min='-32768' max='32767' value='" + sensor.offset + "'>" +
-	"</div>" +
+"<div class='offset_container' style='display:none;'><label for='offset'>" + OSApp.Language._("Offset (mV)") + "</label>" +
+	"<input type='number' id='offset' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.offset + "'></div>" +
 
-		"<label class='chartunit_label'>" + OSApp.Language._("Chart Unit") + "</label>" +
-		"<select data-mini='true' id='unitid'>" +
+	"<div class='chartunit_label'><label for='unitid'>" + OSApp.Language._("Chart Unit") + "</label>" +
+	"<select data-mini='true' id='unitid'>" +
 			"<option value='0'>" + OSApp.Language._("Default") + "</option>" +
 			"<option value='1'>" + OSApp.Language._("Soil Moisture %") + "</option>" +
-			"<option value='2'>" + OSApp.Language._("Degree Celcius " + String.fromCharCode(176) + "C") + "</option>" +
+			"<option value='2'>" + OSApp.Language._("Degree Celsius " + String.fromCharCode(176) + "C") + "</option>" +
 			"<option value='3'>" + OSApp.Language._("Degree Fahrenheit " + String.fromCharCode(176) + "F") + "</option>" +
 			"<option value='4'>" + OSApp.Language._("Volt V") + "</option>" +
 			"<option value='5'>" + OSApp.Language._("Air Humidity %") + "</option>" +
@@ -1879,71 +2434,65 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			"<option value='11'>" + OSApp.Language._("DK") + "</option>" +
 			"<option value='12'>" + OSApp.Language._("Lumen (lm)") + "</option>" +
 			"<option value='13'>" + OSApp.Language._("LUX (lx)") + "</option>" +
-			"<option value='99'>" + OSApp.Language._("Own Unit") + "</option>" +
-			"</select>" +
+			"<option value='99'>" + OSApp.Language._("Custom Unit") + "</option>" +
+		"</select></div>" +
+"<div class='unit_container' style='display:none;'><label for='unit'>" + OSApp.Language._("Unit") + "</label>" +
+	"<input type='text' id='unit' data-mini='true' maxlength='10' value='" + (sensor.unit ? sensor.unit : "") + "'></div>" +
 
-		"<div class='unit_container' style='display:none'>" +
-	"<label>" + OSApp.Language._("Unit") + "</label>" +
-	"<input type='text' id='unit' maxlength='10' value='" + (sensor.unit ? sensor.unit : "") + "'>" +
-	"</div>" +
+"<div class='topic_container' style='display:none;'><label for='topic'>" + OSApp.Language._("MQTT Topic") + "</label>" +
+	"<input type='text' id='topic' data-mini='true' maxlength='100' value='" + (sensor.topic ? sensor.topic : "") + "'></div>" +
 
-		"<div class='topic_container' style='display:none'>" +
-	"<label>" + OSApp.Language._("MQTT Topic") + "</label>" +
-	"<input type='text' id='topic' maxlength='100' value='" + (sensor.topic ? sensor.topic : "") + "'>" +
-	"</div>" +
+"<div class='filter_container' style='display:none;'><label for='filter'>" + OSApp.Language._("MQTT Filter") + "</label>" +
+	"<input type='text' id='filter' data-mini='true' maxlength='100' value='" + (sensor.filter ? sensor.filter : "") + "'></div>" +
 
-		"<div class='filter_container' style='display:none'>" +
-	"<label>" + OSApp.Language._("MQTT Filter") + "</label>" +
-	"<input type='text' id='filter' maxlength='100' value='" + (sensor.filter ? sensor.filter : "") + "'>" +
-	"</div>" +
+"<div class='zigbee_device_ieee_container' style='display:none;'><label for='device_ieee'>" + OSApp.Language._("ZigBee Device IEEE Address") + "</label>" +
+		"<input type='text' id='device_ieee' data-mini='true' value='" + (sensor.device_ieee ? sensor.device_ieee : "") + "' readonly></div>" +
 
-			"<div class='zigbee_device_ieee_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("ZigBee Device IEEE Address") + "</label>" +
-			"<input type='text' id='device_ieee' value='" + (sensor.device_ieee ? sensor.device_ieee : "") + "' readonly>" +
+"<div class='zigbee_known_sensors_container' style='display:none;'>" +
+		"<label for='known_zigbee_sensors'>" + OSApp.Language._("Known Sensor Types") + "</label>" +
+		"<select id='known_zigbee_sensors' data-mini='true'>" +
+		"<option value=''>" + OSApp.Language._("Select known sensor or enter manually...") + "</option>" +
+		"</select>" +
+		"<button data-mini='true' id='report_zigbee_sensor' style='margin:5px 0;'>" + OSApp.Language._("Report New Sensor") + "</button>" +
 			"</div>" +
 
-			"<div class='zigbee_endpoint_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("Endpoint") + "</label>" +
-			"<input type='number' id='endpoint' inputmode='decimal' min='1' max='255' value='" + (sensor.endpoint ? sensor.endpoint : "1") + "'>" +
-			"</div>" +
+"<div class='zigbee_endpoint_container' style='display:none;'><label for='endpoint'>" + OSApp.Language._("Endpoint") + "</label>" +
+		"<input type='number' id='endpoint' data-mini='true' inputmode='decimal' min='1' max='255' value='" + (sensor.endpoint ? sensor.endpoint : "1") + "'></div>" +
 
-			"<div class='zigbee_cluster_id_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("Cluster ID (hex)") + "</label>" +
-			"<input type='text' id='cluster_id' value='" + (sensor.cluster_id ? "0x" + sensor.cluster_id.toString(16).toUpperCase().padStart(4, '0') : "0x0408") + "'>" +
-			"</div>" +
+"<div class='zigbee_cluster_id_container' style='display:none;'><label for='cluster_id'>" + OSApp.Language._("Cluster ID (hex)") + "</label>" +
+		"<input type='text' id='cluster_id' data-mini='true' value='" + (sensor.cluster_id ? "0x" + sensor.cluster_id.toString(16).toUpperCase().padStart(4, '0') : "0x0408") + "'></div>" +
 
-			"<div class='zigbee_attribute_id_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("Attribute ID (hex)") + "</label>" +
-			"<input type='text' id='attribute_id' value='" + (sensor.attribute_id ? "0x" + sensor.attribute_id.toString(16).toUpperCase().padStart(4, '0') : "0x0000") + "'>" +
-			"</div>" +
+"<div class='zigbee_attribute_id_container' style='display:none;'><label for='attribute_id'>" + OSApp.Language._("Attribute ID (hex)") + "</label>" +
+		"<input type='text' id='attribute_id' data-mini='true' value='" + (sensor.attribute_id ? "0x" + sensor.attribute_id.toString(16).toUpperCase().padStart(4, '0') : "0x0000") + "'></div>" +
 
-			"<div class='zigbee_poll_interval_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("Poll Interval (ms)") + "</label>" +
-			"<input type='number' id='poll_interval' inputmode='decimal' min='0' max='999999' value='" + (sensor.poll_interval ? sensor.poll_interval : "60000") + "'>" +
-			"</div>" +
+"<div class='zigbee_poll_interval_container' style='display:none;'><label for='zigbee_poll_interval'>" + OSApp.Language._("Poll Interval (ms)") + "</label>" +
+		"<input type='number' id='zigbee_poll_interval' data-mini='true' inputmode='decimal' min='0' max='999999' value='" + (sensor.poll_interval ? sensor.poll_interval : "60000") + "'></div>" +
 
-			"<div class='bluetooth_device_mac_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("Bluetooth Device MAC Address") + "</label>" +
-			"<input type='text' id='device_mac' value='" + (sensor.device_mac ? sensor.device_mac : "") + "' readonly>" +
-			"</div>" +
+"<div class='bluetooth_char_uuid_container' style='display:none;'><label for='char_uuid'>" + OSApp.Language._("Characteristic UUID") + "</label>" +
+		"<input type='text' id='char_uuid' data-mini='true' value='" + (sensor.char_uuid ? sensor.char_uuid : "") + "'></div>" +
 
-			"<div class='bluetooth_service_uuid_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("Service UUID") + "</label>" +
-			"<input type='text' id='service_uuid' value='" + (sensor.service_uuid ? sensor.service_uuid : "") + "'>" +
-			"</div>" +
+"<div class='bluetooth_format_container' style='display:none;'><label for='format'>" + OSApp.Language._("Format") + "</label>" +
+		"<select id='format' data-mini='true'>" +
+		"<option value='0' " + ((sensorFormat === 0) ? "selected" : "") + ">FORMAT_RAW (0)</option>" +
+		"<option value='1' " + ((sensorFormat === 1) ? "selected" : "") + ">FORMAT_UINT8 (1)</option>" +
+		"<option value='2' " + ((sensorFormat === 2) ? "selected" : "") + ">FORMAT_INT8 (2)</option>" +
+		"<option value='3' " + ((sensorFormat === 3) ? "selected" : "") + ">FORMAT_UINT16_LE (3)</option>" +
+		"<option value='4' " + ((sensorFormat === 4) ? "selected" : "") + ">FORMAT_INT16_LE (4)</option>" +
+		"<option value='5' " + ((sensorFormat === 5) ? "selected" : "") + ">FORMAT_UINT16_BE (5)</option>" +
+		"<option value='6' " + ((sensorFormat === 6) ? "selected" : "") + ">FORMAT_INT16_BE (6)</option>" +
+		"<option value='7' " + ((sensorFormat === 7) ? "selected" : "") + ">FORMAT_UINT32_LE (7)</option>" +
+		"<option value='8' " + ((sensorFormat === 8) ? "selected" : "") + ">FORMAT_INT32_LE (8)</option>" +
+		"<option value='9' " + ((sensorFormat === 9) ? "selected" : "") + ">FORMAT_FLOAT_LE (9)</option>" +
+		"<option value='10' " + ((sensorFormat === 10) ? "selected" : "") + ">FORMAT_TEMP_001 (10)</option>" +
+		"<option value='11' " + ((sensorFormat === 11) ? "selected" : "") + ">FORMAT_HUM_001 (11)</option>" +
+		"<option value='12' " + ((sensorFormat === 12) ? "selected" : "") + ">FORMAT_PRESS_PA (12)</option>" +
+		"<option value='20' " + ((sensorFormat === 20) ? "selected" : "") + ">FORMAT_XIAOMI_TEMP (20)</option>" +
+		"<option value='21' " + ((sensorFormat === 21) ? "selected" : "") + ">FORMAT_XIAOMI_HUM (21)</option>" +
+		"<option value='30' " + ((sensorFormat === 30) ? "selected" : "") + ">FORMAT_TUYA_SOIL (30)</option>" +
+		"</select></div>" +
 
-			"<div class='bluetooth_char_uuid_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("Characteristic UUID") + "</label>" +
-			"<input type='text' id='char_uuid' value='" + (sensor.char_uuid ? sensor.char_uuid : "") + "'>" +
-			"</div>" +
-
-			"<div class='bluetooth_poll_interval_container' style='display:none'>" +
-			"<label>" + OSApp.Language._("Poll Interval (ms)") + "</label>" +
-			"<input type='number' id='poll_interval' inputmode='decimal' min='0' max='999999' value='" + (sensor.poll_interval ? sensor.poll_interval : "60000") + "'>" +
-			"</div>" +
-
-			"<label class='ri_label'>" + OSApp.Language._("Read Interval (s)") + "</label>" +
-			"<input class='ri' type='number' inputmode='decimal' min='1' max='999999' value='" + sensor.ri + "'>" +
+"<div class='ri_label'><label for='sensor_ri'>" + OSApp.Language._("Read Interval (s)") + "</label>" +
+	"<input class='ri' id='sensor_ri' data-mini='true' type='number' inputmode='decimal' min='1' max='999999' value='" + sensor.ri + "'></div>" +
 
 			"<label for='enable'><input data-mini='true' id='enable' type='checkbox' " + ((sensor.enable === 1) ? "checked='checked'" : "") + ">" +
 			OSApp.Language._("Sensor Enabled") + "</label>" +
@@ -1985,13 +2534,13 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			};
 
 		popup.find("#type").change(function () {
-			var type = $(this).val();
-			OSApp.Analog.updateSensorVisibility(popup, type);
+			var sensortype = parseInt($(this).val());
+			OSApp.Analog.updateSensorVisibility(popup, sensortype);
 		});
 
 		popup.find("#unitid").change(function () {
-			var type = popup.find("#type").val();
-			OSApp.Analog.updateSensorVisibility(popup, type);
+			var sensortype = parseInt(popup.find("#type").val());
+			OSApp.Analog.updateSensorVisibility(popup, sensortype);
 		});
 
 		//SMT 100 Toolbox function: SET ID
@@ -2011,56 +2560,537 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 		//ZigBee: Scan for devices
 		popup.find("#zigbeesel").on("click", function (e) {
 			e.preventDefault();
-			OSApp.Analog.showZigBeeDeviceScanner(popup, function (device) {
-				// Set the IEEE address
-				popup.find("#device_ieee").val(device.ieee);
+			var btn = $(this);
+			var originalText = btn.text();
+			btn.text(OSApp.Language._("Scanning...") + " (0)").prop("disabled", true);
 
-				// Update the sensor name with the device model
+			// Show scan area + selection
+			popup.find("#zigbeeScanArea").show();
+			// Countdown is already shown in the scan button; hide the extra timer line
+			popup.find("#zigbeeScanTimer").hide().text("");
+			popup.find(".zigbee_scan_select_container").show();
+
+			var scanStartTime = Date.now();
+			var scanDuration = 10;
+			var lastFoundDevice = null;
+			var scanInterval = null;
+			var scanTimeout = null;
+
+			// Start ZigBee scan
+			OSApp.Firmware.sendToOS("/zo?pw=&duration=10", "json").then(function () {
+
+				// Prepare UI elements
+				var deviceSelect = popup.find("#zigbeeDeviceSelect");
+				deviceSelect.empty();
+				popup.data("zigbeeDevices", []);
+				deviceSelect.append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+				try {
+					deviceSelect.selectmenu("refresh", true);
+				} catch (e) {
+					// ignore
+				}
+
+				function updateDeviceList() {
+					OSApp.Firmware.sendToOS("/zd?pw=", "json").then(function (data) {
+						var devices = (data && Array.isArray(data.devices)) ? data.devices : [];
+						var deviceCount = devices.length;
+						btn.text(OSApp.Language._("Scanning...") + " (" + deviceCount + ")");
+						popup.data("zigbeeDevices", devices);
+
+						var deviceSelect = popup.find("#zigbeeDeviceSelect");
+
+						if (devices.length > 0) {
+							deviceSelect.empty();
+							deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
+							for (var i = 0; i < devices.length; i++) {
+								var device = devices[i] || {};
+								var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
+								var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
+								var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
+
+								var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
+								deviceSelect.append($("<option>").val(String(i)).text(label));
+							}
+							try {
+								deviceSelect.selectmenu("refresh", true);
+							} catch (e) {
+								// ignore
+							}
+						} else {
+							deviceSelect.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+							try {
+								deviceSelect.selectmenu("refresh", true);
+							} catch (e) {
+								// ignore
+							}
+						}
+					});
+				}
+
+				// Immediately apply selected ZigBee device to fields on combobox change
+				popup.find("#zigbeeDeviceSelect").off("change").on("change", function () {
+					var idxStr = popup.find("#zigbeeDeviceSelect").val();
+					var idx = parseInt(idxStr, 10);
+					if (idxStr === "" || isNaN(idx)) {
+						return;
+					}
+					var devices = popup.data("zigbeeDevices") || [];
+					if (!devices || idx < 0 || idx >= devices.length) {
+						return;
+					}
+					var dev = devices[idx] || null;
+					if (!dev) {
+						return;
+					}
+					var selectedDevice = {
+						ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
+						model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
+						manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
+					};
+
+					if (scanInterval) {
+						clearInterval(scanInterval);
+						scanInterval = null;
+					}
+					if (scanTimeout) {
+						clearTimeout(scanTimeout);
+						scanTimeout = null;
+					}
+
+					OSApp.Firmware.sendToOS("/zc?pw=", "json").always(function () {
+						popup.find("#zigbeeScanArea").hide();
+						btn.text(originalText).prop("disabled", false);
+
+						popup.find("#device_ieee").val(selectedDevice.ieee).trigger("change");
+
+						var currentName = popup.find(".name").val();
+						if (!currentName || currentName.trim() === "") {
+							var nameField = popup.find(".name");
+							nameField.val(selectedDevice.model).trigger("change");
+							try {
+								nameField.textinput("refresh");
+							} catch (e) {
+								// ignore
+							}
+						}
+
+						if (selectedDevice.model.toLowerCase().includes("temp")) {
+							popup.find("#cluster_id").val("0x0402");
+							popup.find("#attribute_id").val("0x0000");
+						} else if (selectedDevice.model.toLowerCase().includes("humid")) {
+							popup.find("#cluster_id").val("0x0405");
+							popup.find("#attribute_id").val("0x0000");
+						} else if (selectedDevice.model.toLowerCase().includes("soil") || selectedDevice.model.toLowerCase().includes("moist")) {
+							popup.find("#cluster_id").val("0x0408");
+							popup.find("#attribute_id").val("0x0000");
+						}
+
+						popup.find(".name").focus();
+					});
+				});
+
+				// Update device list immediately
+				updateDeviceList();
+
+				// Update device list every second
+				scanInterval = setInterval(updateDeviceList, 1000);
+
+				// Stop scanning after 10 seconds, keep results visible
+				scanTimeout = setTimeout(function() {
+					if (scanInterval) {
+						clearInterval(scanInterval);
+						scanInterval = null;
+					}
+					popup.find("#zigbeeScanTimer").text(OSApp.Language._("Scan finished"));
+					// Collapse scan area, keep select visible
+					popup.find("#zigbeeScanArea").hide();
+					// Best-effort: close/clear pairing window on backend (do not touch UI list)
+					try {
+						OSApp.Firmware.sendToOS("/zc?pw=", "json");
+					} catch (e) {
+						// ignore
+					}
+					btn.text(originalText).prop("disabled", false);
+					scanTimeout = null;
+				}, 10000);
+
+			}, function () {
+				// Error handler
+				btn.text(originalText).prop("disabled", false);
+				popup.find("#zigbeeScanArea").hide();
+				popup.find(".zigbee_scan_select_container").hide();
+				OSApp.Errors.showError(OSApp.Language._("Failed to start ZigBee scanning. Please ensure ZigBee is supported."));
+			});
+
+			return false;
+		});
+	// Load ZigBee cluster data and populate dropdown
+	OSApp.Analog.loadZigBeeClusterData().then(function(clusterData) {
+		if (clusterData && clusterData.length > 0) {
+			var knownSensorsSelect = popup.find("#known_zigbee_sensors");
+			clusterData.forEach(function(sensor) {
+				var optionText = sensor.name + " (" + sensor.description + ")";
+				knownSensorsSelect.append(
+					$("<option>").val(sensor.id).text(optionText).data("sensor", sensor)
+				);
+			});
+			knownSensorsSelect.selectmenu("refresh");
+		}
+	});
+
+	// Handle known sensor selection
+		popup.find("#known_zigbee_sensors").on("change", function() {
+			var selectedOption = $(this).find("option:selected");
+			var sensorData = selectedOption.data("sensor");
+
+			if (sensorData) {
+				// Update endpoint, cluster_id, and attribute_id fields
+				popup.find("#endpoint").val(sensorData.endpoint || "1");
+				popup.find("#cluster_id").val(sensorData.cluster_id || "0x0000");
+				popup.find("#attribute_id").val(sensorData.attribute_id || "0x0000");
+
+				// Set poll interval if provided
+				if (sensorData.poll_interval) {
+					popup.find("#zigbee_poll_interval").val(sensorData.poll_interval);
+				}
+
+				// Set unit ID if provided
+				if (sensorData.unitid) {
+					popup.find("#unitid").val(sensorData.unitid);
+					// Trigger change to show/hide unit field
+					popup.find("#unitid").change();
+				}
+
+				// Set custom unit if provided
+				if (sensorData.unit) {
+					popup.find("#unit").val(sensorData.unit);
+				}
+
+				// Set factor if provided
+				if (sensorData.factor) {
+					popup.find("#factor").val(sensorData.factor);
+				}
+
+				// Set divider if provided
+				if (sensorData.divider) {
+					popup.find("#divider").val(sensorData.divider);
+				}
+
+				// Set offset if provided
+				if (sensorData.offset) {
+					popup.find("#offset").val(sensorData.offset);
+				}
+
+				// Update sensor name if empty
 				var currentName = popup.find(".name").val();
 				if (!currentName || currentName.trim() === "") {
-					popup.find(".name").val(device.model);
+					popup.find(".name").val(sensorData.name);
 				}
+			}
+		});
 
-				// Set default values for typical ZigBee sensors
-				// These can be adjusted by the user afterward
-				if (device.model.toLowerCase().includes("temp")) {
-					popup.find("#cluster_id").val("0x0402"); // Temperature cluster
-					popup.find("#attribute_id").val("0x0000"); // Measured value
-				} else if (device.model.toLowerCase().includes("humid")) {
-					popup.find("#cluster_id").val("0x0405"); // Humidity cluster
-					popup.find("#attribute_id").val("0x0000"); // Measured value
-				} else if (device.model.toLowerCase().includes("soil") || device.model.toLowerCase().includes("moist")) {
-					popup.find("#cluster_id").val("0x0408"); // Soil moisture cluster
-					popup.find("#attribute_id").val("0x0000"); // Measured value
-				}
+		// Report new ZigBee sensor
+		popup.find("#report_zigbee_sensor").on("click", function(e) {
+			e.preventDefault();
 
-				popup.find(".name").focus();
-			});
+			var deviceIeee = popup.find("#device_ieee").val();
+			var endpoint = popup.find("#endpoint").val();
+			var clusterId = popup.find("#cluster_id").val();
+			var attributeId = popup.find("#attribute_id").val();
+			var sensorName = popup.find(".name").val();
+			var pollInterval = popup.find("#zigbee_poll_interval").val();
+			var unitId = popup.find("#unitid").val();
+			var unit = popup.find("#unit").val();
+			var factor = popup.find("#factor").val();
+			var divider = popup.find("#divider").val();
+			var offset = popup.find("#offset").val();
+
+			var emailBody = "New ZigBee Sensor Report:\\n\\n" +
+				"Sensor Name: " + (sensorName || "N/A") + "\\n" +
+				"Device IEEE: " + (deviceIeee || "N/A") + "\\n" +
+				"Endpoint: " + (endpoint || "N/A") + "\\n" +
+				"Cluster ID: " + (clusterId || "N/A") + "\\n" +
+				"Attribute ID: " + (attributeId || "N/A") + "\\n" +
+				"Poll Interval: " + (pollInterval || "N/A") + " ms\\n" +
+				"Unit ID: " + (unitId || "N/A") + "\\n" +
+				"Unit: " + (unit || "N/A") + "\\n" +
+				"Factor: " + (factor || "N/A") + "\\n" +
+				"Divider: " + (divider || "N/A") + "\\n" +
+				"Offset: " + (offset || "N/A") + "\\n\\n" +
+				"Please add this sensor to the database.";
+
+			var subject = "New ZigBee Sensor: " + (sensorName || "Unknown");
+			var mailtoLink = "mailto:info@opensprinklershop.de?subject=" +
+				encodeURIComponent(subject) +
+				"&body=" + encodeURIComponent(emailBody);
+
+			window.location.href = mailtoLink;
+
 			return false;
 		});
 
 		//Bluetooth: Scan for devices
 		popup.find("#bluetoothsel").on("click", function (e) {
 			e.preventDefault();
-			OSApp.Analog.showBluetoothDeviceScanner(popup, function (device) {
-				// Set the MAC address
-				popup.find("#device_mac").val(device.mac);
+			var btn = $(this);
+			var originalText = btn.text();
+			btn.text(OSApp.Language._("Scanning...") + " 10s (0)").prop("disabled", true);
 
-				// Update the sensor name with the device name
-				var currentName = popup.find(".name").val();
-				if (!currentName || currentName.trim() === "") {
-					popup.find(".name").val(device.name);
+			// Show scan area
+			popup.find("#bluetoothScanArea").show();
+			// Countdown is already shown in the scan button; hide the extra timer line
+			popup.find("#bluetoothScanTimer").hide().text("");
+			popup.find(".bluetooth_scan_select_container").show();
+
+			var scanStartTime = Date.now();
+			var scanDuration = 10;
+			var lastFoundDevice = null;
+			var scanInterval = null;
+			var uiInterval = null;
+			var scanTimeout = null;
+			var requestInFlight = false;
+			var didCleanup = false;
+			var lastDeviceCount = 0;
+
+			function updateScanUi() {
+				var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
+				var remaining = Math.max(0, scanDuration - elapsed);
+				btn.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + lastDeviceCount + ")");
+			}
+
+			// Start countdown UI immediately (even if /bs is slow)
+			updateScanUi();
+			uiInterval = setInterval(updateScanUi, 250);
+
+			function normalizeBluetoothDevices(data) {
+				if (Array.isArray(data)) {
+					return data;
+				}
+				if (data && Array.isArray(data.devices)) {
+					return data.devices;
+				}
+				if (data && data.devices && typeof data.devices === "object") {
+					return Object.values(data.devices);
+				}
+				return [];
+			}
+
+			function normalizeBluetoothCount(data, devices) {
+				if (data && typeof data.count === "number") {
+					return data.count;
+				}
+				if (data && typeof data.count === "string") {
+					var parsed = parseInt(data.count, 10);
+					if (!isNaN(parsed)) {
+						return parsed;
+					}
+				}
+				return (devices || []).length;
+			}
+
+			// Start Bluetooth scan
+			OSApp.Firmware.sendToOS("/bs?pw=&duration=10", "json").then(function () {
+
+				// Prepare UI elements
+				var deviceSelect = popup.find("#bluetoothDeviceSelect");
+				deviceSelect.empty();
+				popup.data("bluetoothDevices", []);
+
+				// Ensure select has at least a placeholder
+				deviceSelect.append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please activate your device.")));
+				try {
+					deviceSelect.selectmenu("refresh", true);
+				} catch (e) {
+					// ignore
 				}
 
-				popup.find(".name").focus();
+				function updateDeviceList() {
+					if (requestInFlight) {
+						return;
+					}
+					// Timer UI is handled by updateScanUi() so it keeps updating even if /bd is slow.
+
+					requestInFlight = true;
+					OSApp.Firmware.sendToOS("/bd?pw=", "json").then(function (data) {
+						requestInFlight = false;
+						var devices = normalizeBluetoothDevices(data);
+						popup.data("bluetoothDevices", devices);
+						lastDeviceCount = normalizeBluetoothCount(data, devices);
+
+							if (devices && devices.length > 0) {
+								var deviceSelect = popup.find("#bluetoothDeviceSelect");
+								deviceSelect.empty();
+								deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
+								popup.data("bluetoothDevices", devices);
+
+								for (var i = 0; i < devices.length; i++) {
+									var device = devices[i] || {};
+									var macAddr = device.address || device.mac_addr || device.mac || "00:00:00:00:00:00";
+									var name = device.name || OSApp.Language._("Unknown Device");
+									var rssi = (device.rssi === undefined || device.rssi === null) ? "N/A" : device.rssi;
+									var serviceUuid = device.service_uuid || "";
+									var serviceName = device.service_name || "";
+
+									var label = name + " | " + macAddr + " | RSSI: " + rssi;
+									if (serviceUuid) {
+										label += " | " + (serviceName || OSApp.Language._("Unknown")) + " (" + serviceUuid + ")";
+									}
+
+									deviceSelect.append($("<option>").val(String(i)).text(label));
+								}
+
+								try {
+									deviceSelect.selectmenu("refresh", true);
+								} catch (e) {
+									// ignore
+								}
+							} else {
+								var deviceSelectEmpty = popup.find("#bluetoothDeviceSelect");
+								deviceSelectEmpty.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please activate your device.")));
+								try {
+									deviceSelectEmpty.selectmenu("refresh", true);
+								} catch (e) {
+									// ignore
+								}
+							}
+					}, function () {
+						requestInFlight = false;
+							var deviceSelectErr = popup.find("#bluetoothDeviceSelect");
+							deviceSelectErr.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please activate your device.")));
+							try {
+								deviceSelectErr.selectmenu("refresh", true);
+							} catch (e) {
+								// ignore
+							}
+					});
+				}
+
+				// Immediately apply selected device to fields on combobox change
+				popup.find("#bluetoothDeviceSelect").off("change").on("change", function () {
+					var idxStr = popup.find("#bluetoothDeviceSelect").val();
+					var idx = parseInt(idxStr, 10);
+					if (idxStr === "" || isNaN(idx)) {
+						return;
+					}
+					var currentDevices = popup.data("bluetoothDevices") || [];
+					if (!currentDevices || idx < 0 || idx >= currentDevices.length) {
+						return;
+					}
+					var dev = currentDevices[idx] || null;
+					if (!dev) {
+						return;
+					}
+
+					var selectedCharUuid = dev.char_uuid || dev.characteristic_uuid || dev.charUuid || dev.characteristicUuid || dev.charUUID || dev.characteristicUUID || dev.service_uuid || dev.serviceUuid || "";
+					if (Array.isArray(selectedCharUuid)) {
+						selectedCharUuid = selectedCharUuid[0] || "";
+					}
+					selectedCharUuid = String(selectedCharUuid || "");
+
+					// Stop scanning timers but keep the device list visible
+					if (scanInterval) {
+						clearInterval(scanInterval);
+						scanInterval = null;
+					}
+					if (uiInterval) {
+						clearInterval(uiInterval);
+						uiInterval = null;
+					}
+					if (scanTimeout) {
+						clearTimeout(scanTimeout);
+						scanTimeout = null;
+					}
+
+					// Apply values
+					var charField = popup.find("#char_uuid");
+					if (charField.length && selectedCharUuid) {
+						charField.val(selectedCharUuid).trigger("change");
+						try {
+							charField.textinput("refresh");
+						} catch (e) {
+							// ignore
+						}
+					}
+
+					// Apply MAC address to MAC field
+					var mac = dev.address || dev.mac_addr || dev.mac || "";
+					if (mac) {
+						var macField = popup.find(".mac");
+						if (macField.length) {
+							macField.val(mac).trigger("change");
+						}
+					}
+
+					var deviceName = dev.name || OSApp.Language._("Unknown Device");
+					var currentName = popup.find(".name").val();
+					if (!currentName || currentName.trim() === "") {
+						var nameField = popup.find(".name");
+						nameField.val(deviceName).trigger("change");
+						try {
+							nameField.textinput("refresh");
+						} catch (e) {
+							// ignore
+						}
+					}
+
+					// Clear flags on backend after selection (ignore failures)
+					OSApp.Firmware.sendToOS("/bc?pw=", "json").always(function () {
+						popup.find("#bluetoothScanArea").hide();
+						btn.text(originalText).prop("disabled", false);
+					});
+				});
+
+				// Update device list immediately
+				updateDeviceList();
+
+				// Countdown UI already running via uiInterval
+
+				// Update device list every second
+				scanInterval = setInterval(updateDeviceList, 1000);
+
+				// Stop scanning after 10 seconds, keep results visible
+				scanTimeout = setTimeout(function() {
+					// Stop scanning, but keep discovered devices visible for selection
+					if (scanInterval) {
+						clearInterval(scanInterval);
+						scanInterval = null;
+					}
+					if (uiInterval) {
+						clearInterval(uiInterval);
+						uiInterval = null;
+					}
+					popup.find("#bluetoothScanTimer").text(OSApp.Language._("Scan finished"));
+					// Collapse scan area, keep select visible
+					popup.find("#bluetoothScanArea").hide();
+					// Best-effort: clear scan flags on backend (do not touch UI list)
+					try {
+						OSApp.Firmware.sendToOS("/bc?pw=", "json");
+					} catch (e) {
+						// ignore
+					}
+					btn.text(originalText).prop("disabled", false);
+					scanTimeout = null;
+				}, 10000);
+
+			}, function () {
+				// Error handler
+				if (uiInterval) {
+					clearInterval(uiInterval);
+					uiInterval = null;
+				}
+				btn.text(originalText).prop("disabled", false);
+				popup.find("#bluetoothScanArea").hide();
+				popup.find(".bluetooth_scan_select_container").hide();
+				OSApp.Errors.showError(OSApp.Language._("Failed to start Bluetooth scanning. Please ensure Bluetooth is supported."));
 			});
+
 			return false;
 		});
 
-		//FYTA: Select Sensor
-		popup.find("#fytasel").on("click", function () {
+	//FYTA: Select Sensor
+	popup.find("#fytasel").on("click", function () {
 
-			return OSApp.Firmware.sendToOS("/fy?pw=", "json").then(function (result) {
+		return OSApp.Firmware.sendToOS("/fy?pw=", "json").then(function (result) {
 				var token = result.token;
 				var sel = "<ul class='fyta-plants' data-role='listview'>";
 				for (let i = 0; i < result.plants.length; i++) {
@@ -2104,24 +3134,9 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			});
 		});
 
-		popup.find("#type").change(function () {
-			var type = parseInt(popup.find("#type").val());
-			// Update button visibility based on sensor type
-			document.getElementById("smt100id").style.display = OSApp.Analog.isSmt100(type) ? "block" : "none";
-			document.getElementById("fytasel").style.display = (type == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE || type == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE) ? "block" : "none";
-			document.getElementById("zigbeesel").style.display = (type == OSApp.Analog.Constants.SENSOR_ZIGBEE) ? "block" : "none";
-			document.getElementById("bluetoothsel").style.display = (type == OSApp.Analog.Constants.SENSOR_BLUETOOTH) ? "block" : "none";
-		});
 
-		//download log:
-		popup.find("#display-log").on("click", function () {
-			var dur = $(this),
-				value = dur.attr("value");
-			popup.popup("close");
 
-			OSApp.UIDom.changePage("#analogsensorchart_"+value);
-			return false;
-		});
+
 
 		//download log:
 		popup.find("#download-log").on("click", function () {
@@ -2213,8 +3228,9 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 
 		$("#sensorEditor").remove();
 
-		popup.css("max-width", "580px");
+	popup.css("max-width", "576px");
 
+		// Initial visibility update based on sensor type
 		OSApp.Analog.updateSensorVisibility(popup, sensor.type);
 
 		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
@@ -2272,7 +3288,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			}
 			var sensor = {
 				nr: maxNr + 1,
-				name: "new sensor",
+				name: OSApp.Language._("new sensor"),
 				type: 1,
 				ri: 600,
 				enable: 1,

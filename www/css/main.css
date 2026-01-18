@@ -426,7 +426,16 @@ body, #loadingPage {
     height: 100%
 }
 body, input, select, textarea, button, .ui-btn {
-    font-family: Lato, sans-serif;
+    font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+    font-feature-settings: "liga" 1, "calt" 1, "kern" 1;
+    font-variant-ligatures: common-ligatures;
+    text-rendering: optimizeLegibility;
+    text-shadow: none !important;
+    letter-spacing: normal !important;
+}
+html, body, * {
+    text-shadow: none !important;
+    letter-spacing: normal !important;
 }
 :not(input):not(textarea) {
     -webkit-touch-callout:none;
@@ -528,6 +537,342 @@ input[type=number] {
 
 #mainMenu > .ui-grid-a .ui-btn {
     text-overflow: clip !important;
+}
+
+/* Left panel (sprinklers settings) theming */
+html:not(.theme-colorful) #sprinklers-settings,
+html:not(.theme-colorful) #sprinklers-settings .ui-panel-inner,
+html:not(.theme-colorful) #sprinklers-settings .ui-listview,
+html:not(.theme-colorful) #sprinklers-settings .ui-btn {
+    background-color: #000000 !important;
+    color: #e6e6e6 !important;
+    border-color: #2b3340 !important;
+    text-shadow: none !important;
+    letter-spacing: normal !important;
+}
+html.theme-colorful #sprinklers-settings,
+html.theme-colorful #sprinklers-settings .ui-panel-inner,
+html.theme-colorful #sprinklers-settings .ui-listview,
+html.theme-colorful #sprinklers-settings .ui-btn {
+    background-color: var( --theme-colorful-surface ) !important;
+    color: var( --theme-colorful-text ) !important;
+    border-color: var( --theme-colorful-border ) !important;
+    text-shadow: none !important;
+    letter-spacing: normal !important;
+}
+
+/* Footer menu popup theming */
+html:not(.theme-dark):not(.theme-colorful) #mainMenu,
+html:not(.theme-dark):not(.theme-colorful) #mainMenu .ui-listview,
+html:not(.theme-dark):not(.theme-colorful) #mainMenu .ui-btn {
+    background-color: #f7f7f7 !important;
+    color: #1b1b1b !important;
+    border-color: #d9d9d9 !important;
+}
+html.theme-dark #mainMenu,
+html.theme-dark #mainMenu .ui-listview,
+html.theme-dark #mainMenu .ui-btn {
+    background-color: #1b212b !important;
+    color: #e6e6e6 !important;
+    border-color: #2b3340 !important;
+}
+html.theme-colorful #mainMenu,
+html.theme-colorful #mainMenu .ui-listview,
+html.theme-colorful #mainMenu .ui-btn {
+    background-color: var( --theme-colorful-surface ) !important;
+    color: var( --theme-colorful-text ) !important;
+    border-color: var( --theme-colorful-border ) !important;
+}
+
+/* Theme modes */
+html.theme-dark body,
+html.theme-dark #loadingPage {
+    background-color: #000000 !important;
+    color: #e6e6e6;
+}
+html.theme-dark .ui-panel-wrapper,
+html.theme-dark .ui-page,
+html.theme-dark .ui-page-theme-a,
+html.theme-dark .ui-page-theme-b,
+html.theme-dark .ui-content,
+html.theme-dark .ui-panel,
+html.theme-dark .ui-popup {
+    background-color: #000000 !important;
+    color: #e6e6e6;
+}
+html.theme-dark .ui-bar-a,
+html.theme-dark .ui-bar-b,
+html.theme-dark .ui-body-a,
+html.theme-dark .ui-body-b,
+html.theme-dark .ui-btn {
+    background-color: #1b212b !important;
+    color: #e6e6e6 !important;
+    border-color: #2b3340 !important;
+}
+html.theme-dark .ui-body-inherit,
+html.theme-dark .ui-collapsible-content {
+    background-color: #151a22 !important;
+    color: #e6e6e6 !important;
+    border-color: #2b3340 !important;
+}
+html.theme-dark .ui-page-theme-a table,
+html.theme-dark .ui-page-theme-b table,
+html.theme-dark .ui-content table {
+    background-color: #000000 !important;
+    color: #e6e6e6 !important;
+    border-color: #2b3340 !important;
+}
+html.theme-dark .ui-page-theme-a table th,
+html.theme-dark .ui-page-theme-a table td,
+html.theme-dark .ui-page-theme-b table th,
+html.theme-dark .ui-page-theme-b table td,
+html.theme-dark .ui-content table th,
+html.theme-dark .ui-content table td {
+    background-color: #151a22 !important;
+    color: #e6e6e6 !important;
+    border-color: #2b3340 !important;
+}
+html.theme-dark a {
+    color: #8cc8ff;
+}
+html.theme-dark .activeButton,
+html.theme-dark .activeButton.ui-slider-bg,
+html.theme-dark .activeButton.ui-checkbox-on,
+html.theme-dark .ui-btn.ui-checkbox-on:after,
+html.theme-dark button.ui-btn-active {
+    background-color: #3a8dde !important;
+    border-color: #3a8dde !important;
+    color: #fff !important;
+    text-shadow: 0 1px 0 #1f5f9e !important;
+}
+
+html.theme-colorful {
+    --theme-colorful-page-bg: #f6f4ff;
+    --theme-colorful-surface: rgba( 255, 255, 255, 0.92 );
+    --theme-colorful-surface-strong: rgba( 255, 255, 255, 0.96 );
+    --theme-colorful-border: rgba( 215, 201, 255, 0.5 );
+    --theme-colorful-text: #2a2440;
+}
+html.theme-colorful body,
+html.theme-colorful #loadingPage,
+html.theme-colorful .ui-panel-wrapper {
+    background-color: var( --theme-colorful-page-bg ) !important;
+    background-image: none;
+    color: var( --theme-colorful-text );
+}
+html.theme-colorful .ui-page,
+html.theme-colorful .ui-page-theme-a,
+html.theme-colorful .ui-page-theme-b {
+    background: transparent !important;
+}
+html.theme-colorful .ui-content,
+html.theme-colorful .ui-panel,
+html.theme-colorful .ui-popup {
+    background-color: var( --theme-colorful-surface ) !important;
+}
+html.theme-colorful .ui-content,
+html.theme-colorful .ui-content.ui-body-a,
+html.theme-colorful .ui-content.ui-body-b,
+html.theme-colorful .ui-content .ui-body,
+html.theme-colorful .ui-content .ui-body-a,
+html.theme-colorful .ui-content .ui-body-b {
+    background-color: var( --theme-colorful-surface ) !important;
+    color: var( --theme-colorful-text ) !important;
+}
+html.theme-colorful .ui-page-theme-a,
+html.theme-colorful .ui-page-theme-b,
+html.theme-colorful .ui-content,
+html.theme-colorful .ui-panel,
+html.theme-colorful .ui-popup {
+    background-color: var( --theme-colorful-surface ) !important;
+    color: var( --theme-colorful-text );
+}
+html.theme-colorful .ui-body-inherit,
+html.theme-colorful .ui-collapsible-content,
+html.theme-colorful .ui-input-text,
+html.theme-colorful .ui-input-search,
+html.theme-colorful .ui-select .ui-btn,
+html.theme-colorful .ui-slider-track,
+html.theme-colorful .ui-slider-bg,
+html.theme-colorful textarea,
+html.theme-colorful input[type='text'],
+html.theme-colorful input[type='password'],
+html.theme-colorful input[type='number'],
+html.theme-colorful input[type='email'],
+html.theme-colorful input[type='url'],
+html.theme-colorful input[type='tel'] {
+    background-color: var( --theme-colorful-surface ) !important;
+    color: var( --theme-colorful-text ) !important;
+    border-color: var( --theme-colorful-border ) !important;
+}
+html.theme-colorful .ui-body-a,
+html.theme-colorful .ui-body-b,
+html.theme-colorful .ui-body-a > .ui-body,
+html.theme-colorful .ui-body-b > .ui-body,
+html.theme-colorful .ui-body-a.center,
+html.theme-colorful .ui-body-b.center,
+html.theme-colorful .ui-body-a .center,
+html.theme-colorful .ui-body-b .center {
+    background-color: var( --theme-colorful-surface ) !important;
+    color: var( --theme-colorful-text ) !important;
+}
+html.theme-colorful .ui-body-a table,
+html.theme-colorful .ui-body-b table,
+html.theme-colorful .ui-body-a .ui-input-text,
+html.theme-colorful .ui-body-b .ui-input-text,
+html.theme-colorful .ui-body-a .ui-select .ui-btn,
+html.theme-colorful .ui-body-b .ui-select .ui-btn {
+    background-color: var( --theme-colorful-surface-strong ) !important;
+    color: var( --theme-colorful-text ) !important;
+    border-color: var( --theme-colorful-border ) !important;
+}
+html.theme-colorful .ui-page-theme-a table,
+html.theme-colorful .ui-page-theme-b table,
+html.theme-colorful .ui-content table {
+    background-color: var( --theme-colorful-surface-strong ) !important;
+    color: var( --theme-colorful-text ) !important;
+    border-color: rgba( 169, 150, 255, 0.28 ) !important;
+}
+html.theme-colorful .ui-page-theme-a table th,
+html.theme-colorful .ui-page-theme-a table td,
+html.theme-colorful .ui-page-theme-b table th,
+html.theme-colorful .ui-page-theme-b table td,
+html.theme-colorful .ui-content table th,
+html.theme-colorful .ui-content table td {
+    background-color: var( --theme-colorful-surface-strong ) !important;
+    color: var( --theme-colorful-text ) !important;
+    border-color: rgba( 169, 150, 255, 0.28 ) !important;
+}
+html.theme-colorful .ui-field-contain {
+    border-bottom-color: var( --theme-colorful-border ) !important;
+}
+html.theme-colorful .table-stroke thead th,
+html.theme-colorful .table-stripe thead th,
+html.theme-colorful .table-stripe tbody tr:last-child {
+    border-bottom: 1px solid var( --theme-colorful-border ) !important;
+}
+html.theme-colorful .table-stroke tbody th,
+html.theme-colorful .table-stroke tbody td {
+    border-bottom: 1px solid rgba( 215, 201, 255, 0.4 ) !important;
+}
+html.theme-colorful .table-stripe tbody tr:nth-child(odd) td,
+html.theme-colorful .table-stripe tbody tr:nth-child(odd) th {
+    background-color: rgba( 198, 233, 255, 0.35 ) !important;
+}
+html.theme-colorful .ui-shadow {
+    box-shadow: 0 1px 3px rgba( 141, 120, 235, 0.35 ) !important;
+}
+html.theme-colorful .ui-shadow-inset {
+    box-shadow: inset 0 1px 3px rgba( 141, 120, 235, 0.35 ) !important;
+}
+html.theme-colorful .ui-overlay-shadow {
+    box-shadow: 0 0 12px rgba( 141, 120, 235, 0.45 ) !important;
+}
+html.theme-colorful .ui-panel-display-reveal,
+html.theme-colorful .ui-panel-display-overlay,
+html.theme-colorful .ui-panel-position-right.ui-panel-display-reveal,
+html.theme-colorful .ui-panel-position-right.ui-panel-display-overlay {
+    box-shadow: 0 0 8px rgba( 141, 120, 235, 0.35 ) !important;
+}
+html.theme-colorful .ui-btn-icon-left:after,
+html.theme-colorful .ui-btn-icon-right:after,
+html.theme-colorful .ui-btn-icon-top:after,
+html.theme-colorful .ui-btn-icon-bottom:after,
+html.theme-colorful .ui-btn-icon-notext:after {
+    background-color: rgba( 162, 142, 255, 0.4 ) !important;
+}
+html.theme-colorful .apexcharts-tooltip.apexcharts-theme-light,
+html.theme-colorful .apexcharts-xaxistooltip,
+html.theme-colorful .apexcharts-yaxistooltip,
+html.theme-colorful .apexcharts-menu {
+    background: var( --theme-colorful-surface-strong ) !important;
+    border-color: rgba( 215, 201, 255, 0.55 ) !important;
+    color: var( --theme-colorful-text ) !important;
+}
+html.theme-colorful .apexcharts-tooltip-title {
+    background: rgba( 198, 233, 255, 0.55 ) !important;
+    border-bottom-color: rgba( 215, 201, 255, 0.55 ) !important;
+}
+html.theme-colorful {
+    --dt-row-stripe: 205, 195, 255;
+    --dt-row-hover: 190, 232, 255;
+    --dt-column-ordering: 205, 195, 255;
+    --dt-row-selected: 178, 168, 255;
+    --dt-row-selected-text: 38, 36, 64;
+    --dt-row-selected-link: 85, 72, 160;
+    --dt-html-background: var( --theme-colorful-page-bg );
+}
+html.theme-colorful .dt-container .dt-search input,
+html.theme-colorful .dt-container .dt-input,
+html.theme-colorful .dt-container select.dt-input {
+    border-color: rgba( 215, 201, 255, 0.55 ) !important;
+}
+html.theme-colorful #header,
+html.theme-colorful #footer {
+    background: linear-gradient(90deg, #8a79ff, #77e0ff) !important;
+}
+html.theme-colorful #header .ui-btn,
+html.theme-colorful #footer .ui-btn {
+    color: #ffffff !important;
+}
+html.theme-colorful a {
+    color: #7059ff;
+}
+html.theme-colorful .activeButton,
+html.theme-colorful .activeButton.ui-slider-bg,
+html.theme-colorful .activeButton.ui-checkbox-on,
+html.theme-colorful .ui-btn.ui-checkbox-on:after,
+html.theme-colorful button.ui-btn-active {
+    background-color: #ff8fb1 !important;
+    border-color: #ff8fb1 !important;
+    color: #fff !important;
+    text-shadow: 0 1px 0 #cc5f85 !important;
+}
+
+html.theme-colorful #start {
+    --theme-colorful-page-bg: #f4f1ff;
+}
+html.theme-colorful #loadingPage {
+    --theme-colorful-page-bg: #f7f7ff;
+}
+html.theme-colorful #sprinklers {
+    --theme-colorful-page-bg: #f3f8ff;
+}
+html.theme-colorful #site-control {
+    --theme-colorful-page-bg: #fff2e9;
+}
+html.theme-colorful #programs {
+    --theme-colorful-page-bg: #f1fff6;
+}
+html.theme-colorful #addprogram {
+    --theme-colorful-page-bg: #fff2f9;
+}
+html.theme-colorful #manual {
+    --theme-colorful-page-bg: #fff6e8;
+}
+html.theme-colorful #runonce {
+    --theme-colorful-page-bg: #eef9ff;
+}
+html.theme-colorful #os-options {
+    --theme-colorful-page-bg: #f2f0ff;
+}
+html.theme-colorful #logs {
+    --theme-colorful-page-bg: #edf3ff;
+}
+html.theme-colorful #forecast {
+    --theme-colorful-page-bg: #edfff7;
+}
+html.theme-colorful #preview {
+    --theme-colorful-page-bg: #f9f0ff;
+}
+html.theme-colorful #about {
+    --theme-colorful-page-bg: #f2ffea;
+}
+html.theme-colorful #analogsensorconfig {
+    --theme-colorful-page-bg: #f2f4ff;
+}
+html.theme-colorful #analogsensorchart {
+    --theme-colorful-page-bg: #edf7ff;
 }
 
 /* Start page rules */
@@ -713,7 +1058,7 @@ input[type=number] {
     text-shadow:none;
     background:#fff;
     border:1px solid #b4b4b4;
-    font:700 14px helvetica;
+    font:700 14px "Inter", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
     padding:0;
     margin-top:10px;
     width:100%;

@@ -2526,6 +2526,15 @@ msgstr ""
 msgid "Scan for ZigBee Devices"
 msgstr ""
 
+msgid "Known Sensor Types"
+msgstr ""
+
+msgid "Select known sensor or enter manually..."
+msgstr ""
+
+msgid "Report New Sensor"
+msgstr ""
+
 msgid "ZigBee Device IEEE Address"
 msgstr ""
 
