@@ -100,9 +100,10 @@
                 <action android:name="android.intent.action.GET_CONTENT" />
             </intent>
         </config-file>
+        <!--
         <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">
         	<application android:debuggable="true" />
-	</edit-config>
+	</edit-config>-->
         <preference name="Scheme" value="http" />
         <preference name="android-minSdkVersion" value="24" />
         <preference name="android-targetSdkVersion" value="35" />
