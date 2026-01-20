@@ -18,3 +18,4 @@ chown stefan:www platforms/* -R
 
 rm ./platforms/browser/platform_www/plugins/* -R 2>/dev/null
 rm ./platforms/browser/www/*.js 2>/dev/null
+#systemctl restart squid

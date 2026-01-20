@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZigBee Cluster Database Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .sensor-entry {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 4px;
+            background: #fafafa;
+        }
+        .sensor-entry:hover {
+            background: #f0f0f0;
+        }
+        .sensor-name {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        .sensor-details {
+            font-size: 0.9em;
+            color: #666;
+            margin: 5px 0;
+        }
+        .code {
+            font-family: 'Courier New', monospace;
+            background: #e8e8e8;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        textarea {
+            width: 100%;
+            height: 400px;
+            font-family: 'Courier New', monospace;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .error {
+            color: #e74c3c;
+            padding: 10px;
+            background: #fadbd8;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #27ae60;
+            padding: 10px;
+            background: #d5f4e6;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>ZigBee Cluster Database Manager</h1>
+
+    <div class="container">
+        <h2>Aktuelle Sensor-Datenbank</h2>
+        <div id="sensorList">Lade Daten...</div>
+    </div>
+
+    <div class="container">
+        <h2>JSON Editor</h2>
+        <p>Bearbeiten Sie die JSON-Daten direkt:</p>
+        <textarea id="jsonEditor"></textarea>
+        <br>
+        <button onclick="validateJSON()">JSON Validieren</button>
+        <button onclick="downloadJSON()">Als Datei herunterladen</button>
+        <div id="message"></div>
+    </div>
+
+    <div class="container">
+        <h2>Neue Sensor-Vorlage</h2>
+        <button onclick="addSensorTemplate()">Neue Sensor-Vorlage hinzufügen</button>
+    </div>
+
+    <script>
+        // Lade die aktuelle JSON-Datei
+        let currentData = [];
+
+        async function loadData() {
+            try {
+                const response = await fetch('zigbeeclusterids.json');
+                currentData = await response.json();
+                displaySensors(currentData);
+                document.getElementById('jsonEditor').value = JSON.stringify(currentData, null, 2);
+            } catch (error) {
+                document.getElementById('sensorList').innerHTML =
+                    '<div class="error">Fehler beim Laden der Daten: ' + error.message + '</div>' +
+                    '<p>Erstelle eine neue leere Datenbank...</p>';
+                currentData = [];
+                document.getElementById('jsonEditor').value = JSON.stringify([], null, 2);
+            }
+        }
+
+        function displaySensors(sensors) {
+            const container = document.getElementById('sensorList');
+            if (sensors.length === 0) {
+                container.innerHTML = '<p>Keine Sensoren in der Datenbank.</p>';
+                return;
+            }
+
+            let html = '<p>Anzahl Sensoren: ' + sensors.length + '</p>';
+            sensors.forEach(sensor => {
+                html += `
+                    <div class="sensor-entry">
+                        <div class="sensor-name">${sensor.name}</div>
+                        <div class="sensor-details">
+                            <strong>ID:</strong> ${sensor.id}<br>
+                            <strong>Beschreibung:</strong> ${sensor.description}<br>
+                            <strong>Endpoint:</strong> <span class="code">${sensor.endpoint}</span> |
+                            <strong>Cluster ID:</strong> <span class="code">${sensor.cluster_id}</span> |
+                            <strong>Attribute ID:</strong> <span class="code">${sensor.attribute_id}</span><br>
+                            <strong>Poll Interval:</strong> ${sensor.poll_interval} ms<br>
+                            <strong>Unit ID:</strong> ${sensor.unitid || 'N/A'} |
+                            <strong>Unit:</strong> ${sensor.unit || 'N/A'} |
+                            <strong>Factor:</strong> ${sensor.factor || 'N/A'} |
+                            <strong>Divider:</strong> ${sensor.divider || 'N/A'} |
+                            <strong>Offset:</strong> ${sensor.offset || 'N/A'}
+                        </div>
+                    </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        function validateJSON() {
+            const editor = document.getElementById('jsonEditor');
+            const message = document.getElementById('message');
+
+            try {
+                const data = JSON.parse(editor.value);
+
+                // Validiere Struktur
+                if (!Array.isArray(data)) {
+                    throw new Error('Daten müssen ein Array sein');
+                }
+
+                data.forEach((sensor, index) => {
+                    if (!sensor.id) throw new Error(`Sensor ${index}: 'id' fehlt`);
+                    if (!sensor.name) throw new Error(`Sensor ${index}: 'name' fehlt`);
+                    if (!sensor.description) throw new Error(`Sensor ${index}: 'description' fehlt`);
+                    if (!sensor.endpoint) throw new Error(`Sensor ${index}: 'endpoint' fehlt`);
+                    if (!sensor.cluster_id) throw new Error(`Sensor ${index}: 'cluster_id' fehlt`);
+                    if (!sensor.attribute_id) throw new Error(`Sensor ${index}: 'attribute_id' fehlt`);
+                });
+
+                currentData = data;
+                displaySensors(data);
+                message.innerHTML = '<div class="success">✓ JSON ist gültig! Anzahl Sensoren: ' + data.length + '</div>';
+            } catch (error) {
+                message.innerHTML = '<div class="error">✗ JSON Fehler: ' + error.message + '</div>';
+            }
+        }
+
+        function downloadJSON() {
+            const editor = document.getElementById('jsonEditor');
+            const blob = new Blob([editor.value], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'zigbeeclusterids.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function addSensorTemplate() {
+            const template = {
+                "id": "new_sensor_" + Date.now(),
+                "name": "Neuer Sensor",
+                "description": "Beschreibung des Messwerts",
+                "endpoint": "1",
+                "cluster_id": "0x0000",
+                "attribute_id": "0x0000",
+                "poll_interval": "60000",
+                "unitid": "0",
+                "unit": "",
+                "factor": "1",
+                "divider": "1",
+                "offset": "0"
+            };
+
+            currentData.push(template);
+            document.getElementById('jsonEditor').value = JSON.stringify(currentData, null, 2);
+            displaySensors(currentData);
+        }
+
+        // Lade Daten beim Start
+        loadData();
+    </script>
+</body>
+</html>

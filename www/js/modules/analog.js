@@ -2370,7 +2370,7 @@ list += "</select></div>" +
 	"<select data-mini='true' id='zigbeeDeviceSelect'></select>" +
 	"</div>" +
 	"</div>" +
-	"<div id='zigbeeScanArea' style='display:none; margin: 10px 0; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'>" +
+	"<div id='zigbeeScanArea' class='ui-body ui-body-a' style='display:none; margin: 10px 0; padding: 10px; border-radius: 5px;'>" +
 	"<div id='zigbeeScanTimer' class='center' style='font-size: 16px; font-weight: bold; margin: 5px 0; color: #2196F3;'></div>" +
 	"</div>" +
 		//Bluetooth device scanner button:
@@ -2381,7 +2381,7 @@ list += "</select></div>" +
 	"<select data-mini='true' id='bluetoothDeviceSelect'></select>" +
 	"</div>" +
 	"</div>" +
-	"<div id='bluetoothScanArea' style='display:none; margin: 10px 0; padding: 10px; background-color: #f5f5f5; border-radius: 5px;'>" +
+	"<div id='bluetoothScanArea' class='ui-body ui-body-a' style='display:none; margin: 10px 0; padding: 10px; border-radius: 5px;'>" +
 	"<div id='bluetoothScanTimer' class='center' style='font-size: 16px; font-weight: bold; margin: 5px 0; color: #2196F3;'></div>" +
 	"</div>" +
 "<div class='ip_label'><label for='sensor_ip'>" + OSApp.Language._("IP Address") + "</label>" +
@@ -2396,7 +2396,7 @@ list += "</select></div>" +
 "<div class='mac_label'><label for='sensor_mac'>" + OSApp.Language._("MAC Address") + "</label>" +
 	"<input class='mac' id='sensor_mac' data-mini='true' type='text' value='" + (sensor.mac ? sensor.mac : "") + "'></div>" +
 
-			"<div class='rs485_help' style='display:none; margin: 10px 0; padding: 10px; background-color: #f0f0f0; border-radius: 5px;'>" +
+			"<div class='rs485_help ui-body ui-body-a' style='display:none; margin: 10px 0; padding: 10px; border-radius: 5px;'>" +
 			"<p style='margin: 0; font-size: 0.9em;'>" + OSApp.Language._("RS485 Configuration Help:") + "<br>" +
 			OSApp.Language._("For TCP/IP RS485 adapter: Enter IP address and port (e.g., 192.168.1.100:502)") + "<br>" +
 			OSApp.Language._("For I2C/USB RS485 adapter: Leave IP empty and set Port to device number (0-3)") + "<br>" +
