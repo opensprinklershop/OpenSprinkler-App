@@ -16,7 +16,6 @@
   <preference name="BackgroundColor" value="0x001c1c1c"/>
   <preference name="DisallowOverscroll" value="true"/>
   <preference name="webviewbounce" value="false"/>
-  <preference name="UIWebViewBounce" value="false"/>
   <preference name="HideMousePointer" value="1"/>
   <preference name="WindowSize" value="900x760"/>
   <preference name="EnableWebGL" value="true"/>

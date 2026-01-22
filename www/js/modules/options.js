@@ -2229,7 +2229,7 @@ OSApp.Options.coordsToLocation = function( lat, lon, callback, fallback ) {
 	fallback = fallback || lat + "," + lon;
 
 	$.getJSON( "https://maps.googleapis.com/maps/api/geocode/json?latlng=" + lat + "," + lon + "&key="+
-		"GOOGLEMAPSAPIKEY"+
+		""+
 		"&result_type=locality|sublocality|administrative_area_level_1|country", function( data ) {
 		if ( data.results.length === 0 ) {
 			callback( fallback );
