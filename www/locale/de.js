@@ -974,5 +974,8 @@
    "Weather Failure": "Wetterdienst-Fehler",
    "Network Failure": "Netzwerk-Fehler",
    "Clock Update": "Uhr-Aktualisierung",
-   "Power On": "Einschalten"
+   "Power On": "Einschalten",
+   "Sort": "Sortieren",
+   "Sort completed": "Sortieren abgeschlossen",
+   "Show Analog Sensor Log": "Analog-Sensorprotokoll anzeigen"
 }}

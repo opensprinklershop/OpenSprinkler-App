@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "Reiniciar OpenSprinkler",
    "Downgrade UI": "Desactualizar UI",
    "System Diagnostics": "Diagnóstico de Sistema"
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

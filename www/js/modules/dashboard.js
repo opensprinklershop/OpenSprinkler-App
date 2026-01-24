@@ -992,6 +992,9 @@ OSApp.Dashboard.displayPage = function() {
 					|| !(displayOption & OSApp.ProgramView.Constants.SHOW_ZONES);
 			} ).remove();
 
+			if (!(displayOption & OSApp.ProgramView.Constants.SHOW_ZONES))
+				return;
+
 			for ( var sid = 0; sid < OSApp.currentSession.controller.stations.snames.length; sid++ ) {
 				isScheduled = OSApp.Stations.getPID( sid ) > 0;
 				isRunning = OSApp.Stations.getStatus( sid ) > 0;

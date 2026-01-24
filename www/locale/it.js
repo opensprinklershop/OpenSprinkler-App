@@ -818,4 +818,8 @@
    "Service UUID": "UUID del servizio",
    "Characteristic UUID": "UUID della caratteristica",
    "Unknown Device": "Dispositivo sconosciuto"
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

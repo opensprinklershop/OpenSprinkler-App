@@ -1,10 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<<<<<<< HEAD
-<widget android-versionCode="184" version="2.3.184" versionCode="184" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="de.opensprinklershop.sprinklers" >
-=======
-
-<widget xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" android-versionCode="184" id="de.opensprinklershop.sprinklers" vversion="2.3.184" version="19943" versionCode="184" xversioncode="19943">
->>>>>>> e6c4cf6c60c358c264282b4352f50af8519a1f76
+<widget android-versionCode="185" version="2.3.185" versionCode="185" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="de.opensprinklershop.sprinklers" >
   <name>OpenSprinklerASB</name>
   <description>
             Designed to allow intuitive control of the OpenSprinkler irrigation controller.
@@ -52,7 +47,7 @@
             <false/>
         </config-file>
         <edit-config target="CFBundleShortVersionString" file="*-Info.plist" mode="overwrite">
-            <string>19943</string>
+            <string>19946</string>
         </edit-config>
         <config-file target="*-Info.plist" overwrite="true" parent="LSApplicationCategoryType">
             <string>public.app-category.utilities</string>

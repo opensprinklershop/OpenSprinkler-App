@@ -299,6 +299,10 @@ hr.divider {
     font-weight:400;
     text-shadow:none!important
 }
+
+/* Positioning for two right buttons in header */
+#header .ui-btn-right.secondary-right { right: 44px; }
+#header .ui-btn-right.theme-toggle-btn { right: 0; }
 .full-width-slider input {
     display: none;
 }
@@ -644,6 +648,29 @@ html.theme-dark button.ui-btn-active {
     border-color: #3a8dde !important;
     color: #fff !important;
     text-shadow: 0 1px 0 #1f5f9e !important;
+}
+
+/* Ensure status color classes override dark theme for buttons */
+html.theme-dark .red,
+html.theme-dark .red.ui-btn {
+    background: #C96161 !important;
+    color: #FFF !important;
+    border-color: #C96161 !important;
+    text-shadow: none !important;
+}
+html.theme-dark .green,
+html.theme-dark .green.ui-btn {
+    background: #16a085 !important;
+    color: #FFF !important;
+    border-color: #16a085 !important;
+    text-shadow: none !important;
+}
+html.theme-dark .yellow,
+html.theme-dark .yellow.ui-btn {
+    background: #FFC82C !important;
+    color: #1b1b1b !important;
+    border-color: #FFC82C !important;
+    text-shadow: none !important;
 }
 
 html.theme-colorful {

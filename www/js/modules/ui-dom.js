@@ -968,14 +968,16 @@ OSApp.UIDom.changeHeader = function( opt ) {
 				"class='ui-btn-left " + opt.leftBtn.class + "'>" + opt.leftBtn.text + "</button>" +
 			"<h3 class='" + opt.class + "'>" + opt.title + "</h3>" +
 			"<button data-icon='" + opt.rightBtn.icon + "' " + ( opt.rightBtn.text === "" ? "data-iconpos='notext' " : "" ) +
-				"class='ui-btn-right " + opt.rightBtn.class + "'>" + opt.rightBtn.text + "</button>" ),
+				"class='ui-btn-right secondary-right " + opt.rightBtn.class + "'>" + opt.rightBtn.text + "</button>" +
+			"<button data-icon='gear' data-iconpos='notext' class='ui-btn-right theme-toggle-btn'></button>" ),
 		speed = opt.animate ? "fast" : 0;
 
 	// Fade out the header content, replace it, and update the header
 	header.children().stop().fadeOut( speed, function() {
 		header.html( newHeader ).toolbar( header.hasClass( "ui-header" ) ? "refresh" : null );
 		header.find( ".ui-btn-left" ).on( "click", opt.leftBtn.on );
-		header.find( ".ui-btn-right" ).on( "click", opt.rightBtn.on );
+		header.find( ".secondary-right" ).on( "click", opt.rightBtn.on );
+		header.find( ".theme-toggle-btn" ).on( "click", function() { OSApp.UIDom.showThemeSelector( $( this ) ); return false; } );
 	} ).fadeIn( speed );
 
 	return newHeader;

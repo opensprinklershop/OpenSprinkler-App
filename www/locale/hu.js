@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "OpenSprinkler újraindítása",
    "Downgrade UI": "Korábbi verziós Felhasználói felület",
    "System Diagnostics": "Rendszer diagnosztika"
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

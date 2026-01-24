@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "איתחול OpenSprinkler",
    "Downgrade UI": "שינמוך ממשק משתמש",
    "System Diagnostics": ""
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

@@ -1,4 +1,5 @@
 #!/bin/sh
+source ~/.bash_profile
 rm ./www/js/*~ 2>/dev/null
 rm ./www/js/DEADJOE 2>/dev/null
 rm ./www/locale/*~ 2>/dev/null

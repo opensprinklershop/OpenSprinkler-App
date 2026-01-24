@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "መቆጣጠሪያውን ቀስቅስ",
    "Downgrade UI": "ዳውን ግሬድ ዩ አይ ",
    "System Diagnostics": ""
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

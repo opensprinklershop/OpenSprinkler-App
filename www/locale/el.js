@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "Επανεκίννηση του OpenSprinkler",
    "Downgrade UI": "",
    "System Diagnostics": ""
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

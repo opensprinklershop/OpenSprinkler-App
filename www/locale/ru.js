@@ -817,4 +817,8 @@
    "Service UUID": "UUID сервиса",
    "Characteristic UUID": "UUID характеристики",
    "Unknown Device": "Неизвестное устройство"
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "Pārstartēt OpenSprinkler",
    "Downgrade UI": "Pāriet uz vecāku UI versiju",
    "System Diagnostics": ""
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "Omstart av OpenSprinkler",
    "Downgrade UI": "Nedgrader UI",
    "System Diagnostics": ""
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

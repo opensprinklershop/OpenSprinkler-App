@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "Reštartovať systém",
    "Downgrade UI": "Downgrade UI",
    "System Diagnostics": "Systémové informácie"
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

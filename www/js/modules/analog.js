@@ -305,6 +305,34 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 	if (OSApp.Analog.checkAnalogSensorAvail()) {
 		var showArea = page.find("#os-sensor-show");
 		var html = "", i, j;
+
+		var root = document.documentElement;
+		var body = document.body || document.getElementsByTagName('body')[0];
+		var isDark = (root.classList.contains("theme-dark") || (body && body.classList.contains("theme-dark")));
+		var isColorful = (root.classList.contains("theme-colorful") || (body && body.classList.contains("theme-colorful")));
+		var css = getComputedStyle(root);
+		var theme = {
+			accent: isColorful ? css.getPropertyValue("--theme-colorful-text").trim() || "#7059ff" : (isDark ? "#3a8dde" : "#20E647"),
+			surfaceStrong: isColorful ? (css.getPropertyValue("--theme-colorful-surface-strong").trim() || "#fff") : (isDark ? "#151a22" : "#fff"),
+			gauge: {
+				green: isDark ? "#18c36e" : "#20E647",
+				orange: isDark ? "#ff9f43" : "#FF8C00",
+				red: isDark ? "#ff6b6b" : "#CD5C5C"
+			},
+			monitorBg: isColorful ? [
+				"rgba(141,120,235,0.15)",
+				"rgba(141,120,235,0.25)",
+				"rgba(141,120,235,0.35)"
+			] : (isDark ? [
+				"rgba(58,141,222,0.15)",
+				"rgba(58,141,222,0.25)",
+				"rgba(58,141,222,0.35)"
+			] : [
+				"#e8f7ee",
+				"#fff6db",
+				"#ffe5e7"
+			])
+		};
 		html += "<div class='ui-body ui-body-a center'><table style='margin: 0px auto;'>";
 		var cols = Math.round(window.innerWidth / 300);
 
@@ -325,7 +353,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 				var monitor = OSApp.Analog.monitors[i];
 				if (monitor.active) {
 					let prio = Object.prototype.hasOwnProperty.call(monitor, "prio")?monitor.prio:0;
-					let pcolor = OSApp.Analog.Constants.NOTIFICATION_COLORS[prio];
+					let pcolor = theme.monitorBg[prio];
 					var name = monitor.name;
 					//if (monitor.ts>0)
 					//	name += " "+monitor.ts+"s";
@@ -369,11 +397,11 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 				disp.label = progAdjust.name;
 
 			//current = 80; //testvalue!
-			var color = ["#87D4F9"];
+			var color = [ theme.gauge.green ];
 			if (current > 100)
-				color = ["#FF8C00"];
+				color = [ theme.gauge.orange ];
 			if (current > 150)
-				color = ["#CD5C5C"];
+				color = [ theme.gauge.red ];
 			disp.color = color;
 
 			var min = Math.min(progAdjust.factor1, progAdjust.factor2) * 100;
@@ -411,7 +439,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 						}
 					},
 					series: [disp.current],
-					colors: ["#20E647"],
+					colors: [ theme.gauge.green ],
 					plotOptions: {
 						radialBar: {
 							startAngle: -120,
@@ -430,7 +458,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 								},
 							},*/
 							track: {
-								background: '#fff',
+								background: theme.surfaceStrong,
 								startAngle: -120,
 								endAngle: 120,
 								strokeWidth: '67%',
@@ -448,11 +476,11 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 								name: {
 									offsetY: -25,
 									show: true,
-									color: "#222",
+									color: isDark ? "#e6e6e6" : "#222",
 									fontSize: "14px"
 								},
 								value: {
-									color: "#111",
+									color: isDark ? "#e6e6e6" : "#111",
 									fontSize: "30px",
 									offsetY: 0,
 									show: true,
@@ -2514,6 +2542,9 @@ list += "</select></div>" +
 
 			"<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
 
+			((row < 0) ? "" : ("<a data-role='button' class='show-sensor-log' value='" + sensor.nr + "' href='#' data-mini='true' data-icon='grid'>" +
+				OSApp.Language._("Show Analog Sensor Log") + "</a>")) +
+
 			((row < 0) ? "" : ("<a data-role='button' class='black delete-sensor' value='" + sensor.nr + "' row='" + row + "' href='#' data-icon='delete'>" +
 				OSApp.Language._("Delete") + "</a>")) +
 
@@ -3172,6 +3203,14 @@ list += "</select></div>" +
 			return false;
 		});
 
+		//Show Analog Sensor Log:
+		popup.find(".show-sensor-log").on("click", function () {
+			var sensorNr = $(this).attr("value");
+			popup.popup("close");
+			OSApp.Analog.showAnalogSensorCharts(sensorNr);
+			return false;
+		});
+
 		//Delete a sensor:
 		popup.find(".delete-sensor").on("click", function () {
 
@@ -3233,6 +3272,9 @@ list += "</select></div>" +
 		// Initial visibility update based on sensor type
 		OSApp.Analog.updateSensorVisibility(popup, sensor.type);
 
+		// Enhance jQuery Mobile elements before opening
+		popup.enhanceWithin();
+
 		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
 	});
 };
@@ -3253,6 +3295,9 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 	function updateSensorContent() {
 		var list = $(OSApp.Analog.buildSensorConfig());
+
+		// Apply saved section order
+		OSApp.Analog.applySectionOrder(list);
 
 		//Edit a sensor:
 		list.find(".edit-sensor").on("click", function () {
@@ -3342,7 +3387,15 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 		//Add a new program adjust:
 		list.find(".add-progadjust").on("click", function () {
+			// Find highest program adjustment number and add 1
+			var maxNr = 0;
+			for (var i = 0; i < OSApp.Analog.progAdjusts.length; i++) {
+				if (OSApp.Analog.progAdjusts[i].nr > maxNr) {
+					maxNr = OSApp.Analog.progAdjusts[i].nr;
+				}
+			}
 			var progAdjust = {
+				nr: maxNr + 1,
 				type: 1
 			};
 
@@ -3384,7 +3437,15 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 			//Add a monitor:
 			list.find(".add-monitor").on("click", function () {
+				// Find highest monitor number and add 1
+				var maxNr = 0;
+				for (var i = 0; i < OSApp.Analog.monitors.length; i++) {
+					if (OSApp.Analog.monitors[i].nr > maxNr) {
+						maxNr = OSApp.Analog.monitors[i].nr;
+					}
+				}
 				var monitor = {
+					nr: maxNr + 1,
 					type: 1,
 				};
 				if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 178) {
@@ -3493,6 +3554,15 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		});
 
 		page.find("#analogsensorlist").html(list).enhanceWithin();
+
+		// Sort button handlers - bind after DOM elements are ready
+		page.find(".sort-section-toggle").on("click", function(e) {
+			e.preventDefault();
+			e.stopPropagation();
+			var container = page.find("#analogsensorlist");
+			OSApp.Analog.toggleSortMode(container);
+			return false;
+		});
 	}
 
 	OSApp.UIDom.changeHeader({
@@ -3589,7 +3659,283 @@ OSApp.Analog.setupFytaCredentials = function() {
 	});
 };
 
+// Section sorting functionality
+OSApp.Analog.getSectionOrder = function() {
+	var stored = localStorage.getItem("OSApp.Analog.sectionOrder");
+	if (stored) {
+		try {
+			return JSON.parse(stored);
+		} catch (e) {
+			return ["sensors", "progadjust", "monitors"];
+		}
+	}
+	return ["sensors", "progadjust", "monitors"];
+};
+
+OSApp.Analog.setSectionOrder = function(order) {
+	localStorage.setItem("OSApp.Analog.sectionOrder", JSON.stringify(order));
+};
+
+// Persist per-section row order (by item number)
+OSApp.Analog.getRowOrder = function(sectionId) {
+	var stored = localStorage.getItem("OSApp.Analog.rowOrder." + sectionId);
+	if (stored) {
+		try {
+			return JSON.parse(stored);
+		} catch (e) {
+			return [];
+		}
+	}
+	return [];
+};
+
+OSApp.Analog.setRowOrder = function(sectionId, order) {
+	localStorage.setItem("OSApp.Analog.rowOrder." + sectionId, JSON.stringify(order));
+};
+
+// Reorder in-memory data arrays according to saved order
+OSApp.Analog.applyRowOrderToData = function(sectionId) {
+	var order = OSApp.Analog.getRowOrder(sectionId);
+	if (!order || !order.length) return;
+
+	var target;
+	switch (sectionId) {
+		case "sensors":
+			target = OSApp.Analog.analogSensors;
+			break;
+		case "progadjust":
+			target = OSApp.Analog.progAdjusts;
+			break;
+		case "monitors":
+			target = OSApp.Analog.monitors;
+			break;
+		default:
+			return;
+	}
+
+	if (!Array.isArray(target)) return;
+
+	// Build a lookup for quick positioning
+	var pos = new Map();
+	for (var i = 0; i < order.length; i++) pos.set(order[i], i);
+
+	target.sort(function(a, b) {
+		var pa = pos.has(a.nr) ? pos.get(a.nr) : Number.POSITIVE_INFINITY;
+		var pb = pos.has(b.nr) ? pos.get(b.nr) : Number.POSITIVE_INFINITY;
+		if (pa === pb) return (a.nr || 0) - (b.nr || 0);
+		return pa - pb;
+	});
+};
+
+OSApp.Analog.applySectionOrder = function(container) {
+	var order = OSApp.Analog.getSectionOrder();
+	var fieldsets = container.find("fieldset[data-section-id]");
+
+	if (fieldsets.length >= 2) {
+		var fieldsetMap = {};
+		fieldsets.each(function() {
+			var id = $(this).attr("data-section-id");
+			fieldsetMap[id] = $(this).detach();
+		});
+
+		// Reorder fieldsets based on saved order
+		for (var i = 0; i < order.length; i++) {
+			if (fieldsetMap[order[i]]) {
+				container.append(fieldsetMap[order[i]]);
+			}
+		}
+	}
+};
+
+OSApp.Analog.toggleSortMode = function(container) {
+	var sections = container.find("fieldset[data-section-id]");
+
+	sections.each(function() {
+		var section = $(this);
+		var table = section.find("table").first();
+		var rows = table.find("tbody tr, tr").not(":has(th)"); // Get all data rows (not header rows)
+		var sortButton = section.find(".sort-section-toggle");
+		var sectionId = section.attr("data-section-id");
+
+		// Helper: capture positions for FLIP animation
+		var capturePositions = function(rowSet) {
+			var pos = {};
+			rowSet.each(function() {
+				var key = $(this).attr("data-sort-key");
+				if (!key) return;
+				pos[key] = this.getBoundingClientRect().top;
+			});
+			return pos;
+		};
+
+		var animateFlip = function(rowSet, oldPos) {
+			rowSet.each(function() {
+				var key = $(this).attr("data-sort-key");
+				if (!key || oldPos[key] === undefined) return;
+				var newTop = this.getBoundingClientRect().top;
+				var delta = oldPos[key] - newTop;
+				if (!delta) return;
+				var row = $(this);
+				row.css("transform", "translateY(" + delta + "px)");
+				requestAnimationFrame(function() {
+					row.css("transition", "transform 150ms ease, background-color 120ms ease");
+					row.css("transform", "");
+				});
+			});
+		};
+
+		if (rows.length === 0) return; // Skip if no rows
+
+		var isSortMode = section.data("sort-mode") === true;
+
+		if (!isSortMode) {
+			section.data("sort-mode", true);
+			// Enter sort mode - add handles to each row
+			// Remove any stale handles to avoid duplicates
+			rows.find(".sort-handle").remove();
+			rows.each(function() {
+				var row = $(this);
+				var firstCell = row.find("td, th").first();
+				var keyText = firstCell.text();
+				row.attr("data-sort-key", keyText);
+				row.css({"transition": "transform 150ms ease, background-color 120ms ease", "will-change": "transform"});
+
+				// Create handle element
+				var handle = $("<span class='sort-handle' style='cursor: grab; padding: 5px 8px; margin-right: 5px; display: inline-block; font-size: 18px; user-select: none;' draggable='true' title='Drag to reorder'>☰</span>");
+
+				// Add handle to first cell
+				firstCell.prepend(handle);
+				row.css("opacity", "1");
+			});
+
+			// Add drag event handlers to rows
+			rows.on("dragstart", function(e) {
+				// Only allow drag if started from handle
+				if (!$(e.target).hasClass("sort-handle")) {
+					e.preventDefault();
+					return false;
+				}
+
+				var row = $(this);
+				row.addClass("dragging");
+				row.css("opacity", "0.3");
+
+				// Create a visual drag image - a clone of the row
+				var dragImage = row.clone();
+				dragImage.css({
+					"position": "absolute",
+					"top": "-9999px",
+					"left": "-9999px",
+					"background-color": "rgba(33, 150, 243, 0.3)",
+					"border": "2px solid #2196F3",
+					"box-shadow": "0 4px 8px rgba(0, 0, 0, 0.2)",
+					"opacity": "1"
+				});
+				$("body").append(dragImage);
+
+				var handleEl = $(e.target).closest(".sort-handle")[0] || this;
+				var rect = handleEl.getBoundingClientRect();
+				var offsetX = e.originalEvent.clientX - rect.left;
+				var offsetY = e.originalEvent.clientY - rect.top;
+
+				e.originalEvent.dataTransfer.effectAllowed = "move";
+				e.originalEvent.dataTransfer.setDragImage(dragImage[0], offsetX, offsetY);
+
+				// Remove the temporary element after a short delay
+				setTimeout(function() {
+					dragImage.remove();
+				}, 0);
+			});
+
+			rows.on("dragover", function(e) {
+				var targetRow = $(e.target).closest("tr");
+				var dragging = table.find(".dragging");
+				if (!dragging.length || targetRow.hasClass("dragging")) return;
+				e.preventDefault();
+				e.originalEvent.dataTransfer.dropEffect = "move";
+
+				// FLIP: capture before
+				var beforePos = capturePositions(rows);
+
+				// Reorder immediately so the user sees the new order (partial overlap triggers)
+				if (targetRow.index() < dragging.index()) {
+					dragging.insertBefore(targetRow);
+				} else {
+					dragging.insertAfter(targetRow);
+				}
+
+				// Animate to new positions
+				animateFlip(rows, beforePos);
+
+				// Highlight target row
+				targetRow.stop(true, true).css({
+					"background-color": "rgba(33, 150, 243, 0.25)",
+					"transition": "background-color 120ms ease"
+				});
+			});
+
+			rows.on("dragleave", function(e) {
+				$(this).css({
+					"background-color": "",
+					"border-top": ""
+				});
+			});
+
+			rows.on("drop", function(e) {
+				e.preventDefault();
+				$(this).css({
+					"background-color": "",
+					"border-top": ""
+				});
+				var dragging = table.find(".dragging");
+				if (dragging.length && dragging[0] !== this) {
+					dragging.insertBefore($(this));
+				}
+			});
+
+			rows.on("dragend", function(e) {
+				$(this).removeClass("dragging");
+				$(this).css("opacity", "1");
+				table.find("tr").css({
+					"background-color": "",
+					"border-top": ""
+				});
+			});
+
+			// Change button text to "Sort completed"
+			sortButton.text(OSApp.Language._("Sort completed"));
+			sortButton.css("color", "#4CAF50");
+		} else {
+			section.data("sort-mode", false);
+			// Exit sort mode - remove handles
+			rows.find(".sort-handle").remove();
+			rows.off("dragstart dragover dragleave drop dragend");
+			rows.css("opacity", "1");
+			rows.css({ "background-color": "", "border-top": "", "transform": "", "transition": "", "will-change": "" });
+
+			// Persist new order based on first cell (Nr)
+			var newOrder = [];
+			rows.each(function() {
+				var txt = $(this).find("td, th").first().text();
+				var nr = parseInt(txt, 10);
+				if (!isNaN(nr)) newOrder.push(nr);
+			});
+			OSApp.Analog.setRowOrder(sectionId, newOrder);
+			OSApp.Analog.applyRowOrderToData(sectionId);
+
+			// Reset button text to "Sort" and exit visual state
+			sortButton.text(OSApp.Language._("Sort"));
+			sortButton.css("color", "");
+		}
+	});
+};
+
 OSApp.Analog.buildSensorConfig = function() {
+
+	// Apply saved row orders to data before rendering
+	OSApp.Analog.applyRowOrderToData("sensors");
+	OSApp.Analog.applyRowOrderToData("progadjust");
+	OSApp.Analog.applyRowOrderToData("monitors");
 
 	//detected Analog Sensor Boards:
 	var detected_boards = "";
@@ -3611,13 +3957,14 @@ OSApp.Analog.buildSensorConfig = function() {
 		detected_boards = ": " + boards.filter(Boolean).join(", ");
 	}
 
-	var list = "<fieldset data-role='collapsible'" + (OSApp.Analog.expandItem.has("sensors") ? " data-collapsed='false'" : "") + ">" +
+	var list = "<fieldset data-role='collapsible' data-section-id='sensors'" + (OSApp.Analog.expandItem.has("sensors") ? " data-collapsed='false'" : "") + ">" +
 		"<legend>" + OSApp.Language._("Sensors") + detected_boards + "</legend>";
 
 	var info = OSApp.Analog.checkFirmwareUpdate();
 	if (info === undefined)
 		info = "";
-	list += "<table style='width: 100%;' id='analog_sensor_table'><tr>" +
+	list +=
+		"<table style='width: 100%; clear: both;' id='analog_sensor_table'><tr>" +
 		info +
 		"<tr><th>" + OSApp.Language._("Nr") + "</th><th class=\"hidecol\">" + OSApp.Language._("Type") + "</th><th class=\"hidecol\">" + OSApp.Language._("Group") + "</th><th>" + OSApp.Language._("Name") + "</th>" +
 		"<th class=\"hidecol\">" + OSApp.Language._("IP") + "</th><th class=\"hidecol\">" + OSApp.Language._("Port") + "</th><th class=\"hidecol\">" + OSApp.Language._("ID") + "</th>" +
@@ -3649,16 +3996,20 @@ OSApp.Analog.buildSensorConfig = function() {
 		row++;
 	});
 	list += "</table>";
-	list += "<a data-role='button' class='add-sensor'     href='#' data-mini='true' data-icon='plus'   >" +
-		OSApp.Language._("Add Sensor") + "</a>";
-	list += "<a data-role='button' class='refresh-sensor' href='#' data-mini='true' data-icon='refresh'>" +
-		OSApp.Language._("Refresh Sensordata") + "</a>";
+	list += "<div style='margin-top: 10px;'>" +
+		"<a data-role='button' class='sort-section-toggle' data-section='sensors' href='#' data-mini='true' data-icon='bars' style='display: inline-block; margin-right: 5px;'>" + OSApp.Language._("Sort") + "</a>" +
+		"<a data-role='button' class='add-sensor' href='#' data-mini='true' data-icon='plus' style='display: inline-block; margin-right: 5px;'>" +
+		OSApp.Language._("Add Sensor") + "</a>" +
+		"<a data-role='button' class='refresh-sensor' href='#' data-mini='true' data-icon='refresh' style='display: inline-block;'>" +
+		OSApp.Language._("Refresh Sensordata") + "</a>" +
+		"</div>";
 	list += "</fieldset>";
 
 	//Program adjustments table:
-	list += "<fieldset data-role='collapsible'" + (OSApp.Analog.expandItem.has("progadjust") ? " data-collapsed='false'" : "") + ">" +
+	list += "<fieldset data-role='collapsible' data-section-id='progadjust'" + (OSApp.Analog.expandItem.has("progadjust") ? " data-collapsed='false'" : "") + ">" +
 		"<legend>" + OSApp.Language._("Program Adjustments") + "</legend>";
-	list += "<table style='width: 100%;' id='progadjusttable'><tr style='width:100%;vertical-align: top;'>" +
+	list +=
+		"<table style='width: 100%; clear: both;' id='progadjusttable'><tr style='width:100%;vertical-align: top;'>" +
 		"<tr><th>" + OSApp.Language._("Nr") + "</th>" +
 		"<th class=\"hidecol\">" + OSApp.Language._("Type") + "</th>" +
 		"<th class=\"hidecol2\">" + OSApp.Language._("S.Nr") + "</th>" +
@@ -3706,14 +4057,17 @@ OSApp.Analog.buildSensorConfig = function() {
 		row++;
 	});
 	list += "</table>";
-	list += "<a data-role='button' class='add-progadjust' href='#' data-mini='true' data-icon='plus'>" + OSApp.Language._("Add program adjustment") + "</a>";
+	list += "<div style='margin-top: 10px;'>" +
+		"<a data-role='button' class='sort-section-toggle' data-section='progadjust' href='#' data-mini='true' data-icon='bars' style='display: inline-block; margin-right: 5px;'>" + OSApp.Language._("Sort") + "</a>" +
+		"<a data-role='button' class='add-progadjust' href='#' data-mini='true' data-icon='plus' style='display: inline-block;'>" + OSApp.Language._("Add program adjustment") + "</a>" +
+		"</div>";
 	list += "</fieldset>";
 
 	//Monitors table:
 	if (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors) {
-		list += "<fieldset data-role='collapsible'" + (OSApp.Analog.expandItem.has("monitors") ? " data-collapsed='false'" : "") + ">" +
+		list += "<fieldset data-role='collapsible' data-section-id='monitors'" + (OSApp.Analog.expandItem.has("monitors") ? " data-collapsed='false'" : "") + ">" +
 			"<legend>" + OSApp.Language._("Monitoring and control") + "</legend>";
-		list += "<table style='width: 100%; id='monitorstable'><tr style='width:100%;vertical-align: top;'>" +
+		list += "<table style='width: 100%;' id='monitorstable'><tr style='width:100%;vertical-align: top;'>" +
 			"<tr><th>" + OSApp.Language._("Nr") + "</th>" +
 			"<th class=\"hidecol\">" + OSApp.Language._("Type") + "</th>" +
 			"<th class=\"hidecol2\">" + OSApp.Language._("S.Nr") + "</th>" +
@@ -3801,7 +4155,10 @@ OSApp.Analog.buildSensorConfig = function() {
 			row++;
 		});
 		list += "</table>";
-		list += "<a data-role='button' class='add-monitor' href='#' data-mini='true' data-icon='plus'>" + OSApp.Language._("Add monitor") + "</a>";
+		list += "<div style='margin-top: 10px;'>" +
+			"<a data-role='button' class='sort-section-toggle' data-section='monitors' href='#' data-mini='true' data-icon='bars' style='display: inline-block; margin-right: 5px;'>" + OSApp.Language._("Sort") + "</a>" +
+			"<a data-role='button' class='add-monitor' href='#' data-mini='true' data-icon='plus' style='display: inline-block;'>" + OSApp.Language._("Add monitor") + "</a>" +
+			"</div>";
 		list += "</fieldset>";
 	}
 
@@ -3937,6 +4294,7 @@ OSApp.Analog.showAnalogSensorCharts = function(limit2sensor) {
 
 	$("#analogsensorchart").remove();
 	$.mobile.pageContainer.append(page);
+	$.mobile.pageContainer.pagecontainer("change", page);
 
 	OSApp.Analog.updateCharts(limit2sensor);
 }

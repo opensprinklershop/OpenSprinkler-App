@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "Ponovno podizanje sustava",
    "Downgrade UI": "Downgrade UI",
    "System Diagnostics": "Dijagnostika sustava"
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}

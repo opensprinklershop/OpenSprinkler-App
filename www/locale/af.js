@@ -722,4 +722,8 @@
    "Reboot OpenSprinkler": "Herlaai OpenSprinkler",
    "Downgrade UI": "Gradeer Koppelvlak Af",
    "System Diagnostics": "Stelseldiagnostiek"
+,
+   "Sort": "Sort",
+   "Sort completed": "Sort completed",
+   "Show Analog Sensor Log": "Show Analog Sensor Log"
 }}
