@@ -977,5 +977,17 @@
    "Power On": "Einschalten",
    "Sort": "Sortieren",
    "Sort completed": "Sortieren abgeschlossen",
-   "Show Analog Sensor Log": "Analog-Sensorprotokoll anzeigen"
-}}
+   "Show Analog Sensor Log": "Analog-Sensorprotokoll anzeigen",
+   "Add OTC Connection": "OTC-Verbindung hinzufügen",
+   "To add an OTC (OpenThings Cloud) connection to this local device, you need an OTC token.": "Um eine OTC (OpenThings Cloud) Verbindung zu diesem lokalen Gerät hinzuzufügen, benötigen Sie einen OTC-Token.",
+   "Step 1:": "Schritt 1:",
+   "Register an account at:": "Registrieren Sie ein Konto unter:",
+   "Step 2:": "Schritt 2:",
+   "Create an entry and get your token at:": "Erstellen Sie einen Eintrag und erhalten Sie Ihren Token unter:",
+   "Step 3:": "Schritt 3:",
+   "Enter your OTC token below:": "Geben Sie Ihren OTC-Token unten ein:",
+   "OTC Token:": "OTC-Token:",
+   "Add Connection": "Verbindung hinzufügen",
+   "Invalid OTC token format. Token must start with 'OT' followed by 30 alphanumeric characters.": "Ungültiges OTC-Token-Format. Der Token muss mit 'OT' beginnen, gefolgt von 30 alphanumerischen Zeichen.",
+   "OTC connection added successfully as": "OTC-Verbindung erfolgreich hinzugefügt als",
+   "Failed to register OTC token with the device. Please check your connection and try again.": "OTC-Token konnte nicht beim Gerät registriert werden. Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut."

@@ -153,6 +153,7 @@ OSApp.Sites.displayPage = function() {
 							"</fieldset>" ) +
 						"<input class='submit' type='submit' value='" + OSApp.Language._( "Save Changes to" ) + " " + a + "'>" +
 						"<a data-role='button' class='deletesite' data-site='" + i + "' href='#' data-theme='b'>" + OSApp.Language._( "Delete" ) + " " + a + "</a>" +
+						( b.os_token ? "" : "<a data-role='button' class='add-otc-connection' data-site='" + i + "' href='#' data-theme='a'>" + OSApp.Language._( "Add OTC Connection" ) + "</a>" ) +
 						"</form>" +
 						"</fieldset>";
 
@@ -333,6 +334,14 @@ OSApp.Sites.displayPage = function() {
 							return false;
 						} );
 					} );
+					return false;
+				} );
+
+list.find( ".add-otc-connection" ).on( "click", function() {
+				var siteIndex = $( this ).data( "site" );
+				var siteName = siteNames[ siteIndex ];
+				var siteData = sites[ siteName ];
+				OSApp.Sites.showAddOTCConnection( siteName, siteData );
 					return false;
 				} );
 
@@ -1402,24 +1411,3 @@ OSApp.Sites.addFound = function( ip ) {
 	} ).popup( "close" );
 };
 
-// Stub for guided setup page
-OSApp.Sites.showGuidedSetup = function() {
-
-	// Stub for guided setup page
-
-};
-
-OSApp.Sites.refreshData = function() {
-	if ( !OSApp.currentSession.isControllerConnected() ) {
-		return;
-	}
-
-	if ( OSApp.Firmware.checkOSVersion( 216 ) ) {
-		OSApp.Sites.updateController( function() {}, OSApp.Network.networkFail );
-	} else {
-		$.when(
-			OSApp.Sites.updateControllerPrograms(),
-			OSApp.Sites.updateControllerStations()
-		).fail( OSApp.Network.networkFail );
-	}
-};
