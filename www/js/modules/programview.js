@@ -25,6 +25,10 @@ OSApp.ProgramView = {
 	},
 };
 
+OSApp.ProgramView.hashcode = function( str ) {
+	return Array.from(str).reduce( (s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0);
+};
+
 OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 	if (!OSApp.Firmware.checkOSVersion( 210 ))
 		return;
@@ -88,7 +92,8 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 
 						var stationIsRunning = OSApp.Stations.isRunning(j);
 						if (stationIsRunning)
-							sr++;
+							sr += OSApp.ProgramView.hashcode( OSApp.currentSession.controller.stations.snames[ j ] );
+
 						html += "<button class='" +
 							(stationIsRunning ? "ui-btn-active " : "") +
 							"ui-shadow ui-btn-inline ui-btn ui-corner-all ui-btn-b ui-mini' id='progStation-"+i+"-"+j+"' value='"+i+"_"+j+"'>" +

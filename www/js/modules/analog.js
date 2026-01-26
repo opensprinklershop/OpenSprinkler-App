@@ -1856,11 +1856,41 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			"</div>");
 
 		var scanInterval = null;
+		var uiInterval = null;
 		var scanTimeout = null;
 		var selectedDevice = null;
 		var scanStartTime = Date.now();
 		var scanDuration = 10;
 		var lastFoundDevice = null;
+		var requestInFlight = false;
+		var didCleanup = false;
+		var lastDeviceCount = 0;
+
+		function normalizeZigBeeDevices(data) {
+			if (Array.isArray(data)) {
+				return data;
+			}
+			if (data && Array.isArray(data.devices)) {
+				return data.devices;
+			}
+			if (data && data.devices && typeof data.devices === "object") {
+				return Object.values(data.devices);
+			}
+			return [];
+		}
+
+		function normalizeZigBeeCount(data, devices) {
+			if (data && typeof data.count === "number") {
+				return data.count;
+			}
+			if (data && typeof data.count === "string") {
+				var parsed = parseInt(data.count, 10);
+				if (!isNaN(parsed)) {
+					return parsed;
+				}
+			}
+			return (devices || []).length;
+		}
 
 		// Initialize select
 		(function initSelect() {
@@ -1873,21 +1903,31 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			}
 		})();
 
-		function updateDeviceList() {
+		function updateScanUi() {
 			var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
 			var remaining = Math.max(0, scanDuration - elapsed);
+			if (scanButton && originalButtonText) {
+				scanButton.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + lastDeviceCount + ")");
+			}
+		}
 
+		function updateDeviceList() {
+			if (requestInFlight) {
+				return;
+			}
+			// Timer + button countdown UI is handled by updateScanUi() so it keeps updating even if /zd is slow.
+
+			requestInFlight = true;
 			OSApp.Firmware.sendToOS("/zd?pw=", "json").then(function (data) {
-				var devices = (data && Array.isArray(data.devices)) ? data.devices : [];
-				var deviceCount = devices.length;
+				requestInFlight = false;
+				var devices = normalizeZigBeeDevices(data);
+				var deviceCount = normalizeZigBeeCount(data, devices);
+				lastDeviceCount = deviceCount;
 				scanDialog.data("zigbeeDevices", devices);
 
-				// Update button text with device count
-				if (scanButton && originalButtonText) {
-					scanButton.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + deviceCount + ")");
-				}
+				// Button countdown text is updated by updateScanUi().
 				var sel = scanDialog.find("#zigbeeDeviceSelectScanner");
-				if (devices.length > 0) {
+				if (devices && devices.length > 0) {
 					sel.empty();
 					sel.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
 					for (var i = 0; i < devices.length; i++) {
@@ -1901,7 +1941,8 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 						sel.append($("<option>").val(String(i)).text(label));
 
 						// Track last found device
-						if (device.is_new && !lastFoundDevice) {
+						var isNew = (device.is_new === true || device.is_new === 1 || device.is_new === "1");
+						if (isNew && !lastFoundDevice) {
 							lastFoundDevice = {
 								model: modelId,
 								ieee: ieeeAddr,
@@ -1909,8 +1950,8 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 							};
 							scanDialog.find("#lastDevice").html(
 								"<strong style='color: green;'>" + OSApp.Language._("Last found") + ":</strong> " +
-								modelId + " (" + manufacturer + ")<br>" +
-								"<small>IEEE: " + ieeeAddr + "</small>"
+								OSApp.Utils.htmlEscape(modelId) + " (" + OSApp.Utils.htmlEscape(manufacturer) + ")<br>" +
+								"<small>IEEE: " + OSApp.Utils.htmlEscape(ieeeAddr) + "</small>"
 							).show();
 						}
 					}
@@ -1926,6 +1967,15 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 					} catch (e) {
 						// ignore
 					}
+				}
+			}, function () {
+				requestInFlight = false;
+				var sel = scanDialog.find("#zigbeeDeviceSelectScanner");
+				sel.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+				try {
+					sel.selectmenu("refresh", true);
+				} catch (e) {
+					// ignore
 				}
 			});
 		}
@@ -1956,6 +2006,10 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 				clearInterval(scanInterval);
 				scanInterval = null;
 			}
+			if (uiInterval) {
+				clearInterval(uiInterval);
+				uiInterval = null;
+			}
 			if (scanTimeout) {
 				clearTimeout(scanTimeout);
 				scanTimeout = null;
@@ -1971,9 +2025,17 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 		});
 
 		function cleanupScanner() {
+			if (didCleanup) {
+				return;
+			}
+			didCleanup = true;
 			if (scanInterval) {
 				clearInterval(scanInterval);
 				scanInterval = null;
+			}
+			if (uiInterval) {
+				clearInterval(uiInterval);
+				uiInterval = null;
 			}
 			if (scanTimeout) {
 				clearTimeout(scanTimeout);
@@ -2015,6 +2077,8 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 
 	// Update device list immediately
 	updateDeviceList();
+	updateScanUi();
+	uiInterval = setInterval(updateScanUi, 250);
 
 	// Update device list every second
 	scanInterval = setInterval(updateDeviceList, 1000);
@@ -2024,6 +2088,10 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 		if (scanInterval) {
 			clearInterval(scanInterval);
 			scanInterval = null;
+		}
+		if (uiInterval) {
+			clearInterval(uiInterval);
+			uiInterval = null;
 		}
 		scanDialog.find("#scanTimer").text(OSApp.Language._("Scan finished"));
 		scanDialog.find("#scanTimer").show();
@@ -2593,7 +2661,7 @@ list += "</select></div>" +
 			e.preventDefault();
 			var btn = $(this);
 			var originalText = btn.text();
-			btn.text(OSApp.Language._("Scanning...") + " (0)").prop("disabled", true);
+			btn.text(OSApp.Language._("Scanning...") + " 10s (0)").prop("disabled", true);
 
 			// Show scan area + selection
 			popup.find("#zigbeeScanArea").show();
@@ -2605,7 +2673,47 @@ list += "</select></div>" +
 			var scanDuration = 10;
 			var lastFoundDevice = null;
 			var scanInterval = null;
+			var uiInterval = null;
 			var scanTimeout = null;
+			var requestInFlight = false;
+			var didCleanup = false;
+			var lastDeviceCount = 0;
+
+			function updateScanUi() {
+				var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
+				var remaining = Math.max(0, scanDuration - elapsed);
+				btn.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + lastDeviceCount + ")");
+			}
+
+			// Start countdown UI immediately (even if /zo is slow)
+			updateScanUi();
+			uiInterval = setInterval(updateScanUi, 250);
+
+			function normalizeZigBeeDevices(data) {
+				if (Array.isArray(data)) {
+					return data;
+				}
+				if (data && Array.isArray(data.devices)) {
+					return data.devices;
+				}
+				if (data && data.devices && typeof data.devices === "object") {
+					return Object.values(data.devices);
+				}
+				return [];
+			}
+
+			function normalizeZigBeeCount(data, devices) {
+				if (data && typeof data.count === "number") {
+					return data.count;
+				}
+				if (data && typeof data.count === "string") {
+					var parsed = parseInt(data.count, 10);
+					if (!isNaN(parsed)) {
+						return parsed;
+					}
+				}
+				return (devices || []).length;
+			}
 
 			// Start ZigBee scan
 			OSApp.Firmware.sendToOS("/zo?pw=&duration=10", "json").then(function () {
@@ -2622,15 +2730,21 @@ list += "</select></div>" +
 				}
 
 				function updateDeviceList() {
+					if (requestInFlight) {
+						return;
+					}
+					// Timer UI is handled by updateScanUi() so it keeps updating even if /zd is slow.
+
+					requestInFlight = true;
 					OSApp.Firmware.sendToOS("/zd?pw=", "json").then(function (data) {
-						var devices = (data && Array.isArray(data.devices)) ? data.devices : [];
-						var deviceCount = devices.length;
-						btn.text(OSApp.Language._("Scanning...") + " (" + deviceCount + ")");
+						requestInFlight = false;
+						var devices = normalizeZigBeeDevices(data);
 						popup.data("zigbeeDevices", devices);
+						lastDeviceCount = normalizeZigBeeCount(data, devices);
 
 						var deviceSelect = popup.find("#zigbeeDeviceSelect");
 
-						if (devices.length > 0) {
+						if (devices && devices.length > 0) {
 							deviceSelect.empty();
 							deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
 							for (var i = 0; i < devices.length; i++) {
@@ -2654,6 +2768,15 @@ list += "</select></div>" +
 							} catch (e) {
 								// ignore
 							}
+						}
+					}, function () {
+						requestInFlight = false;
+						var deviceSelectErr = popup.find("#zigbeeDeviceSelect");
+						deviceSelectErr.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+						try {
+							deviceSelectErr.selectmenu("refresh", true);
+						} catch (e) {
+							// ignore
 						}
 					});
 				}
@@ -2679,9 +2802,14 @@ list += "</select></div>" +
 						manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
 					};
 
+					// Stop scanning timers but keep the device list visible
 					if (scanInterval) {
 						clearInterval(scanInterval);
 						scanInterval = null;
+					}
+					if (uiInterval) {
+						clearInterval(uiInterval);
+						uiInterval = null;
 					}
 					if (scanTimeout) {
 						clearTimeout(scanTimeout);
@@ -2728,9 +2856,14 @@ list += "</select></div>" +
 
 				// Stop scanning after 10 seconds, keep results visible
 				scanTimeout = setTimeout(function() {
+					// Stop scanning, but keep discovered devices visible for selection
 					if (scanInterval) {
 						clearInterval(scanInterval);
 						scanInterval = null;
+					}
+					if (uiInterval) {
+						clearInterval(uiInterval);
+						uiInterval = null;
 					}
 					popup.find("#zigbeeScanTimer").text(OSApp.Language._("Scan finished"));
 					// Collapse scan area, keep select visible
@@ -2747,6 +2880,10 @@ list += "</select></div>" +
 
 			}, function () {
 				// Error handler
+				if (uiInterval) {
+					clearInterval(uiInterval);
+					uiInterval = null;
+				}
 				btn.text(originalText).prop("disabled", false);
 				popup.find("#zigbeeScanArea").hide();
 				popup.find(".zigbee_scan_select_container").hide();
