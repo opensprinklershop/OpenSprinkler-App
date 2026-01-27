@@ -22,6 +22,7 @@ OSApp.Sites.displayPage = function() {
 			"<div class='ui-content'>" +
 			"</div>" +
 			"</div>" ),
+		statusCheckTimer = null,
 		makeStart = function() {
 			var finish = function() {
 				header.eq( 0 ).hide();
@@ -68,6 +69,10 @@ OSApp.Sites.displayPage = function() {
 	} );
 
 	page.on( "pagehide", function() {
+		if ( statusCheckTimer ) {
+			clearTimeout( statusCheckTimer );
+			statusCheckTimer = null;
+		}
 		popup.popup( "destroy" ).detach();
 		page.detach();
 	} );
@@ -167,6 +172,34 @@ OSApp.Sites.displayPage = function() {
 				} );
 
 				list = $( list + "</div>" );
+
+				// Start periodic status check only if no device is connected
+				if ( statusCheckTimer ) {
+					clearTimeout( statusCheckTimer );
+					statusCheckTimer = null;
+				}
+
+				if ( !OSApp.currentSession.isControllerConnected() ) {
+					var scheduleNextCheck = function() {
+						statusCheckTimer = setTimeout( function() {
+							if ( page.hasClass( "ui-page-active" ) && !OSApp.currentSession.isControllerConnected() ) {
+								// Re-check all sites
+								var index = 0;
+								$.each( sites, function( name, siteData ) {
+									OSApp.Sites.testSite( siteData, index, function( id, result ) {
+										page.find( "#site-" + id + " .connectnow" )
+											.removeClass( "yellow green red" )
+											.addClass( result ? "green" : "red" );
+									} );
+									index++;
+								} );
+								// Schedule next check
+								scheduleNextCheck();
+							}
+						}, 10000 );
+					};
+					scheduleNextCheck();
+				}
 
 				list.find( "form" ).one( "change input", function() {
 					$( this ).find( ".submit" ).addClass( "hasChanges" );

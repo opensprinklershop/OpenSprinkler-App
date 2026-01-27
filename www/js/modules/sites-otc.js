@@ -109,7 +109,7 @@ OSApp.Sites.registerOTCToken = function( siteName, siteData, token ) {
 	};
 
 	// URL encode the JSON
-	var encodedJson = encodeURIComponent( JSON.stringify( otcConfig ) );
+	var encodedJson = encodeURIComponent( JSON.stringify( otcConfig ).slice(1,-1) );
 
 	// Store current session to restore later
 	var originalIp = OSApp.currentSession.ip;
@@ -132,7 +132,10 @@ OSApp.Sites.registerOTCToken = function( siteName, siteData, token ) {
 	// Send token registration to the device
 	OSApp.Firmware.sendToOS( "/co?pw=&otc=" + encodedJson ).then(
 		function( response ) {
-			// Token registration successful, now create new OTC site entry
+			// Token registration successful, now reboot the device (ignore response)
+			OSApp.Firmware.sendToOS( "/cv?pw=&rbt=1" );
+
+			// Create new OTC site entry
 			OSApp.Storage.get( [ "sites", "current_site" ], function( data ) {
 				var sites = OSApp.Sites.parseSites( data.sites );
 
