@@ -610,6 +610,11 @@ OSApp.UIDom.bindPanel = function() {
 		return false;
 	} );
 
+	panel.find( ".setup-matter" ).on( "click", function() {
+		OSApp.Matter.setupMatter();
+		return false;
+	} );
+
 	panel.find( ".cloud-login" ).on( "click", function() {
 		OSApp.Network.requestCloudAuth();
 		return false;
@@ -700,6 +705,13 @@ OSApp.UIDom.bindPanel = function() {
 			updateButtons = function() {
 				var operation = ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.en && OSApp.currentSession.controller.settings.en === 1 ) ? OSApp.Language._( "Disable" ) : OSApp.Language._( "Enable" );
 				panel.find( ".toggleOperation span:first" ).html( operation ).attr( "data-translate", operation );
+
+				// Update Matter menu item visibility
+				if ( OSApp.Matter && OSApp.Matter.isMatterSupported() ) {
+					panel.find( ".matter-setup" ).removeClass( "hidden" );
+				} else {
+					panel.find( ".matter-setup" ).addClass( "hidden" );
+				}
 			};
 
 		$( "html" ).on( "datarefresh",  updateButtons );
