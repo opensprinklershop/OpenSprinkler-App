@@ -30,7 +30,28 @@
 		<link rel="stylesheet" href="css/main.css">
 		<link rel="stylesheet" href="css/dataTables-2.1.8.dataTables.min.css"></link>
 
-		<script src="cordova.js"></script>
+		<script src="cordova.js" onerror="console.warn('Cordova not available')"></script>
+		<script>
+			// Suppress Cordova plugin errors gracefully
+			if (window.cordova && window.cordova.exec) {
+				var originalExec = window.cordova.exec;
+				window.cordova.exec = function(success, error, service, action, args) {
+					// Wrap error callback to handle plugin loading errors
+					var wrappedError = function(err) {
+						console.warn('[Cordova] Plugin error:', err);
+						if (error) error(err);
+					};
+					return originalExec(success, wrappedError, service, action, args);
+				};
+			}
+			// Handle missing plugins during registration
+			window.addEventListener('error', function(event) {
+				if (event.message && event.message.includes('does not exist')) {
+					console.warn('[Cordova] Plugin registration warning:', event.message);
+					event.preventDefault();
+				}
+			}, true);
+		</script>
 		<script src="vendor-js/jquery.js"></script>
 		<script src="vendor-js/libs.js"></script>
 		<script src="vendor-js/apexcharts.min.js"></script>

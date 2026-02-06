@@ -994,3 +994,4 @@
    "Invalid OTC token format. Token must start with 'OT' followed by 30 alphanumeric characters.": "Ungültiges OTC-Token-Format. Der Token muss mit 'OT' beginnen, gefolgt von 30 alphanumerischen Zeichen.",
    "OTC connection added successfully as": "OTC-Verbindung erfolgreich hinzugefügt als",
    "Failed to register OTC token with the device. Please check your connection and try again.": "OTC-Token konnte nicht beim Gerät registriert werden. Bitte überprüfen Sie Ihre Verbindung und versuchen Sie es erneut."
+}}

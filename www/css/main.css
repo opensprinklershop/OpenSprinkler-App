@@ -902,6 +902,17 @@ html.theme-colorful #analogsensorchart {
     --theme-colorful-page-bg: #edf7ff;
 }
 
+/* Preserve station status colors in colorful mode - override the general ui-btn-icon-notext:after rule */
+html.theme-colorful .station-status.on:after {
+    background-color: #16a085 !important;
+}
+html.theme-colorful .station-status.wait:after {
+    background-color: #FFC82C !important;
+}
+html.theme-colorful .station-status.off:after {
+    background-color: #C96161 !important;
+}
+
 /* Start page rules */
 
 #start {

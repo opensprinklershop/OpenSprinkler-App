@@ -44,6 +44,10 @@ OSApp.Analog = {
 		RS485_TRUEBNER4 : 0x100,
 		OSPI_USB_RS485 : 0x200,
 
+		MONITOR_MIN      : 1,
+		MONITOR_MAX      : 2,
+		MONITOR_SENSOR12 : 3,
+		MONITOR_SET_SENSOR12 : 4,
 		MONITOR_AND      : 10,
 		MONITOR_OR       : 11,
 		MONITOR_XOR      : 12,
@@ -3439,9 +3443,19 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		//Edit a sensor:
 		list.find(".edit-sensor").on("click", function () {
 			var dur = $(this),
-				row = dur.attr("row");
+				nr = parseInt(dur.attr("value"), 10);
 
-			var sensor = OSApp.Analog.analogSensors[row];
+			// Find sensor by nr instead of row index (row index becomes incorrect after sorting)
+			var row = -1;
+			var sensor = null;
+			for (var i = 0; i < OSApp.Analog.analogSensors.length; i++) {
+				if (OSApp.Analog.analogSensors[i].nr === nr) {
+					row = i;
+					sensor = OSApp.Analog.analogSensors[i];
+					break;
+				}
+			}
+			if (!sensor) return;
 
 			OSApp.Analog.expandItem.add("sensors");
 			OSApp.Analog.showSensorEditor(sensor, row, function (sensorOut) {
@@ -3504,9 +3518,19 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		//Edit a program adjust:
 		list.find(".edit-progadjust").on("click", function () {
 			var dur = $(this),
-				row = dur.attr("row");
+				nr = parseInt(dur.attr("value"), 10);
 
-			var progAdjust = OSApp.Analog.progAdjusts[row];
+			// Find progAdjust by nr instead of row index (row index becomes incorrect after sorting)
+			var row = -1;
+			var progAdjust = null;
+			for (var i = 0; i < OSApp.Analog.progAdjusts.length; i++) {
+				if (OSApp.Analog.progAdjusts[i].nr === nr) {
+					row = i;
+					progAdjust = OSApp.Analog.progAdjusts[i];
+					break;
+				}
+			}
+			if (!progAdjust) return;
 
 			OSApp.Analog.expandItem.add("progadjust");
 			OSApp.Analog.showAdjustmentsEditor(progAdjust, row, function (progAdjustOut) {
@@ -3554,9 +3578,19 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			//Edit a monitor:
 			list.find(".edit-monitor").on("click", function () {
 				var dur = $(this),
-					row = dur.attr("row");
+					nr = parseInt(dur.attr("value"), 10);
 
-				var monitor = OSApp.Analog.monitors[row];
+				// Find monitor by nr instead of row index (row index becomes incorrect after sorting)
+				var row = -1;
+				var monitor = null;
+				for (var i = 0; i < OSApp.Analog.monitors.length; i++) {
+					if (OSApp.Analog.monitors[i].nr === nr) {
+						row = i;
+						monitor = OSApp.Analog.monitors[i];
+						break;
+					}
+				}
+				if (!monitor) return;
 
 				OSApp.Analog.expandItem.add("monitors");
 				OSApp.Analog.showMonitorEditor(monitor, row, function (monitorOut) {
@@ -3717,11 +3751,18 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		}
 	});
 
-	updateSensorContent();
-
 	$("#analogsensorconfig").remove();
 
 	$.mobile.pageContainer.append(page);
+
+	// Load sensor data before displaying content
+	OSApp.Analog.updateProgramAdjustments(function () {
+		OSApp.Analog.updateMonitors(function () {
+			OSApp.Analog.updateAnalogSensor(function () {
+				updateSensorContent();
+			});
+		});
+	});
 };
 
 OSApp.Analog.checkFirmwareUpdate = function() {
@@ -3937,8 +3978,8 @@ OSApp.Analog.toggleSortMode = function(container) {
 				row.attr("data-sort-key", keyText);
 				row.css({"transition": "transform 150ms ease, background-color 120ms ease", "will-change": "transform"});
 
-				// Create handle element
-				var handle = $("<span class='sort-handle' style='cursor: grab; padding: 5px 8px; margin-right: 5px; display: inline-block; font-size: 18px; user-select: none;' draggable='true' title='Drag to reorder'>☰</span>");
+				// Create handle element - use HTML entity for better compatibility
+				var handle = $("<span class='sort-handle' style='cursor: grab; padding: 5px 8px; margin-right: 5px; display: inline-block; font-size: 18px; user-select: none;' draggable='true' title='Drag to reorder'>&#9776;</span>");
 
 				// Add handle to first cell
 				firstCell.prepend(handle);

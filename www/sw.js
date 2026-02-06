@@ -229,7 +229,13 @@ self.addEventListener("install", (e) => {
     e.waitUntil(
         caches.open(cacheName).then((cache) => {
             console.log("[Service Worker] Caching all the files");
-            return cache.addAll(cacheFiles);
+            return Promise.all(
+                cacheFiles.map((file) => {
+                    return cache.add(file).catch((err) => {
+                        console.warn("[Service Worker] Failed to cache: " + file, err);
+                    });
+                })
+            );
         })
     );
 });

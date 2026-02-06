@@ -70,7 +70,7 @@ OSApp.Language._ = function( key ) {
 OSApp.Language.setLang = function() {
 
 	//Update all static elements to the current language
-	$( "[data-translate]" ).text( function() {
+	$( "[data-translate]" ).each( function() {
 		var el = $( this ),
 			txt = el.data( "translate" );
 
@@ -82,19 +82,42 @@ OSApp.Language.setLang = function() {
 				el.button( "refresh" );
 			}
 		} else {
-			return OSApp.Language._( txt );
+			el.text( OSApp.Language._( txt ) );
 		}
 	} );
 	$( ".ui-toolbar-back-btn" ).text( OSApp.Language._( "Back" ) );
 
 	OSApp.Language.checkCurrLang();
-};
 
-OSApp.Language.updateUIElements = function() {
 	// FIXME: Some elements need to be manually re-rendered to apply language changes. Can this be handled through an event? page reload?
 	OSApp.Weather.updateWeatherBox();
 	OSApp.Dashboard.updateWaterLevel();
 	OSApp.Dashboard.updateRestrictNotice();
+};
+
+OSApp.Language.updateUIElements = function() {
+	// FIXME: Some elements need to be manually re-rendered to apply language changes. Can this be handled through an event? page reload?
+	try {
+		if ( typeof OSApp.Weather !== "undefined" && typeof OSApp.Weather.updateWeatherBox === "function" ) {
+			OSApp.Weather.updateWeatherBox();
+		}
+	} catch ( e ) {
+		console.warn( "Could not update weather box: ", e );
+	}
+	try {
+		if ( typeof OSApp.Dashboard !== "undefined" && typeof OSApp.Dashboard.updateWaterLevel === "function" ) {
+			OSApp.Dashboard.updateWaterLevel();
+		}
+	} catch ( e ) {
+		console.warn( "Could not update water level: ", e );
+	}
+	try {
+		if ( typeof OSApp.Dashboard !== "undefined" && typeof OSApp.Dashboard.updateRestrictNotice === "function" ) {
+			OSApp.Dashboard.updateRestrictNotice();
+		}
+	} catch ( e ) {
+		console.warn( "Could not update restrict notice: ", e );
+	}
 };
 
 OSApp.Language.updateLang = function( lang ) {
@@ -121,13 +144,30 @@ OSApp.Language.updateLang = function( lang ) {
 		return;
 	}
 
-	$.getJSON( OSApp.UIDom.getAppURLPath() + "locale/" + lang + ".js", function( store ) {
-		OSApp.uiState.language = store.messages;
+	var langURL = OSApp.UIDom.getAppURLPath() + "locale/" + lang + ".js";
+	console.log( "Loading language file: " + langURL );
+
+	$.getJSON( langURL, function( store ) {
+		console.log( "Language file loaded successfully", store );
+		if ( store && store.messages ) {
+			OSApp.uiState.language = store.messages;
+			OSApp.Language.setLang();
+		} else {
+			console.error( "Language file format error: missing 'messages' object" );
+			OSApp.Language.setLang();
+		}
+	} ).fail( function( jqxhr, textStatus, errorThrown ) {
+		console.error( "Failed to load language file: " + textStatus + " - " + errorThrown );
+		console.error( "Tried URL: " + langURL );
+		console.error( "Response status: " + jqxhr.status );
+		alert( "Error loading language file: " + textStatus + "\nURL: " + langURL );
 		OSApp.Language.setLang();
-	} ).fail( OSApp.Language.setLang );
+	} );
 };
 
 OSApp.Language.languageSelect = function() {
+	console.log( "languageSelect called" );
+
 	$( "#localization" ).popup( "destroy" ).remove();
 
 	/*
@@ -135,8 +175,11 @@ OSApp.Language.languageSelect = function() {
 	*/
 
 	var popup = "<div data-role='popup' data-theme='a' id='localization' data-corners='false'>" +
-				"<ul data-inset='true' data-role='listview' id='lang' data-corners='false'>" +
-				"<li data-role='list-divider' data-theme='b' class='center' data-translate='Localization'>" + OSApp.Language._( "Localization" ) + "</li>";
+				"<div class='ui-header ui-bar-a' role='banner' style='display: flex; justify-content: space-between; align-items: center; padding: 10px;'>" +
+				"<h1 data-translate='Localization'>" + OSApp.Language._( "Localization" ) + "</h1>" +
+				"<button class='ui-btn ui-corner-all ui-icon-delete ui-btn-icon-right' id='lang-close-btn'>Close</button>" +
+				"</div>" +
+				"<ul data-inset='true' data-role='listview' id='lang' data-corners='false'>";
 
 	$.each( OSApp.Language.Constants.languageCodes, function( key, name ) {
 		popup += "<li><a href='#' data-lang-code='" + key + "'><span data-translate='" + name + "'>" + OSApp.Language._( name ) + "</span> (" + key.toUpperCase() + ")</a></li>";
@@ -146,14 +189,25 @@ OSApp.Language.languageSelect = function() {
 
 	popup = $( popup );
 
-	popup.find( "a" ).on( "click", function() {
+	popup.find( "a" ).on( "click", function( e ) {
+		e.preventDefault();
 		var link = $( this ),
 			lang = link.data( "lang-code" );
 
+		console.log( "Language selected: " + lang );
 		OSApp.Language.updateLang( lang );
 	} );
 
+	popup.find( "#lang-close-btn" ).on( "click", function( e ) {
+		e.preventDefault();
+		console.log( "Closing language popup" );
+		popup.popup( "close" );
+		return false;
+	} );
+
+	console.log( "About to open popup", popup );
 	OSApp.UIDom.openPopup( popup );
+	console.log( "Popup opened" );
 
 	return false;
 };
@@ -162,16 +216,19 @@ OSApp.Language.checkCurrLang = function() {
 	OSApp.Storage.get( "lang", function( data ) {
 		var popup = $( "#localization" );
 
-		popup.find( "a" ).each( function() {
-			var item = $( this );
-			if ( item.data( "lang-code" ) === data.lang ) {
-				item.removeClass( "ui-icon-carat-r" ).addClass( "ui-icon-check" );
-			} else {
-				item.removeClass( "ui-icon-check" ).addClass( "ui-icon-carat-r" );
-			}
-		} );
+		// Only update popup if it exists
+		if ( popup.length > 0 ) {
+			popup.find( "a" ).each( function() {
+				var item = $( this );
+				if ( item.data( "lang-code" ) === data.lang ) {
+					item.removeClass( "ui-icon-carat-r" ).addClass( "ui-icon-check" );
+				} else {
+					item.removeClass( "ui-icon-check" ).addClass( "ui-icon-carat-r" );
+				}
+			} );
 
-		popup.find( "li.ui-last-child" ).removeClass( "ui-last-child" );
+			popup.find( "li.ui-last-child" ).removeClass( "ui-last-child" );
+		}
 
 		OSApp.Language.updateUIElements();
 	} );
