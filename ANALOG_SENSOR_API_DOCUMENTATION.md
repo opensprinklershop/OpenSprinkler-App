@@ -48,6 +48,15 @@ Utility functions for device scanning and management.
 - `showZigBeeDeviceScanner()` - Display ZigBee device scanner dialog
 - `showBluetoothDeviceScanner()` - Display Bluetooth device scanner dialog
 
+### Firmware runtime behavior (BLE/ZigBee)
+- **Scan/Register mode**: scan is only started on explicit request.
+- **Data mode**: sensor data pipeline is active.
+- **BLE remains active permanently** in firmware runtime to support asynchronous updates.
+- **BLE active query + passive report devices are both supported**:
+  - passive/reporting devices push updates spontaneously;
+  - active/query devices are read on interval.
+- If new data arrives before the next scheduled interval, firmware accepts the new values immediately.
+
 ---
 
 ## Data Structures

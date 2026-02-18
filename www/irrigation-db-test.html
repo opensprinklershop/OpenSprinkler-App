@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Irrigation Database Integration - Test</title>
+    <link rel="stylesheet" href="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.css">
+    <script src="https://code.jquery.com/jquery-1.11.3.min.js"></script>
+    <script src="https://code.jquery.com/mobile/1.4.5/jquery.mobile-1.4.5.min.js"></script>
+    
+    <!-- Simulate OSApp environment -->
+    <script>
+        var OSApp = OSApp || {};
+        OSApp.Language = {
+            _: function(text) { return text; }
+        };
+        OSApp.UIDom = {
+            openPopup: function(popup) {
+                popup.appendTo("body").popup().popup("open").enhanceWithin();
+            }
+        };
+        OSApp.Analog = {};
+    </script>
+    
+    <!-- Irrigation DB Integration Module -->
+    <script src="modules/irrigation-db-integration.js"></script>
+    
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .success-box {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .code-box {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+            overflow-x: auto;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #2196f3;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2196f3;
+            margin-top: 30px;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+        button.secondary {
+            background: #ff9800;
+        }
+        button.secondary:hover {
+            background: #f57c00;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background: #2196f3;
+            color: white;
+        }
+        .value-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #4caf50;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌱 Irrigation Database Integration - Test Page</h1>
+        
+        <div class="info-box">
+            <strong>ℹ️ Info:</strong> Diese Seite demonstriert die Integration der Irrigation Database in das OpenSprinkler UI.
+            <br><br>
+            Die Integration ermöglicht es, optimale Bodenfeuchte-Werte (min/max) basierend auf Pflanzentyp und Klimazone automatisch zu laden.
+        </div>
+
+        <h2>1. Test: Dialog öffnen</h2>
+        <p>Öffnet den vollständigen Dialog mit Zone-Auswahl, Pflanzensuche und Ergebnistabelle.</p>
+        <button onclick="testDialog()">🔍 Open Irrigation Database Dialog</button>
+        
+        <div id="result1" class="result" style="display:none;">
+            <h3>Ausgewählte Werte:</h3>
+            <table>
+                <tr><td><strong>Pflanze:</strong></td><td id="res-plant"></td></tr>
+                <tr><td><strong>Zone:</strong></td><td id="res-zone"></td></tr>
+                <tr><td><strong>Min Wert:</strong></td><td id="res-min" class="value-display"></td></tr>
+                <tr><td><strong>Max Wert:</strong></td><td id="res-max" class="value-display"></td></tr>
+            </table>
+        </div>
+
+        <h2>2. Test: API Endpoints direkt</h2>
+        <p>Testet die API-Endpoints ohne UI.</p>
+        
+        <button onclick="testSearchPlants()">🔍 Search Plants (query: "grass")</button>
+        <button class="secondary" onclick="testGetSettings()">⚙️ Get Settings (Buffalo Grass, Zone D)</button>
+        <button class="secondary" onclick="testGetZones()">🌍 Get All Zones</button>
+        
+        <div id="result2" class="result" style="display:none;">
+            <h3>API Response:</h3>
+            <pre id="api-response" class="code-box"></pre>
+        </div>
+
+        <h2>3. Simulierte Program Adjustment</h2>
+        <p>Simuliert das Program Adjustments Formular von analog.js</p>
+        
+        <div style="background:#f9f9f9; padding:20px; border:1px solid #ddd; border-radius:4px;">
+            <h3>Program Adjustment Editor (Simulation)</h3>
+            
+            <label>Adjustment-Nr: <input type="number" value="1" disabled></label><br><br>
+            <label>Type: 
+                <select><option>Soil Moisture Curve</option></select>
+            </label><br><br>
+            <label>Sensor: 
+                <select><option>1 - Soil Moisture Sensor</option></select>
+            </label><br><br>
+            <label>Program: 
+                <select><option>Lawn Program</option></select>
+            </label><br><br>
+            
+            <label>Min sensor value: 
+                <input type="number" id="sim-min" value="15" style="width:100px;">
+            </label><br><br>
+            
+            <label>Max sensor value: 
+                <input type="number" id="sim-max" value="30" style="width:100px;">
+            </label><br><br>
+            
+            <!-- Irrigation Database Button - wie in analog.js -->
+            <div style="margin-top:15px; padding:10px; background:#e3f2fd; border-radius:5px;">
+                <button onclick="loadFromIrrigationDB()">📊 Load from Irrigation Database</button>
+                <p style="margin:5px 0 0 0; color:#666; font-size:0.9em;">
+                    Automatically set min/max values based on plant type and climate zone
+                </p>
+            </div>
+        </div>
+
+        <h2>4. Aktueller Status</h2>
+        <div class="success-box">
+            <strong>✅ Installationsstatus:</strong>
+            <ul style="margin:10px 0 0 0;">
+                <li>Irrigation DB Integration Module: <span id="status-module">...</span></li>
+                <li>API Erreichbar: <span id="status-api">...</span></li>
+                <li>Gespeicherte Zone: <span id="status-zone">...</span></li>
+            </ul>
+        </div>
+
+        <h2>5. Dokumentation</h2>
+        <p>Weitere Informationen:</p>
+        <ul>
+            <li><a href="modules/IRRIGATION_DB_INTEGRATION.md">Integration Dokumentation</a></li>
+            <li><a href="/irrigationdb/">Irrigation Database Web-Interface</a></li>
+            <li><a href="/irrigationdb/README_API.md">API Dokumentation</a></li>
+        </ul>
+    </div>
+
+    <script>
+        // Check installation status
+        $(document).ready(function() {
+            // Check if module is loaded
+            if (typeof OSApp.Analog.IrrigationDB !== 'undefined') {
+                $('#status-module').html('<span style="color:green;">✓ Loaded</span>');
+            } else {
+                $('#status-module').html('<span style="color:red;">✗ Not loaded</span>');
+            }
+            
+            // Check API
+            $.ajax({
+                url: '/irrigationdb/api.php?endpoint=stats',
+                success: function() {
+                    $('#status-api').html('<span style="color:green;">✓ Available</span>');
+                },
+                error: function() {
+                    $('#status-api').html('<span style="color:red;">✗ Not available</span>');
+                }
+            });
+            
+            // Check saved zone
+            var savedZone = localStorage.getItem('irrigationdb_zone');
+            if (savedZone) {
+                $('#status-zone').html('<strong>' + savedZone + '</strong>');
+            } else {
+                $('#status-zone').html('None (default will be D)');
+            }
+        });
+
+        // Test 1: Open Dialog
+        function testDialog() {
+            if (typeof OSApp.Analog.IrrigationDB === 'undefined') {
+                alert('ERROR: Irrigation DB Integration module not loaded!');
+                return;
+            }
+            
+            OSApp.Analog.IrrigationDB.showDialog(function(data) {
+                $('#result1').show();
+                $('#res-plant').text(data.plant);
+                $('#res-zone').text(data.zone);
+                $('#res-min').text(data.min + '%');
+                $('#res-max').text(data.max + '%');
+            });
+        }
+
+        // Test 2: Search Plants
+        function testSearchPlants() {
+            OSApp.Analog.IrrigationDB.searchPlants('grass', function(data) {
+                $('#result2').show();
+                $('#api-response').text(JSON.stringify(data, null, 2));
+            });
+        }
+
+        // Test 2b: Get Settings
+        function testGetSettings() {
+            OSApp.Analog.IrrigationDB.getSettings('D', 'Buffalo Grass', function(data) {
+                $('#result2').show();
+                $('#api-response').text(JSON.stringify(data, null, 2));
+            });
+        }
+
+        // Test 2c: Get Zones
+        function testGetZones() {
+            OSApp.Analog.IrrigationDB.getZones(function(data) {
+                $('#result2').show();
+                $('#api-response').text(JSON.stringify(data, null, 2));
+            });
+        }
+
+        // Test 3: Simulated Load
+        function loadFromIrrigationDB() {
+            OSApp.Analog.IrrigationDB.showDialog(function(data) {
+                // Update simulated inputs
+                $('#sim-min').val(data.min);
+                $('#sim-max').val(data.max);
+                
+                alert('Values loaded!\n\nPlant: ' + data.plant + '\nZone: ' + data.zone + '\nMin: ' + data.min + '%\nMax: ' + data.max + '%');
+            });
+        }
+    </script>
+</body>
+</html>

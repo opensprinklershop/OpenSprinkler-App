@@ -38,6 +38,90 @@ OSApp.Firmware.Constants = {
 	}
 };
 
+OSApp.Firmware.nativeHttpReady = false;
+
+OSApp.Firmware.canUseNativeHttp = function( url ) {
+	return !!(
+		OSApp.currentDevice.isAndroid &&
+		!OSApp.currentSession.token &&
+		typeof url === "string" &&
+		/^https:\/\//i.test( url ) &&
+		window.cordova &&
+		window.cordova.plugin &&
+		window.cordova.plugin.http &&
+		typeof window.cordova.plugin.http.sendRequest === "function"
+	);
+};
+
+OSApp.Firmware.ensurePinnedNativeHttp = function( callback ) {
+	callback = callback || function() {};
+
+	if ( OSApp.Firmware.nativeHttpReady ) {
+		callback( true );
+		return;
+	}
+
+	if ( !window.cordova || !window.cordova.plugin || !window.cordova.plugin.http ||
+		typeof window.cordova.plugin.http.setServerTrustMode !== "function" ) {
+		callback( false );
+		return;
+	}
+
+	window.cordova.plugin.http.setServerTrustMode( "pinned", function() {
+		OSApp.Firmware.nativeHttpReady = true;
+		callback( true );
+	}, function() {
+		callback( false );
+	} );
+};
+
+OSApp.Firmware.nativeHttpRequest = function( obj ) {
+	var defer = $.Deferred();
+
+	OSApp.Firmware.ensurePinnedNativeHttp( function( ready ) {
+		if ( !ready ) {
+			defer.reject( { status: 0, statusText: "error" } );
+			return;
+		}
+
+		var options = {
+			method: ( obj.type || "GET" ).toLowerCase(),
+			headers: obj.headers || {}
+		};
+
+		if ( options.method === "post" && obj.data ) {
+			options.data = obj.data;
+			options.serializer = "urlencoded";
+		}
+
+		if ( typeof obj.timeout === "number" && obj.timeout > 0 && typeof window.cordova.plugin.http.setRequestTimeout === "function" ) {
+			window.cordova.plugin.http.setRequestTimeout( Math.max( 1, Math.round( obj.timeout / 1000 ) ) );
+		}
+
+		window.cordova.plugin.http.sendRequest( obj.url, options, function( response ) {
+			var data = response && typeof response.data !== "undefined" ? response.data : "";
+
+			if ( obj.dataType === "json" && typeof data === "string" ) {
+				try {
+					data = JSON.parse( data );
+				} catch {
+					defer.reject( { status: response.status || 0, statusText: "parsererror" } );
+					return;
+				}
+			}
+
+			defer.resolve( data );
+		}, function( error ) {
+			defer.reject( {
+				status: error && typeof error.status === "number" ? error.status : 0,
+				statusText: error && error.error ? error.error : "error"
+			} );
+		} );
+	} );
+
+	return defer.promise();
+};
+
 // Wrapper function to communicate with OpenSprinkler
 OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
@@ -58,6 +142,7 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 			data: usePOST ? OSApp.Firmware.getUrlVars( dest ) : null,
 			dataType: type,
 			timeout: timeout,
+			headers: {},
 			shouldRetry: function( xhr, current ) {
 				if ( xhr.status === 0 && xhr.statusText === "abort" || OSApp.Constants.http.RETRY_COUNT < current ) {
 					$.ajaxq.abort( queue );
@@ -69,11 +154,10 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 		defer;
 
 	if ( OSApp.currentSession.auth ) {
+		obj.headers.Authorization = "Basic " + btoa( OSApp.currentSession.authUser + ":" + OSApp.currentSession.authPass );
 		$.extend( obj, {
 			beforeSend: function( xhr ) {
-				xhr.setRequestHeader(
-					"Authorization", "Basic " + btoa( OSApp.currentSession.authUser + ":" + OSApp.currentSession.authPass )
-				);
+				xhr.setRequestHeader( "Authorization", obj.headers.Authorization );
 			}
 		} );
 	}
@@ -86,7 +170,9 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 		} );
 	}
 
-	defer = $.ajaxq( queue, obj ).then(
+	var request = OSApp.Firmware.canUseNativeHttp( obj.url ) ? OSApp.Firmware.nativeHttpRequest( obj ) : $.ajaxq( queue, obj );
+
+	defer = request.then(
 		function( data ) {
 
 			// In case the data type was incorrect, attempt to fix.
@@ -142,7 +228,11 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 			if ( ( e.statusText === "timeout" || e.status === 0 ) && /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|cm)/.exec( dest ) ) {
 
 				// Handle the connection timing out but only show error on setting change
-				OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. Please try again." ) );
+				if ( OSApp.currentSession.prefix === "https://" ) {
+					OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. If using a self-signed certificate, please open the device URL in your browser first to accept it." ) );
+				} else {
+					OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. Please try again." ) );
+				}
 			} else if ( e.status === 401 ) {
 
 				//Handle unauthorized requests

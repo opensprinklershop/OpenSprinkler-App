@@ -1105,6 +1105,26 @@ OSApp.Dashboard.displayPage = function() {
 
 	page.one( "pageshow", function() {
 		$( "html" ).on( "datarefresh", updateContent );
+
+		// Poll sensor data every 5s only while dashboard is visible
+		var sensorInterval = null;
+		if ( OSApp.Analog.checkAnalogSensorAvail() ) {
+			var refreshSensors = function() {
+				OSApp.Analog.updateAnalogSensor();
+				OSApp.Analog.updateProgramAdjustments();
+				OSApp.Analog.updateMonitors();
+			};
+			refreshSensors();
+			sensorInterval = setInterval( refreshSensors, 5000 );
+		}
+
+		page.one( "pagehide", function() {
+			$( "html" ).off( "datarefresh", updateContent );
+			if ( sensorInterval ) {
+				clearInterval( sensorInterval );
+				sensorInterval = null;
+			}
+		} );
 	} );
 
 	function begin( firstLoad ) {

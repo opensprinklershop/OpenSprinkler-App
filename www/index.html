@@ -71,7 +71,9 @@
 		<script src="js/modules/groups.js"></script>
 		<script src="js/modules/import-export.js"></script>
 		<script src="js/modules/language.js"></script>
-		<script src="js/modules/logs.js"></script>	<script src="js/modules/matter.js"></script>		<script src="js/modules/network.js"></script>
+		<script src="js/modules/logs.js"></script>
+		<script src="js/modules/esp32mode.js"></script>
+		<script src="js/modules/network.js"></script>
 		<script src="js/modules/notifications.js"></script>
 		<script src="js/modules/options.js"></script>
 		<script src="js/modules/programs.js"></script>
@@ -110,12 +112,15 @@
 				<li data-icon="action"><a href="#" class="export_config" data-translate="Export Configuration"></a></li>
 				<li data-icon="back"><a href="#" class="import_config" data-translate="Import Configuration"></a></li>
 				<li data-icon="mail"><a href="https://openthings.freshdesk.com/widgets/feedback_widget/new?&widgetType=popup&screenshot=no&attachFile=no&formTitle=Help%20%26%20Support" target="_blank" class="iab iabNoScale" data-translate="Help & Support"></a></li>
-				<li class="matter-setup hidden" data-icon="cloud"><a href="#" class="setup-matter" data-translate="Setup Matter"></a></li>
 				<li data-icon="info"><a href="#about" data-translate="About"></a></li>
 				<li data-icon="location"><a href="#localization" data-translate="Localization"></a></li>
 				<li class="hidden logout-button" data-icon="power"><a id="logout" href="#" data-translate="Logout"></a></li>
 				<li class="hidden login-button"><a class="cloud-login" href="#" data-translate="OpenSprinkler.com Login"></a></li>
 				<li data-role="list-divider" data-translate="Advanced"></li>
+				<li class="esp32-mode-setup hidden" data-icon="gear"><a href="#" class="setup-esp32-mode" data-translate="Setup ESP32 Mode"></a></li>
+				<li class="matter-setup hidden" data-icon="cloud"><a href="#" class="setup-matter" data-translate="Setup Matter"></a></li>
+				<li class="zigbee-gateway-setup hidden" data-icon="star"><a href="#" class="setup-zigbee-gateway" data-translate="ZigBee Gateway"></a></li>
+				<li class="zigbee-client-setup hidden" data-icon="star"><a href="#" class="setup-zigbee-client" data-translate="ZigBee Client"></a></li>
 				<li data-icon="power"><a href="#" class="toggleOperation">
 					<span data-translate="Disable"></span>
 					<span> </span>

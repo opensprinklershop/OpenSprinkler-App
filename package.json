@@ -89,9 +89,9 @@
 			"de.appplant.cordova.plugin.local-notification": {}
 		},
 		"platforms": [
-			"android",
 			"ios",
-			"browser"
+			"browser",
+			"android"
 		]
 	}
 }

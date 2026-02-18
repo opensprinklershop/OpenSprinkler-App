@@ -1,0 +1,11 @@
+--- a/platforms/android/app/src/main/AndroidManifest.xml
++++ b/platforms/android/app/src/main/AndroidManifest.xml
+@@ -2,7 +2,7 @@
+ <manifest android:hardwareAccelerated="true" android:versionCode="188" android:versionName="2.3.188" xmlns:android="http://schemas.android.com/apk/res/android">
+     <supports-screens android:anyDensity="true" android:largeScreens="true" android:normalScreens="true" android:resizeable="true" android:smallScreens="true" android:xlargeScreens="true" />
+     <uses-permission android:name="android.permission.INTERNET" />
+-    <application android:debuggable="true" android:hardwareAccelerated="true" android:icon="@mipmap/ic_launcher" android:label="@string/app_name" android:networkSecurityConfig="@xml/network_security_config" android:supportsRtl="true" android:usesCleartextTraffic="true">
++    <application android:hardwareAccelerated="true" android:icon="@mipmap/ic_launcher" android:label="@string/app_name" android:networkSecurityConfig="@xml/network_security_config" android:supportsRtl="true" android:usesCleartextTraffic="true">
+         <activity android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation" android:exported="true" android:label="@string/activity_name" android:launchMode="singleTop" android:name="MainActivity" android:theme="@style/Theme.App.SplashScreen" android:windowSoftInputMode="adjustResize">
+             <intent-filter android:label="@string/launcher_name">
+                 <action android:name="android.intent.action.MAIN" />

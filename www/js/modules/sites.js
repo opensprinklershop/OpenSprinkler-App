@@ -403,7 +403,7 @@ list.find( ".add-otc-connection" ).on( "click", function() {
 			},
 			rightBtn: {
 				icon: "plus",
-				text: OSApp.Language._( "Add" ),
+				text: "",
 				on: function() {
 					if ( typeof OSApp.currentDevice.deviceIp === "undefined" ) {
 						OSApp.Sites.showAddNew();

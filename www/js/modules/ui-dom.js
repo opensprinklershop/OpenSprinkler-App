@@ -397,8 +397,10 @@ OSApp.UIDom.initAppData = function() {
 	// Prevent caching of AJAX requests on Android and Windows Phone devices
 	if ( OSApp.currentDevice.isAndroid ) {
 
-		// Hide the back button for Android (all devices have back button)
-		OSApp.UIDom.insertStyle( ".ui-toolbar-back-btn{display:none!important}" );
+		// On Android, show the menu button alongside the back button.
+		// The .is-visible class activates the CSS sibling rules that shift
+		// the back-btn and title so they don't overlap the menu button.
+		OSApp.UIDom.insertStyle( ".header-menu-btn.is-visible{display:block!important}" );
 
 		$( this ).ajaxStart( function() {
 			try {
@@ -611,7 +613,30 @@ OSApp.UIDom.bindPanel = function() {
 	} );
 
 	panel.find( ".setup-matter" ).on( "click", function() {
-		OSApp.Matter.setupMatter();
+		OSApp.UIDom.closePanel( function() {
+			OSApp.ESP32Mode.setupMatter();
+		} );
+		return false;
+	} );
+
+	panel.find( ".setup-esp32-mode" ).on( "click", function() {
+		OSApp.UIDom.closePanel( function() {
+			OSApp.ESP32Mode.setupESP32Mode();
+		} );
+		return false;
+	} );
+
+	panel.find( ".setup-zigbee-gateway" ).on( "click", function() {
+		OSApp.UIDom.closePanel( function() {
+			OSApp.ESP32Mode.setupZigBeeGateway();
+		} );
+		return false;
+	} );
+
+	panel.find( ".setup-zigbee-client" ).on( "click", function() {
+		OSApp.UIDom.closePanel( function() {
+			OSApp.ESP32Mode.setupZigBeeClient();
+		} );
 		return false;
 	} );
 
@@ -703,15 +728,57 @@ OSApp.UIDom.bindPanel = function() {
 	 OSApp.uiState.openPanel = ( function() {
 		var panel = $( "#sprinklers-settings" ),
 			updateButtons = function() {
-				var operation = ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.en && OSApp.currentSession.controller.settings.en === 1 ) ? OSApp.Language._( "Disable" ) : OSApp.Language._( "Enable" );
+				var operation = ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.en && OSApp.currentSession.controller.settings.en === 1 ) ? OSApp.Language._( "Disable" ) : OSApp.Language._( "Enable" ),
+					listview = panel.find( "ul[data-role='listview']" );
+
 				panel.find( ".toggleOperation span:first" ).html( operation ).attr( "data-translate", operation );
 
-				// Update Matter menu item visibility
-				if ( OSApp.Matter && OSApp.Matter.isMatterSupported() ) {
-					panel.find( ".matter-setup" ).removeClass( "hidden" );
+				// Update ESP32 Mode and sub-menu visibility
+				if ( OSApp.ESP32Mode && OSApp.ESP32Mode.isESP32Supported() ) {
+
+					// Remove hidden class and clear any inline display style
+					// that jQuery Mobile may have cached from initial enhancement
+					panel.find( ".esp32-mode-setup" ).removeClass( "hidden" ).css( "display", "" );
+
+					// Fetch radio info to determine mode-dependent menu visibility
+					OSApp.ESP32Mode.fetchRadioInfo().done( function() {
+
+						// Update Matter menu item visibility (only when Matter mode is active)
+						if ( OSApp.ESP32Mode.isMatterActive() ) {
+							panel.find( ".matter-setup" ).removeClass( "hidden" ).css( "display", "" );
+						} else {
+							panel.find( ".matter-setup" ).addClass( "hidden" );
+						}
+
+						// Update ZigBee Gateway menu item visibility
+						if ( OSApp.ESP32Mode.isZigBeeGatewayActive() ) {
+							panel.find( ".zigbee-gateway-setup" ).removeClass( "hidden" ).css( "display", "" );
+						} else {
+							panel.find( ".zigbee-gateway-setup" ).addClass( "hidden" );
+						}
+
+						// Update ZigBee Client menu item visibility
+						if ( OSApp.ESP32Mode.isZigBeeClientActive() ) {
+							panel.find( ".zigbee-client-setup" ).removeClass( "hidden" ).css( "display", "" );
+						} else {
+							panel.find( ".zigbee-client-setup" ).addClass( "hidden" );
+						}
+
+						// Refresh listview after async visibility updates
+						listview.listview( "refresh" );
+					} ).fail( function() {
+
+						// Still refresh even if fetchRadioInfo fails
+						listview.listview( "refresh" );
+					} );
 				} else {
+					panel.find( ".esp32-mode-setup" ).addClass( "hidden" );
 					panel.find( ".matter-setup" ).addClass( "hidden" );
+					panel.find( ".zigbee-gateway-setup" ).addClass( "hidden" );
+					panel.find( ".zigbee-client-setup" ).addClass( "hidden" );
 				}
+
+				listview.listview( "refresh" );
 			};
 
 		$( "html" ).on( "datarefresh",  updateButtons );
@@ -975,21 +1042,37 @@ OSApp.UIDom.changeHeader = function( opt ) {
 		opt.class = "logo";
 	}
 
+	// If left button is a back button, also add a menu button for Android
+	// (Android hides back buttons via CSS, so the menu button provides navigation)
+	var hasBackBtn = opt.leftBtn.class.indexOf( "ui-toolbar-back-btn" ) !== -1;
+	var isMenuBtn = opt.leftBtn.icon === "bullets";
+
 	// Generate new header content
 	var newHeader = $( "<button data-icon='" + opt.leftBtn.icon + "' " + ( opt.leftBtn.text === "" ? "data-iconpos='notext' " : "" ) +
 				"class='ui-btn-left " + opt.leftBtn.class + "'>" + opt.leftBtn.text + "</button>" +
 			"<h3 class='" + opt.class + "'>" + opt.title + "</h3>" +
 			"<button data-icon='" + opt.rightBtn.icon + "' " + ( opt.rightBtn.text === "" ? "data-iconpos='notext' " : "" ) +
-				"class='ui-btn-right secondary-right " + opt.rightBtn.class + "'>" + opt.rightBtn.text + "</button>" +
-			"<button data-icon='gear' data-iconpos='notext' class='ui-btn-right theme-toggle-btn'></button>" ),
+				"class='ui-btn-right " + opt.rightBtn.class + "'>" + opt.rightBtn.text + "</button>" ),
 		speed = opt.animate ? "fast" : 0;
 
 	// Fade out the header content, replace it, and update the header
 	header.children().stop().fadeOut( speed, function() {
 		header.html( newHeader ).toolbar( header.hasClass( "ui-header" ) ? "refresh" : null );
-		header.find( ".ui-btn-left" ).on( "click", opt.leftBtn.on );
-		header.find( ".secondary-right" ).on( "click", opt.rightBtn.on );
-		header.find( ".theme-toggle-btn" ).on( "click", function() { OSApp.UIDom.showThemeSelector( $( this ) ); return false; } );
+		header.find( ".ui-btn-left" ).not( ".header-menu-btn" ).on( "click", opt.leftBtn.on );
+		header.find( ".ui-btn-right" ).on( "click", opt.rightBtn.on );
+
+		// Prepend menu button before the back button so it appears to its left.
+		// Inserted separately (not part of newHeader) to preserve eq() indices.
+		// Only add menu button if there is NO back button and NO menu button already - prefer back button for navigation.
+		// Remove any existing menu button first to avoid duplicates
+		header.find( ".header-menu-btn" ).remove();
+
+		if ( !hasBackBtn && !isMenuBtn && OSApp.currentDevice.isAndroid ) {
+			var menuBtn = $( "<button data-icon='bullets' data-iconpos='notext' class='ui-btn-left header-menu-btn is-visible'></button>" );
+			header.find( ".ui-btn-left" ).before( menuBtn );
+			menuBtn.button();
+			menuBtn.on( "click", function() { OSApp.uiState.openPanel(); return false; } );
+		}
 	} ).fadeIn( speed );
 
 	return newHeader;

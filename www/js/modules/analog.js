@@ -20,6 +20,8 @@ OSApp.Analog = {
 
 	lastSensorHtml : "",
 	zigbeeClusterData : null,
+	chartConvertTemp : 0, // 0=no conversion, 1=F->C, 2=C->F
+	chartCombineMoistTemp : false, // combine soil moisture and temperature in one chart
 
 	Constants: {
 		CHARTS: 14,
@@ -43,6 +45,7 @@ OSApp.Analog = {
 		RS485_TRUEBNER3 : 0x80,
 		RS485_TRUEBNER4 : 0x100,
 		OSPI_USB_RS485 : 0x200,
+		I2C_RS485 : 0x400,
 
 		MONITOR_MIN      : 1,
 		MONITOR_MAX      : 2,
@@ -113,6 +116,46 @@ OSApp.Analog = {
 };
 
 OSApp.Analog.success_callback = function() {
+};
+
+OSApp.Analog.syncChartOptionsFromController = function() {
+	try {
+		var stored = localStorage.getItem("OSApp.Analog.chartOptions");
+		if ( stored ) {
+			var opts = JSON.parse( stored );
+			var tmpCo = opts.tmpCo;
+			var comb = opts.comb;
+
+			if ( typeof tmpCo === "string" ) {
+				tmpCo = parseInt( tmpCo, 10 );
+			}
+			if ( typeof tmpCo === "number" && !isNaN( tmpCo ) ) {
+				OSApp.Analog.chartConvertTemp = Math.max( 0, Math.min( 2, tmpCo ) );
+			}
+
+			if ( typeof comb === "string" ) {
+				comb = parseInt( comb, 10 );
+			}
+			if ( typeof comb === "number" && !isNaN( comb ) ) {
+				OSApp.Analog.chartCombineMoistTemp = comb === 1;
+			}
+		}
+	} catch ( e ) {
+		// Ignore parse errors, use defaults
+	}
+};
+
+OSApp.Analog.saveChartOptions = function() {
+	var payload = {
+		tmpCo: OSApp.Analog.chartConvertTemp,
+		comb: OSApp.Analog.chartCombineMoistTemp ? 1 : 0
+	};
+
+	try {
+		localStorage.setItem("OSApp.Analog.chartOptions", JSON.stringify( payload ));
+	} catch ( e ) {
+		// Ignore storage errors
+	}
 };
 
 
@@ -1565,6 +1608,34 @@ OSApp.Analog.isIDNeeded = function(sensorType) {
 		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE;
 }
 
+OSApp.Analog.getBatteryPercent = function(value) {
+	if (value === undefined || value === null || value === "") {
+		return null;
+	}
+	var parsed = parseFloat(value);
+	if (isNaN(parsed)) {
+		return null;
+	}
+	return Math.max(0, Math.min(100, Math.round(parsed)));
+};
+
+OSApp.Analog.renderBatteryIcon = function(percent, showText) {
+	if (percent === null || percent === undefined || isNaN(percent)) {
+		return "";
+	}
+	var clamped = Math.max(0, Math.min(100, Math.round(percent)));
+	var fillColor = clamped <= 20 ? "#d9534f" : (clamped <= 50 ? "#f0ad4e" : "#5cb85c");
+	var innerWidth = Math.max(0, Math.round((clamped / 100) * 16));
+	var title = OSApp.Language._("Battery") + ": " + clamped + "%";
+	return "<span class='battery-icon' title='" + OSApp.Utils.htmlEscape(title) + "' style='display:inline-flex;align-items:center;gap:4px;vertical-align:middle;'>" +
+		"<span style='position:relative;display:inline-block;width:18px;height:10px;border:1px solid #444;border-radius:2px;box-sizing:border-box;background:#fff;'>" +
+		"<span style='position:absolute;left:1px;top:1px;bottom:1px;width:" + innerWidth + "px;background:" + fillColor + ";'></span>" +
+		"<span style='position:absolute;right:-3px;top:3px;width:2px;height:4px;background:#444;border-radius:1px;'></span>" +
+		"</span>" +
+		(showText ? "<span style='font-size:12px;'>" + clamped + "%</span>" : "") +
+		"</span>";
+};
+
 //show and hide sensor editor fields
 OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	// First hide IP/Port/ID related fields (but NOT the always-visible standard fields)
@@ -1651,7 +1722,6 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	popup.find(".zigbee_endpoint_container").hide();
 	popup.find(".zigbee_cluster_id_container").hide();
 	popup.find(".zigbee_attribute_id_container").hide();
-	popup.find(".zigbee_poll_interval_container").hide();
 	popup.find(".bluetooth_char_uuid_container").hide();
 	popup.find(".bluetooth_format_container").hide();
 
@@ -1674,7 +1744,6 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 		popup.find(".zigbee_endpoint_container").show();
 		popup.find(".zigbee_cluster_id_container").show();
 		popup.find(".zigbee_attribute_id_container").show();
-		popup.find(".zigbee_poll_interval_container").show();
 		popup.find(".fac_container").show();
 		popup.find(".div_container").show();
 		popup.find(".offset_container").show();
@@ -1759,12 +1828,9 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 			sensorOut.attribute_id = parseInt(attributeIdStr, 16);
 		}
 
-		var zigbeePollIntervalField = popup.find("#zigbee_poll_interval");
-		if (zigbeePollIntervalField && zigbeePollIntervalField.length) {
-			var zigbeePollInterval = parseInt(zigbeePollIntervalField.val(), 10);
-			if (!isNaN(zigbeePollInterval)) {
-				sensorOut.poll_interval = zigbeePollInterval;
-			}
+		// poll_interval (ms) is derived from sensor read interval (ri seconds)
+		if (sensorOut.ri !== undefined && sensorOut.ri !== null && !isNaN(sensorOut.ri)) {
+			sensorOut.poll_interval = sensorOut.ri * 1000;
 		}
 	}
 
@@ -1797,7 +1863,7 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 
 // Load ZigBee cluster definitions from online source
 OSApp.Analog.loadZigBeeClusterData = function() {
-	if (OSApp.Analog.zigbeeClusterData !== undefined) {
+	if (OSApp.Analog.zigbeeClusterData !== null && OSApp.Analog.zigbeeClusterData !== undefined) {
 		return Promise.resolve(OSApp.Analog.zigbeeClusterData);
 	}
 
@@ -2421,6 +2487,9 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 		if (isNaN(sensorFormat)) {
 			sensorFormat = 0;
 		}
+		var batteryPercent = OSApp.Analog.getBatteryPercent(sensor.battery);
+		var batteryHtml = batteryPercent !== null ? OSApp.Analog.renderBatteryIcon(batteryPercent, true) : "";
+		var batteryStyle = batteryPercent !== null ? "" : "display:none;";
 
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
 
@@ -2436,6 +2505,9 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 		"<br>" +
 		OSApp.Language._("Last") + ": " + (sensor.last === undefined ? "" : OSApp.Dates.dateToString(new Date(sensor.last * 1000))) +
 		"</p>" +
+
+"<div class='battery_container' style='" + batteryStyle + "'><label>" + OSApp.Language._("Battery") + "</label>" +
+	"<div class='battery_value' style='margin-top:4px;'>" + batteryHtml + "</div></div>" +
 
 "<div class='sensor_nr_label'><label for='sensor_nr'>" + OSApp.Language._("Sensor Nr.") + "</label>" +
 	"<input class='nr' id='sensor_nr' data-mini='true' type='number' inputmode='decimal' min='1' max='99999' required value='" + sensor.nr + (sensor.nr > 0 ? "' disabled='disabled'></div>" : "'></div>") +
@@ -2551,22 +2623,19 @@ list += "</select></div>" +
 "<div class='zigbee_known_sensors_container' style='display:none;'>" +
 		"<label for='known_zigbee_sensors'>" + OSApp.Language._("Known Sensor Types") + "</label>" +
 		"<select id='known_zigbee_sensors' data-mini='true'>" +
-		"<option value=''>" + OSApp.Language._("Select known sensor or enter manually...") + "</option>" +
+		"<option value=''>" + OSApp.Language._("Sensor Template") + "</option>" +
+		"<option value='__report__'>" + OSApp.Language._("Report New Sensor") + "</option>" +
 		"</select>" +
-		"<button data-mini='true' id='report_zigbee_sensor' style='margin:5px 0;'>" + OSApp.Language._("Report New Sensor") + "</button>" +
 			"</div>" +
 
 "<div class='zigbee_endpoint_container' style='display:none;'><label for='endpoint'>" + OSApp.Language._("Endpoint") + "</label>" +
 		"<input type='number' id='endpoint' data-mini='true' inputmode='decimal' min='1' max='255' value='" + (sensor.endpoint ? sensor.endpoint : "1") + "'></div>" +
 
 "<div class='zigbee_cluster_id_container' style='display:none;'><label for='cluster_id'>" + OSApp.Language._("Cluster ID (hex)") + "</label>" +
-		"<input type='text' id='cluster_id' data-mini='true' value='" + (sensor.cluster_id ? "0x" + sensor.cluster_id.toString(16).toUpperCase().padStart(4, '0') : "0x0408") + "'></div>" +
+		"<input type='text' id='cluster_id' data-mini='true' value='" + (function() { if (!sensor.cluster_id && sensor.cluster_id !== 0) return "0x0408"; var val = sensor.cluster_id; if (typeof val === 'string') { val = val.startsWith('0x') ? parseInt(val, 16) : parseInt(val, 10); } return isNaN(val) ? "0x0408" : "0x" + val.toString(16).toUpperCase().padStart(4, '0'); })() + "'></div>" +
 
 "<div class='zigbee_attribute_id_container' style='display:none;'><label for='attribute_id'>" + OSApp.Language._("Attribute ID (hex)") + "</label>" +
-		"<input type='text' id='attribute_id' data-mini='true' value='" + (sensor.attribute_id ? "0x" + sensor.attribute_id.toString(16).toUpperCase().padStart(4, '0') : "0x0000") + "'></div>" +
-
-"<div class='zigbee_poll_interval_container' style='display:none;'><label for='zigbee_poll_interval'>" + OSApp.Language._("Poll Interval (ms)") + "</label>" +
-		"<input type='number' id='zigbee_poll_interval' data-mini='true' inputmode='decimal' min='0' max='999999' value='" + (sensor.poll_interval ? sensor.poll_interval : "60000") + "'></div>" +
+		"<input type='text' id='attribute_id' data-mini='true' value='" + (function() { if (!sensor.attribute_id && sensor.attribute_id !== 0) return "0x0000"; var val = sensor.attribute_id; if (typeof val === 'string') { val = val.startsWith('0x') ? parseInt(val, 16) : parseInt(val, 10); } return isNaN(val) ? "0x0000" : "0x" + val.toString(16).toUpperCase().padStart(4, '0'); })() + "'></div>" +
 
 "<div class='bluetooth_char_uuid_container' style='display:none;'><label for='char_uuid'>" + OSApp.Language._("Characteristic UUID") + "</label>" +
 		"<input type='text' id='char_uuid' data-mini='true' value='" + (sensor.char_uuid ? sensor.char_uuid : "") + "'></div>" +
@@ -2616,6 +2685,9 @@ list += "</select></div>" +
 
 			((row < 0) ? "" : ("<a data-role='button' class='show-sensor-log' value='" + sensor.nr + "' href='#' data-mini='true' data-icon='grid'>" +
 				OSApp.Language._("Show Analog Sensor Log") + "</a>")) +
+
+			((row < 0) ? "" : ("<a data-role='button' class='copy-sensor' value='" + sensor.nr + "' href='#' data-mini='true' data-icon='plus'>" +
+				OSApp.Language._("Copy Sensor") + "</a>")) +
 
 			((row < 0) ? "" : ("<a data-role='button' class='black delete-sensor' value='" + sensor.nr + "' row='" + row + "' href='#' data-icon='delete'>" +
 				OSApp.Language._("Delete") + "</a>")) +
@@ -2897,34 +2969,93 @@ list += "</select></div>" +
 			return false;
 		});
 	// Load ZigBee cluster data and populate dropdown
-	OSApp.Analog.loadZigBeeClusterData().then(function(clusterData) {
-		if (clusterData && clusterData.length > 0) {
-			var knownSensorsSelect = popup.find("#known_zigbee_sensors");
-			clusterData.forEach(function(sensor) {
-				var optionText = sensor.name + " (" + sensor.description + ")";
-				knownSensorsSelect.append(
-					$("<option>").val(sensor.id).text(optionText).data("sensor", sensor)
-				);
-			});
-			knownSensorsSelect.selectmenu("refresh");
+	OSApp.Analog.populateZigBeeKnownSensors = function(targetPopup) {
+		var knownSensorsSelect = targetPopup.find("#known_zigbee_sensors");
+		if (!knownSensorsSelect.length) return;
+		// Only populate if not already populated (check for existing sensor options)
+		if (knownSensorsSelect.find("option").filter(function() { return $(this).data("sensor"); }).length > 0) {
+			try { knownSensorsSelect.selectmenu("refresh"); } catch(e) { /* widget not yet initialized */ }
+			return;
 		}
-	});
+		OSApp.Analog.loadZigBeeClusterData().then(function(clusterData) {
+			if (clusterData && clusterData.length > 0) {
+				var reportOption = knownSensorsSelect.find("option[value='__report__']");
+				clusterData.forEach(function(sensorDef) {
+					var optionText = sensorDef.name + " (" + sensorDef.description + ")";
+					var option = $("<option>").val(sensorDef.id).text(optionText).data("sensor", sensorDef);
+					if (reportOption.length) {
+						reportOption.before(option);
+					} else {
+						knownSensorsSelect.append(option);
+					}
+				});
+				try { knownSensorsSelect.selectmenu("refresh"); } catch(e) { /* widget not yet initialized */ }
+			}
+		});
+	};
+	var lazyLoadZigBeeKnownSensors = function() {
+		OSApp.Analog.populateZigBeeKnownSensors(popup);
+	};
+	popup.find("#known_zigbee_sensors").one("focusin click", lazyLoadZigBeeKnownSensors);
+	popup.on("selectmenubeforeopen", "#known_zigbee_sensors", lazyLoadZigBeeKnownSensors);
 
 	// Handle known sensor selection
+		function reportZigBeeSensorFromPopup() {
+			var deviceIeee = popup.find("#device_ieee").val();
+			var endpoint = popup.find("#endpoint").val();
+			var clusterId = popup.find("#cluster_id").val();
+			var attributeId = popup.find("#attribute_id").val();
+			var sensorName = popup.find(".name").val();
+			var readInterval = popup.find(".ri").val();
+			var unitId = popup.find("#unitid").val();
+			var unit = popup.find("#unit").val();
+			var factor = popup.find("#factor").val();
+			var divider = popup.find("#divider").val();
+			var offset = popup.find("#offset").val();
+
+			var emailBody = "New ZigBee Sensor Report:\\n\\n" +
+				"Sensor Name: " + (sensorName || "N/A") + "\\n" +
+				"Device IEEE: " + (deviceIeee || "N/A") + "\\n" +
+				"Endpoint: " + (endpoint || "N/A") + "\\n" +
+				"Cluster ID: " + (clusterId || "N/A") + "\\n" +
+				"Attribute ID: " + (attributeId || "N/A") + "\\n" +
+				"Read Interval: " + (readInterval || "N/A") + " s\\n" +
+				"Unit ID: " + (unitId || "N/A") + "\\n" +
+				"Unit: " + (unit || "N/A") + "\\n" +
+				"Factor: " + (factor || "N/A") + "\\n" +
+				"Divider: " + (divider || "N/A") + "\\n" +
+				"Offset: " + (offset || "N/A") + "\\n\\n" +
+				"Please add this sensor to the database.";
+
+			var subject = "New ZigBee Sensor: " + (sensorName || "Unknown");
+			var mailtoLink = "mailto:info@opensprinklershop.de?subject=" +
+				encodeURIComponent(subject) +
+				"&body=" + encodeURIComponent(emailBody);
+
+			window.location.href = mailtoLink;
+		}
+
 		popup.find("#known_zigbee_sensors").on("change", function() {
 			var selectedOption = $(this).find("option:selected");
+			if (selectedOption.val() === "__report__") {
+				reportZigBeeSensorFromPopup();
+				$(this).val("");
+				try { $(this).selectmenu("refresh"); } catch(e) { /* widget not yet initialized */ }
+				return;
+			}
 			var sensorData = selectedOption.data("sensor");
 
 			if (sensorData) {
 				// Update endpoint, cluster_id, and attribute_id fields
 				popup.find("#endpoint").val(sensorData.endpoint || "1");
-				popup.find("#cluster_id").val(sensorData.cluster_id || "0x0000");
-				popup.find("#attribute_id").val(sensorData.attribute_id || "0x0000");
+				// Convert cluster_id and attribute_id from integer to hex string
+				var clusterId = sensorData.cluster_id;
+				var clusterId_num = clusterId ? (typeof clusterId === 'string' ? (clusterId.startsWith('0x') ? parseInt(clusterId, 16) : parseInt(clusterId, 10)) : clusterId) : null;
+				popup.find("#cluster_id").val(clusterId_num !== null && !isNaN(clusterId_num) ? "0x" + clusterId_num.toString(16).toUpperCase().padStart(4, '0') : "0x0000");
 
-				// Set poll interval if provided
-				if (sensorData.poll_interval) {
-					popup.find("#zigbee_poll_interval").val(sensorData.poll_interval);
-				}
+				var attributeId = sensorData.attribute_id;
+				var attributeId_num = attributeId ? (typeof attributeId === 'string' ? (attributeId.startsWith('0x') ? parseInt(attributeId, 16) : parseInt(attributeId, 10)) : attributeId) : null;
+				popup.find("#attribute_id").val(attributeId_num !== null && !isNaN(attributeId_num) ? "0x" + attributeId_num.toString(16).toUpperCase().padStart(4, '0') : "0x0000");
 
 				// Set unit ID if provided
 				if (sensorData.unitid) {
@@ -2961,45 +3092,7 @@ list += "</select></div>" +
 			}
 		});
 
-		// Report new ZigBee sensor
-		popup.find("#report_zigbee_sensor").on("click", function(e) {
-			e.preventDefault();
 
-			var deviceIeee = popup.find("#device_ieee").val();
-			var endpoint = popup.find("#endpoint").val();
-			var clusterId = popup.find("#cluster_id").val();
-			var attributeId = popup.find("#attribute_id").val();
-			var sensorName = popup.find(".name").val();
-			var pollInterval = popup.find("#zigbee_poll_interval").val();
-			var unitId = popup.find("#unitid").val();
-			var unit = popup.find("#unit").val();
-			var factor = popup.find("#factor").val();
-			var divider = popup.find("#divider").val();
-			var offset = popup.find("#offset").val();
-
-			var emailBody = "New ZigBee Sensor Report:\\n\\n" +
-				"Sensor Name: " + (sensorName || "N/A") + "\\n" +
-				"Device IEEE: " + (deviceIeee || "N/A") + "\\n" +
-				"Endpoint: " + (endpoint || "N/A") + "\\n" +
-				"Cluster ID: " + (clusterId || "N/A") + "\\n" +
-				"Attribute ID: " + (attributeId || "N/A") + "\\n" +
-				"Poll Interval: " + (pollInterval || "N/A") + " ms\\n" +
-				"Unit ID: " + (unitId || "N/A") + "\\n" +
-				"Unit: " + (unit || "N/A") + "\\n" +
-				"Factor: " + (factor || "N/A") + "\\n" +
-				"Divider: " + (divider || "N/A") + "\\n" +
-				"Offset: " + (offset || "N/A") + "\\n\\n" +
-				"Please add this sensor to the database.";
-
-			var subject = "New ZigBee Sensor: " + (sensorName || "Unknown");
-			var mailtoLink = "mailto:info@opensprinklershop.de?subject=" +
-				encodeURIComponent(subject) +
-				"&body=" + encodeURIComponent(emailBody);
-
-			window.location.href = mailtoLink;
-
-			return false;
-		});
 
 		//Bluetooth: Scan for devices
 		popup.find("#bluetoothsel").on("click", function (e) {
@@ -3352,6 +3445,36 @@ list += "</select></div>" +
 			return false;
 		});
 
+		//Copy a sensor:
+		popup.find(".copy-sensor").on("click", function () {
+			OSApp.Analog.saveSensor(popup, sensor, function (sensorOut) {
+				var maxNr = 0;
+				for (var i = 0; i < OSApp.Analog.analogSensors.length; i++) {
+					if (OSApp.Analog.analogSensors[i].nr > maxNr) {
+						maxNr = OSApp.Analog.analogSensors[i].nr;
+					}
+				}
+
+				var newSensor = $.extend(true, {}, sensorOut);
+				newSensor.nr = maxNr + 1;
+				var baseName = newSensor.name && newSensor.name.trim() !== "" ? newSensor.name : OSApp.Language._("Sensor");
+				newSensor.name = baseName + " (" + OSApp.Language._("copy") + ")";
+				delete newSensor.last;
+				delete newSensor.data;
+				delete newSensor.nativedata;
+
+				OSApp.Analog.showSensorEditor(newSensor, -1, function (sensorOutNew) {
+					return OSApp.Analog.sendToOsObj("/sc?pw=", sensorOutNew).done(function (info) {
+						var result = info.result;
+						if (!result || result > 1)
+							OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
+						OSApp.Analog.updateAnalogSensor(callbackCancel);
+					});
+				}, callbackCancel);
+			});
+			return false;
+		});
+
 		//Delete a sensor:
 		popup.find(".delete-sensor").on("click", function () {
 
@@ -3416,6 +3539,11 @@ list += "</select></div>" +
 		// Enhance jQuery Mobile elements before opening
 		popup.enhanceWithin();
 
+		// Re-populate ZigBee known sensors after enhanceWithin if data already loaded
+		if (sensor.type == OSApp.Analog.Constants.SENSOR_ZIGBEE && OSApp.Analog.zigbeeClusterData && OSApp.Analog.zigbeeClusterData.length > 0) {
+			OSApp.Analog.populateZigBeeKnownSensors(popup);
+		}
+
 		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
 	});
 };
@@ -3435,6 +3563,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		});
 
 	function updateSensorContent() {
+		OSApp.Analog.syncChartOptionsFromController();
 		var list = $(OSApp.Analog.buildSensorConfig());
 
 		// Apply saved section order
@@ -3670,6 +3799,29 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			return false;
 		});
 
+		// Chart option: Temperature conversion
+		list.find("input[name='chart-temp-convert']").on("change", function () {
+			OSApp.Analog.chartConvertTemp = parseInt($(this).val(), 10);
+			OSApp.Analog.saveChartOptions();
+		});
+
+		// Chart option: Combine soil moisture and temperature
+		list.find(".chart-combine-moist-temp").on("change", function () {
+			OSApp.Analog.chartCombineMoistTemp = $(this).is(":checked");
+			OSApp.Analog.saveChartOptions();
+		});
+
+		// Chart options from Chart Options section
+		list.find("#tempconvert").on("change", function () {
+			OSApp.Analog.chartConvertTemp = parseInt($(this).val(), 10);
+			OSApp.Analog.saveChartOptions();
+		});
+
+		list.find("#combinemoisttemp").on("change", function () {
+			OSApp.Analog.chartCombineMoistTemp = $(this).is(":checked");
+			OSApp.Analog.saveChartOptions();
+		});
+
 		list.find(".fytasetup").on("click", function () {
 			OSApp.Analog.expandItem.add("fytasetup");
 			OSApp.Analog.setupFytaCredentials();
@@ -3756,13 +3908,28 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 	$.mobile.pageContainer.append(page);
 
 	// Load sensor data before displaying content
-	OSApp.Analog.updateProgramAdjustments(function () {
-		OSApp.Analog.updateMonitors(function () {
-			OSApp.Analog.updateAnalogSensor(function () {
-				updateSensorContent();
-			});
+	var loadData = function() {
+		var pa = $.Deferred(), mo = $.Deferred(), se = $.Deferred();
+
+		OSApp.Analog.updateProgramAdjustments(function() { pa.resolve(); })
+			.fail(function() { pa.resolve(); });
+
+		pa.done(function() {
+			OSApp.Analog.updateMonitors(function() { mo.resolve(); })
+				.fail(function() { mo.resolve(); });
 		});
-	});
+
+		mo.done(function() {
+			OSApp.Analog.updateAnalogSensor(function() { se.resolve(); })
+				.fail(function() { se.resolve(); });
+		});
+
+		se.done(function() {
+			updateSensorContent();
+		});
+	};
+
+	loadData();
 };
 
 OSApp.Analog.checkFirmwareUpdate = function() {
@@ -4130,12 +4297,13 @@ OSApp.Analog.buildSensorConfig = function() {
 		if (detected & OSApp.Analog.Constants.RS485_TRUEBNER3) boards.push("RS485-Adapter Truebner 3");
 		if (detected & OSApp.Analog.Constants.RS485_TRUEBNER4) boards.push("RS485-Adapter Truebner 4");
 		if (detected & OSApp.Analog.Constants.OSPI_USB_RS485) boards.push("OSPI USB-RS485-Adapter");
+		if (detected & OSApp.Analog.Constants.I2C_RS485) boards.push("I2C-RS485-Adapter");
 		if (detected == 0) boards.push("No Boards detected");
 		if (detected && boards.length == 0) boards.push("Unknown Adapter");
 		detected_boards = ": " + boards.filter(Boolean).join(", ");
 	}
 
-	var list = "<fieldset data-role='collapsible' data-section-id='sensors'" + (OSApp.Analog.expandItem.has("sensors") ? " data-collapsed='false'" : "") + ">" +
+	var list = "<fieldset data-role='collapsible' data-section-id='sensors' data-iconpos='left'" + (OSApp.Analog.expandItem.has("sensors") ? " data-collapsed='false'" : "") + ">" +
 		"<legend>" + OSApp.Language._("Sensors") + detected_boards + "</legend>";
 
 	var info = OSApp.Analog.checkFirmwareUpdate();
@@ -4153,6 +4321,14 @@ OSApp.Analog.buildSensorConfig = function() {
 
 	var row = 0;
 	$.each(OSApp.Analog.analogSensors, function (_i, item) {
+		var batteryPercent = OSApp.Analog.getBatteryPercent(item.battery);
+		var dataCell = $("<td>");
+		if (!isNaN(item.data)) {
+			dataCell.text(OSApp.Analog.formatVal(item.data) + item.unit);
+		}
+		if (batteryPercent !== null) {
+			dataCell.append(" ").append($(OSApp.Analog.renderBatteryIcon(batteryPercent, false)));
+		}
 
 		var $tr = $("<tr>").append(
 			$("<td>").text(item.nr),
@@ -4164,7 +4340,7 @@ OSApp.Analog.buildSensorConfig = function() {
 			$("<td class=\"hidecol\">").text(item.port ? (":" + item.port) : ""),
 			$("<td class=\"hidecol\">").text(isNaN(item.id) ? "" : (item.type < 1000 ? item.id : "")),
 			$("<td class=\"hidecol\">").text(isNaN(item.ri) ? "" : item.ri),
-			$("<td>").text(isNaN(item.data) ? "" : (OSApp.Analog.formatVal(item.data) + item.unit)),
+			dataCell,
 			"<td>" + (item.enable ? checkpng : "") + "</td>",
 			"<td class=\"hidecol\">" + (item.log ? checkpng : "") + "</td>",
 			"<td class=\"hidecol\">" + (item.show ? checkpng : "") + "</td>",
@@ -4184,7 +4360,7 @@ OSApp.Analog.buildSensorConfig = function() {
 	list += "</fieldset>";
 
 	//Program adjustments table:
-	list += "<fieldset data-role='collapsible' data-section-id='progadjust'" + (OSApp.Analog.expandItem.has("progadjust") ? " data-collapsed='false'" : "") + ">" +
+	list += "<fieldset data-role='collapsible' data-section-id='progadjust' data-iconpos='left'" + (OSApp.Analog.expandItem.has("progadjust") ? " data-collapsed='false'" : "") + ">" +
 		"<legend>" + OSApp.Language._("Program Adjustments") + "</legend>";
 	list +=
 		"<table style='width: 100%; clear: both;' id='progadjusttable'><tr style='width:100%;vertical-align: top;'>" +
@@ -4243,7 +4419,7 @@ OSApp.Analog.buildSensorConfig = function() {
 
 	//Monitors table:
 	if (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors) {
-		list += "<fieldset data-role='collapsible' data-section-id='monitors'" + (OSApp.Analog.expandItem.has("monitors") ? " data-collapsed='false'" : "") + ">" +
+		list += "<fieldset data-role='collapsible' data-section-id='monitors' data-iconpos='left'" + (OSApp.Analog.expandItem.has("monitors") ? " data-collapsed='false'" : "") + ">" +
 			"<legend>" + OSApp.Language._("Monitoring and control") + "</legend>";
 		list += "<table style='width: 100%;' id='monitorstable'><tr style='width:100%;vertical-align: top;'>" +
 			"<tr><th>" + OSApp.Language._("Nr") + "</th>" +
@@ -4340,20 +4516,62 @@ OSApp.Analog.buildSensorConfig = function() {
 		list += "</fieldset>";
 	}
 
+	//Chart options (Diagramm-Optionen):
+	{
+		var tmpCo = OSApp.Analog.chartConvertTemp;
+		var comb = OSApp.Analog.chartCombineMoistTemp ? 1 : 0;
+
+		list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("chartoptions") ? " data-collapsed='false'" : "") + ">" +
+			"<legend>" + OSApp.Language._("Chart Options") + "</legend>" +
+
+			"<label for='tempconvert'>" + OSApp.Language._("Temperature Conversion") + ":</label>" +
+			"<select id='tempconvert' data-mini='true'>" +
+			"<option value='0' " + (tmpCo === 0 ? "selected" : "") + ">" + OSApp.Language._("No conversion") + "</option>" +
+			"<option value='1' " + (tmpCo === 1 ? "selected" : "") + ">" + OSApp.Language._("Fahrenheit to Celsius") + "</option>" +
+			"<option value='2' " + (tmpCo === 2 ? "selected" : "") + ">" + OSApp.Language._("Celsius to Fahrenheit") + "</option>" +
+			"</select>" +
+
+			"<label for='combinemoisttemp'><input id='combinemoisttemp' type='checkbox' " + (comb === 1 ? "checked='checked'" : "") + ">" +
+			OSApp.Language._("Combine Soil Moisture and Temperature in one chart") + "</label>" +
+
+			"</fieldset>";
+	}
+
 	//Analog sensor logs:
-	list += "<fieldset data-role='collapsible'" + (OSApp.Analog.expandItem.has("sensorlog") ? " data-collapsed='false'" : "") + ">" +
+	list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("sensorlog") ? " data-collapsed='false'" : "") + ">" +
 		"<legend>" + OSApp.Language._("Sensor Log") + "</legend>";
 	list += "<a data-role='button' class='red clear_sensor_logs' href='#' data-mini='true' data-icon='alert'>" +
 		OSApp.Language._("Clear Log") +
 		"</a>" +
 		"<a data-role='button' data-icon='action' class='download-log' href='#' data-mini='true'>" + OSApp.Language._("Download Log") + "</a>" +
-		"<a data-role='button' data-icon='grid' class='show-log' href='#' data-mini='true'>" + OSApp.Language._("Show Log") + "</a>" +
+		"<a data-role='button' data-icon='grid' class='show-log' href='#' data-mini='true'>" + OSApp.Language._("Show Log") + "</a>";
 
+	// Chart options: Temperature conversion and combined chart
+	list += "<div style='margin-top: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 5px;'>" +
+		"<label><b>" + OSApp.Language._("Chart Options") + "</b></label>";
+
+	list += "<fieldset data-role='controlgroup' data-type='vertical' data-mini='true'>" +
+		"<legend>" + OSApp.Language._("Temperature Conversion") + "</legend>" +
+		"<input type='radio' name='chart-temp-convert' id='chart-temp-none' value='0'" + (OSApp.Analog.chartConvertTemp === 0 ? " checked='checked'" : "") + ">" +
+		"<label for='chart-temp-none'>" + OSApp.Language._("No conversion") + "</label>" +
+		"<input type='radio' name='chart-temp-convert' id='chart-temp-f2c' value='1'" + (OSApp.Analog.chartConvertTemp === 1 ? " checked='checked'" : "") + ">" +
+		"<label for='chart-temp-f2c'>" + OSApp.Language._("Fahrenheit to Celsius") + "</label>" +
+		"<input type='radio' name='chart-temp-convert' id='chart-temp-c2f' value='2'" + (OSApp.Analog.chartConvertTemp === 2 ? " checked='checked'" : "") + ">" +
+		"<label for='chart-temp-c2f'>" + OSApp.Language._("Celsius to Fahrenheit") + "</label>" +
 		"</fieldset>";
+
+	list += "<label for='chart-combine-moist-temp'>" +
+		"<input type='checkbox' id='chart-combine-moist-temp' class='chart-combine-moist-temp'" + (OSApp.Analog.chartCombineMoistTemp ? " checked='checked'" : "") + ">" +
+		OSApp.Language._("Combine Soil Moisture and Temperature in one chart") +
+		"</label>";
+
+	list += "</div>";
+
+	list += "</fieldset>";
 
 	//FYTA Setup:
 	if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 181) {
-		list += "<fieldset data-role='collapsible'" + (OSApp.Analog.expandItem.has("fytasetup") ? " data-collapsed='false'" : "") + ">" +
+		list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("fytasetup") ? " data-collapsed='false'" : "") + ">" +
 			"<legend>" + OSApp.Language._("FYTA Setup") + "</legend>";
 		list += "<a data-role='button' data-icon='grid' class='fytasetup' href='#' data-mini='true'>" + OSApp.Language._("Setup FYTA credentials") + "</a>" +
 			"</fieldset>";
@@ -4361,7 +4579,7 @@ OSApp.Analog.buildSensorConfig = function() {
 
 	//backup:
 	if (OSApp.Firmware.checkOSVersion(231)) {
-		list += "<fieldset data-role='collapsible'" + (OSApp.Analog.expandItem.has("backup") ? " data-collapsed='false'" : "") + ">" +
+		list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("backup") ? " data-collapsed='false'" : "") + ">" +
 			"<legend>" + OSApp.Language._("Backup and Restore") + "</legend>";
 		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-all wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Config") + "</a>" +
 			"<a data-role='button' data-icon='back'      class='restore-all wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Config") + "</a>";
@@ -4510,7 +4728,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 
 	var legends = [], opacities = [], widths = [], colors = [], coloridx = 0;
 	let canExport = !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS;
-	let combine = 0;//lvl==0;
+	let combine = OSApp.Analog.chartCombineMoistTemp ? 1 : 0;
 	let AllOptions = [];
 	for (var j = 0; j < OSApp.Analog.analogSensors.length; j++) {
 		var sensor = OSApp.Analog.analogSensors[j];
@@ -4525,6 +4743,14 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 			unitid = sensor.unitid,
 			lastdate = 0;
 
+		// Temperature conversion: determine if this sensor needs conversion
+		var convertTemp = 0; // 0=none, 1=F->C, 2=C->F
+		if (OSApp.Analog.chartConvertTemp === 1 && unitid === 3) convertTemp = 1; // F->C
+		if (OSApp.Analog.chartConvertTemp === 2 && unitid === 2) convertTemp = 2; // C->F
+		// Override unitid for chart grouping when converting
+		if (convertTemp === 1) unitid = 2; // show in Celsius chart
+		if (convertTemp === 2) unitid = 3; // show in Fahrenheit chart
+
 		for (var k = 1; k < csvlines.length; k++) {
 			var line = csvlines[k].split(";");
 			if (line.length >= 3 && Number(line[0]) === nr) {
@@ -4533,6 +4759,9 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 				lastdate = date;
 				let value = Number(line[2]);
 				if (value === undefined || date === undefined) continue;
+				// Apply temperature conversion
+				if (convertTemp === 1) value = (value - 32) * 5 / 9; // F->C
+				else if (convertTemp === 2) value = value * 9 / 5 + 32; // C->F
 				if (unitid != 3 && unitid != OSApp.Analog.Constants.USERDEF_UNIT && value > 100) continue;
 				if (unitid == 1 && value < 0) continue;
 				if (lvl == 0) //day values
@@ -4871,105 +5100,58 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 		}
 	}
 
-	if (combine && AllOptions[1] && AllOptions[2]) {
+	// When combining, determine which temperature unit is available (2=Celsius, 3=Fahrenheit)
+	var tempUnitId = AllOptions[2] ? 2 : (AllOptions[3] ? 3 : 2);
+	var moistUnitId = 1; // Soil moisture
 
-		let series = AllOptions[1].series.concat(AllOptions[2].series);
-		let yaxis = [AllOptions[1].yaxis, AllOptions[2].yaxis];
+	// Combine Soil Moisture (unitid 1) and Temperature in one chart when option is enabled
+	if (combine && AllOptions[moistUnitId] && AllOptions[tempUnitId]) {
+
+		let series = AllOptions[moistUnitId].series.concat(AllOptions[tempUnitId].series);
+		let yaxis = [AllOptions[moistUnitId].yaxis, AllOptions[tempUnitId].yaxis];
 		yaxis[1].opposite = true;
 		let annotations = [];
-		if (AllOptions[1].annotations)
-			annotations = annotations.concat(AllOptions[1].annotations.yaxis);
-		if (AllOptions[2].annotations)
-			annotations = annotations.concat(AllOptions[2].annotations.yaxis);
+		if (AllOptions[moistUnitId].annotations)
+			annotations = annotations.concat(AllOptions[moistUnitId].annotations.yaxis);
+		if (AllOptions[tempUnitId].annotations)
+			annotations = annotations.concat(AllOptions[tempUnitId].annotations.yaxis);
 
 		let options = {
 			chart: {
 				type: 'area',
-				animations: {
-					speed: 500
-				},
+				animations: { speed: 500 },
 				stacked: false,
 				width: '100%',
 				height: (screen.height > screen.width ? screen.height : screen.width) / 3,
-				toolbar: {
-                	show: canExport,
-					tools: {
-						download: canExport,
-							selection: canExport,
-							zoom: canExport,
-							zoomin: canExport,
-							zoomout: canExport,
-							pan: canExport
-					},
-				},
-				zoom: {
-					enabled: canExport
-				},
-				dropShadow: {
-					enabled: true
-				}
+				toolbar: { show: canExport, tools: { download: canExport, selection: canExport, zoom: canExport, zoomin: canExport, zoomout: canExport, pan: canExport } },
+				zoom: { enabled: canExport },
+				dropShadow: { enabled: true }
 			},
-			forecastDataPoints: {
-				count: 1
-			},
-			dataLabels: {
-				enabled: false
-			},
+			forecastDataPoints: { count: 1 },
+			dataLabels: { enabled: false },
 			fill: {
-				colors: colors[1],
-				opacity: opacities[1],
+				colors: (colors[moistUnitId]||[]).concat(colors[tempUnitId]||[]),
+				opacity: (opacities[moistUnitId]||[]).concat(opacities[tempUnitId]||[]),
 				type: 'solid'
 			},
 			stroke: {
 				curve: "smooth",
-				colors: colors[1],
-				width: widths[1],
+				colors: (colors[moistUnitId]||[]).concat(colors[tempUnitId]||[]),
+				width: (widths[moistUnitId]||[]).concat(widths[tempUnitId]||[]),
 				dashArray: 0
 			},
-			grid: {
-				xaxis: {
-					lines: {
-						show: true
-					}
-				},
-				yaxis: {
-					lines: {
-						show: true
-					}
-				}
-			},
-			plotOptions: {
-				bar: {
-					columnWidth: "20%"
-				}
-			},
-			tooltip: {
-				x: {
-					datetimeUTC: false,
-					format: timestr
-				}
-			},
-			xaxis: {
-				type: "datetime",
-				labels: {
-					datetimeUTC: false,
-					format: timestr
-				}
-			},
-			legend: {
-				showForSingleSeries: true,
-				fontSize: "10px"
-			},
-
+			grid: { xaxis: { lines: { show: true } }, yaxis: { lines: { show: true } } },
+			plotOptions: { bar: { columnWidth: "20%" } },
+			tooltip: { x: { datetimeUTC: false, format: timestr } },
+			xaxis: { type: "datetime", labels: { datetimeUTC: false, format: timestr } },
+			legend: { showForSingleSeries: true, fontSize: "10px" },
 			series: series,
 			yaxis: yaxis,
-			title: { text: AllOptions[1].title.text + "/" + AllOptions[2].title.text },
-			annotations: {
-				yaxis: annotations
-			},
+			title: { text: AllOptions[moistUnitId].title.text + " / " + AllOptions[tempUnitId].title.text },
+			annotations: { yaxis: annotations },
 		};
-		AllOptions[1] = options;
-		AllOptions[2] = null;
+		AllOptions[moistUnitId] = options;
+		AllOptions[tempUnitId] = null;
 	}
 
 	for (var c = 0; c < chart.length; c++) {

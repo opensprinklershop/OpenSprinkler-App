@@ -1,0 +1,85 @@
+diff --git a/build.sh b/build.sh
+index 36f159d7..17176f69 100755
+--- a/build.sh
++++ b/build.sh
+@@ -20,6 +20,10 @@ cp build/modules.json platforms/browser/www/
+ cp build.json platforms/android/build.json
+ cp network_security_config.xml /srv/www/htdocs/ui/platforms/android/app/src/main/res/xml/
+ 
++# Copy server certificate to Android raw resources for trust-anchors
++mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
++cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
++
+ # Sync www/ into Android platform assets before building
+ cordova prepare android
+ 
+diff --git a/config.xml b/config.xml
+index 68fdb47a..f1733a63 100755
+--- a/config.xml
++++ b/config.xml
+@@ -11,6 +11,7 @@
+     <content src="index.html" />
+     <access origin="*" />
+     <allow-intent href="*" />
++    <allow-navigation href="*" />
+     <preference name="WebSecurity" value="disable" />
+     <preference name="KeepRunning" value="false" />
+     <preference name="BackgroundColor" value="0x001c1c1c" />
+@@ -46,6 +47,13 @@
+         <config-file target="*-Info.plist" parent="ITSAppUsesNonExemptEncryption">
+             <false/>
+         </config-file>
++        <config-file target="*-Info.plist" parent="NSAppTransportSecurity">
++            <dict>
++                <key>NSAllowsArbitraryLoads</key>
++                <true/>
++            </dict>
++        </config-file>
++        <resource-file src="cert/server_cert.der" />
+         <edit-config target="CFBundleShortVersionString" file="*-Info.plist" mode="overwrite">
+             <string>19946</string>
+         </edit-config>
+@@ -91,6 +99,7 @@
+     	                        android:networkSecurityConfig="@xml/network_security_config" />
+         </edit-config>
+         <resource-file src="res/android/network_security_config.xml" target="app/src/main/res/xml/network_security_config.xml" />
++        <resource-file src="cert/server_cert.der" target="app/src/main/res/raw/server_cert.der" />
+         <config-file target="AndroidManifest.xml" parent="queries">
+             <intent>
+                 <action android:name="android.media.action.IMAGE_CAPTURE" />
+@@ -104,6 +113,7 @@
+         	<application android:debuggable="true" />
+ 	</edit-config>-->
+         <preference name="Scheme" value="http" />
++        <preference name="MixedContentMode" value="0" />
+         <preference name="android-minSdkVersion" value="24" />
+         <preference name="android-targetSdkVersion" value="35" />
+         <preference name="android-theme" value="@android:style/Theme.Holo.Light.NoActionBar" />
+diff --git a/network_security_config.xml b/network_security_config.xml
+index 66ab1caa..a323bced 100644
+--- a/network_security_config.xml
++++ b/network_security_config.xml
+@@ -1,5 +1,10 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <network-security-config>
+ 	<base-config cleartextTrafficPermitted="true">
++		<trust-anchors>
++			<certificates src="system" />
++			<certificates src="user" />
++			<certificates src="@raw/server_cert" />
++		</trust-anchors>
+ 	</base-config>
+ </network-security-config>
+diff --git a/res/android/network_security_config.xml b/res/android/network_security_config.xml
+index ce333e1e..0fdd74fe 100644
+--- a/res/android/network_security_config.xml
++++ b/res/android/network_security_config.xml
+@@ -4,6 +4,7 @@
+     <trust-anchors>
+         <certificates src="system" />
+         <certificates src="user" />
++        <certificates src="@raw/server_cert" />
+     </trust-anchors>
+ </base-config>
+ </network-security-config>
+\ No newline at end of file

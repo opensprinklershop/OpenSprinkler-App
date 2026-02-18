@@ -72,3 +72,134 @@ html.theme-colorful #analogsensorlist table th {
 	word-wrap: break-word;
 }
 
+/* Sensor freshness states (pastel highlights) */
+#analogsensorlist table tr.sensor-stale-warning,
+#analogsensorlist table td.sensor-stale-warning,
+#analogsensorlist table th.sensor-stale-warning,
+#analogsensorlist table tr.sensor-stale-warning > td,
+#analogsensorlist table tr.sensor-stale-warning > th,
+#os-sensor-show .sensor-stale-warning {
+	background-color: #fff6d8 !important;
+}
+
+#analogsensorlist table tr.sensor-stale-error,
+#analogsensorlist table td.sensor-stale-error,
+#analogsensorlist table th.sensor-stale-error,
+#analogsensorlist table tr.sensor-stale-error > td,
+#analogsensorlist table tr.sensor-stale-error > th,
+#os-sensor-show .sensor-stale-error {
+	background-color: #f2e6ff !important;
+}
+
+#analogsensorlist table tr.sensor-stale-critical,
+#analogsensorlist table td.sensor-stale-critical,
+#analogsensorlist table th.sensor-stale-critical,
+#analogsensorlist table tr.sensor-stale-critical > td,
+#analogsensorlist table tr.sensor-stale-critical > th,
+#os-sensor-show .sensor-stale-critical {
+	background-color: #ffe6e6 !important;
+}
+
+html.theme-dark #analogsensorlist table tr.sensor-stale-warning,
+html.theme-dark #analogsensorlist table td.sensor-stale-warning,
+html.theme-dark #analogsensorlist table th.sensor-stale-warning,
+html.theme-dark #analogsensorlist table tr.sensor-stale-warning > td,
+html.theme-dark #analogsensorlist table tr.sensor-stale-warning > th,
+html.theme-dark #os-sensor-show .sensor-stale-warning {
+	background-color: rgba(110, 90, 30, 0.42) !important;
+}
+
+html.theme-dark #analogsensorlist table tr.sensor-stale-error,
+html.theme-dark #analogsensorlist table td.sensor-stale-error,
+html.theme-dark #analogsensorlist table th.sensor-stale-error,
+html.theme-dark #analogsensorlist table tr.sensor-stale-error > td,
+html.theme-dark #analogsensorlist table tr.sensor-stale-error > th,
+html.theme-dark #os-sensor-show .sensor-stale-error {
+	background-color: rgba(88, 60, 110, 0.45) !important;
+}
+
+html.theme-dark #analogsensorlist table tr.sensor-stale-critical,
+html.theme-dark #analogsensorlist table td.sensor-stale-critical,
+html.theme-dark #analogsensorlist table th.sensor-stale-critical,
+html.theme-dark #analogsensorlist table tr.sensor-stale-critical > td,
+html.theme-dark #analogsensorlist table tr.sensor-stale-critical > th,
+html.theme-dark #os-sensor-show .sensor-stale-critical {
+	background-color: rgba(105, 38, 38, 0.45) !important;
+}
+
+/* Compact editor dialogs (sensor, program adjustment, monitor) */
+#sensorEditor .ui-content,
+#progAdjustEditor .ui-content,
+#monitorEditor .ui-content {
+	padding: 8px 10px !important;
+	font-size: 13px;
+}
+#sensorEditor label,
+#progAdjustEditor label,
+#monitorEditor label {
+	font-size: 12px !important;
+	margin: 4px 0 1px 0 !important;
+	font-weight: 600;
+}
+#sensorEditor .ui-input-text input,
+#sensorEditor input[type='text'],
+#sensorEditor input[type='number'],
+#progAdjustEditor input[type='text'],
+#progAdjustEditor input[type='number'],
+#monitorEditor input[type='text'],
+#monitorEditor input[type='number'] {
+	padding: 4px 6px !important;
+	font-size: 13px !important;
+	height: auto !important;
+	min-height: 0 !important;
+}
+#sensorEditor .ui-select .ui-btn,
+#progAdjustEditor .ui-select .ui-btn,
+#monitorEditor .ui-select .ui-btn {
+	padding-top: 4px !important;
+	padding-bottom: 4px !important;
+	font-size: 13px !important;
+	min-height: 0 !important;
+}
+#sensorEditor .ui-btn,
+#progAdjustEditor .ui-btn,
+#monitorEditor .ui-btn {
+	padding-top: 5px !important;
+	padding-bottom: 5px !important;
+	padding-right: 10px !important;
+	font-size: 13px !important;
+	margin: 4px 0 !important;
+}
+#sensorEditor .ui-header h1,
+#progAdjustEditor .ui-header h1,
+#monitorEditor .ui-header h1 {
+	font-size: 15px !important;
+}
+#sensorEditor .ui-content p,
+#progAdjustEditor .ui-content p,
+#monitorEditor .ui-content p {
+	margin: 3px 0 !important;
+	font-size: 12px;
+}
+#sensorEditor .ui-content form,
+#progAdjustEditor .ui-content form,
+#monitorEditor .ui-content form {
+	margin: 0;
+}
+#sensorEditor .ui-content .ui-field-contain,
+#progAdjustEditor .ui-content .ui-field-contain,
+#monitorEditor .ui-content .ui-field-contain {
+	margin: 2px 0 !important;
+	padding: 0 !important;
+}
+#sensorEditor .ui-checkbox label,
+#monitorEditor .ui-checkbox label {
+	font-size: 12px !important;
+	padding: 4px 8px 4px 28px !important;
+}
+#sensorEditor button[data-mini],
+#progAdjustEditor button[data-mini],
+#monitorEditor button[data-mini] {
+	font-size: 12px !important;
+	padding: 3px 8px !important;
+}

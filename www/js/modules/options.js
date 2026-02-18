@@ -435,7 +435,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 	//Select Zone/Program display options:
 	var displayOption = OSApp.ProgramView.Constants.SHOW_ZONES;
-	if (localStorage.hasOwnProperty('displayOption'))
+	if (Object.prototype.hasOwnProperty.call(localStorage, "displayOption"))
 		displayOption = localStorage.displayOption;
 	let sel = new Array(4).fill("");
 	sel[displayOption] = " selected='selected'";

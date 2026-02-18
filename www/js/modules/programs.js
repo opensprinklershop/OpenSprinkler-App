@@ -2144,6 +2144,13 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 	// Close basic settings group
 	list += "</div></div></div></div>";
 
+	// Irrigation Database section between basic settings and program type
+	list += "<div style='margin-top:10px' class='ui-corner-all'>";
+	list += "<div class='ui-bar ui-bar-a'><h3>" + OSApp.Language._( "Irrigation Database" ) + "</h3></div>";
+	list += "<div class='ui-body ui-body-a center'>";
+	list += "<button data-mini='true' data-icon='grid' class='open-irrigationdb-program' id='irrigdb-" + id + "'>" + OSApp.Language._( "Irrigation Database" ) + "</button>";
+	list += "</div></div>";
+
 	// Group all program type options visually
 	list += "<div style='margin-top:10px' class='ui-corner-all'>";
 	list += "<div class='ui-bar ui-bar-a'><h3>" + OSApp.Language._( "Program Type" ) + "</h3></div>";
@@ -2417,6 +2424,11 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 			maximum: 65535,
 			showSun: OSApp.Firmware.checkOSVersion( 214 ) ? true : false
 		} );
+	} );
+
+	page.find( ".open-irrigationdb-program" ).on( "click", function() {
+		OSApp.UIDom.openIrrigationDb();
+		return false;
 	} );
 
 	OSApp.UIDom.fixInputClick( page );

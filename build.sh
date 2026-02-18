@@ -1,75 +1,53 @@
 #!/bin/sh
 source ~/.bash_profile
-rm ./www/js/*~
-rm ./www/js/DEADJOE
-rm ./www/locale/*~
+rm ./www/js/*~ 2>/dev/null
+rm ./www/js/DEADJOE 2>/dev/null
+rm ./www/locale/*~ 2>/dev/null
 
-#export JAVA_HOME=/usr/lib64/jvm/jre-21-openjdk/
-#export JAVA_HOME=/etc/alternatives/java_sdk_21/
-
+# Build firmware and web assets
 ./scripts/appGMK.sh
 grunt makeFW
+
+# Stamp sw.js with build timestamp to bust Service Worker cache
+BUILD_TS=$(date +%Y%m%d%H%M%S)
+sed -i "s/__BUILD_TIMESTAMP__/$BUILD_TS/g" www/sw.js
+
+# Copy modules.json to www/ and platforms BEFORE building
+cp build/modules.json www/
+cp build/modules.json platforms/browser/www/
+
+# Copy Android build configuration
+cp build.json platforms/android/build.json
+cp network_security_config.xml /srv/www/htdocs/ui/platforms/android/app/src/main/res/xml/
+
+# Sync www/ into Android platform assets before building
+cordova prepare android
+
+# Apply Android platform patches (e.g. LocalNotification CordovaWebView fix)
+for p in patches/*.patch; do
+	[ -f "$p" ] && patch -p1 -N --forward -r- < "$p" || true
+done
+
+# Build browser platform
 cordova build browser --release
-#cp build.json platforms/android/build.json
-#cp network_security_config.xml /srv/www/htdocs/ui/platforms/android/app/src/main/res/xml/
 
-#Kompatible Version für alte Android:
-#mv config.xml config.xml.sav -f
-#xmlstarlet edit \
-#--update '//*[local-name()="preference"][@name="android-minSdkVersion"]/@value' \
-#--value "25" \
-#--update '//*[local-name()="preference"][@name="android-targetSdkVersion"]/@value' \
-#--value "34" \
-#config.xml.sav >config.xml
-
-#cordova platform remove android
-#cordova platform add android
-#cordova plugin add https://github.com/katzer/cordova-plugin-local-notifications.git
-#cordova plugin add cordova-plugin-background-fetch
-#cordova plugin add https://bitbucket.org/TheBosZ/cordova-plugin-run-in-background
-#cordova plugin add cordova-plugin-inappbrowser
-#cordova plugin add https://github.com/kitolog/cordova-plugin-timer
-#cordova build --release
-##cordova run android --release
-#cordova run android --release -- --packageType=apk
-
-#cp /srv/www/htdocs/ui/platforms/android/app/build/outputs/apk/release/app-release.apk /srv/www/htdocs/opensprinklershop/firmware/ -v
-
-#Und wieder zurück:
-#mv config.xml config.xml.sav -f
-#xmlstarlet edit \
-#--update '//*[local-name()="preference"][@name="android-minSdkVersion"]/@value' \
-#--value "29" \
-#--update '//*[local-name()="preference"][@name="android-targetSdkVersion"]/@value' \
-#--value "34" \
-#config.xml.sav >config.xml
-
-#cordova platform remove android
-#cordova platform add android
-#cordova plugin add https://github.com/katzer/cordova-plugin-local-notifications.git
-#cordova plugin add cordova-plugin-background-fetch
-#cordova plugin add https://bitbucket.org/TheBosZ/cordova-plugin-run-in-background
-#cordova plugin add cordova-plugin-inappbrowser
-#cordova plugin add https://github.com/kitolog/cordova-plugin-timer
-cordova build --release
-cordova build browser --release
-cordova run android --release
+# Build Android platform (release AAB + APK)
+cordova build android --release
 cordova run android --release -- --packageType=apk
 
-cp build/modules.json platforms/browser/www
+# Post-build cleanup
 chown stefan:www platforms/* -R
 ./scripts/appGMK2.sh
+
+# Restore sw.js build timestamp placeholder for source control
+sed -i "s/OpenSprinkler-v$BUILD_TS/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.js
 
 rm ./platforms/browser/platform_www/plugins/* -R 2>/dev/null
 rm ./platforms/browser/www/*.js 2>/dev/null
 
-
-#rm ./platforms/browser/platform_www/plugins/* 2>/dev/null
-#rm ./platforms/browser/www/*.js 2>/dev/null
-
 chown stefan:www platforms/* -R
+
+# Copy build artifacts
+sudo rm /data/app-release.*
 cp /srv/www/htdocs/ui/platforms/android/app/build/outputs/bundle/release/app-release.aab /data/app-release.aab
 cp /srv/www/htdocs/ui/platforms/android/app/build/outputs/apk/release/app-release.apk /data/app-release.apk
-#cp /srv/www/htdocs/ui-test/platforms/android/app/build/outputs/apk/release/app-release-unsigned.apk /data/app-release-unsigned.apk
-
-#./scripts/appGMK2.sh

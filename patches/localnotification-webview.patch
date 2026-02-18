@@ -1,0 +1,21 @@
+--- a/platforms/android/app/src/main/java/de/appplant/cordova/plugin/localnotification/LocalNotification.java
++++ b/platforms/android/app/src/main/java/de/appplant/cordova/plugin/localnotification/LocalNotification.java
+@@ -558,13 +558,16 @@
+             return;
+         }
+
+-        webView.post(new Runnable(){
++        final android.webkit.WebView nativeWebView =
++            (android.webkit.WebView) webView.getView();
++
++        nativeWebView.post(new Runnable(){
+             public void run(){
+                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+-                    webView.evaluateJavascript(js, null);
++                    nativeWebView.evaluateJavascript(js, null);
+                 } else {
+-                    webView.loadUrl("javascript:" + js);
++                    nativeWebView.loadUrl("javascript:" + js);
+                 }
+             }
+         });

@@ -2529,10 +2529,13 @@ msgstr ""
 msgid "Known Sensor Types"
 msgstr ""
 
-msgid "Select known sensor or enter manually..."
+msgid "Sensor Template"
 msgstr ""
 
 msgid "Report New Sensor"
+msgstr ""
+
+msgid "Battery"
 msgstr ""
 
 msgid "ZigBee Device IEEE Address"

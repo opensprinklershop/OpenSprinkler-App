@@ -1,4 +1,4 @@
-/* global $, OSApp */
+/* global $, cordova */
 
 /* OpenSprinkler App
  * Copyright (C) 2015 - present, Samer Albahra. All rights reserved.
@@ -132,6 +132,7 @@ OSApp.Sites.registerOTCToken = function( siteName, siteData, token ) {
 	// Send token registration to the device
 	OSApp.Firmware.sendToOS( "/co?pw=&otc=" + encodedJson ).then(
 		function( response ) {
+			void response;
 			// Token registration successful, now reboot the device (ignore response)
 			OSApp.Firmware.sendToOS( "/cv?pw=&rbt=1" );
 
@@ -176,6 +177,7 @@ OSApp.Sites.registerOTCToken = function( siteName, siteData, token ) {
 			} );
 		},
 		function( error ) {
+			void error;
 			// Restore original session
 			OSApp.currentSession.ip = originalIp;
 			OSApp.currentSession.token = originalToken;

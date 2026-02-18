@@ -1,0 +1,70 @@
+--- a/platforms/android/CordovaLib/src/org/apache/cordova/engine/SystemWebViewClient.java	2026-02-14 20:19:56.937611735 +0100
++++ b/platforms/android/CordovaLib/src/org/apache/cordova/engine/SystemWebViewClient.java	2026-02-14 20:57:33.701513008 +0100
+@@ -288,25 +288,8 @@
+      */
+     @Override
+     public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+-
+-        final String packageName = parentEngine.cordova.getActivity().getPackageName();
+-        final PackageManager pm = parentEngine.cordova.getActivity().getPackageManager();
+-
+-        ApplicationInfo appInfo;
+-        try {
+-            appInfo = pm.getApplicationInfo(packageName, PackageManager.GET_META_DATA);
+-            if ((appInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0) {
+-                // debug = true
+-                handler.proceed();
+-                return;
+-            } else {
+-                // debug = false
+-                super.onReceivedSslError(view, handler, error);
+-            }
+-        } catch (NameNotFoundException e) {
+-            // When it doubt, lock it out!
+-            super.onReceivedSslError(view, handler, error);
+-        }
++        // Accept self-signed certificates for local OpenSprinkler devices
++        handler.proceed();
+     }
+ 
+ 
+--- a/platforms/android/CordovaLib/src/org/apache/cordova/engine/SystemWebViewEngine.java	2026-02-14 20:19:56.948982291 +0100
++++ b/platforms/android/CordovaLib/src/org/apache/cordova/engine/SystemWebViewEngine.java	2026-02-14 20:57:46.474490522 +0100
+@@ -198,6 +198,9 @@
+         // Enable DOM storage
+         settings.setDomStorageEnabled(true);
+ 
++        // Allow mixed content (HTTP resources on HTTPS pages) and self-signed certificates
++        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
++
+         // Enable built-in geolocation
+         settings.setGeolocationEnabled(true);
+ 
+--- a/platforms/android/app/src/main/java/org/apache/cordova/inappbrowser/InAppBrowser.java	2026-02-14 20:19:56.959214746 +0100
++++ b/platforms/android/app/src/main/java/org/apache/cordova/inappbrowser/InAppBrowser.java	2026-02-14 21:10:06.389974610 +0100
+@@ -948,6 +948,7 @@
+                 settings.setJavaScriptCanOpenWindowsAutomatically(true);
+                 settings.setBuiltInZoomControls(showZoomControls);
+                 settings.setPluginState(android.webkit.WebSettings.PluginState.ON);
++                settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+                 
+                 // download event
+                 
+@@ -1411,7 +1412,8 @@
+ 
+         @Override
+         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+-            super.onReceivedSslError(view, handler, error);
++            // Accept self-signed certificates for local OpenSprinkler devices
++            handler.proceed();
+             try {
+                 JSONObject obj = new JSONObject();
+                 obj.put("type", LOAD_ERROR_EVENT);
+@@ -1446,7 +1448,6 @@
+             } catch (JSONException ex) {
+                 LOG.d(LOG_TAG, "Should never happen");
+             }
+-            handler.cancel();
+         }
+ 
+         /**

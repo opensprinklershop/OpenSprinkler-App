@@ -18,8 +18,8 @@
     margin-bottom:10px!important
 }
 .ui-header .ui-title {
-    margin-left:1em;
-    margin-right:1em
+    margin-left:3em;
+    margin-right:3em
 }
 .ui-header .ui-btn, .ui-header .ui-btn:after, .ui-header .ui-btn-active {
     background-color: transparent !important;
@@ -300,9 +300,17 @@ hr.divider {
     text-shadow:none!important
 }
 
-/* Positioning for two right buttons in header */
-#header .ui-btn-right.secondary-right { right: 44px; }
-#header .ui-btn-right.theme-toggle-btn { right: 0; }
+/* Menu button: hidden by default, only inserted + shown on Android.
+   On Android, JS adds the .is-visible class and injects a display:block
+   rule. The sibling selectors below only trigger when the menu button is
+   actually visible, preventing the back-btn and title from shifting on
+   non-Android platforms where the menu button does not exist in the DOM. */
+#header .header-menu-btn { display: none; }
+
+/* --- Android: menu button visible ------------------------------------ */
+#header .header-menu-btn.is-visible { display: block; }
+#header .header-menu-btn.is-visible + .ui-toolbar-back-btn { left: 2.5em; }
+#header .header-menu-btn.is-visible ~ .ui-title { margin-left: 7em; }
 .full-width-slider input {
     display: none;
 }
