@@ -5,7 +5,6 @@
 The Analog Sensor API is a comprehensive JavaScript module for managing analog sensors, monitors, and program adjustments in the OpenSprinkler application. The API consists of two main files:
 
 - **`analog.js`** - Core functionality for sensor management, data visualization, and configuration
-- **`analog-util.js`** - Utility functions for device scanning (ZigBee and Bluetooth)
 
 ---
 
@@ -39,14 +38,6 @@ Main namespace for all analog sensor functionality.
 - `expandItem` - Set of expanded UI items
 - `timer` - Background timer for updates
 - `zigbeeClusterData` - Cached ZigBee cluster definitions
-
-### OSApp.AnalogUtil
-
-Utility functions for device scanning and management.
-
-**Functions:**
-- `showZigBeeDeviceScanner()` - Display ZigBee device scanner dialog
-- `showBluetoothDeviceScanner()` - Display Bluetooth device scanner dialog
 
 ### Firmware runtime behavior (BLE/ZigBee)
 - **Scan/Register mode**: scan is only started on explicit request.
@@ -515,7 +506,7 @@ OSApp.Analog.loadZigBeeClusterData().then(function(data) {
 ```
 
 #### `OSApp.Analog.showZigBeeDeviceScanner(popup, callback)`
-Displays ZigBee device scanner (wrapper function).
+Displays ZigBee device scanner.
 
 **Parameters:**
 - `popup` (jQuery) - Parent popup element
@@ -529,13 +520,6 @@ OSApp.Analog.showZigBeeDeviceScanner(popup, function(device) {
   console.log('Selected device:', device.ieee, device.model);
 });
 ```
-
-#### `OSApp.AnalogUtil.showZigBeeDeviceScanner(popup, callback)`
-Internal implementation of ZigBee scanner.
-
-**Parameters:**
-- `popup` (jQuery) - Parent popup element
-- `callback` (Function) - Callback with device object
 
 **Callback receives:**
 ```javascript
@@ -567,20 +551,12 @@ Internal implementation of ZigBee scanner.
 }
 ```
 
-**Usage:**
-```javascript
-OSApp.AnalogUtil.showZigBeeDeviceScanner(popup, function(device) {
-  // Use device.ieee, device.model, etc.
-  console.log('Device:', device.ieee, device.model);
-});
-```
-
 ---
 
 ### Bluetooth Integration
 
 #### `OSApp.Analog.showBluetoothDeviceScanner(popup, callback)`
-Displays Bluetooth device scanner (wrapper function).
+Displays Bluetooth device scanner.
 
 **Parameters:**
 - `popup` (jQuery) - Parent popup element
@@ -594,13 +570,6 @@ OSApp.Analog.showBluetoothDeviceScanner(popup, function(device) {
   console.log('Selected device:', device.mac, device.name);
 });
 ```
-
-#### `OSApp.AnalogUtil.showBluetoothDeviceScanner(popup, callback)`
-Internal implementation of Bluetooth scanner.
-
-**Parameters:**
-- `popup` (jQuery) - Parent popup element
-- `callback` (Function) - Callback with device object
 
 **Callback receives:**
 ```javascript
@@ -622,13 +591,6 @@ Internal implementation of Bluetooth scanner.
     }
   ]
 }
-```
-
-**Usage:**
-```javascript
-OSApp.AnalogUtil.showBluetoothDeviceScanner(popup, function(device) {
-  console.log('Device:', device.mac, device.name, device.rssi);
-});
 ```
 
 ---

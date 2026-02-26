@@ -202,51 +202,23 @@ OSApp.Statistics.parseData = function( logData, wlData, flData, range ) {
 };
 
 // --- Build KPI Cards ---
-OSApp.Statistics.buildKPICards = function( data, theme ) {
-	var cards = [];
-
-	// Total Runtime
-	cards.push( {
-		label: OSApp.Language._( "Total Runtime" ),
-		value: OSApp.Statistics.formatDuration( data.totalRuntime ),
-		icon: "clock"
-	} );
-
-	// Total Events
-	cards.push( {
-		label: OSApp.Language._( "Total Station Events" ),
-		value: data.totalEvents,
-		icon: "star"
-	} );
-
-	// Average Water Level
+OSApp.Statistics.buildKPICards = function( data ) {
+	var wlValue = "--";
+	var wlClass = "";
 	if ( data.avgWaterLevel > 0 ) {
-		var wlClass = data.avgWaterLevel < 100 ? "green-text" : ( data.avgWaterLevel > 100 ? "red-text" : "" );
-		cards.push( {
-			label: OSApp.Language._( "Water Level" ) + " &#216;",
-			value: "<span class='" + wlClass + "'>" + data.avgWaterLevel + "%</span>",
-			icon: "grid"
-		} );
+		wlClass = data.avgWaterLevel < 100 ? "green-text" : ( data.avgWaterLevel > 100 ? "red-text" : "" );
+		wlValue = "<span class='" + wlClass + "'>" + data.avgWaterLevel + "%</span>";
 	}
 
-	// Total Volume
-	if ( data.totalVolume > 0 ) {
-		cards.push( {
-			label: OSApp.Language._( "Total Water Used" ),
-			value: data.totalVolume.toFixed( 1 ) + " L",
-			icon: "info"
-		} );
-	}
-
-	var html = "<div class='stats-kpi-grid'>";
-	for ( var i = 0; i < cards.length; i++ ) {
-		html += "<div class='stats-kpi-card' style='background:" + theme.cardBg + ";color:" + theme.text + "'>" +
-			"<div class='stats-kpi-value'>" + cards[ i ].value + "</div>" +
-			"<div class='stats-kpi-label'>" + cards[ i ].label + "</div>" +
-			"</div>";
-	}
-	html += "</div>";
-	return html;
+	return "<table class='stats-kpi-table'>" +
+		"<tbody>" +
+		"<tr><th>" + OSApp.Language._( "Total Runtime" ) + "</th><td>" +
+		OSApp.Statistics.formatDuration( data.totalRuntime ) + "</td></tr>" +
+		"<tr><th>" + OSApp.Language._( "Total Station Events" ) + "</th><td>" +
+		data.totalEvents + "</td></tr>" +
+		"<tr><th>" + OSApp.Language._( "Water Level" ) + "</th><td>" +
+		wlValue + "</td></tr>" +
+		"</tbody></table>";
 };
 
 // --- Build Charts ---
@@ -277,7 +249,7 @@ OSApp.Statistics.buildDailyRuntimeChart = function( container, data, theme ) {
 			title: { text: OSApp.Language._( "Runtime" ) + " (min)" },
 			min: 0
 		},
-		plotOptions: { bar: { borderRadius: 3, columnWidth: "60%" } },
+		plotOptions: { bar: { borderRadius: 3, columnWidth: "30%" } },
 		dataLabels: { enabled: false },
 		title: {
 			text: OSApp.Language._( "Daily Runtime" ),
@@ -320,7 +292,7 @@ OSApp.Statistics.buildDailyVolumeChart = function( container, data, theme ) {
 			title: { text: OSApp.Language._( "Volume" ) + " (L)" },
 			min: 0
 		},
-		plotOptions: { bar: { borderRadius: 3, columnWidth: "60%" } },
+		plotOptions: { bar: { borderRadius: 3, columnWidth: "30%" } },
 		dataLabels: { enabled: false },
 		title: {
 			text: OSApp.Language._( "Daily Water Usage" ),

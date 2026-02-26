@@ -167,6 +167,8 @@ OSApp.UIDom.launchApp = function() {
 			OSApp.Analog.showAnalogSensorConfig();
 		} else if ( OSApp.Analog.checkAnalogSensorAvail() && hash === "#analogsensorchart" ) {
 			OSApp.Analog.showAnalogSensorCharts();
+		} else if ( hash === "#statistics" ) {
+			OSApp.Statistics.displayPage();
 		} else if ( hash === "#preview" ) {
 			OSApp.Programs.displayPagePreviewPrograms();
 		} else if ( hash === "#logs" ) {
@@ -281,6 +283,29 @@ OSApp.UIDom.launchApp = function() {
 	} )
 	.on( "popupbeforeposition", function() {
 		$( ".ui-page-active" ).children().add( "#sprinklers-settings" ).addClass( "blur-filter" );
+
+		// Position ONLY dialog-like popups at top (y=0) on mobile devices with unfixed positioning
+		// Exclude menu popups (mainMenu, footer menus, etc.) - they stay at their tap position
+		if ( window.innerWidth <= 768 ) {
+			var popupContainer = $( ".ui-popup-container:not(.ui-screen-hidden)" );
+			if ( popupContainer.length ) {
+				var popupId = popupContainer.find( ".ui-popup" ).attr( "id" );
+				// Only apply y=0 positioning to dialog-like popups, NOT menu popups
+				var isMenuPopup = popupId === "mainMenu" || popupId === "menu-footer" || popupId === "menu-left" || popupId === "menu-right";
+
+				if ( !isMenuPopup ) {
+					// Position dialog at start of visible viewport using current scroll offset
+					var scrollOffset = window.scrollY || window.pageYOffset || 0;
+					popupContainer.css( {
+						position: "absolute",
+						top: scrollOffset + "px",
+						left: 0,
+						right: "auto",
+						width: "100%"
+					} );
+				}
+			}
+		}
 	} )
 	.on( "popupbeforeposition", "#localization", OSApp.Language.checkCurrLang )
 	.one( "pagebeforeshow", "#loadingPage", OSApp.UIDom.initAppData );
@@ -298,6 +323,7 @@ OSApp.UIDom.showHomeMenu = ( function() {
 		popup = $( "<div data-role='popup' data-theme='a' id='mainMenu'>" +
 			"<ul data-role='listview' data-inset='true' data-corners='false'>" +
 				"<li data-role='list-divider'>" + OSApp.Language._( "Information" ) + "</li>" +
+				"<li><a href='#statistics'>" + OSApp.Language._( "Statistics" ) + "</a></li>" +
 				"<li><a href='#preview' class='squeeze'>" + OSApp.Language._( "Preview Programs" ) + "</a></li>" +
 				( OSApp.Firmware.checkOSVersion( 206 ) || OSApp.Firmware.checkOSPiVersion( "1.9" ) ? "<li><a href='#logs'>" + OSApp.Language._( "View Logs" ) + "</a></li>" : "" ) +
 				"<li data-role='list-divider'>" + OSApp.Language._( "Programs and Settings" ) + "</li>" +
@@ -640,6 +666,13 @@ OSApp.UIDom.bindPanel = function() {
 		return false;
 	} );
 
+	panel.find( ".open-irrigationdb-menu" ).on( "click", function() {
+		OSApp.UIDom.closePanel( function() {
+			window.open( "https://opensprinklershop.de/irrigationdb", OSApp.currentDevice.isOSXApp ? "_system" : "_blank" );
+		} );
+		return false;
+	} );
+
 	panel.find( ".cloud-login" ).on( "click", function() {
 		OSApp.Network.requestCloudAuth();
 		return false;
@@ -907,6 +940,7 @@ OSApp.UIDom.goHome = function( firstLoad ) {
 			"#forecast": true,
 			"#preview": true,
 			"#about": true,
+			"#statistics": true,
 			"#analogsensorconfig": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail(),
 			"#analogsensorchart": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail()
 		};
@@ -1019,6 +1053,7 @@ OSApp.UIDom.changeHeader = function( opt ) {
 			title: "",
 			class: "",
 			animate: true,
+			suppressAndroidMenuBtn: false,
 			leftBtn: {
 				icon: "",
 				class: "",
@@ -1067,7 +1102,7 @@ OSApp.UIDom.changeHeader = function( opt ) {
 		// Remove any existing menu button first to avoid duplicates
 		header.find( ".header-menu-btn" ).remove();
 
-		if ( !hasBackBtn && !isMenuBtn && OSApp.currentDevice.isAndroid ) {
+		if ( !opt.suppressAndroidMenuBtn && !hasBackBtn && !isMenuBtn && OSApp.currentDevice.isAndroid ) {
 			var menuBtn = $( "<button data-icon='bullets' data-iconpos='notext' class='ui-btn-left header-menu-btn is-visible'></button>" );
 			header.find( ".ui-btn-left" ).before( menuBtn );
 			menuBtn.button();
@@ -1150,6 +1185,88 @@ OSApp.UIDom.showThemeSelector = function( button ) {
 	OSApp.UIDom.openPopup( popup, { positionTo: button || "window" } );
 	updateSelection();
 
+	return false;
+};
+
+OSApp.UIDom.openIrrigationDb = function( programId ) {
+	if ( !OSApp.Analog || !OSApp.Analog.IrrigationDB || typeof OSApp.Analog.IrrigationDB.showDialog !== "function" ) {
+		return false;
+	}
+
+	var applySelection = function( selection ) {
+		var popup = $( "#progAdjustEditor" );
+		var parseValue = function( value ) {
+			if ( typeof value === "number" ) {
+				return value;
+			}
+			if ( typeof value === "string" && value.trim() !== "" ) {
+				var parsed = parseFloat( value );
+				return isNaN( parsed ) ? "" : parsed;
+			}
+			return "";
+		};
+		var minVal = selection ? parseValue( selection.min ) : "";
+		var maxVal = selection ? parseValue( selection.max ) : "";
+		var plantName = selection && selection.plant ? selection.plant : "";
+		var progId = programId ? parseInt( programId, 10 ) : null;
+
+		if ( popup.length === 0 ) {
+			var defaultSensor = OSApp.Analog.analogSensors && OSApp.Analog.analogSensors.length
+				? OSApp.Analog.analogSensors[ 0 ].nr
+				: 0;
+			var progAdjust = {
+				nr: 0,
+				prog: progId || 1,
+				sensor: defaultSensor,
+				factor1: 1,
+				factor2: 1,
+				min: minVal,
+				max: maxVal,
+				name: plantName
+			};
+			OSApp.Analog.showAdjustmentsEditor( progAdjust, -1 );
+			setTimeout( function() {
+				var editor = $( "#progAdjustEditor" );
+				if ( editor.length === 0 ) {
+					return;
+				}
+				if ( minVal !== "" ) {
+					editor.find( ".min" ).val( minVal );
+				}
+				if ( maxVal !== "" ) {
+					editor.find( ".max" ).val( maxVal );
+				}
+				if ( plantName ) {
+					var nameInput = editor.find( ".adj-name" );
+					if ( nameInput.length && !nameInput.val() ) {
+						nameInput.val( plantName );
+					}
+				}
+				if ( progId ) {
+					editor.find( "#prog" ).val( progId ).change();
+				}
+			}, 300 );
+			return;
+		}
+
+		if ( minVal !== "" ) {
+			popup.find( ".min" ).val( minVal );
+		}
+		if ( maxVal !== "" ) {
+			popup.find( ".max" ).val( maxVal );
+		}
+		if ( plantName ) {
+			var popupName = popup.find( ".adj-name" );
+			if ( popupName.length && !popupName.val() ) {
+				popupName.val( plantName );
+			}
+		}
+		if ( progId ) {
+			popup.find( "#prog" ).val( progId ).change();
+		}
+	};
+
+	OSApp.Analog.IrrigationDB.showDialog( applySelection );
 	return false;
 };
 

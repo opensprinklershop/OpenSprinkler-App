@@ -73,22 +73,22 @@ html.theme-colorful #analogsensorlist table th {
 }
 
 /* Sensor freshness states (pastel highlights) */
+#analogsensorlist table tr.sensor-data-notok,
+#analogsensorlist table td.sensor-data-notok,
+#analogsensorlist table th.sensor-data-notok,
+#analogsensorlist table tr.sensor-data-notok > td,
+#analogsensorlist table tr.sensor-data-notok > th,
+#os-sensor-show .sensor-data-notok {
+	background-color: #eadcf7 !important;
+}
+
 #analogsensorlist table tr.sensor-stale-warning,
 #analogsensorlist table td.sensor-stale-warning,
 #analogsensorlist table th.sensor-stale-warning,
 #analogsensorlist table tr.sensor-stale-warning > td,
 #analogsensorlist table tr.sensor-stale-warning > th,
 #os-sensor-show .sensor-stale-warning {
-	background-color: #fff6d8 !important;
-}
-
-#analogsensorlist table tr.sensor-stale-error,
-#analogsensorlist table td.sensor-stale-error,
-#analogsensorlist table th.sensor-stale-error,
-#analogsensorlist table tr.sensor-stale-error > td,
-#analogsensorlist table tr.sensor-stale-error > th,
-#os-sensor-show .sensor-stale-error {
-	background-color: #f2e6ff !important;
+	background-color: #fff4cc !important;
 }
 
 #analogsensorlist table tr.sensor-stale-critical,
@@ -97,7 +97,16 @@ html.theme-colorful #analogsensorlist table th {
 #analogsensorlist table tr.sensor-stale-critical > td,
 #analogsensorlist table tr.sensor-stale-critical > th,
 #os-sensor-show .sensor-stale-critical {
-	background-color: #ffe6e6 !important;
+	background-color: #ffd9d9 !important;
+}
+
+html.theme-dark #analogsensorlist table tr.sensor-data-notok,
+html.theme-dark #analogsensorlist table td.sensor-data-notok,
+html.theme-dark #analogsensorlist table th.sensor-data-notok,
+html.theme-dark #analogsensorlist table tr.sensor-data-notok > td,
+html.theme-dark #analogsensorlist table tr.sensor-data-notok > th,
+html.theme-dark #os-sensor-show .sensor-data-notok {
+	background-color: rgba(140, 100, 185, 0.34) !important;
 }
 
 html.theme-dark #analogsensorlist table tr.sensor-stale-warning,
@@ -106,16 +115,7 @@ html.theme-dark #analogsensorlist table th.sensor-stale-warning,
 html.theme-dark #analogsensorlist table tr.sensor-stale-warning > td,
 html.theme-dark #analogsensorlist table tr.sensor-stale-warning > th,
 html.theme-dark #os-sensor-show .sensor-stale-warning {
-	background-color: rgba(110, 90, 30, 0.42) !important;
-}
-
-html.theme-dark #analogsensorlist table tr.sensor-stale-error,
-html.theme-dark #analogsensorlist table td.sensor-stale-error,
-html.theme-dark #analogsensorlist table th.sensor-stale-error,
-html.theme-dark #analogsensorlist table tr.sensor-stale-error > td,
-html.theme-dark #analogsensorlist table tr.sensor-stale-error > th,
-html.theme-dark #os-sensor-show .sensor-stale-error {
-	background-color: rgba(88, 60, 110, 0.45) !important;
+	background-color: rgba(130, 110, 35, 0.40) !important;
 }
 
 html.theme-dark #analogsensorlist table tr.sensor-stale-critical,
@@ -124,7 +124,7 @@ html.theme-dark #analogsensorlist table th.sensor-stale-critical,
 html.theme-dark #analogsensorlist table tr.sensor-stale-critical > td,
 html.theme-dark #analogsensorlist table tr.sensor-stale-critical > th,
 html.theme-dark #os-sensor-show .sensor-stale-critical {
-	background-color: rgba(105, 38, 38, 0.45) !important;
+	background-color: rgba(140, 55, 55, 0.42) !important;
 }
 
 /* Compact editor dialogs (sensor, program adjustment, monitor) */

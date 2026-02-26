@@ -1106,17 +1106,26 @@ OSApp.Dashboard.displayPage = function() {
 	page.one( "pageshow", function() {
 		$( "html" ).on( "datarefresh", updateContent );
 
-		// Poll sensor data every 5s only while dashboard is visible
+		// Fetch sensor data on page load and poll every 5s while dashboard is visible
 		var sensorInterval = null;
-		if ( OSApp.Analog.checkAnalogSensorAvail() ) {
-			var refreshSensors = function() {
-				OSApp.Analog.updateAnalogSensor();
-				OSApp.Analog.updateProgramAdjustments();
-				OSApp.Analog.updateMonitors();
-			};
-			refreshSensors();
-			sensorInterval = setInterval( refreshSensors, 5000 );
-		}
+		var refreshSensors = function() {
+			// Fetch all sensor data: analog sensors, program adjustments, and monitors
+			OSApp.Analog.updateAnalogSensor( function() {
+				OSApp.Analog.updateProgramAdjustments( function() {
+					OSApp.Analog.updateMonitors( function() {
+						if ( page.hasClass( "ui-page-active" ) ) {
+							OSApp.Analog.updateSensorShowArea( page );
+						}
+					} );
+				} );
+			} );
+		};
+
+		// Fetch sensor data immediately on page load
+		refreshSensors();
+
+		// Then poll every 5 seconds
+		sensorInterval = setInterval( refreshSensors, 5000 );
 
 		page.one( "pagehide", function() {
 			$( "html" ).off( "datarefresh", updateContent );
@@ -1124,6 +1133,10 @@ OSApp.Dashboard.displayPage = function() {
 				clearInterval( sensorInterval );
 				sensorInterval = null;
 			}
+			// Force updateSensorShowArea to rebuild HTML on next visit,
+			// since the DOM container is about to be destroyed.
+			OSApp.Analog.lastSensorStructKey = "";
+			page.remove();
 		} );
 	} );
 

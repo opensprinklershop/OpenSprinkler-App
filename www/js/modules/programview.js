@@ -124,6 +124,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 		if (!programChart) {
 			programChart = {updated : 1, current : 0, remaining : 0, running : false, en : prog.en, stationsRunning : sr, name: name, chart: null};
 			OSApp.ProgramView.programCharts[i] = programChart;
+			reset = true; // New entry — force full HTML rebuild
 		}
 		else programChart.updated = 0;
 

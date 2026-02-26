@@ -54,13 +54,17 @@
 		</script>
 		<script src="vendor-js/jquery.js"></script>
 		<script src="vendor-js/libs.js"></script>
+	<script src="vendor-js/vis-timeline-graph2d.min.js"></script>
 		<script src="vendor-js/apexcharts.min.js"></script>
 		<script src="vendor-js/jqm.js"></script>
 		<script src="vendor-js/dataTables-2.1.8.min.js"></script>
 
 		<!-- Load OSApp modules -->
+	<script src="js/modules/language.js"></script>
 	<script src="js/modules/about.js"></script>
 	<script src="js/modules/analog.js?v=4"></script>
+	<script src="js/modules/analog-log.js?v=1"></script>
+	<script src="js/modules/irrigation-db-integration.js"></script>
 		<script src="js/modules/programview.js"></script>
 		<script src="js/modules/card-list.js"></script>
 		<script src="js/modules/cards.js"></script>
@@ -70,7 +74,6 @@
 		<script src="js/modules/firmware.js"></script>
 		<script src="js/modules/groups.js"></script>
 		<script src="js/modules/import-export.js"></script>
-		<script src="js/modules/language.js"></script>
 		<script src="js/modules/logs.js"></script>
 		<script src="js/modules/esp32mode.js"></script>
 		<script src="js/modules/network.js"></script>
@@ -82,6 +85,7 @@
 		<script src="js/modules/station-attributes.js"></script>
 		<script src="js/modules/station-queue.js"></script>
 		<script src="js/modules/stations.js"></script>
+		<script src="js/modules/statistics.js"></script>
 		<script src="js/modules/status.js"></script>
 		<script src="js/modules/storage.js"></script>
 		<script src="js/modules/supported.js"></script>
@@ -108,29 +112,30 @@
 				<li class="multiSite">
 					<select data-mini="true" id="site-selector"></select>
 				</li>
-				<li class="multiSite" data-icon="gear"><a href="#site-control" data-translate="Manage Sites"></a></li>
-				<li data-icon="action"><a href="#" class="export_config" data-translate="Export Configuration"></a></li>
-				<li data-icon="back"><a href="#" class="import_config" data-translate="Import Configuration"></a></li>
-				<li data-icon="mail"><a href="https://openthings.freshdesk.com/widgets/feedback_widget/new?&widgetType=popup&screenshot=no&attachFile=no&formTitle=Help%20%26%20Support" target="_blank" class="iab iabNoScale" data-translate="Help & Support"></a></li>
-				<li data-icon="info"><a href="#about" data-translate="About"></a></li>
-				<li data-icon="location"><a href="#localization" data-translate="Localization"></a></li>
-				<li class="hidden logout-button" data-icon="power"><a id="logout" href="#" data-translate="Logout"></a></li>
+				<li class="multiSite" data-icon="gear"><a href="#site-control" data-translate="Manage Sites">Manage Sites</a></li>
+				<li data-icon="action"><a href="#" class="export_config" data-translate="Export Configuration">Export Configuration</a></li>
+				<li data-icon="back"><a href="#" class="import_config" data-translate="Import Configuration">Import Configuration</a></li>
+				<li data-icon="mail"><a href="https://openthings.freshdesk.com/widgets/feedback_widget/new?&widgetType=popup&screenshot=no&attachFile=no&formTitle=Help%20%26%20Support" target="_blank" class="iab iabNoScale" data-translate="Help & Support">Help & Support</a></li>
+				<li data-icon="info"><a href="#about" data-translate="About">About</a></li>
+				<li data-icon="location"><a href="#localization" data-translate="Localization">Localization</a></li>
+				<li class="hidden logout-button" data-icon="power"><a id="logout" href="#" data-translate="Logout">Logout</a></li>
 				<li class="hidden login-button"><a class="cloud-login" href="#" data-translate="OpenSprinkler.com Login"></a></li>
-				<li data-role="list-divider" data-translate="Advanced"></li>
-				<li class="esp32-mode-setup hidden" data-icon="gear"><a href="#" class="setup-esp32-mode" data-translate="Setup ESP32 Mode"></a></li>
-				<li class="matter-setup hidden" data-icon="cloud"><a href="#" class="setup-matter" data-translate="Setup Matter"></a></li>
-				<li class="zigbee-gateway-setup hidden" data-icon="star"><a href="#" class="setup-zigbee-gateway" data-translate="ZigBee Gateway"></a></li>
-				<li class="zigbee-client-setup hidden" data-icon="star"><a href="#" class="setup-zigbee-client" data-translate="ZigBee Client"></a></li>
+				<li data-role="list-divider" data-translate="Advanced">Advanced</li>
+				<li class="esp32-mode-setup hidden" data-icon="gear"><a href="#" class="setup-esp32-mode" data-translate="Setup ESP32 Mode">Setup ESP32 Mode</a></li>
+				<li class="matter-setup hidden" data-icon="cloud"><a href="#" class="setup-matter" data-translate="Setup Matter">Setup Matter</a></li>
+				<li class="zigbee-gateway-setup hidden" data-icon="star"><a href="#" class="setup-zigbee-gateway" data-translate="ZigBee Gateway">ZigBee Gateway</a></li>
+				<li class="zigbee-client-setup hidden" data-icon="star"><a href="#" class="setup-zigbee-client" data-translate="ZigBee Client">ZigBee Client</a></li>
+				<li data-icon="grid"><a href="#" class="open-irrigationdb-menu" data-translate="Irrigation Database">Irrigation Database</a></li>
 				<li data-icon="power"><a href="#" class="toggleOperation">
 					<span data-translate="Disable"></span>
 					<span> </span>
 					<span data-translate="Operation"></span>
 				</a></li>
-				<li data-icon="lock" class="changePassword"><a href="#" data-translate="Change Password"></a></li>
-				<li data-icon="alert"><a href="#" class="reboot-os" data-translate="Reboot OpenSprinkler"></a></li>
-				<li data-icon="alert" class="localSite hidden"><a id="downgradeui" href="#" data-translate="Downgrade UI"></a></li>
-				<li data-icon="info" class="weatherAdjust"><a href="#debugWU" class="squeeze" data-translate="System Diagnostics"></a></li>
-				<li data-icon="gear"><a href="#" class="theme-toggle" data-translate="Theme"></a></li>
+				<li data-icon="lock" class="changePassword"><a href="#" data-translate="Change Password">Change Password</a></li>
+				<li data-icon="alert"><a href="#" class="reboot-os" data-translate="Reboot OpenSprinkler">Reboot OpenSprinkler</a></li>
+				<li data-icon="alert" class="localSite hidden"><a id="downgradeui" href="#" data-translate="Downgrade UI">Downgrade UI</a></li>
+				<li data-icon="info" class="weatherAdjust"><a href="#debugWU" class="squeeze" data-translate="System Diagnostics">System Diagnostics</a></li>
+				<li data-icon="gear"><a href="#" class="theme-toggle" data-translate="Theme">Theme</a></li>
 			</ul>
 		</div>
 

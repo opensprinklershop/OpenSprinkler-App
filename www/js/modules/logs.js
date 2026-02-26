@@ -146,11 +146,13 @@ OSApp.Logs.displayPage = function() {
 						group = name;
 					} else if ( this[ 1 ] === "s1" ) {
 						className = "delayed";
-						name = OSApp.currentSession.controller.options.sn1t === 3 ? OSApp.Language._( "Soil Sensor" ) : OSApp.Language._( "Rain Sensor" );
+						name = OSApp.currentSession.controller.options.sn1t === 3 ? OSApp.Language._( "Soil Sensor" ) :
+							( OSApp.currentSession.controller.options.sn1t === 1 ? OSApp.Language._( "Rain Sensor" ) : OSApp.Language._( "Sensor 1" ) );
 						group = name;
 					} else if ( this[ 1 ] === "s2" ) {
 						className = "delayed";
-						name = OSApp.currentSession.controller.options.sn2t === 3 ? OSApp.Language._( "Soil Sensor" ) : OSApp.Language._( "Rain Sensor" );
+						name = OSApp.currentSession.controller.options.sn2t === 3 ? OSApp.Language._( "Soil Sensor" ) :
+							( OSApp.currentSession.controller.options.sn2t === 1 ? OSApp.Language._( "Rain Sensor" ) : OSApp.Language._( "Sensor 2" ) );
 						group = name;
 					} else if ( pid === 0 ) {
 						return;
@@ -603,8 +605,10 @@ OSApp.Logs.displayPage = function() {
 
 	function begin() {
 		var additionalMetrics = OSApp.Firmware.checkOSVersion( 219 ) ? [
-			OSApp.currentSession.controller.options.sn1t === 3 ? OSApp.Language._( "Soil Sensor" ) : OSApp.Language._( "Rain Sensor" ),
-			OSApp.currentSession.controller.options.sn2t === 3 ? OSApp.Language._( "Soil Sensor" ) : OSApp.Language._( "Rain Sensor" ),
+			OSApp.currentSession.controller.options.sn1t === 3 ? OSApp.Language._( "Soil Sensor" ) :
+				( OSApp.currentSession.controller.options.sn1t === 1 ? OSApp.Language._( "Rain Sensor" ) : OSApp.Language._( "Sensor 1" ) ),
+			OSApp.currentSession.controller.options.sn2t === 3 ? OSApp.Language._( "Soil Sensor" ) :
+				( OSApp.currentSession.controller.options.sn2t === 1 ? OSApp.Language._( "Rain Sensor" ) : OSApp.Language._( "Sensor 2" ) ),
 			OSApp.Language._( "Rain Delay" )
 		] : [ OSApp.Language._( "Rain Sensor" ), OSApp.Language._( "Rain Delay" ) ];
 

@@ -39,3 +39,53 @@
   - Locale payloads are JSON-like files under `www/locale/` and are loaded by `OSApp.Language.updateLang`.
 - This is a legacy global-JS codebase (not ES modules/TypeScript); preserve existing style patterns (`var`, jQuery objects, global declarations like `/* global $ */`) unless a task explicitly modernizes code.
 - Service worker cache versioning uses `OpenSprinkler-v__BUILD_TIMESTAMP__` in `www/sw.js`; build scripts replace and then restore this placeholder.
+
+## Debug / Test Environment 🔧
+
+### Device Connection
+- **Device IP**: `192.168.0.86`
+- **Admin Password**: Required for API access (MD5 hash needed)
+
+### Computing the Admin Password Hash
+
+The REST API requires the MD5 hash of the admin password. Calculate it locally:
+
+```bash
+# Linux/Mac
+echo -n "your_admin_password" | md5sum | awk '{print $1}'
+
+# Windows PowerShell
+$Text = "your_admin_password"
+$Bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+$Hash = [System.Security.Cryptography.MD5]::Create().ComputeHash($Bytes)
+([System.BitConverter]::ToString($Hash) -replace "-","").ToLower()
+```
+
+⚠️ **Security Note**: This hash is only computed and stored locally. Do NOT share it or commit it to public repositories.
+
+### Testing via MCP Server
+The firmware repo includes an MCP server at `tools/mcp-server/` (in the OpenSprinkler-Firmware workspace) that exposes the OpenSprinkler REST API as MCP tools for AI assistants. See `tools/mcp-server/README.md` for setup and available tools.
+
+### Testing via direct REST API
+All OpenSprinkler endpoints accept `?pw=<md5hash>` (use the admin password hash computed above):
+```bash
+# Example (replace HASH with your computed MD5):
+ADMIN_HASH="<YOUR_ADMIN_PASSWORD_HASH>"
+
+# Get all data (stations, programs, options, status)
+curl "http://192.168.0.86/ja?pw=${ADMIN_HASH}"
+
+# Get options (firmware version, network settings)
+curl "http://192.168.0.86/jo?pw=${ADMIN_HASH}"
+
+# Get station status
+curl "http://192.168.0.86/js?pw=${ADMIN_HASH}"
+
+# Get sensors
+curl "http://192.168.0.86/sl?pw=${ADMIN_HASH}"
+```
+
+### UI Development with Device
+- When running `npm start`, the local dev server serves at `http://localhost:8080`
+- Point the UI to the device by entering `http://192.168.0.86` as the site IP in the app
+- The UI communicates with the controller via AJAX calls to the REST API endpoints above

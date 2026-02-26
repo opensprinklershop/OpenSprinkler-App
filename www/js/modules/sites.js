@@ -25,8 +25,9 @@ OSApp.Sites.displayPage = function() {
 		statusCheckTimer = null,
 		makeStart = function() {
 			var finish = function() {
-				header.eq( 0 ).hide();
 				$( "#header" ).show();
+				$( "#header .header-menu-btn" ).remove();
+				$( "#header .site-login-btn" ).show();
 				$( "#footer, #footer-menu" ).hide();
 			};
 
@@ -75,6 +76,13 @@ OSApp.Sites.displayPage = function() {
 		}
 		popup.popup( "destroy" ).detach();
 		page.detach();
+	} );
+
+	// Refresh content when page is shown
+	page.on( "pagebeforeshow", function() {
+		if ( page.hasClass( "ui-page-active" ) ) {
+			updateContent();
+		}
 	} );
 
 	$( "html" ).on( "siterefresh", function() {
@@ -392,13 +400,13 @@ list.find( ".add-otc-connection" ).on( "click", function() {
 		header = OSApp.UIDom.changeHeader( {
 			title: OSApp.Language._( "Manage Sites" ),
 			animate: OSApp.currentSession.isControllerConnected() ? true : false,
+			suppressAndroidMenuBtn: true,
 			leftBtn: {
-				icon: "carat-l",
-				text: OSApp.Language._( "Back" ),
-				class: "ui-toolbar-back-btn",
+				icon: "lock",
+				text: "",
+				class: "site-login-btn",
 				on: function() {
-					page.find( ".hasChanges" ).addClass( "preventUpdate" );
-					OSApp.UIDom.checkChangesBeforeBack();
+					OSApp.Network.requestCloudAuth();
 				}
 			},
 			rightBtn: {
@@ -415,6 +423,9 @@ list.find( ".add-otc-connection" ).on( "click", function() {
 				}
 			}
 		} );
+
+		$( "#header .header-menu-btn" ).remove();
+		$( "#header .site-login-btn" ).show();
 
 		updateContent();
 
@@ -523,6 +534,7 @@ OSApp.Sites.checkConfigured = function( firstLoad ) {
 
 		OSApp.Sites.updateSiteList( names, current );
 
+		OSApp.currentSession.currentSite = current;
 		OSApp.currentSession.token = sites[ current ].os_token;
 
 		OSApp.currentSession.ip = sites[ current ].os_ip;
@@ -912,8 +924,8 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 // Gather new controller information and load home page
 OSApp.Sites.newLoad = function() {
 
-	// Get the current site name from the site select drop down
-	var name = $( "#site-selector" ).val(),
+	// Get the current site name from the session (not from selector which may not be updated yet)
+	var name = OSApp.currentSession.currentSite || $( "#site-selector" ).val(),
 		loading = "<div class='logo'></div>" +
 			"<h1 style='padding-top:5px'>" + OSApp.Language._( "Connecting to" ) + " " + name + "</h1>" +
 			"<p class='cancel tight center inline-icon'>" +
@@ -1012,7 +1024,14 @@ OSApp.Sites.newLoad = function() {
 			if ( OSApp.currentSession.controller.options.firstRun ) {
 				OSApp.Sites.showGuidedSetup();
 			} else {
-				OSApp.UIDom.goHome( true );
+				// Remove the old sprinklers page so it gets fully rebuilt
+				// with new site data (the route handler in ui-dom.js only
+				// calls Dashboard.displayPage when #sprinklers doesn't exist)
+				$( "#sprinklers" ).remove();
+
+				// goHome() without firstLoad=true skips the hash check
+				// and navigates directly to #sprinklers
+				OSApp.UIDom.goHome();
 			}
 		},
 		function( error ) {
@@ -1398,15 +1417,11 @@ OSApp.Sites.updateControllerStationSpecial = function( callback ) {
 };
 
 // Change the current site (needs to be defined AFTER OSApp.Sites.checkConfigured!)
-OSApp.Sites.updateSite = function( newsite, opts ) {
-	opts = opts || {};
+OSApp.Sites.updateSite = function( newsite ) {
 	OSApp.Storage.get( "sites", function( data ) {
 		var sites = OSApp.Sites.parseSites( data.sites );
 		if ( newsite in sites ) {
 			OSApp.UIDom.closePanel( function() {
-				if ( opts.goSprinklers ) {
-					window.location.hash = "#sprinklers";
-				}
 				OSApp.Storage.set( { "current_site":newsite }, () => OSApp.Sites.checkConfigured() );
 			} );
 		}

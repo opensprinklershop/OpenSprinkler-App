@@ -1,4 +1,4 @@
-/* global $ */
+/* global $, cordova */
 
 /* OpenSprinkler App
  * Copyright (C) 2015 - present, Samer Albahra. All rights reserved.
@@ -74,44 +74,8 @@ OSApp.ESP32Mode.isESP32Supported = function() {
 		featureStr.indexOf( "ESP32" ) !== -1 ||
 		featureStr.indexOf( "IEEE802154" ) !== -1 ||
 		featureStr.indexOf( "IEEE_802154" ) !== -1 ||
-		featureStr.indexOf( "802.15.4" ) !== -1 ||
-		featureStr.indexOf( "ZIGBEE" ) !== -1 ||
-		featureStr.indexOf( "MATTER" ) !== -1
+		featureStr.indexOf( "802.15.4" ) !== -1
 	);
-};
-
-/**
- * Check if Matter is available as an option (feature string contains "MATTER")
- */
-OSApp.ESP32Mode.isMatterAvailable = function() {
-	if ( !OSApp.currentSession.controller || !OSApp.currentSession.controller.options ) {
-		return false;
-	}
-
-	var feature = OSApp.currentSession.controller.options.feature;
-	if ( !feature ) {
-		return false;
-	}
-
-	var featureStr = Array.isArray( feature ) ? feature.join( "," ) : String( feature );
-	return featureStr.toUpperCase().indexOf( "MATTER" ) !== -1;
-};
-
-/**
- * Check if ZigBee is available as an option (feature string contains "ZIGBEE")
- */
-OSApp.ESP32Mode.isZigBeeAvailable = function() {
-	if ( !OSApp.currentSession.controller || !OSApp.currentSession.controller.options ) {
-		return false;
-	}
-
-	var feature = OSApp.currentSession.controller.options.feature;
-	if ( !feature ) {
-		return false;
-	}
-
-	var featureStr = Array.isArray( feature ) ? feature.join( "," ) : String( feature );
-	return featureStr.toUpperCase().indexOf( "ZIGBEE" ) !== -1;
 };
 
 /**
@@ -120,8 +84,14 @@ OSApp.ESP32Mode.isZigBeeAvailable = function() {
  * Returns a jQuery Deferred that resolves with the radio info object:
  *   { activeMode, activeModeName, modes[], enabled, matter, zigbee, zigbee_gw, zigbee_client }
  */
-OSApp.ESP32Mode.fetchRadioInfo = function() {
+OSApp.ESP32Mode.fetchRadioInfo = function( forceRefresh ) {
 	var deferred = $.Deferred();
+
+	// Return cached data immediately if available and not forced refresh
+	if ( !forceRefresh && OSApp.ESP32Mode._radioInfo !== null ) {
+		deferred.resolve( OSApp.ESP32Mode._radioInfo );
+		return deferred.promise();
+	}
 
 	OSApp.Firmware.sendToOS( "/ir?pw=", "json" ).done( function( data ) {
 		if ( data && typeof data.activeMode !== "undefined" ) {
@@ -171,7 +141,7 @@ OSApp.ESP32Mode.isZigBeeClientActive = function() {
 OSApp.ESP32Mode.setupESP32Mode = function() {
 	$.mobile.loading( "show" );
 
-	OSApp.ESP32Mode.fetchRadioInfo().done( function( radioInfo ) {
+	OSApp.ESP32Mode.fetchRadioInfo( true ).done( function( radioInfo ) {
 		$.mobile.loading( "hide" );
 		OSApp.ESP32Mode.showESP32ModePopup( radioInfo );
 	} ).fail( function() {
@@ -203,36 +173,32 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo ) {
 	content += "</label>";
 
 	// Option b) Matter — only if MATTER feature is available
-	if ( OSApp.ESP32Mode.isMatterAvailable() ) {
-		content += "<label for='esp32-mode-matter'>";
-		content += "<input type='radio' name='esp32-mode' id='esp32-mode-matter' value='" + OSApp.ESP32Mode.MODE_MATTER + "'";
-		if ( currentMode === OSApp.ESP32Mode.MODE_MATTER ) {
-			content += " checked='checked'";
-		}
-		content += "> " + OSApp.Language._( "Matter" );
-		content += " <em style='font-size:0.85em;color:#999'>( " + OSApp.Language._( "experimental / uncertified" ) + " )</em>";
-		content += "</label>";
+	content += "<label for='esp32-mode-matter'>";
+	content += "<input type='radio' name='esp32-mode' id='esp32-mode-matter' value='" + OSApp.ESP32Mode.MODE_MATTER + "'";
+	if ( currentMode === OSApp.ESP32Mode.MODE_MATTER ) {
+		content += " checked='checked'";
 	}
+	content += "> " + OSApp.Language._( "Matter" );
+	content += " <em style='font-size:0.85em;color:#999'>( " + OSApp.Language._( "experimental / uncertified" ) + " )</em>";
+	content += "</label>";
 
 	// Options c) + d) ZigBee Gateway & Client — only if ZIGBEE feature is available
-	if ( OSApp.ESP32Mode.isZigBeeAvailable() ) {
-		content += "<label for='esp32-mode-zigbee-gw'>";
-		content += "<input type='radio' name='esp32-mode' id='esp32-mode-zigbee-gw' value='" + OSApp.ESP32Mode.MODE_ZIGBEE_GATEWAY + "'";
-		if ( currentMode === OSApp.ESP32Mode.MODE_ZIGBEE_GATEWAY ) {
-			content += " checked='checked'";
-		}
-		content += "> " + OSApp.Language._( "ZigBee Gateway" );
-		content += "</label>";
-
-		content += "<label for='esp32-mode-zigbee-cl'>";
-		content += "<input type='radio' name='esp32-mode' id='esp32-mode-zigbee-cl' value='" + OSApp.ESP32Mode.MODE_ZIGBEE_CLIENT + "'";
-		if ( currentMode === OSApp.ESP32Mode.MODE_ZIGBEE_CLIENT ) {
-			content += " checked='checked'";
-		}
-		content += "> " + OSApp.Language._( "ZigBee Client" );
-		content += " <em style='font-size:0.85em;color:#999'>( " + OSApp.Language._( "ZigBee Hub required" ) + " )</em>";
-		content += "</label>";
+	content += "<label for='esp32-mode-zigbee-gw'>";
+	content += "<input type='radio' name='esp32-mode' id='esp32-mode-zigbee-gw' value='" + OSApp.ESP32Mode.MODE_ZIGBEE_GATEWAY + "'";
+	if ( currentMode === OSApp.ESP32Mode.MODE_ZIGBEE_GATEWAY ) {
+		content += " checked='checked'";
 	}
+	content += "> " + OSApp.Language._( "ZigBee Gateway" );
+	content += "</label>";
+
+	content += "<label for='esp32-mode-zigbee-cl'>";
+	content += "<input type='radio' name='esp32-mode' id='esp32-mode-zigbee-cl' value='" + OSApp.ESP32Mode.MODE_ZIGBEE_CLIENT + "'";
+	if ( currentMode === OSApp.ESP32Mode.MODE_ZIGBEE_CLIENT ) {
+		content += " checked='checked'";
+	}
+	content += "> " + OSApp.Language._( "ZigBee Client" );
+	content += " <em style='font-size:0.85em;color:#999'>( " + OSApp.Language._( "ZigBee Hub required" ) + " )</em>";
+	content += "</label>";
 
 	content += "</fieldset>";
 	content += "<button class='submit-esp32-mode ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Apply Mode" ) + "</button>";

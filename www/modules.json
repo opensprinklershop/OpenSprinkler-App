@@ -1,6 +1,8 @@
 [
   "about.js",
   "analog.js",
+  "analog-log.js",
+  "irrigation-db-integration.js",
   "card-list.js",
   "cards.js",
   "dashboard.js",
@@ -23,6 +25,7 @@
   "station-attributes.js",
   "station-queue.js",
   "stations.js",
+  "statistics.js",
   "status.js",
   "storage.js",
   "supported.js",

@@ -49,7 +49,14 @@
         </config-file>
         <config-file target="*-Info.plist" parent="NSAppTransportSecurity">
             <dict>
+                <!-- Disable ATS for all network connections (allows self-signed certs) -->
                 <key>NSAllowsArbitraryLoads</key>
+                <true/>
+                <!-- Explicitly allow WKWebView connections to bypass cert validation -->
+                <key>NSAllowsArbitraryLoadsInWebContent</key>
+                <true/>
+                <!-- Allow plain HTTP to local devices (needed for IP-based connections) -->
+                <key>NSAllowsLocalNetworking</key>
                 <true/>
             </dict>
         </config-file>

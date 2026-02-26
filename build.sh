@@ -20,6 +20,10 @@ cp build/modules.json platforms/browser/www/
 cp build.json platforms/android/build.json
 cp network_security_config.xml /srv/www/htdocs/ui/platforms/android/app/src/main/res/xml/
 
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
 # Sync www/ into Android platform assets before building
 cordova prepare android
 

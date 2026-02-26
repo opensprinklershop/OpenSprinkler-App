@@ -2427,7 +2427,9 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 	} );
 
 	page.find( ".open-irrigationdb-program" ).on( "click", function() {
-		OSApp.UIDom.openIrrigationDb();
+		var btnId = $( this ).attr( "id" ) || "";
+		var programId = btnId.indexOf( "irrigdb-" ) === 0 ? btnId.split( "irrigdb-" )[ 1 ] : "";
+		OSApp.UIDom.openIrrigationDb( programId );
 		return false;
 	} );
 
@@ -2493,6 +2495,7 @@ OSApp.Programs.deleteProgram = function( id ) {
 		OSApp.Firmware.sendToOS( "/dp?pw=&pid=" + id ).done( function() {
 			$.mobile.loading( "hide" );
 			OSApp.Sites.updateControllerPrograms( function() {
+				OSApp.ProgramView.programCharts = [];
 				$( "#programs" ).trigger( "programrefresh" );
 				OSApp.Errors.showError( OSApp.Language._( "Program" ) + " " + program + " " + OSApp.Language._( "deleted" ) );
 			} );
@@ -2582,6 +2585,7 @@ OSApp.Programs.submitProgram183 = function( id ) {
 		OSApp.Firmware.sendToOS( "/cp?pw=&pid=" + id + "&v=" + program ).done( function() {
 			$.mobile.loading( "hide" );
 			OSApp.Sites.updateControllerPrograms( function() {
+				OSApp.ProgramView.programCharts = [];
 				$( "#programs" ).trigger( "programrefresh" );
 				OSApp.Programs.updateProgramHeader();
 			} );
@@ -2764,6 +2768,7 @@ OSApp.Programs.submitProgram21 = function( id, ignoreWarning ) {
 		OSApp.Firmware.sendToOS( "/cp?pw=&pid=" + id + url + daterange ).done( function() {
 			$.mobile.loading( "hide" );
 			OSApp.Sites.updateControllerPrograms( function() {
+				OSApp.ProgramView.programCharts = [];
 				$( "#programs" ).trigger( "programrefresh" );
 				OSApp.Programs.updateProgramHeader();
 				$( "#program-" + id ).find( ".program-name" ).text( name );

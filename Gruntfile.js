@@ -58,18 +58,18 @@
 			secrets: secrets,
 
 			jshint: {
-			main: [ "www/js/main.js", "www/js/programview.js", "www/js/modules/analog-util.js", "www/js/analog.js", "www/js/map.js", "Gruntfile.js", "www/js/hasher.js", "www/js/home.js", "test/tests.js" ],
-			options: {
-				esversion: 6
-				}
-			},
+		main: [ "www/js/main.js", "www/js/programview.js", "www/js/modules/analog.js", "www/js/map.js", "Gruntfile.js", "www/js/hasher.js", "www/js/home.js", "test/tests.js" ],
+		options: {
+			esversion: 6
+			}
+		},
 
-			jscs: {
-			main: [ "www/js/main.js", "www/js/programview.js", "www/js/modules/analog-util.js", "www/js/analog.js", "www/js/map.js", "Gruntfile.js", "www/js/hasher.js", "www/js/home.js", "test/tests.js" ],
-			options: {
-					fix: true
-				}
-			},
+		jscs: {
+		main: [ "www/js/main.js", "www/js/programview.js", "www/js/modules/analog.js", "www/js/map.js", "Gruntfile.js", "www/js/hasher.js", "www/js/home.js", "test/tests.js" ],
+		options: {
+				fix: true
+			}
+		},
 
 			csslint: {
 				strict: {
@@ -130,7 +130,7 @@
 				},
 				updateTrans: {
 					command: [
-					" xgettext --keyword=_ --output=- www/js/modules/analog-util.js www/js/analog.js --omit-header --force-po --from-code=UTF-8 --language='javascript' --stringtable-output|sed '/File/d'|sed '/Flag/d'|sed '/^$/d' >www/locale/out.txt"
+					" xgettext --keyword=_ --output=- www/js/modules/analog.js --omit-header --force-po --from-code=UTF-8 --language='javascript' --stringtable-output|sed '/File/d'|sed '/Flag/d'|sed '/^$/d' >www/locale/out.txt"
                                         ].join( "&&" )
 
 				},
@@ -240,9 +240,7 @@
 				},
 				buildFW: {
 					files: {
-						"www/js/app.js": [ "www/js/jquery.js", "www/js/jqm.js", "www/js/dataTables-2.1.8.min.js", "www/js/libs.js", "www/js/main.js", "www/js/modules/analog-util.js", "www/js/analog.js",
-						"www/js/programview.js", "www/js/map.js",
-						"www/js/apexcharts.min.js" ]
+						"www/js/app.js": [ "www/vendor-js/jquery.js", "www/vendor-js/jqm.js", "www/vendor-js/dataTables-2.1.8.min.js", "www/vendor-js/libs.js", "www/vendor-js/vis-timeline-graph2d.min.js", "www/vendor-js/apexcharts.min.js", "www/js/modules/language.js", "www/js/modules/about.js", "www/js/modules/analog.js", "www/js/modules/analog-log.js", "www/js/programview.js", "www/js/modules/card-list.js", "www/js/modules/cards.js", "www/js/modules/dashboard.js", "www/js/modules/dates.js", "www/js/modules/errors.js", "www/js/modules/firmware.js", "www/js/modules/groups.js", "www/js/modules/import-export.js", "www/js/modules/logs.js", "www/js/modules/esp32mode.js", "www/js/modules/network.js", "www/js/modules/notifications.js", "www/js/modules/options.js", "www/js/modules/programs.js", "www/js/modules/sites.js", "www/js/modules/sites-otc.js", "www/js/modules/station-attributes.js", "www/js/modules/station-queue.js", "www/js/modules/stations.js", "www/js/modules/statistics.js", "www/js/modules/status.js", "www/js/modules/storage.js", "www/js/modules/supported.js", "www/js/modules/system-diagnostics.js", "www/js/modules/ui-dom.js", "www/js/modules/utils.js", "www/js/modules/welcome.js", "www/js/modules/weather.js", "www/js/map.js", "www/js/main.js" ]
 					},
 				},
 			},

@@ -408,7 +408,7 @@ OSApp.Options.showOptions = function( expandItem ) {
                list += "<label for='isMetric'><input data-mini='true' class='noselect' id='isMetric' type='checkbox' " + ( OSApp.currentDevice.isMetric ? "checked='checked'" : "" ) + ">" +
                        OSApp.Language._( "Use Metric" ) + "</label>";
 
-               list += "<label for='is24Hour'><input data-mini='true' class='noselect' id='is24Hour' type='checkbox' " + ( OSApp.uiState.is24Hour ? "checked='checked'" : "" ) + ">" +
+               list += "<label for='is24Hour'><input data-mini='true' id='is24Hour' type='checkbox' " + ( OSApp.uiState.is24Hour ? "checked='checked'" : "" ) + ">" +
                        OSApp.Language._( "Use 24 Hour Time" ) + "</label>";
        list += "</div>";
 
@@ -1092,7 +1092,6 @@ OSApp.Options.showOptions = function( expandItem ) {
         page.find( "#is24Hour" ).on( "change", function() {
                 OSApp.uiState.is24Hour = this.checked;
                 OSApp.Storage.set( { is24Hour: this.checked } );
-                return false;
         } );
 
         page.find( "#groupView" ).on( "change", function() {

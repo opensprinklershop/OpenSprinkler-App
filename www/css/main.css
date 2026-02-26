@@ -63,6 +63,30 @@ a {
 	top: 36px;
 }
 
+#analog_sensor_table .sensor-stale-warning {
+    background-color: #fff4cc;
+}
+
+#analog_sensor_table .sensor-stale-critical {
+    background-color: #ffd9d9;
+}
+
+#analog_sensor_table .sensor-data-notok {
+    background-color: #eadcf7;
+}
+
+@media ( max-width: 360px ) {
+    #header .site-login-btn {
+        width: 2.4em;
+        padding-left: 0.4em;
+        padding-right: 0.4em;
+    }
+
+    #header .site-login-btn .ui-btn-text {
+        display: none;
+    }
+}
+
 /* Station tab rules */
 
 ul.tabs {
@@ -310,6 +334,7 @@ hr.divider {
 /* --- Android: menu button visible ------------------------------------ */
 #header .header-menu-btn.is-visible { display: block; }
 #header .header-menu-btn.is-visible + .ui-toolbar-back-btn { left: 2.5em; }
+#header .header-menu-btn.is-visible + .ui-btn-left { left: 2.5em; }
 #header .header-menu-btn.is-visible ~ .ui-title { margin-left: 7em; }
 .full-width-slider input {
     display: none;
@@ -1560,4 +1585,24 @@ button[id^="start_1-"] {
     .ui-field-contain .sensor-options {
         width: 100%;
     }
+}
+
+/* Statistics page */
+.stats-kpi-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 14px;
+}
+.stats-kpi-table th,
+.stats-kpi-table td {
+    padding: 8px 10px;
+    border: 1px solid rgba(128, 128, 128, 0.2);
+}
+.stats-kpi-table th {
+    text-align: left;
+    font-weight: 600;
+}
+.stats-kpi-table td {
+    text-align: right;
+    font-weight: 700;
 }

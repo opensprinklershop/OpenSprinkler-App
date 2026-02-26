@@ -192,8 +192,10 @@ OSApp.Status.checkStatus = function() {
 
 	// Show overcurrent fault status
 	if ( OSApp.currentSession.controller.settings.ocs ) {
+		var ocsCurrent = Number( OSApp.currentSession.controller.settings.ocma );
+		var ocsCurrentText = ( Number.isFinite( ocsCurrent ) && ocsCurrent > 0 ) ? (" (" + ocsCurrent + "mA)") : "";
 		OSApp.Status.changeStatus( 0, "red", "<p class='running-text center pointer'>" + OSApp.Language._( "Overcurrent Fault detected" ) +
-			( OSApp.currentSession.controller.settings.ocs === 255 ? "" : ( OSApp.Language._( " when opening Station " ) + OSApp.currentSession.controller.settings.ocs ) ) + "!</p>",
+			( OSApp.currentSession.controller.settings.ocs === 255 ? ocsCurrentText : ( OSApp.Language._( " when opening Station " ) + OSApp.currentSession.controller.settings.ocs + ocsCurrentText ) ) + "!</p>",
 			function() {
 				var infoText = OSApp.Language._(
 					"The controller detected one or more zones drawing too much current, exceeding the limit. " +
@@ -259,13 +261,22 @@ OSApp.Status.checkStatus = function() {
 	}
 
 	if ( OSApp.currentSession.controller.settings.sn1 === 1 ) {
-		OSApp.Status.changeStatus( 0, "blue", "<p class='running-text center'>Sensor 1 (" + ( OSApp.currentSession.controller.options.sn1t === 3 ? OSApp.Language._( "Soil" ) : OSApp.Language._( "Rain" ) ) + OSApp.Language._( ") Activated" ) + "</p>" );
-		return;
+		var sn1Type = OSApp.currentSession.controller.options.sn1t;
+		// Only show the sensor-1 activated banner for binary sensor types (Rain=1, Soil=3).
+		// A stuck sn1=1 from a firmware without the NONE-branch fix, or a Flow sensor (sn1t=2),
+		// should not produce a misleading "(Rain)" label.
+		if ( sn1Type === 1 || sn1Type === 3 ) {
+			OSApp.Status.changeStatus( 0, "blue", "<p class='running-text center'>Sensor 1 (" + ( sn1Type === 3 ? OSApp.Language._( "Soil" ) : OSApp.Language._( "Rain" ) ) + OSApp.Language._( ") Activated" ) + "</p>" );
+			return;
+		}
 	}
 
 	if ( OSApp.currentSession.controller.settings.sn2 === 1 ) {
-		OSApp.Status.changeStatus( 0, "blue", "<p class='running-text center'>Sensor 2 (" + ( OSApp.currentSession.controller.options.sn2t === 3 ? OSApp.Language._( "Soil" ) : OSApp.Language._( "Rain" ) ) + OSApp.Language._( ") Activated" ) + "</p>" );
-		return;
+		var sn2Type = OSApp.currentSession.controller.options.sn2t;
+		if ( sn2Type === 1 || sn2Type === 3 ) {
+			OSApp.Status.changeStatus( 0, "blue", "<p class='running-text center'>Sensor 2 (" + ( sn2Type === 3 ? OSApp.Language._( "Soil" ) : OSApp.Language._( "Rain" ) ) + OSApp.Language._( ") Activated" ) + "</p>" );
+			return;
+		}
 	}
 
 	// Handle manual mode enabled
