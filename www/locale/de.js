@@ -945,6 +945,8 @@
    "Scanning for ZigBee devices...": "Suche nach ZigBee-Geräten...",
    "Please pair your device now.": "Bitte koppeln Sie Ihr Gerät jetzt.",
    "Failed to start ZigBee scanning. Please ensure ZigBee is supported.": "ZigBee-Scan konnte nicht gestartet werden. Bitte stellen Sie sicher, dass ZigBee unterstützt wird.",
+   "Connecting to network...": "Verbinde mit Netzwerk...",
+   "device(s) found": "Gerät(e) gefunden",
    "Bluetooth Device MAC Address": "Bluetooth-Geräte-MAC-Adresse",
    "Service UUID": "Service UUID",
    "Characteristic UUID": "BLE UUID",

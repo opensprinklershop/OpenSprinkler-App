@@ -1768,6 +1768,9 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	popup.find(".bluetooth_char_uuid_container").hide();
 	popup.find(".bluetooth_format_container").hide();
 
+	// Reset RI field editability (ZigBee will override to readonly below)
+	popup.find(".ri").prop("readonly", false);
+
 	// Standard fields are already visible (never hidden), no need to show them again
 
 	var unitid = popup.find("#unitid").val();
@@ -1784,6 +1787,9 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 		popup.find(".zigbee_known_sensors_container").show();
 		popup.find(".zigbee_endpoint_cluster_attribute_container").show();
 		popup.find(".fac_div_offset_container").show();
+		// ZigBee sleeping sensors: fix RI to 900s (15 min) to match the default
+		// Configure Reporting interval sent to devices during scan.
+		popup.find(".ri").val(900).prop("readonly", true);
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
 		popup.find(".bluetooth_char_uuid_container").show();
 		popup.find(".bluetooth_format_container").show();
@@ -1885,6 +1891,12 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 		// poll_interval (ms) is derived from sensor read interval (ri seconds)
 		if (sensorOut.ri !== undefined && sensorOut.ri !== null && !isNaN(sensorOut.ri)) {
 			sensorOut.poll_interval = sensorOut.ri * 1000;
+		}
+
+		// Pass discovery timestamp as join_anchor for predictive boost
+		var discoveredAt = popup.data("zigbee_discovered_at");
+		if (discoveredAt && parseInt(discoveredAt, 10) > 0) {
+			sensorOut.join_anchor = parseInt(discoveredAt, 10);
 		}
 	}
 
@@ -2033,29 +2045,16 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 
 		function updateScanUi() {
 			var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
-			var remaining = Math.max(0, 10 - elapsed);
 			var msg;
 			if (elapsed < 10) {
-				// Phase 1: Join window active — countdown
-				msg = OSApp.Language._("Scanning...") + " " + remaining + "s";
+				// Phase 1: ZigBee join window active (0–10s)
+				msg = OSApp.Language._("Scanning...");
 			} else if (!wifiConnected) {
-				// Phase 2a: Join ended, waiting for WiFi to come back
-				msg = OSApp.Language._("Reconnecting...");
+				// Phase 2: Polling /zd, waiting for device to come back online
+				msg = OSApp.Language._("Connecting to network...");
 			} else if (!pollingDone) {
-				// Phase 2b: WiFi back, polling /zd for discovered devices
-				// Polling runs from t=10s to t=20s (absolute from scan start)
-				var pollRemaining = Math.max(0, 20 - elapsed);
-				msg = OSApp.Language._("Searching for devices...") + " " + pollRemaining + "s";
-				if (lastDeviceCount > 0) {
-					msg += " \u00B7 " + lastDeviceCount + " " + OSApp.Language._("found");
-				}
-			} else {
-				// Phase 3: Polling done — show results
-				if (lastDeviceCount > 0) {
-					msg = OSApp.Language._("Scan finished") + " \u00B7 " + lastDeviceCount + " " + OSApp.Language._("devices found");
-				} else {
-					msg = OSApp.Language._("Scan finished") + " \u00B7 " + OSApp.Language._("No new devices found");
-				}
+				// Phase 3: Connected — show device count for 10s before restoring button
+				msg = lastDeviceCount + " " + OSApp.Language._("device(s) found");
 			}
 			if (scanButton && originalButtonText) {
 				if (pollingDone) {
@@ -2064,7 +2063,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 					scanButton.text(msg);
 				}
 			}
-			scanDialog.find("#scanTimer").text(msg).show();
+			scanDialog.find("#scanTimer").text(msg || "").show();
 		}
 
 		function updateDeviceList() {
@@ -2076,7 +2075,18 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			requestInFlight = true;
 			OSApp.Firmware.sendToOS("/zd?pw=", "json", 3000).then(function (data) {
 				requestInFlight = false;
+				var wasConnected = wifiConnected;
 				wifiConnected = true;
+				// First successful /zd response: stop polling, display count for 10s, then restore button
+				if (!wasConnected && !pollingDone) {
+					if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+					if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
+					scanTimeout = setTimeout(function() {
+						pollingDone = true;
+						if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
+						scanTimeout = null;
+					}, 10000);
+				}
 				var devices = normalizeZigBeeDevices(data);
 				lastDeviceCount = normalizeZigBeeCount(data, devices);
 				scanDialog.data("zigbeeDevices", devices);
@@ -2150,7 +2160,8 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 				ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
 				short_addr: dev.short_addr || "0x0000",
 				model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
-				manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
+				manufacturer: dev.manufacturer || OSApp.Language._("Unknown"),
+				discovered_at: dev.discovered_at || 0
 			};
 
 			if (scanInterval) {
@@ -2228,35 +2239,26 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 	updateScanUi();
 	uiInterval = setInterval(updateScanUi, 250);
 
-	// Phase 2 (after 10s): Start polling /zd for newly joined devices
+	// Phase 2 (after 10s): Start polling /zd for newly joined devices.
+	// The first successful response triggers phase 3 — show count for 10s, then restore button.
+	// Safety fallback: if no /zd response after 120s, force completion anyway.
 	scanTimeout = setTimeout(function() {
 		scanTimeout = null;
 		updateDeviceList();
 		scanInterval = setInterval(updateDeviceList, 2000);
-
-		// Phase 3 (10s after polling starts = ~20-25s total): Stop polling, show results
+		// Safety fallback: force phase 3 after 120s of polling regardless of connection state
 		scanTimeout = setTimeout(function() {
-			pollingDone = true;
-			if (scanInterval) {
-				clearInterval(scanInterval);
-				scanInterval = null;
+			scanTimeout = null;
+			if (!pollingDone) {
+				if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+				wifiConnected = true;  // force phase-3 display
+				scanTimeout = setTimeout(function() {
+					pollingDone = true;
+					if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
+					scanTimeout = null;
+				}, 10000);
 			}
-			// One final poll to get latest device list
-			updateDeviceList();
-			// Restore scan button immediately
-			if (scanButton && originalButtonText) {
-				scanButton.text(originalButtonText).prop("disabled", false);
-			}
-			// Keep UI timer alive for 10s to show "Scan finished" message,
-			// then stop it. Dialog stays open for device selection.
-			scanTimeout = setTimeout(function() {
-				if (uiInterval) {
-					clearInterval(uiInterval);
-					uiInterval = null;
-				}
-				scanTimeout = null;
-			}, 10000);
-		}, 10000);
+		}, 120000);
 	}, 10000);
 }, function () {
 	// Error handler - reset button text on failure
@@ -2858,13 +2860,15 @@ list += "</select></div>" +
 
 			function updateScanUi() {
 				var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
-				var remaining = Math.max(0, 10 - elapsed);
 				if (elapsed < 10) {
-					btn.text(OSApp.Language._("Scanning...") + " " + remaining + "s");
+					// Phase 1: ZigBee join window active (0–10s)
+					btn.text(OSApp.Language._("Scanning..."));
 				} else if (!wifiConnected) {
-					btn.text(OSApp.Language._("Searching for devices..."));
+					// Phase 2: Polling /zd, waiting for device to respond
+					btn.text(OSApp.Language._("Connecting to network..."));
 				} else {
-					btn.text(OSApp.Language._("Devices found:") + " " + lastDeviceCount);
+					// Phase 3: Connected — show device count (restored after 10s)
+					btn.text(lastDeviceCount + " " + OSApp.Language._("device(s) found"));
 				}
 			}
 
@@ -2934,7 +2938,22 @@ list += "</select></div>" +
 					requestStartTime = Date.now();
 					OSApp.Firmware.sendToOS("/zd?pw=", "json", 3000).then(function (data) {
 						requestInFlight = false;
+						var wasConn = wifiConnected;
 						wifiConnected = true;
+						// First successful /zd response: stop polling, show count for 10s, then restore button
+						if (!wasConn) {
+							if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+							if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
+							if (joinRenewInterval) { clearInterval(joinRenewInterval); joinRenewInterval = null; }
+							scanTimeout = setTimeout(function() {
+								if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
+								popup.find("#zigbeeScanTimer").text(OSApp.Language._("Scan finished"));
+								popup.find("#zigbeeScanArea").hide();
+								try { OSApp.Firmware.sendToOS("/zc?pw=", "json"); } catch (e) { void e; }
+								btn.text(originalText).prop("disabled", false);
+								scanTimeout = null;
+							}, 10000);
+						}
 						var devices = normalizeZigBeeDevices(data);
 						popup.data("zigbeeDevices", devices);
 						lastDeviceCount = normalizeZigBeeCount(data, devices);
@@ -3018,7 +3037,8 @@ list += "</select></div>" +
 						manufacturer: dev.manufacturer || OSApp.Language._("Unknown"),
 						cluster_id: dev.cluster_id || dev.cluster,
 						attribute_id: dev.attribute_id || dev.attribute,
-						endpoint: dev.endpoint
+						endpoint: dev.endpoint,
+						discovered_at: dev.discovered_at || 0
 					};
 
 					// Stop scanning timers but keep the device list visible
@@ -3044,6 +3064,11 @@ list += "</select></div>" +
 						btn.text(originalText).prop("disabled", false);
 
 						popup.find("#device_ieee").val(selectedDevice.ieee).trigger("change");
+
+						// Store discovery timestamp for predictive boost anchor
+						if (selectedDevice.discovered_at) {
+							popup.data("zigbee_discovered_at", selectedDevice.discovered_at);
+						}
 
 						var currentName = popup.find(".name").val();
 						if (!currentName || currentName.trim() === "") {
@@ -3098,38 +3123,30 @@ list += "</select></div>" +
 				}
 			}, 8000);
 
-			// Phase 1 (0-10s): ZigBee join window open — countdown only, no polling
-			// Phase 2 (after 10s): Start polling /zd for newly joined devices
+			// Phase 1 (0–10s): ZigBee join window open — no polling
+			// Phase 2 (after 10s): Start polling /zd; first success triggers phase 3
+			// Safety fallback: force completion after 120s if never connected
 			scanTimeout = setTimeout(function() {
 				scanTimeout = null;
 				updateDeviceList();
 				scanInterval = setInterval(updateDeviceList, 1000);
-
-				// Phase 3 (after 20s total): stop polling, collapse scan area
+				// Safety fallback: force phase-3 display after 120s of polling
 				scanTimeout = setTimeout(function() {
-					if (scanInterval) {
-						clearInterval(scanInterval);
-						scanInterval = null;
-					}
-					if (joinRenewInterval) {
-						clearInterval(joinRenewInterval);
-						joinRenewInterval = null;
-					}
-					if (uiInterval) {
-						clearInterval(uiInterval);
-						uiInterval = null;
-					}
-					popup.find("#zigbeeScanTimer").text(OSApp.Language._("Scan finished"));
-					popup.find("#zigbeeScanArea").hide();
-					try {
-						OSApp.Firmware.sendToOS("/zc?pw=", "json");
-					} catch (e) {
-						void e;
-						// ignore
-					}
-					btn.text(originalText).prop("disabled", false);
 					scanTimeout = null;
-				}, 110000);
+					if (!wifiConnected) {
+						if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
+						if (joinRenewInterval) { clearInterval(joinRenewInterval); joinRenewInterval = null; }
+						wifiConnected = true;  // force phase-3 display
+						scanTimeout = setTimeout(function() {
+							if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
+							popup.find("#zigbeeScanTimer").text(OSApp.Language._("Scan finished"));
+							popup.find("#zigbeeScanArea").hide();
+							try { OSApp.Firmware.sendToOS("/zc?pw=", "json"); } catch (e) { void e; }
+							btn.text(originalText).prop("disabled", false);
+							scanTimeout = null;
+						}, 10000);
+					}
+				}, 120000);
 			}, 10000);
 
 			return false;
@@ -3830,6 +3847,11 @@ list += "</select></div>" +
 
 		// Initial visibility update based on sensor type
 		OSApp.Analog.updateSensorVisibility(popup, sensor.type);
+
+		// Preserve existing join_anchor for ZigBee sensors (predictive boost)
+		if (sensor.type == OSApp.Analog.Constants.SENSOR_ZIGBEE && sensor.join_anchor) {
+			popup.data("zigbee_discovered_at", sensor.join_anchor);
+		}
 
 		// Enhance jQuery Mobile elements before opening
 		popup.enhanceWithin();
