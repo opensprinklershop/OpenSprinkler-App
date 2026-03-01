@@ -376,9 +376,12 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 	}
 
 	var orderedSensors     = sortedByOrder(OSApp.Analog.analogSensors, "sensors");
-	var orderedProgAdjusts = sortedByOrder(OSApp.Analog.progAdjusts,   "progadjust");
-	var orderedMonitors    = (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors)
-		? sortedByOrder(OSApp.Analog.monitors, "monitors") : [];
+	var pctFormatter = function(val) { return OSApp.Analog.formatValUnit(val, "%"); };
+		var orderedProgAdjusts = sortedByOrder(OSApp.Analog.progAdjusts,   "progadjust");
+        var orderedMonitors    = (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors) ?
+            sortedByOrder(OSApp.Analog.monitors, "monitors") : [];
+
+
 
 	var root = document.documentElement;
 	var body = document.body || document.getElementsByTagName("body")[0];
@@ -416,7 +419,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 
 		// Build skeleton HTML (sensor rows have empty cells; values filled in-place below)
 		var html = "<div class='ui-body ui-body-a center'><table style='margin: 0px auto;'>";
-		for (i = 0; i < orderedProgAdjusts.length; i++) {
+				for (i = 0; i < orderedProgAdjusts.length; i++) {
 			if (i % cols === 0) {
 				if (i > 0) html += "</tr>";
 				html += "<tr>";
@@ -460,7 +463,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 		showArea.html(html);
 
 		// Create ApexCharts instances for prog adjustments
-		for (i = 0; i < orderedProgAdjusts.length; i++) {
+				for (i = 0; i < orderedProgAdjusts.length; i++) {
 			var el = document.querySelector("#mainpageChart-" + i);
 			if (!el) continue;
 			var chartOptions = {
@@ -484,7 +487,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 							name:  { offsetY: -25, show: true, color: isDark ? "#e6e6e6" : "#222", fontSize: "14px" },
 							value: {
 								color: isDark ? "#e6e6e6" : "#111", fontSize: "30px", offsetY: 0, show: true,
-								formatter: function(val) { return OSApp.Analog.formatValUnit(val, "%"); }
+								formatter: pctFormatter
 							}
 						}
 					}
@@ -550,7 +553,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 	}
 
 	// ProgAdjust charts
-	for (i = 0; i < orderedProgAdjusts.length; i++) {
+			for (i = 0; i < orderedProgAdjusts.length; i++) {
 		var progAdjust = orderedProgAdjusts[i];
 		var current = Math.round(progAdjust.current * 100);
 		var label;
@@ -646,7 +649,7 @@ OSApp.Analog.getImportMethodSensors = function(restore_type, callback) {
 				data = JSON.parse($.trim(data).replace(/“|”|″/g, "\""));
 				popup.popup("close");
 				OSApp.Analog.importConfigSensors(data, restore_type, callback);
-			} catch {
+			} catch (e) {
 				popup.find("textarea").val("");
 				OSApp.Errors.showError(OSApp.Language._("Unable to read the configuration file. Please check the file and try again."));
 			}
@@ -1196,9 +1199,9 @@ OSApp.Analog.updateAdjustmentChart = function(popup) {
 };
 
 OSApp.Analog.requiredCheck = function(field, obj, property) {
-	if (obj['missingValue']) return;
+	if (obj.missingValue) return;
 	if (field.is(":visible") && field.prop("required") && !obj[property])
-		obj['missingValue'] = field;
+		obj.missingValue = field;
 };
 
 OSApp.Analog.addToObjectChk = function(popup, fieldId, obj) {
@@ -1328,7 +1331,7 @@ OSApp.Analog.monitorSelection = function(id, sel, ignore) {
 	}
 	list += "</select>";
 	return list;
-}
+};
 
 //Monitor editor
 OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel) {
@@ -1646,13 +1649,13 @@ OSApp.Analog.isRS485Sensor = function( sensorType ) {
 
 OSApp.Analog.isIPSensor = function(sensorType) {
 	return OSApp.Analog.isSmt100(sensorType) || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE;
-}
+};
 
 OSApp.Analog.isIDNeeded = function(sensorType) {
 	return sensorType < OSApp.Analog.Constants.SENSOR_OSPI_INTERNAL_TEMP || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE ||
 		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE ||
 		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE;
-}
+};
 
 OSApp.Analog.getBatteryPercent = function(value) {
 	if (value === undefined || value === null || value === "") {
@@ -2910,7 +2913,7 @@ list += "</select></div>" +
 			deviceSelect.append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
 			try {
 				deviceSelect.selectmenu("refresh", true);
-			} catch (e) {
+			} catch (ex) {
 				void e;
 				// ignore
 			}
@@ -2983,13 +2986,13 @@ list += "</select></div>" +
 								var attributeHex = attributeId ? "0x" + parseInt(attributeId, 10).toString(16).toUpperCase().padStart(4, "0") : "";
 
 								// Try to enrich label with a friendly name from the device DB cache.
-								var dbEntry = OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB
-									? OSApp.ESP32Mode.ZigbeeDeviceDB.getCached(ieeeAddr) : null;
-								var friendlyName = dbEntry && (dbEntry.vendor || dbEntry.description)
-									? (dbEntry.vendor || "") + (dbEntry.vendor && dbEntry.description ? " — " : "") + (dbEntry.description || "")
+								var dbEntry = OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB ?
+						OSApp.ESP32Mode.ZigbeeDeviceDB.getCached(ieeeAddr) : null;
+								var friendlyName = dbEntry && (dbEntry.vendor || dbEntry.description) ?
+						(dbEntry.vendor || "") + (dbEntry.vendor && dbEntry.description ? " — " : "") + (dbEntry.description || "")
 									: "";
-								var label = friendlyName
-									? friendlyName + " (" + modelId + ") | IEEE: " + ieeeAddr
+								var label = friendlyName ?
+						friendlyName + " (" + modelId + ") | IEEE: " + ieeeAddr
 									: modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
 								if (endpoint) label += " | EP: " + endpoint;
 								if (clusterHex) label += " | CID: " + clusterHex;
@@ -3713,7 +3716,7 @@ list += "</select></div>" +
 					request.open('GET', plant.thumb, true);
 					request.setRequestHeader('Authorization', 'Bearer ' + token);
 					request.responseType = 'arraybuffer';
-					request.onload = function() {
+					request.onload = function() { // jshint ignore:line
 					    var data = new Uint8Array(this.response);
 					    var raw = String.fromCharCode.apply(null, data);
 					    var base64 = btoa(raw);
@@ -5067,7 +5070,8 @@ OSApp.Analog.getMonitorName = function(monitorNr) {
 OSApp.Analog.showAnalogSensorCharts = function(limit2sensor) {
 
 	var max = OSApp.Analog.Constants.CHARTS;
-	for (let j = 0; j < OSApp.Analog.analogSensors.length; j++) {
+	/* jshint loopfunc:true */
+		for (let j = 0; j < OSApp.Analog.analogSensors.length; j++) {
 		if (!OSApp.Analog.analogSensors[j].log || !OSApp.Analog.analogSensors[j].enable)
 			continue;
 		var unitid = OSApp.Analog.analogSensors[j].unitid;
@@ -5115,7 +5119,7 @@ OSApp.Analog.showAnalogSensorCharts = function(limit2sensor) {
 	$.mobile.pageContainer.pagecontainer("change", page);
 
 	OSApp.Analog.updateCharts(limit2sensor);
-}
+};
 OSApp.Analog.updateCharts = function(limit2sensor) {
 	var chart1 = new Array(OSApp.Analog.Constants.CHARTS),
 		chart2 = new Array(OSApp.Analog.Constants.CHARTS),
@@ -5143,7 +5147,7 @@ OSApp.Analog.updateCharts = function(limit2sensor) {
 			});
 		});
 	});
-}
+};
 
 OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, lvl) {
 	var csvlines = csv.split(/(?:\r\n|\n)+/).filter(function (el) { return el.length !== 0; });
@@ -5266,83 +5270,83 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 			switch (unitid) {
 				case 1: unit = OSApp.Language._("Soil moisture");
 					title = OSApp.Language._("Soil moisture") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; }; // jshint ignore:line
 					minFunc = 0;
 					maxFunc = 100;
 					break;
 				case 2: unit = OSApp.Language._("degree celsius temperature");
 					title = OSApp.Language._("Temperature") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + String.fromCharCode(176) + "C"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + String.fromCharCode(176) + "C"; }; // jshint ignore:line
 					break;
 				case 3: unit = OSApp.Language._("degree fahrenheit temperature");
 					title = OSApp.Language._("Temperature") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + String.fromCharCode(176) + "F"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + String.fromCharCode(176) + "F"; }; // jshint ignore:line
 					break;
 				case 4: unit = OSApp.Language._("Volt");
 					title = OSApp.Language._("Voltage") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " V"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " V"; }; // jshint ignore:line
 					minFunc = 0;
 					maxFunc = 4;
 					autoY = false;
 					break;
 				case 5: unit = OSApp.Language._("Humidity");
 					title = OSApp.Language._("Air Humidity") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; }; // jshint ignore:line
 					minFunc = 0;
 					maxFunc = 100;
 					break;
 				case 6: unit = OSApp.Language._("Rain");
 					title = OSApp.Language._("Rainfall") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " in"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " in"; }; // jshint ignore:line
 					break;
 				case 7: unit = OSApp.Language._("Rain");
 					title = OSApp.Language._("Rainfall") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " mm"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " mm"; }; // jshint ignore:line
 					minFunc = 0;
 					break;
 				case 8: unit = OSApp.Language._("Wind");
 					title = OSApp.Language._("Wind") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " mph"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " mph"; }; // jshint ignore:line
 					minFunc = 0;
 					break;
 				case 9: unit = OSApp.Language._("Wind");
 					title = OSApp.Language._("Wind") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " kmh"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " kmh"; }; // jshint ignore:line
 					minFunc = 0;
 					break;
 				case 10: unit = OSApp.Language._("Level");
 					title = OSApp.Language._("Level") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; }; // jshint ignore:line
 					minFunc = 0;
 					maxFunc = 100;
 					autoY = false;
 					break;
 				case 11: unit = OSApp.Language._("DK");
 					title = OSApp.Language._("DK") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val); }; // jshint ignore:line
 					minFunc = 0;
 					break;
 				case 12: unit = OSApp.Language._("lm");
 					title = OSApp.Language._("Lumen") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val); }; // jshint ignore:line
 					minFunc = 0;
 					break;
 				case 13: unit = OSApp.Language._("lx");
 					title = OSApp.Language._("LUX") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val); }; // jshint ignore:line
 					minFunc = 0;
 					break;
 				case 14: unit = OSApp.Language._("L");
 					title = OSApp.Language._("Counter") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " L"; };
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " L"; }; // jshint ignore:line
 					minFunc = 0;
 					break;
 
 
 				default: unit = sensor.unit;
 					title = sensor.name + "~ " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
-			};
+					unitStr = function (val) { return OSApp.Analog.formatVal(val); }; // jshint ignore:line
+			}
 
 			let options = {
 				chart: {
@@ -5471,7 +5475,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 
 	for (let p = 0; p < OSApp.Analog.progAdjusts.length; p++) {
 		var adjust = OSApp.Analog.progAdjusts[p];
-		sensor = adjust.sensor;
+		let sensor = adjust.sensor;
 		for (let j = 0; j < OSApp.Analog.analogSensors.length; j++) {
 			if (OSApp.Analog.analogSensors[j].nr == sensor && AllOptions[OSApp.Analog.analogSensors[j].unitid]) {
 				let unitid = OSApp.Analog.analogSensors[j].unitid;
@@ -5592,7 +5596,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 	}
 };
 
-OSApp.Analog.isNumber = function(n) { return !isNaN(parseFloat(n)) && !isNaN(n - 0) };
+OSApp.Analog.isNumber = function(n) { return !isNaN(parseFloat(n)) && !isNaN(n - 0); };
 
 /**
 * format value output with 2 decimals.
