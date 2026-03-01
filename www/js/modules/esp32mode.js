@@ -189,6 +189,7 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo ) {
 		content += " checked='checked'";
 	}
 	content += "> " + OSApp.Language._( "ZigBee Gateway" );
+	content += " <em style='font-size:0.85em;color:#999'>( " + OSApp.Language._( "Ethernet required" ) + " )</em>";
 	content += "</label>";
 
 	content += "<label for='esp32-mode-zigbee-cl'>";
@@ -279,9 +280,64 @@ OSApp.ESP32Mode.setupZigBeeGateway = function() {
 };
 
 /**
+ * Zigbee Device Database — looks up vendor/description from the hosted DB.
+ * Caches results in localStorage by IEEE address.
+ */
+OSApp.ESP32Mode.ZigbeeDeviceDB = {
+	API_URL: "https://opensprinklershop.de/zigbee/devices_api.php",
+	_mem: {},
+
+	getCached: function( ieee ) {
+		if ( this._mem[ ieee ] ) { return this._mem[ ieee ]; }
+		try {
+			var raw = localStorage.getItem( "zb_dev_" + ieee );
+			if ( raw ) { return ( this._mem[ ieee ] = JSON.parse( raw ) ); }
+		} catch ( e ) { void e; }
+		return null;
+	},
+
+	setCached: function( ieee, data ) {
+		this._mem[ ieee ] = data;
+		try { localStorage.setItem( "zb_dev_" + ieee, JSON.stringify( data ) ); } catch ( e ) { void e; }
+	},
+
+	lookup: function( manufacturer, model ) {
+		var url = this.API_URL + "?manufacturer=" + encodeURIComponent( manufacturer ) + "&model=" + encodeURIComponent( model );
+		return $.ajax( { url: url, dataType: "json", timeout: 6000 } );
+	},
+
+	enrich: function( dev, $li ) {
+		var self = this;
+		var ieee = dev.ieee || "";
+		var mfr  = dev.manufacturer || "";
+		var mdl  = dev.model || "";
+		if ( !mfr ) { return; }
+
+		var cached = this.getCached( ieee );
+		if ( cached ) { self._apply( $li, cached ); return; }
+
+		this.lookup( mfr, mdl ).done( function( data ) {
+			if ( data && ( data.vendor || data.description ) ) {
+				self.setCached( ieee, data );
+				self._apply( $li, data );
+			}
+		} );
+	},
+
+	_apply: function( $li, data ) {
+		var label = ( data.vendor && data.description )
+			? data.vendor + " — " + data.description
+			: ( data.vendor || data.description || "" );
+		if ( label ) {
+			$li.find( ".zb-db-info" ).text( label ).show();
+		}
+	}
+};
+
+/**
  * Display the ZigBee Gateway management panel.
  * Shows the device list from /zg (action=list) response and a permit-join button.
- * Response format: { result:1, action:"list", devices:[ {ieee, short_addr, model, manufacturer, endpoint, device_id, is_new} ], count:N }
+ * Response format: { result:1, action:"list", devices:[ {ieee, short_addr, model, manufacturer, endpoint, device_id, is_new, last_rx_s, online} ], count:N }
  */
 OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	var content = "";
@@ -294,10 +350,23 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 		content += "<ul data-role='listview' data-inset='true'>";
 		for ( var i = 0; i < data.devices.length; i++ ) {
 			var dev = data.devices[ i ];
-			content += "<li" + ( dev.is_new ? " data-theme='b'" : "" ) + ">";
+			var isOnline  = dev.online === 1 || dev.online === true;
+			var hasRxInfo = dev.last_rx_s !== undefined && dev.last_rx_s !== null;
+			var onlineBadge = isOnline
+				? "<span style='color:#4caf50'>&#9679; " + OSApp.Language._( "Online" ) + "</span>"
+				: ( hasRxInfo
+					? "<span style='color:#9e9e9e'>&#9675; " + OSApp.Language._( "Offline" ) + "</span>"
+					: "" );
+			var ieeeAttr = dev.ieee ? " data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'" : "";
+
+			content += "<li" + ( dev.is_new ? " data-theme='b'" : "" ) + ieeeAttr + ">";
 			content += "<h4>" + ( dev.model || OSApp.Language._( "Unknown Device" ) ) + "</h4>";
+			if ( onlineBadge ) {
+				content += "<p>" + onlineBadge + "</p>";
+			}
+			content += "<p class='zb-db-info' style='display:none;color:#888;font-size:0.85em;margin:2px 0;'></p>";
 			if ( dev.ieee ) {
-				content += "<p>" + OSApp.Language._( "IEEE Address" ) + ": " + dev.ieee + "</p>";
+				content += "<p>" + OSApp.Language._( "IEEE" ) + ": " + dev.ieee + "</p>";
 			}
 			if ( dev.manufacturer ) {
 				content += "<p>" + OSApp.Language._( "Manufacturer" ) + ": " + dev.manufacturer + "</p>";
@@ -329,6 +398,17 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	} );
 
 	OSApp.UIDom.openPopup( popup );
+
+	// Async: enrich each device with vendor / description from the Zigbee Device DB
+	if ( data.devices ) {
+		for ( var j = 0; j < data.devices.length; j++ ) {
+			var d = data.devices[ j ];
+			if ( d.ieee && d.manufacturer ) {
+				var $li = popup.find( "li[data-ieee='" + d.ieee + "']" );
+				OSApp.ESP32Mode.ZigbeeDeviceDB.enrich( d, $li );
+			}
+		}
+	}
 };
 
 /**

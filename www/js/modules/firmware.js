@@ -229,7 +229,7 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 				// Handle the connection timing out but only show error on setting change
 				if ( OSApp.currentSession.prefix === "https://" ) {
-					OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. If using a self-signed certificate, please open the device URL in your browser first to accept it." ) );
+					OSApp.SSL.showCertDialog( OSApp.currentSession.ip );
 				} else {
 					OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. Please try again." ) );
 				}

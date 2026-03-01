@@ -1022,6 +1022,7 @@
    "ZigBee Client": "ZigBee-Client",
    "experimental / uncertified": "experimentell / unzertifiziert",
    "ZigBee Hub required": "ZigBee-Hub erforderlich",
+   "Ethernet required": "Ethernet erforderlich",
    "Current IEEE 802.15.4 Mode": "Aktueller IEEE 802.15.4 Modus",
    "Select the desired operating mode for the IEEE 802.15.4 radio": "Wählen Sie den gewünschten Betriebsmodus für das IEEE 802.15.4 Funkmodul",
    "Apply Mode": "Modus anwenden",
@@ -1051,6 +1052,15 @@
    "Combine Soil Moisture and Temperature in one chart": "Bodenfeuchte und Temperatur in einem Diagramm kombinieren",
    "Celsius to Fahrenheit": "Celsius in Fahrenheit",
    "Copy Sensor": "Sensor kopieren",
-   "Combine Humidity and Temperature in one chart": "Feuchtigkeit und Temperatur in einem Diagramm darstellen"
+   "Combine Humidity and Temperature in one chart": "Feuchtigkeit und Temperatur in einem Diagramm darstellen",
+   "Self-Signed Certificate": "Selbstsigniertes Zertifikat",
+   "Trust Certificate": "Zertifikat vertrauen",
+   "This device uses a self-signed security certificate. The app includes the standard OpenSprinkler certificate for secure HTTPS access.": "Dieses Gerät verwendet ein selbstsigniertes Sicherheitszertifikat. Die App enthält das Standard-OpenSprinkler-Zertifikat für sicheren HTTPS-Zugang.",
+   "Only proceed if this is your own device on a trusted local network.": "Fahren Sie nur fort, wenn dies Ihr eigenes Gerät in einem vertrauenswürdigen lokalen Netzwerk ist.",
+   "Your browser blocks HTTPS connections to devices with self-signed certificates.": "Ihr Browser blockiert HTTPS-Verbindungen zu Geräten mit selbstsignierten Zertifikaten.",
+   "Click 'Open Device URL' and accept the security warning in your browser.": "Klicken Sie auf 'Geräte-URL öffnen' und akzeptieren Sie die Sicherheitswarnung in Ihrem Browser.",
+   "Return here and try connecting again.": "Kehren Sie hierher zurück und versuchen Sie erneut zu verbinden.",
+   "Open Device URL": "Geräte-URL öffnen",
+   "Download Certificate": "Zertifikat herunterladen"
 }
 }

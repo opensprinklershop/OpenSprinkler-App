@@ -26,5 +26,5 @@ chown stefan:www platforms/* -R
 sed -i "s/OpenSprinkler-v$BUILD_TS/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.js
 
 rm ./platforms/browser/platform_www/plugins/* -R 2>/dev/null
-rm ./platforms/browser/www/*.js 2>/dev/null
+rm ./platforms/browser/www/cordova.js ./platforms/browser/www/cordova_plugins.js 2>/dev/null
 #systemctl restart squid

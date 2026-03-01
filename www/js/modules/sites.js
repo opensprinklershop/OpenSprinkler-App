@@ -157,6 +157,8 @@ OSApp.Sites.displayPage = function() {
 							( typeof b.ssl !== "undefined" && b.ssl === "1" ? " checked='checked'" : "" ) + ">" +
 							OSApp.Language._( "Use SSL" ) +
 							"</label>" +
+							"<a data-role='button' data-mini='true' class='ssl-cert-btn' data-ip='" + b.os_ip + "' href='#'>" +
+							OSApp.Language._( "Trust Certificate" ) + "</a>" +
 							"<label for='useauth-" + i + "'>" +
 							"<input class='useauth' data-user='" + b.auth_user + "' data-pw='" + b.auth_pw +
 							"' data-mini='true' type='checkbox' id='useauth-" + i + "' name='useauth-" + i + "'" +
@@ -383,6 +385,12 @@ list.find( ".add-otc-connection" ).on( "click", function() {
 				var siteName = siteNames[ siteIndex ];
 				var siteData = sites[ siteName ];
 				OSApp.Sites.showAddOTCConnection( siteName, siteData );
+					return false;
+				} );
+
+				list.find( ".ssl-cert-btn" ).on( "click", function() {
+					var ip = $( this ).data( "ip" );
+					OSApp.SSL.showCertDialog( ip );
 					return false;
 				} );
 
@@ -794,7 +802,12 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 			}
 			if ( ssl ) {
 				$.mobile.loading( "hide" );
-				OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
+				if ( x.status === 0 ) {
+					// Status 0 with HTTPS typically means a certificate rejection
+					OSApp.SSL.showCertDialog( ip );
+				} else {
+					OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
+				}
 			} else {
 				OSApp.Sites.submitNewSite( true );
 			}

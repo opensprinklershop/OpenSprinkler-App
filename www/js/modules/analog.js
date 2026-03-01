@@ -2857,6 +2857,7 @@ list += "</select></div>" +
 			var joinRequestInFlight = false;
 			var lastDeviceCount = 0;
 			var wifiConnected = false;
+			var deviceSelected = false;  // true once user picks a device; stops list refresh
 
 			function updateScanUi() {
 				var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
@@ -2925,6 +2926,9 @@ list += "</select></div>" +
 			}
 
 			function updateDeviceList() {
+					// Once the user has selected a device, stop refreshing the list so the
+					// in-flight /zd response can no longer overwrite the dropdown selection.
+					if (deviceSelected) { requestInFlight = false; return; }
 					if (requestInFlight) {
 						if ((Date.now() - requestStartTime) < 4000) {
 							return;
@@ -2978,7 +2982,15 @@ list += "</select></div>" +
 								var clusterHex = clusterId ? "0x" + parseInt(clusterId, 10).toString(16).toUpperCase().padStart(4, "0") : "";
 								var attributeHex = attributeId ? "0x" + parseInt(attributeId, 10).toString(16).toUpperCase().padStart(4, "0") : "";
 
-								var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
+								// Try to enrich label with a friendly name from the device DB cache.
+								var dbEntry = OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB
+									? OSApp.ESP32Mode.ZigbeeDeviceDB.getCached(ieeeAddr) : null;
+								var friendlyName = dbEntry && (dbEntry.vendor || dbEntry.description)
+									? (dbEntry.vendor || "") + (dbEntry.vendor && dbEntry.description ? " — " : "") + (dbEntry.description || "")
+									: "";
+								var label = friendlyName
+									? friendlyName + " (" + modelId + ") | IEEE: " + ieeeAddr
+									: modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
 								if (endpoint) label += " | EP: " + endpoint;
 								if (clusterHex) label += " | CID: " + clusterHex;
 								if (attributeHex) label += " | AID: " + attributeHex;
@@ -3018,6 +3030,9 @@ list += "</select></div>" +
 
 			// Immediately apply selected ZigBee device to fields on combobox change
 			popup.find("#zigbeeDeviceSelect").off("change").on("change", function () {
+					// Mark selection done FIRST so updateDeviceList() stops refreshing
+					// and the in-flight /zd response can no longer overwrite this choice.
+					deviceSelected = true;
 					var idxStr = popup.find("#zigbeeDeviceSelect").val();
 					var idx = parseInt(idxStr, 10);
 					if (idxStr === "" || isNaN(idx)) {
@@ -3065,6 +3080,10 @@ list += "</select></div>" +
 
 						popup.find("#device_ieee").val(selectedDevice.ieee).trigger("change");
 
+						// Store manufacturer & model for device-DB-assisted sensor lookup
+						popup.data("zigbee_manufacturer", selectedDevice.manufacturer || "");
+						popup.data("zigbee_model", selectedDevice.model || "");
+
 						// Store discovery timestamp for predictive boost anchor
 						if (selectedDevice.discovered_at) {
 							popup.data("zigbee_discovered_at", selectedDevice.discovered_at);
@@ -3107,7 +3126,6 @@ list += "</select></div>" +
 							}
 						}
 
-						popup.find(".name").focus();
 					});
 				});
 
@@ -3229,6 +3247,10 @@ list += "</select></div>" +
 			try { knownSensorsSelect.selectmenu("refresh"); } catch ( e ) { void e; /* widget not yet initialized */ }
 			return;
 		}
+		var zbMfr = targetPopup.data("zigbee_manufacturer");
+		var zbMdl = targetPopup.data("zigbee_model");
+
+		// Load generic ZigBee cluster templates
 		OSApp.Analog.loadZigBeeClusterData().then(function(clusterData) {
 			if (clusterData && clusterData.length > 0) {
 				var reportOption = knownSensorsSelect.find("option[value='__report__']");
@@ -3245,6 +3267,42 @@ list += "</select></div>" +
 				try { knownSensorsSelect.selectmenu("refresh"); } catch ( e ) { void e; /* widget not yet initialized */ }
 			}
 		});
+
+		// Load device-specific sensors from Zigbee Device DB (if fingerprint is known)
+		if (zbMfr && zbMdl) {
+			$.ajax({
+				url: "https://opensprinklershop.de/zigbee/devices_api.php?manufacturer=" + encodeURIComponent(zbMfr) + "&model=" + encodeURIComponent(zbMdl),
+				dataType: "json",
+				timeout: 6000
+			}).done(function(dbData) {
+				if (!dbData || !dbData.sensors || !dbData.sensors.length) { return; }
+				var firstOpt = knownSensorsSelect.find("option").first();
+				dbData.sensors.forEach(function(s) {
+					if (!s.name || !s.cluster_id) { return; }
+					var sensorDef = {
+						id:            "__db_" + s.name,
+						name:          ( dbData.vendor || zbMdl ) + ": " + s.description,
+						description:   s.unit || "",
+						endpoint:      s.endpoint || 1,
+						cluster_id:    s.cluster_id,
+						attribute_id:  s.attr_id || "0x0000",
+						unitid:        s.unitid || 0,
+						factor:        s.factor || 1,
+						divider:       s.divider || 1,
+						offset:        0
+					};
+					var optText = ( dbData.vendor || zbMdl ) + ": " + s.description + ( s.unit ? " [" + s.unit + "]" : "" );
+					var opt = $("<option>").val(sensorDef.id).text(optText).data("sensor", sensorDef);
+					if (firstOpt.length) {
+						firstOpt.before(opt);
+					} else {
+						knownSensorsSelect.append(opt);
+					}
+				});
+				applyKnownTemplateSelection();
+				try { knownSensorsSelect.selectmenu("refresh"); } catch (e) { void e; }
+			});
+		}
 	};
 	var lazyLoadZigBeeKnownSensors = function() {
 		OSApp.Analog.populateZigBeeKnownSensors(popup);
