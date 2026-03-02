@@ -60,7 +60,6 @@
                 <true/>
             </dict>
         </config-file>
-        <resource-file src="cert/server_cert.der" />
         <edit-config target="CFBundleShortVersionString" file="*-Info.plist" mode="overwrite">
             <string>19946</string>
         </edit-config>
@@ -106,7 +105,6 @@
     	                        android:networkSecurityConfig="@xml/network_security_config" />
         </edit-config>
         <resource-file src="res/android/network_security_config.xml" target="app/src/main/res/xml/network_security_config.xml" />
-        <resource-file src="cert/server_cert.der" target="app/src/main/res/raw/server_cert.der" />
         <config-file target="AndroidManifest.xml" parent="queries">
             <intent>
                 <action android:name="android.media.action.IMAGE_CAPTURE" />

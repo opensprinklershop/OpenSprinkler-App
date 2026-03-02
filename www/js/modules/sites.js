@@ -454,25 +454,45 @@ list.find( ".add-otc-connection" ).on( "click", function() {
 OSApp.Sites.testSite = function( site, id, callback ) {
 	callback = callback || function() {};
 	var urlDest = "/jo?pw=" + encodeURIComponent( site.os_pw ),
-		url = site.os_token ? "https://cloud.openthings.io/forward/v1/" + site.os_token + urlDest : ( site.ssl === "1" ? "https://" : "http://" ) + site.os_ip + urlDest;
+		url = site.os_token ? "https://cloud.openthings.io/forward/v1/" + site.os_token + urlDest : ( site.ssl === "1" ? "https://" : "http://" ) + site.os_ip + urlDest,
 
-	$.ajax( {
-		url: url,
-		type: "GET",
-		dataType: "json",
-		beforeSend: function( xhr ) {
-			if ( typeof site.auth_user !== "undefined" && typeof site.auth_pw !== "undefined" ) {
-				xhr.setRequestHeader( "Authorization", "Basic " + btoa( site.auth_user + ":" + site.auth_pw ) );
+		// Use native HTTP for direct HTTPS device connections on Android (WebView
+		// cannot verify self-signed certs, but cordova-plugin-advanced-http can).
+		useNative = !site.os_token &&
+			site.ssl === "1" &&
+			OSApp.currentDevice.isAndroid &&
+			window.cordova && window.cordova.plugin && window.cordova.plugin.http &&
+			typeof window.cordova.plugin.http.sendRequest === "function";
+
+	if ( useNative ) {
+		var headers = {};
+		if ( typeof site.auth_user !== "undefined" && typeof site.auth_pw !== "undefined" ) {
+			headers.Authorization = "Basic " + btoa( site.auth_user + ":" + site.auth_pw );
+		}
+		OSApp.Firmware.nativeHttpRequest( {
+			url: url,
+			type: "GET",
+			dataType: "json",
+			headers: headers
+		} ).then(
+			function() { callback( id, true ); },
+			function() { callback( id, false ); }
+		);
+	} else {
+		$.ajax( {
+			url: url,
+			type: "GET",
+			dataType: "json",
+			beforeSend: function( xhr ) {
+				if ( typeof site.auth_user !== "undefined" && typeof site.auth_pw !== "undefined" ) {
+					xhr.setRequestHeader( "Authorization", "Basic " + btoa( site.auth_user + ":" + site.auth_pw ) );
+				}
 			}
-		}
-	} ).then(
-		function() {
-			callback( id, true );
-		},
-		function() {
-			callback( id, false );
-		}
-	);
+		} ).then(
+			function() { callback( id, true ); },
+			function() { callback( id, false ); }
+		);
+	}
 };
 
 // Update the panel list of sites
@@ -804,7 +824,25 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 				$.mobile.loading( "hide" );
 				if ( x.status === 0 ) {
 					// Status 0 with HTTPS typically means a certificate rejection
-					OSApp.SSL.showCertDialog( ip );
+					OSApp.SSL.showCertDialog( ip, function( ready ) {
+						if ( !ready ) { return; }
+						// Certificate trusted — retry via native HTTP (cordova-plugin-advanced-http)
+						$.mobile.loading( "show" );
+						OSApp.Firmware.nativeHttpRequest( {
+							url: prefix + ip + urlDest,
+							type: "GET",
+							dataType: "json",
+							timeout: 10000
+						} ).then( function( reply ) {
+							OSApp.Storage.get( "sites", function( storageData ) {
+								var sites = OSApp.Sites.parseSites( storageData.sites );
+								success( reply, sites );
+							} );
+						}, function() {
+							$.mobile.loading( "hide" );
+							OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
+						} );
+					} );
 				} else {
 					OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
 				}
@@ -970,6 +1008,11 @@ OSApp.Sites.newLoad = function() {
 
 	//Empty timers object
 	OSApp.uiState.timers = {};
+
+	//Clear device-specific sensor/analog caches
+	if ( OSApp.Analog && OSApp.Analog.clearDeviceCache ) {
+		OSApp.Analog.clearDeviceCache();
+	}
 
 	//Clear the current queued AJAX requests (used for previous OSApp.currentSession.controller connection)
 	$.ajaxq.abort( "default" );

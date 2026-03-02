@@ -311,7 +311,7 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 		var ieee = dev.ieee || "";
 		var mfr  = dev.manufacturer || "";
 		var mdl  = dev.model || "";
-		if ( !mfr ) { return; }
+		if ( !mfr || mfr === "unknown" ) { return; }
 
 		var cached = this.getCached( ieee );
 		if ( cached ) { self._apply( $li, cached ); return; }
@@ -360,7 +360,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			var ieeeAttr = dev.ieee ? " data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'" : "";
 
 			content += "<li" + ( dev.is_new ? " data-theme='b'" : "" ) + ieeeAttr + ">";
-			content += "<h4>" + ( dev.model || OSApp.Language._( "Unknown Device" ) ) + "</h4>";
+			content += "<h4>" + ( ( dev.model && dev.model !== "unknown" ) ? dev.model : OSApp.Language._( "Unknown Device" ) ) + "</h4>";
 			if ( onlineBadge ) {
 				content += "<p>" + onlineBadge + "</p>";
 			}
@@ -368,7 +368,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			if ( dev.ieee ) {
 				content += "<p>" + OSApp.Language._( "IEEE" ) + ": " + dev.ieee + "</p>";
 			}
-			if ( dev.manufacturer ) {
+			if ( dev.manufacturer && dev.manufacturer !== "unknown" ) {
 				content += "<p>" + OSApp.Language._( "Manufacturer" ) + ": " + dev.manufacturer + "</p>";
 			}
 			content += "<p class='ui-li-aside'>" + OSApp.Language._( "Endpoint" ) + ": " + dev.endpoint + "</p>";
@@ -403,7 +403,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	if ( data.devices ) {
 		for ( var j = 0; j < data.devices.length; j++ ) {
 			var d = data.devices[ j ];
-			if ( d.ieee && d.manufacturer ) {
+			if ( d.ieee && d.manufacturer && d.manufacturer !== "unknown" ) {
 				var $li = popup.find( "li[data-ieee='" + d.ieee + "']" );
 				OSApp.ESP32Mode.ZigbeeDeviceDB.enrich( d, $li );
 			}

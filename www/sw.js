@@ -15,7 +15,7 @@
 
 // Define a name for the current cache
 // BUILD_TIMESTAMP will be replaced by the build script to bust the cache
-var cacheName = "OpenSprinkler-v__BUILD_TIMESTAMP__";
+var cacheName = "OpenSprinkler-v20260302182436";
 
 // Html
 var cacheFiles = [

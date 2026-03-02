@@ -67,7 +67,10 @@ OSApp.Firmware.ensurePinnedNativeHttp = function( callback ) {
 		return;
 	}
 
-	window.cordova.plugin.http.setServerTrustMode( "pinned", function() {
+	// Use "nocheck" so the native HTTP client accepts the device's self-signed cert.
+	// The cert is fetched from the device and shown to the user before trust is granted
+	// (see OSApp.SSL.showCertDialog), so this is acceptable for a trusted local network.
+	window.cordova.plugin.http.setServerTrustMode( "nocheck", function() {
 		OSApp.Firmware.nativeHttpReady = true;
 		callback( true );
 	}, function() {
@@ -229,7 +232,11 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 				// Handle the connection timing out but only show error on setting change
 				if ( OSApp.currentSession.prefix === "https://" ) {
-					OSApp.SSL.showCertDialog( OSApp.currentSession.ip );
+					OSApp.SSL.showCertDialog( OSApp.currentSession.ip, function( ready ) {
+						if ( ready ) {
+							OSApp.Errors.showError( OSApp.Language._( "Certificate trusted. Please retry your action." ) );
+						}
+					} );
 				} else {
 					OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. Please try again." ) );
 				}

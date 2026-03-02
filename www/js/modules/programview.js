@@ -16,6 +16,9 @@ OSApp.ProgramView = {
 	clickedOn : -1,
 	clickedMove : 0,
 	scrollY : 0,
+	touchStartX : 0,
+	touchStartY : 0,
+	touchMoved : 0,
 	showing : false,
 	lastWidth : 0,
 	Constants: {
@@ -248,13 +251,15 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 							let pid = opts.config.pid;
 							OSApp.ProgramView.clickedMove += Math.abs(top-scrollY);
 							OSApp.ProgramView.scrollY = top;
-							if (OSApp.ProgramView.clickedMove > 10) {
+							if (OSApp.ProgramView.clickedMove > 10 || OSApp.ProgramView.touchMoved > 10) {
 								OSApp.ProgramView.clickedOn = -1;
 								OSApp.ProgramView.clickedMove = 0;
+								OSApp.ProgramView.touchMoved = 0;
 								return;
 							}
 							OSApp.ProgramView.clickedOn = -1;
 							OSApp.ProgramView.clickedMove = 0;
+							OSApp.ProgramView.touchMoved = 0;
 
 							setTimeout(function() {
 								var name = OSApp.currentSession.controller.programs.pd[ pid ][ 5 ];
@@ -358,6 +363,19 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 			if (sel) {
 				chart = new ApexCharts(sel, options);
 				chart.render();
+				// Track touch movement to prevent swipe-triggered program start
+				$(sel).on("touchstart", function(e) {
+					var t = e.originalEvent.touches[0];
+					OSApp.ProgramView.touchStartX = t.clientX;
+					OSApp.ProgramView.touchStartY = t.clientY;
+					OSApp.ProgramView.touchMoved = 0;
+				}).on("touchmove", function(e) {
+					var t = e.originalEvent.touches[0];
+					OSApp.ProgramView.touchMoved += Math.abs(t.clientX - OSApp.ProgramView.touchStartX) +
+						Math.abs(t.clientY - OSApp.ProgramView.touchStartY);
+					OSApp.ProgramView.touchStartX = t.clientX;
+					OSApp.ProgramView.touchStartY = t.clientY;
+				});
 				programChart.chart = chart;
 			}
 		} else {
