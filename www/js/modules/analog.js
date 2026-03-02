@@ -457,9 +457,9 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 		for (i = 0; i < orderedSensors.length; i++) {
 			var skel = orderedSensors[i];
 			if (skel.show) {
-				var nameColStyle = screen.width < 600
-					? "text-align:left;padding:2px 4px 2px 2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"
-					: "text-align:left;padding:2px 4px 2px 2px;white-space:nowrap;";
+				var nameColStyle = (screen.width < 600) ?
+					"text-align:left;padding:2px 4px 2px 2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" :
+					"text-align:left;padding:2px 4px 2px 2px;white-space:nowrap;";
 				sensorRows +=
 					"<tr id='sensor-show-" + skel.nr + "'>" +
 					"<td style='" + nameColStyle + "'></td>" +
