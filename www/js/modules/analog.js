@@ -2138,8 +2138,10 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 						var shortAddr = device.short_addr || "0x0000";
 						var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
 						var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
+						var vendor = device.vendor || "";
+						var displayModel = vendor ? vendor + " " + modelId : modelId;
 
-						var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
+						var label = displayModel + " (" + manufacturer + ") | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
 						sel.append($("<option>").val(String(i)).text(label));
 
 						// Track last found device
@@ -2152,7 +2154,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 							};
 							scanDialog.find("#lastDevice").html(
 								"<strong style='color: green;'>" + OSApp.Language._("Last found") + ":</strong> " +
-								OSApp.Utils.htmlEscape(modelId) + " (" + OSApp.Utils.htmlEscape(manufacturer) + ")<br>" +
+								OSApp.Utils.htmlEscape(displayModel) + " (" + OSApp.Utils.htmlEscape(manufacturer) + ")<br>" +
 								"<small>IEEE: " + OSApp.Utils.htmlEscape(ieeeAddr) + "</small>"
 							).show();
 						}
@@ -2634,7 +2636,9 @@ OSApp.Analog.autoLoadZigBeeDevices = function(popup) {
 				var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
 				var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
 				var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
-				var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
+				var vendor = device.vendor || "";
+				var displayModel = vendor ? vendor + " " + modelId : modelId;
+				var label = displayModel + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
 				deviceSelect.append($('<option>').val(String(i)).text(label).attr("data-ieee", ieeeAddr));
 			}
 			// Restore previously selected device if a known IEEE is already filled in
@@ -2773,6 +2777,10 @@ list += "</select></div>" +
 	"<div class='zigbee-device-select-container'>" +
 	"<label for='zigbeeDeviceSelect'>" + OSApp.Language._("Known ZigBee Devices") + "</label>" +
 	"<select data-mini='true' id='zigbeeDeviceSelect'></select>" +
+	"</div>" +
+	"<div class='zigbee-db-cluster-container' style='display:none; margin-top:8px;'>" +
+	"<label for='zigbeeDbClusterSelect'>" + OSApp.Language._("Sensor / Cluster (from DB)") + "</label>" +
+	"<select data-mini='true' id='zigbeeDbClusterSelect'></select>" +
 	"</div>" +
 	"</div>" +
 	"<div id='zigbeeScanArea' class='ui-body ui-body-a' style='display:none; margin: 10px 0; padding: 10px; border-radius: 5px;'>" +
@@ -2996,6 +3004,50 @@ list += "</select></div>" +
 					popup.find("#attribute_id").val("0x0000");
 				}
 			}
+
+			// Look up per-cluster entries for this device in the DB and populate the cluster combobox
+			var $clusterWrap = popup.find(".zigbee-db-cluster-container");
+			var $clusterSel  = popup.find("#zigbeeDbClusterSelect");
+			$clusterSel.empty().append("<option value=''>" + OSApp.Language._("Loading from DB...") + "</option>");
+			if ( typeof OSApp.ESP32Mode !== "undefined" && OSApp.ESP32Mode.ZigbeeDeviceDB && manufacturer && manufacturer !== OSApp.Language._("Unknown") ) {
+				OSApp.ESP32Mode.ZigbeeDeviceDB.lookupForCombobox( manufacturer, modelId ).then( function( entries ) {
+					$clusterSel.empty();
+					if ( !entries || entries.length === 0 ) {
+						$clusterWrap.hide();
+						return;
+					}
+					$clusterSel.append("<option value=''>" + OSApp.Language._("Select sensor/cluster from DB") + "</option>");
+					$.each( entries, function( i, entry ) {
+						var label = ( entry.sensor_name || "" ) +
+							" (" + ( entry.cluster_id || "" ) + ")" +
+							( entry.unit ? " \u2014 " + entry.unit : "" ) +
+							( entry.endpoint > 1 ? " EP:" + entry.endpoint : "" );
+						$clusterSel.append("<option value='" + i + "'>" + label + "</option>");
+					} );
+					popup.data("zigbeeDbClusterEntries", entries);
+					$clusterWrap.show();
+					try { $clusterSel.selectmenu("refresh", true); } catch (e) { void e; }
+				} );
+			} else {
+				$clusterWrap.hide();
+			}
+		});
+
+		popup.on("change", "#zigbeeDbClusterSelect", function () {
+			var idxStr = $(this).val();
+			if (idxStr === "" || idxStr === null) { return; }
+			var entries = popup.data("zigbeeDbClusterEntries") || [];
+			var entry   = entries[ parseInt(idxStr, 10) ];
+			if (!entry) { return; }
+			if (entry.cluster_id) { popup.find("#cluster_id").val(entry.cluster_id).trigger("change"); }
+			if (entry.attr_id)    { popup.find("#attribute_id").val(entry.attr_id).trigger("change"); }
+			if (entry.endpoint)   { popup.find("#endpoint").val(entry.endpoint).trigger("change"); }
+			if (entry.unitid !== undefined && entry.unitid !== null) {
+				popup.find("#unitid").val(entry.unitid).trigger("change");
+				try { popup.find("#unitid").selectmenu("refresh"); } catch (e) { void e; }
+			}
+			if (entry.factor  !== undefined) { popup.find("#factor").val(entry.factor).trigger("change"); }
+			if (entry.divider !== undefined) { popup.find("#divider").val(entry.divider).trigger("change"); }
 		});
 
 		popup.on("change", "#bluetoothDeviceSelect", function () {
@@ -3218,11 +3270,13 @@ list += "</select></div>" +
 								// Try to enrich label with a friendly name from the device DB cache.
 								var dbEntry = OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB ?
 						OSApp.ESP32Mode.ZigbeeDeviceDB.getCached(ieeeAddr) : null;
+								var directVendor = device.vendor || "";
 								var friendlyName = dbEntry && (dbEntry.vendor || dbEntry.description) ?
 						(dbEntry.vendor || "") + (dbEntry.vendor && dbEntry.description ? " — " : "") + (dbEntry.description || "")
 									: "";
 								var label = friendlyName ?
 						friendlyName + " (" + modelId + ") | IEEE: " + ieeeAddr
+									: directVendor ? directVendor + " " + modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr
 									: modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
 								if (endpoint) label += " | EP: " + endpoint;
 								if (clusterHex) label += " | CID: " + clusterHex;

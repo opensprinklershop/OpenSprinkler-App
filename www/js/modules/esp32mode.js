@@ -306,6 +306,22 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 		return $.ajax( { url: url, dataType: "json", timeout: 6000 } );
 	},
 
+	/** Returns cluster_entries array for the sensor-editor combobox.
+	 *  Each entry has: label, cluster_id, attr_id, sensor_name, unit, unitid,
+	 *  factor, divider, is_tuya_dp, dp, endpoint, vendor, model_name, fingerprint.
+	 *  Resolves with [] on failure so callers don't need to handle errors. */
+	lookupForCombobox: function( manufacturer, model ) {
+		var url = this.API_URL +
+			"?manufacturer=" + encodeURIComponent( manufacturer ) +
+			"&model="        + encodeURIComponent( model ) +
+			"&for_combobox=1";
+		return $.ajax( { url: url, dataType: "json", timeout: 8000 } )
+			.then(
+				function( data ) { return data.cluster_entries || []; },
+				function()       { return []; }
+			);
+	},
+
 	enrich: function( dev, $li ) {
 		var self = this;
 		var ieee = dev.ieee || "";
