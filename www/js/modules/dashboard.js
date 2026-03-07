@@ -1135,7 +1135,7 @@ OSApp.Dashboard.displayPage = function() {
 			}
 			// Force updateSensorShowArea to rebuild HTML on next visit,
 			// since the DOM container is about to be destroyed.
-			OSApp.Analog.lastSensorStructKey = "";
+			OSApp.Analog.lastSensorHtml = "";
 			page.remove();
 		} );
 	} );

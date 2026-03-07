@@ -19,11 +19,7 @@ OSApp.Analog = {
 	timer : null,
 
 	lastSensorHtml : "",
-	lastSensorStructKey : "",
-	_dashboardCharts : [],
 	zigbeeClusterData : null,
-	cachedSensorTypes : null,
-	configPageLoaded : false,
 	chartConvertTemp : 0, // 0=no conversion, 1=F->C, 2=C->F
 	chartCombineMoistTemp : false, // combine soil moisture and temperature in one chart
 
@@ -49,7 +45,6 @@ OSApp.Analog = {
 		RS485_TRUEBNER3 : 0x80,
 		RS485_TRUEBNER4 : 0x100,
 		OSPI_USB_RS485 : 0x200,
-		I2C_RS485 : 0x400,
 
 		MONITOR_MIN      : 1,
 		MONITOR_MAX      : 2,
@@ -123,30 +118,22 @@ OSApp.Analog.success_callback = function() {
 };
 
 OSApp.Analog.syncChartOptionsFromController = function() {
-	try {
-		var stored = localStorage.getItem("OSApp.Analog.chartOptions");
-		if ( stored ) {
-			var opts = JSON.parse( stored );
-			var tmpCo = opts.tmpCo;
-			var comb = opts.comb;
+	var options = OSApp.currentSession.controller && OSApp.currentSession.controller.options ? OSApp.currentSession.controller.options : {};
+	var tmpCo = options.tmpCo;
+	var comb = options.comb;
 
-			if ( typeof tmpCo === "string" ) {
-				tmpCo = parseInt( tmpCo, 10 );
-			}
-			if ( typeof tmpCo === "number" && !isNaN( tmpCo ) ) {
-				OSApp.Analog.chartConvertTemp = Math.max( 0, Math.min( 2, tmpCo ) );
-			}
+	if ( typeof tmpCo === "string" ) {
+		tmpCo = parseInt( tmpCo, 10 );
+	}
+	if ( typeof tmpCo === "number" && !isNaN( tmpCo ) ) {
+		OSApp.Analog.chartConvertTemp = Math.max( 0, Math.min( 2, tmpCo ) );
+	}
 
-			if ( typeof comb === "string" ) {
-				comb = parseInt( comb, 10 );
-			}
-			if ( typeof comb === "number" && !isNaN( comb ) ) {
-				OSApp.Analog.chartCombineMoistTemp = comb === 1;
-			}
-		}
-	} catch ( e ) {
-		void e;
-		// Ignore parse errors, use defaults
+	if ( typeof comb === "string" ) {
+		comb = parseInt( comb, 10 );
+	}
+	if ( typeof comb === "number" && !isNaN( comb ) ) {
+		OSApp.Analog.chartCombineMoistTemp = comb === 1;
 	}
 };
 
@@ -156,12 +143,13 @@ OSApp.Analog.saveChartOptions = function() {
 		comb: OSApp.Analog.chartCombineMoistTemp ? 1 : 0
 	};
 
-	try {
-		localStorage.setItem("OSApp.Analog.chartOptions", JSON.stringify( payload ));
-	} catch ( e ) {
-		void e;
-		// Ignore storage errors
+	if ( !OSApp.currentSession.controller.options ) {
+		OSApp.currentSession.controller.options = {};
 	}
+	OSApp.currentSession.controller.options.tmpCo = payload.tmpCo;
+	OSApp.currentSession.controller.options.comb = payload.comb;
+
+	return OSApp.Analog.sendToOsObj( "/co?pw=", payload );
 };
 
 
@@ -255,20 +243,6 @@ OSApp.Analog.refresh = function() {
 	setTimeout( function() {
 		location.reload();
 	}, 100 );
-};
-
-// Clear all device-specific cached data (call when switching devices)
-OSApp.Analog.clearDeviceCache = function() {
-	OSApp.Analog.cachedSensorTypes  = null;
-	OSApp.Analog.zigbeeClusterData  = null;
-	OSApp.Analog.configPageLoaded   = false;
-	OSApp.Analog.lastSensorHtml     = "";
-	OSApp.Analog.lastSensorStructKey = "";
-	OSApp.Analog._dashboardCharts   = [];
-	OSApp.Analog.analogSensors      = [];
-	OSApp.Analog.progAdjusts        = [];
-	OSApp.Analog.monitors           = [];
-	OSApp.Analog.monitorAlerts      = [];
 };
 
 OSApp.Analog.enc = function(s) {
@@ -369,259 +343,239 @@ OSApp.Analog.checkMonitorAlerts = function() {
 };
 
 OSApp.Analog.updateSensorShowArea = function( page ) {
-	if (!OSApp.Analog.checkAnalogSensorAvail()) return;
+	if (OSApp.Analog.checkAnalogSensorAvail()) {
+		var showArea = page.find("#os-sensor-show");
+		var html = "", i, j;
 
-	var showArea = page.find("#os-sensor-show");
-	var i, j;
+		var root = document.documentElement;
+		var body = document.body || document.getElementsByTagName('body')[0];
+		var isDark = (root.classList.contains("theme-dark") || (body && body.classList.contains("theme-dark")));
+		var isColorful = (root.classList.contains("theme-colorful") || (body && body.classList.contains("theme-colorful")));
+		var css = getComputedStyle(root);
+		var theme = {
+			accent: isColorful ? css.getPropertyValue("--theme-colorful-text").trim() || "#7059ff" : (isDark ? "#3a8dde" : "#20E647"),
+			surfaceStrong: isColorful ? (css.getPropertyValue("--theme-colorful-surface-strong").trim() || "#fff") : (isDark ? "#151a22" : "#fff"),
+			gauge: {
+				green: isDark ? "#18c36e" : "#20E647",
+				orange: isDark ? "#ff9f43" : "#FF8C00",
+				red: isDark ? "#ff6b6b" : "#CD5C5C"
+			},
+			monitorBg: isColorful ? [
+				"rgba(141,120,235,0.15)",
+				"rgba(141,120,235,0.25)",
+				"rgba(141,120,235,0.35)"
+			] : (isDark ? [
+				"rgba(58,141,222,0.15)",
+				"rgba(58,141,222,0.25)",
+				"rgba(58,141,222,0.35)"
+			] : [
+				"#e8f7ee",
+				"#fff6db",
+				"#ffe5e7"
+			])
+		};
+		html += "<div class='ui-body ui-body-a center'><table style='margin: 0px auto;'>";
+		var cols = Math.round(window.innerWidth / 300);
 
-	// Build sorted local copies according to saved row order
-	function sortedByOrder(arr, sectionId) {
-		var copy = arr.slice();
-		var order = OSApp.Analog.getRowOrder(sectionId);
-		if (!order || !order.length) return copy;
-		var pos = new Map();
-		for (var k = 0; k < order.length; k++) pos.set(order[k], k);
-		copy.sort(function(a, b) {
-			var pa = pos.has(a.nr) ? pos.get(a.nr) : Number.POSITIVE_INFINITY;
-			var pb = pos.has(b.nr) ? pos.get(b.nr) : Number.POSITIVE_INFINITY;
-			return pa === pb ? (a.nr || 0) - (b.nr || 0) : pa - pb;
-		});
-		return copy;
-	}
-
-	var orderedSensors     = sortedByOrder(OSApp.Analog.analogSensors, "sensors");
-	var pctFormatter = function(val) { return OSApp.Analog.formatValUnit(val, "%"); };
-		var orderedProgAdjusts = sortedByOrder(OSApp.Analog.progAdjusts,   "progadjust");
-        var orderedMonitors    = (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors) ?
-            sortedByOrder(OSApp.Analog.monitors, "monitors") : [];
-
-
-
-	var root = document.documentElement;
-	var body = document.body || document.getElementsByTagName("body")[0];
-	var isDark     = root.classList.contains("theme-dark")     || (body && body.classList.contains("theme-dark"));
-	var isColorful = root.classList.contains("theme-colorful") || (body && body.classList.contains("theme-colorful"));
-	var css = getComputedStyle(root);
-	var theme = {
-		accent: isColorful ? css.getPropertyValue("--theme-colorful-text").trim() || "#7059ff" : (isDark ? "#3a8dde" : "#20E647"),
-		surfaceStrong: isColorful ? (css.getPropertyValue("--theme-colorful-surface-strong").trim() || "#fff") : (isDark ? "#151a22" : "#fff"),
-		gauge: {
-			green:  isDark ? "#18c36e" : "#20E647",
-			orange: isDark ? "#ff9f43" : "#FF8C00",
-			red:    isDark ? "#ff6b6b" : "#CD5C5C"
-		},
-		monitorBg: isColorful ? [
-			"rgba(141,120,235,0.15)", "rgba(141,120,235,0.25)", "rgba(141,120,235,0.35)"
-		] : (isDark ? [
-			"rgba(58,141,222,0.15)",  "rgba(58,141,222,0.25)",  "rgba(58,141,222,0.35)"
-		] : [ "#e8f7ee", "#fff6db", "#ffe5e7" ])
-	};
-
-	var cols = Math.round(window.innerWidth / 300);
-
-	// Structural key: depends only on which items exist and their display order, not their values
-	var structKey =
-		"pa:"   + orderedProgAdjusts.map(function(p) { return p.nr; }).join(",") +
-		"|cols:" + cols +
-		"|mon:" + orderedMonitors.filter(function(m) { return m.active; }).map(function(m) { return m.nr; }).join(",") +
-		"|sen:" + orderedSensors.filter(function(s) { return s.show; }).map(function(s) { return s.nr; }).join(",") +
-		"|dark:" + isDark + "|col:" + isColorful;
-
-	if (OSApp.Analog.lastSensorStructKey !== structKey) {
-		OSApp.Analog.lastSensorStructKey = structKey;
-		OSApp.Analog._dashboardCharts = [];
-
-		// Build skeleton HTML (sensor rows have empty cells; values filled in-place below)
-		var html = "<div class='ui-body ui-body-a center'><table style='margin: 0px auto;'>";
-				for (i = 0; i < orderedProgAdjusts.length; i++) {
-			if (i % cols === 0) {
-				if (i > 0) html += "</tr>";
+		for (i = 0; i < OSApp.Analog.progAdjusts.length; i++) {
+			if (i % cols == 0) {
+				if (i > 0)
+					html += "</tr>";
 				html += "<tr>";
 			}
 			html += "<td id='mainpageChart-" + i + "'/>";
 		}
-		if (i > 0) html += "</tr>";
+		if (i > 0)
+			html += "</tr>";
 		html += "</table></div>";
 
-		for (i = 0; i < orderedMonitors.length; i++) {
-			var mon = orderedMonitors[i];
-			if (mon.active) {
-				var prio = Object.prototype.hasOwnProperty.call(mon, "prio") ? mon.prio : 0;
-				html += "<div id='monitor-" + mon.nr + "' class='ui-body ui-body-a center' style='background-color:" + theme.monitorBg[prio] + "'>";
-				html += "<label>" + mon.name + "</label>";
+		if (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors) {
+			for (i = 0; i < OSApp.Analog.monitors.length; i++) {
+				var monitor = OSApp.Analog.monitors[i];
+				if (monitor.active) {
+					let prio = Object.prototype.hasOwnProperty.call(monitor, "prio")?monitor.prio:0;
+					let pcolor = theme.monitorBg[prio];
+					var name = monitor.name;
+					//if (monitor.ts>0)
+					//	name += " "+monitor.ts+"s";
+					html += "<div id='monitor-" + monitor.nr + "' class='ui-body ui-body-a center' style='background-color:"+pcolor+"'>";
+					html += "<label>" + name + "</label>";
+					html += "</div>";
+				}
+			}
+		}
+
+		for (i = 0; i < OSApp.Analog.analogSensors.length; i++) {
+			var sensor = OSApp.Analog.analogSensors[i];
+			if (sensor.show) {
+				html += "<div id='sensor-show-" + sensor.nr + "' class='ui-body ui-body-a center'>";
+				html += "<label>" + sensor.name + ": " + OSApp.Analog.formatValUnit(sensor.data, OSApp.Analog.getUnit(sensor)) + "</label>";
 				html += "</div>";
 			}
 		}
 
-		var sensorRows = "";
-		for (i = 0; i < orderedSensors.length; i++) {
-			var skel = orderedSensors[i];
-			if (skel.show) {
-				var nameColStyle = (screen.width < 600) ?
-					"text-align:left;padding:2px 4px 2px 2px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" :
-					"text-align:left;padding:2px 4px 2px 2px;white-space:nowrap;";
-				sensorRows +=
-					"<tr id='sensor-show-" + skel.nr + "'>" +
-					"<td style='" + nameColStyle + "'></td>" +
-					"<td style='text-align:right;padding:2px 4px 2px 2px;white-space:nowrap;'></td>" +
-					"<td style='text-align:left;padding:2px 4px 2px 2px;white-space:nowrap;'></td>" +
-					"<td style='text-align:center;padding:2px 4px 2px 2px;white-space:nowrap;font-size:16px;'></td>" +
-					"<td style='text-align:center;padding:2px 2px 2px 2px;white-space:nowrap;'></td>" +
-					"<td style='text-align:center;padding:2px 2px 2px 2px;white-space:nowrap;'>" +
-					"<a class='dashboard-sensor-chart ui-btn ui-btn-icon-notext ui-icon-grid ui-mini ui-btn-inline' data-nr='" + skel.nr + "' href='#' title='" + OSApp.Language._("Chart") + "' style='border-radius:50%;width:28px;height:28px;min-width:0;margin:0;padding:0;display:inline-flex;align-items:center;justify-content:center;'></a>" +
-					"</td>" +
-					"</tr>";
-			}
-		}
-		if (sensorRows) {
-			html +=
-				"<div class='ui-body ui-body-a center' style='padding-top:6px;padding-bottom:6px;overflow-x:auto;'>" +
-				"<table style='margin:0 auto;border-collapse:collapse;border:none;width:auto;max-width:100%;'>" +
-				sensorRows + "</table></div>";
-		}
+		var progAdjustDisp = new Array(OSApp.Analog.progAdjusts.length);
 
-		showArea.html(html);
+		for (i = 0; i < OSApp.Analog.progAdjusts.length; i++) {
+			var progAdjust = OSApp.Analog.progAdjusts[i];
+			var disp = {};
+			var current = Math.round(progAdjust.current * 100);
 
-		// Delegated click handler for dashboard sensor chart buttons
-		showArea.off("click.dashboardSensorChart").on("click.dashboardSensorChart", ".dashboard-sensor-chart", function(e) {
-			e.preventDefault();
-			var nr = parseInt($(this).attr("data-nr"), 10);
-			OSApp.Analog.showAnalogSensorCharts(nr, "sprinklers");
-		});
+			if (!progAdjust.name || progAdjust.name === "") {
+				var progName = "?";
+				if (progAdjust.prog >= 1 && progAdjust.prog <= OSApp.currentSession.controller.programs.pd.length) {
+					progName = OSApp.Programs.readProgram(OSApp.currentSession.controller.programs.pd[progAdjust.prog - 1]).name;
+				}
 
-		// Create ApexCharts instances for prog adjustments
-				for (i = 0; i < orderedProgAdjusts.length; i++) {
-			var el = document.querySelector("#mainpageChart-" + i);
-			if (!el) continue;
-			var chartOptions = {
-				chart: {
-					height: 180, parentHeightOffset: 0, type: "radialBar", offsetY: -20,
-					sparkline: { enabled: true },
-					animations: { enabled: true, dynamicAnimation: { enabled: true } }
-				},
-				series: [0],
-				colors: [ theme.gauge.green ],
-				plotOptions: {
-					radialBar: {
-						startAngle: -120, endAngle: 120,
-						track: {
-							background: theme.surfaceStrong, startAngle: -120, endAngle: 120,
-							strokeWidth: "67%", margin: 5,
-							dropShadow: { enabled: true, top: -3, left: 0, blur: 4, opacity: 0.7 }
-						},
-						dataLabels: {
-							showOn: "always",
-							name:  { offsetY: -25, show: true, color: isDark ? "#e6e6e6" : "#222", fontSize: "14px" },
-							value: {
-								color: isDark ? "#e6e6e6" : "#111", fontSize: "30px", offsetY: 0, show: true,
-								formatter: pctFormatter
-							}
-						}
+				var sensorName = "";
+				for (j = 0; j < OSApp.Analog.analogSensors.length; j++) {
+					if (OSApp.Analog.analogSensors[j].nr === progAdjust.sensor) {
+						sensorName = OSApp.Analog.analogSensors[j].name;
 					}
-				},
-				fill: { type: "gradient", gradient: { shade: "dark", type: "horizontal", gradientToColors: [ theme.gauge.green ], stops: [0, 100] } },
-				stroke: { lineCap: "round" },
-				labels: [""]
-			};
-			var chart = new ApexCharts(el, chartOptions);
-			chart.render();
-			OSApp.Analog._dashboardCharts[i] = chart;
-		}
-	}
+				}
+				disp.label = progName + " (" + sensorName + ")"
+			} else
+				disp.label = progAdjust.name;
 
-	// Always update values in-place
-	var nowSec = Math.floor(Date.now() / 1000);
+			//current = 80; //testvalue!
+			var color = [ theme.gauge.green ];
+			if (current > 100)
+				color = [ theme.gauge.orange ];
+			if (current > 150)
+				color = [ theme.gauge.red ];
+			disp.color = color;
 
-	// Sensor rows
-	for (i = 0; i < orderedSensors.length; i++) {
-		var sensor = orderedSensors[i];
-		if (!sensor.show) continue;
-		var row = showArea.find("#sensor-show-" + sensor.nr);
-		if (!row.length) continue;
-
-		var sensorTrend        = typeof sensor.trend !== "undefined" ? sensor.trend : 0;
-		var batteryPercent     = OSApp.Analog.getBatteryPercent(sensor.battery);
-		var valueText          = OSApp.Analog.formatVal(sensor.data);
-		var unitText           = OSApp.Analog.getUnit(sensor);
-		var sensorClass        = "";
-		var sensorDataOk       = (sensor.data_ok === true || Number(sensor.data_ok) === 1);
-		var sensorLastTs       = Number(sensor.last);
-		var sensorReadInterval = Number(sensor.ri);
-
-		if (!sensorDataOk) {
-			sensorClass = "sensor-data-notok";
-		} else if (Number.isFinite(sensorLastTs) && Number.isFinite(sensorReadInterval) && sensorReadInterval > 0) {
-			var sensorAgeSec = nowSec - sensorLastTs;
-			if (sensorAgeSec > (sensorReadInterval * 10)) {
-				sensorClass = "sensor-stale-critical";
-			} else if (sensorAgeSec > (sensorReadInterval * 2)) {
-				sensorClass = "sensor-stale-warning";
-			}
+			var min = Math.min(progAdjust.factor1, progAdjust.factor2) * 100;
+			var max = Math.max(progAdjust.factor1, progAdjust.factor2) * 100;
+			if (current < min) current = min;
+			if (current > max) current = max;
+			disp.current = current;
+			progAdjustDisp[i] = disp;
 		}
 
-		row.attr("class", sensorClass);
-		var cells = row.children("td");
-		cells.eq(0).text(sensor.name);
-		cells.eq(1).text(valueText === "" ? "-" : valueText);
-		cells.eq(2).text(unitText || "");
-		cells.eq(3).html(OSApp.Analog.renderTrendIndicator(sensorTrend) || "");
-		cells.eq(4).html(batteryPercent !== null ? OSApp.Analog.renderBatteryIcon(batteryPercent, false) : "");
-	}
-
-	// Monitor divs
-	for (i = 0; i < orderedMonitors.length; i++) {
-		var monitor = orderedMonitors[i];
-		if (!monitor.active) continue;
-		var monDiv = showArea.find("#monitor-" + monitor.nr);
-		if (!monDiv.length) continue;
-		var monPrio = Object.prototype.hasOwnProperty.call(monitor, "prio") ? monitor.prio : 0;
-		monDiv.css("background-color", theme.monitorBg[monPrio]);
-		monDiv.find("label").text(monitor.name);
-	}
-
-	// ProgAdjust charts
-			for (i = 0; i < orderedProgAdjusts.length; i++) {
-		var progAdjust = orderedProgAdjusts[i];
-		var current = Math.round(progAdjust.current * 100);
-		var label;
-
-		if (!progAdjust.name || progAdjust.name === "") {
-			var progName = "?";
-			if (progAdjust.prog >= 1 && progAdjust.prog <= OSApp.currentSession.controller.programs.pd.length) {
-				progName = OSApp.Programs.readProgram(OSApp.currentSession.controller.programs.pd[progAdjust.prog - 1]).name;
-			}
-			var sensorName = "";
-			for (j = 0; j < OSApp.Analog.analogSensors.length; j++) {
-				if (OSApp.Analog.analogSensors[j].nr === progAdjust.sensor) {
-					sensorName = OSApp.Analog.analogSensors[j].name;
+		if (OSApp.Analog.lastSensorHtml != html) {
+			// Destroy any existing charts before rebuilding the HTML structure
+			for (i = 0; i < OSApp.Analog.progAdjusts.length; i++) {
+				if (OSApp.Analog.progAdjusts[i] && OSApp.Analog.progAdjusts[i]._chart) {
+					OSApp.Analog.progAdjusts[i]._chart.destroy();
+					delete OSApp.Analog.progAdjusts[i]._chart;
 				}
 			}
-			label = progName + " (" + sensorName + ")";
+			OSApp.Analog.lastSensorHtml = html;
+			showArea.html(html);
+
+			// Chart elements need to be in the live document for ApexCharts to render.
+			// If the page is not yet attached (called from begin() before append),
+			// reset lastSensorHtml so the next call (from pageshow polling) retries.
+			if (progAdjustDisp.length > 0 && !document.getElementById("mainpageChart-0")) {
+				OSApp.Analog.lastSensorHtml = "";
+				return;
+			}
+
+			for (i = 0; i < progAdjustDisp.length; i++) {
+				disp = progAdjustDisp[i];
+				if (!disp) continue;
+				var options = {
+					chart: {
+						height: 180,
+						parentHeightOffset: 0,
+						type: "radialBar",
+						offsetY: -20,
+          				sparkline: {
+            				enabled: true
+          				},
+						animations: {
+							enabled: true,
+							dynamicAnimation: {
+								enabled: true
+							}
+						}
+					},
+					series: [disp.current],
+					colors: [ theme.gauge.green ],
+					plotOptions: {
+						radialBar: {
+							startAngle: -120,
+							endAngle: 120,
+							/*hollow: {
+								margin: 0,
+								size: '60%',
+								background: '#fff',
+								position: 'front',
+								dropShadow: {
+									enabled: true,
+									top: 3,
+									left: 0,
+									blur: 4,
+									opacity: 0.5
+								},
+							},*/
+							track: {
+								background: theme.surfaceStrong,
+								startAngle: -120,
+								endAngle: 120,
+								strokeWidth: '67%',
+								margin: 5, // margin is in pixels
+								dropShadow: {
+									enabled: true,
+									top: -3,
+									left: 0,
+									blur: 4,
+									opacity: 0.7
+								}
+							},
+							dataLabels: {
+								showOn: "always",
+								name: {
+									offsetY: -25,
+									show: true,
+									color: isDark ? "#e6e6e6" : "#222",
+									fontSize: "14px"
+								},
+								value: {
+									color: isDark ? "#e6e6e6" : "#111",
+									fontSize: "30px",
+									offsetY: 0,
+									show: true,
+									formatter: function (val) {
+										return OSApp.Analog.formatValUnit(val, "%");
+									}
+								}
+							}
+						}
+					},
+
+					fill: {
+						type: "gradient",
+						gradient: {
+							shade: "dark",
+							type: "horizontal",
+							gradientToColors: disp.color,
+							stops: [0, 100]
+						}
+					},
+					stroke: {
+						lineCap: "round",
+					},
+					labels: [disp.label]
+				};
+
+				var chart = new ApexCharts(document.getElementById("mainpageChart-" + i), options);
+				chart.render();
+				OSApp.Analog.progAdjusts[i]._chart = chart;
+			}
 		} else {
-			label = progAdjust.name;
-		}
-
-		var color = [ theme.gauge.green ];
-		if (current > 100) color = [ theme.gauge.orange ];
-		if (current > 150) color = [ theme.gauge.red ];
-
-		var minVal = Math.min(progAdjust.factor1, progAdjust.factor2) * 100;
-		var maxVal = Math.max(progAdjust.factor1, progAdjust.factor2) * 100;
-		if (current < minVal) current = minVal;
-		if (current > maxVal) current = maxVal;
-
-		var chartInst = OSApp.Analog._dashboardCharts[i];
-		if (chartInst) {
-			chartInst.updateSeries([current]);
-			chartInst.updateOptions({
-				labels: [label],
-				colors: color,
-				fill: { type: "gradient", gradient: { shade: "dark", type: "horizontal", gradientToColors: color, stops: [0, 100] } }
-			});
+			for (i = 0; i < progAdjustDisp.length; i++) {
+				disp = progAdjustDisp[i];
+				var existingChart = OSApp.Analog.progAdjusts[i] ? OSApp.Analog.progAdjusts[i]._chart : undefined;
+				if (disp && existingChart) {
+					existingChart.updateSeries([disp.current]);
+					existingChart.updateOptions({labels: [disp.label]});
+				}
+			}
 		}
 	}
 };
-
 
 OSApp.Analog.toByteArray = function( b ) {
 	var result = [];
@@ -641,8 +595,8 @@ OSApp.Analog.intFromBytes = function( x ) {
 			val += parseInt( x[ i ] );
 		}
 		return val;
+		//eslint-disable-next-line no-unused-vars
 	} catch ( e ) {
-		void e;
 		return 0;
 	}
 };
@@ -676,7 +630,7 @@ OSApp.Analog.getImportMethodSensors = function(restore_type, callback) {
 				data = JSON.parse($.trim(data).replace(/“|”|″/g, "\""));
 				popup.popup("close");
 				OSApp.Analog.importConfigSensors(data, restore_type, callback);
-			} catch (e) {
+			} catch {
 				popup.find("textarea").val("");
 				OSApp.Errors.showError(OSApp.Language._("Unable to read the configuration file. Please check the file and try again."));
 			}
@@ -946,11 +900,6 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"</label>" +
 			"<input class='factor2' type='number' inputmode='decimal' value='" + Math.round(progAdjust.factor2 * 100) + "'>" +
 
-			"<div style='margin: 15px 0; text-align: center;'>" +
-			"<button type='button' class='link-irrigationdb-adjustment' data-theme='c' data-mini='true' data-icon='search'>" +
-			OSApp.Language._("Link Irrigation Database") + "</button>" +
-			"</div>" +
-
 			"<label>" +
 			OSApp.Language._("Min sensor value") +
 			"</label>" +
@@ -1003,24 +952,6 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 					callbackCancel();
 				});
 			});
-		});
-
-		// Link Irrigation Database button
-		popup.find(".link-irrigationdb-adjustment").on("click", function () {
-			var applySelection = function(selection) {
-				if (selection && selection.min !== undefined && selection.max !== undefined) {
-					popup.find(".min").val(selection.min).change();
-					popup.find(".max").val(selection.max).change();
-				}
-			};
-
-			if (OSApp.Analog && OSApp.Analog.IrrigationDB && typeof OSApp.Analog.IrrigationDB.showDialog === "function") {
-				OSApp.Analog.IrrigationDB.showDialog(applySelection);
-			} else {
-				OSApp.Errors.showError(OSApp.Language._("Irrigation Database module not available"));
-			}
-
-			return false;
 		});
 
 		let adjFunc = function () {
@@ -1226,9 +1157,9 @@ OSApp.Analog.updateAdjustmentChart = function(popup) {
 };
 
 OSApp.Analog.requiredCheck = function(field, obj, property) {
-	if (obj.missingValue) return;
+	if (obj['missingValue']) return;
 	if (field.is(":visible") && field.prop("required") && !obj[property])
-		obj.missingValue = field;
+		obj['missingValue'] = field;
 };
 
 OSApp.Analog.addToObjectChk = function(popup, fieldId, obj) {
@@ -1358,7 +1289,7 @@ OSApp.Analog.monitorSelection = function(id, sel, ignore) {
 	}
 	list += "</select>";
 	return list;
-};
+}
 
 //Monitor editor
 OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel) {
@@ -1676,86 +1607,57 @@ OSApp.Analog.isRS485Sensor = function( sensorType ) {
 
 OSApp.Analog.isIPSensor = function(sensorType) {
 	return OSApp.Analog.isSmt100(sensorType) || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE;
-};
+}
 
 OSApp.Analog.isIDNeeded = function(sensorType) {
 	return sensorType < OSApp.Analog.Constants.SENSOR_OSPI_INTERNAL_TEMP || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE ||
 		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE ||
 		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE;
-};
-
-OSApp.Analog.getBatteryPercent = function(value) {
-	if (value === undefined || value === null || value === "") {
-		return null;
-	}
-	var parsed = parseFloat(value);
-	// Filter out invalid values (NaN, negative, > 100, or very large numbers)
-	if (isNaN(parsed) || parsed < 0 || parsed > 100 || parsed > 1e6) {
-		return null;
-	}
-	return Math.max(0, Math.min(100, Math.round(parsed)));
-};
-
-OSApp.Analog.renderBatteryIcon = function(percent, showText) {
-	if (percent === null || percent === undefined || isNaN(percent)) {
-		return "";
-	}
-	var clamped = Math.max(0, Math.min(100, Math.round(percent)));
-	var fillColor = clamped <= 20 ? "#d9534f" : (clamped <= 50 ? "#f0ad4e" : "#5cb85c");
-	var innerWidth = Math.max(0, Math.round((clamped / 100) * 16));
-	var title = OSApp.Language._("Battery") + ": " + clamped + "%";
-	return "<span class='battery-icon' title='" + OSApp.Utils.htmlEscape(title) + "' style='display:inline-flex;align-items:center;gap:4px;vertical-align:middle;'>" +
-		"<span style='position:relative;display:inline-block;width:18px;height:10px;border:1px solid #444;border-radius:2px;box-sizing:border-box;background:#fff;'>" +
-		"<span style='position:absolute;left:1px;top:1px;bottom:1px;width:" + innerWidth + "px;background:" + fillColor + ";'></span>" +
-		"<span style='position:absolute;right:-3px;top:3px;width:2px;height:4px;background:#444;border-radius:1px;'></span>" +
-		"</span>" +
-		(showText ? "<span style='font-size:12px;'>" + clamped + "%</span>" : "") +
-		"</span>";
-};
-
-OSApp.Analog.renderTrendIndicator = function(trendCode) {
-	var trend = Number(trendCode);
-	if (!Number.isFinite(trend) || trend === 0) {
-		return "";
-	}
-
-	var symbol = "";
-	if (trend === -1) {
-		symbol = "&#8596;";  // ↔ (horizontal arrow)
-	} else if (trend === -2) {
-		symbol = "&#8595;";  // ↓ (down arrow)
-	} else if (trend === -3) {
-		symbol = "&#8595;&#8595;";  // ↓↓ (double down arrow)
-	} else if (trend === 1) {
-		symbol = "&#8593;";  // ↑ (up arrow)
-	} else if (trend === 2) {
-		symbol = "&#8593;&#8593;";  // ↑↑ (double up arrow)
-	}
-
-	if (!symbol) {
-		return "";
-	}
-
-	return " <span class='sensor-trend-indicator'>" + symbol + "</span>";
-};
+}
 
 //show and hide sensor editor fields
 OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
-	// First hide IP/Port/ID/RS485 related containers
-	popup.find(".ip_port_container").hide();
-	popup.find(".rs485_port_modbus_container").hide();
+	// First hide IP/Port/ID related fields (but NOT the always-visible standard fields)
+	popup.find(".ip_label, .port_label, .id_label").hide();
 	popup.find(".mac_label").hide();
-
 	if (OSApp.Analog.isRS485Sensor(sensortype)) {
-		popup.find(".rs485_port_modbus_container").show();
+		popup.find(".rs485_port_label").show();
+		popup.find(".rs485_port").show();
+		popup.find(".rs485_id_label").show();
+		popup.find(".rs485_id").show();
 		popup.find(".rs485_help").show();
 		// IP/Port nur für TCP/IP-basierte RS485-Adapter anzeigen
-		popup.find(".ip_port_container").show();
+		popup.find(".ip_label").show();
+		popup.find(".port_label").show();
+		popup.find(".ip").show();
+		popup.find(".port").show();
+		// ID-Feld verstecken, da wir rs485_id verwenden
+		popup.find(".id_label").hide();
+		popup.find(".id").hide();
 	} else {
+		popup.find(".rs485_port_label").hide();
+		popup.find(".rs485_port").hide();
+		popup.find(".rs485_id_label").hide();
+		popup.find(".rs485_id").hide();
 		popup.find(".rs485_help").hide();
 		// Normale IP-Sensor-Logik
 		if (OSApp.Analog.isIPSensor(sensortype)) {
-			popup.find(".ip_port_container").show();
+			popup.find(".ip_label").show();
+			popup.find(".port_label").show();
+			popup.find(".ip").show();
+			popup.find(".port").show();
+		} else {
+			popup.find(".ip_label").hide();
+			popup.find(".port_label").hide();
+			popup.find(".ip").hide();
+			popup.find(".port").hide();
+		}
+		if (OSApp.Analog.isIDNeeded(sensortype)) {
+			popup.find(".id_label").show();
+			popup.find(".id").show();
+		} else {
+			popup.find(".id_label").hide();
+			popup.find(".id").hide();
 		}
 	}
 
@@ -1781,12 +1683,15 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 		popup.find("#bluetoothsel").show();
 		popup.find(".mac_label").show();
 		popup.find(".mac").show();
+		popup.find(".bluetooth_scan_select_container").show();
 	} else {
 		popup.find("#bluetoothsel").hide();
 	}
 
 	// Hide all optional containers
-	popup.find(".fac_div_offset_container").hide();
+	popup.find(".fac_container").hide();
+	popup.find(".div_container").hide();
+	popup.find(".offset_container").hide();
 	popup.find(".unit_container").hide();
 	popup.find(".topic_container").hide();
 	popup.find(".filter_container").hide();
@@ -1794,19 +1699,20 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	popup.find(".bluetooth_scan_select_container").hide();
 	popup.find(".zigbee_device_ieee_container").hide();
 	popup.find(".zigbee_known_sensors_container").hide();
-	popup.find(".zigbee_endpoint_cluster_attribute_container").hide();
+	popup.find(".zigbee_endpoint_container").hide();
+	popup.find(".zigbee_cluster_id_container").hide();
+	popup.find(".zigbee_attribute_id_container").hide();
 	popup.find(".bluetooth_char_uuid_container").hide();
 	popup.find(".bluetooth_format_container").hide();
-
-	// Reset RI field editability (ZigBee will override to readonly below)
-	popup.find(".ri").prop("readonly", false);
 
 	// Standard fields are already visible (never hidden), no need to show them again
 
 	var unitid = popup.find("#unitid").val();
 
 	if (sensortype == OSApp.Analog.Constants.SENSOR_USERDEF) {
-		popup.find(".fac_div_offset_container").show();
+		popup.find(".fac_container").show();
+		popup.find(".div_container").show();
+		popup.find(".offset_container").show();
 		popup.find(".unit_container").show();
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_MQTT) {
 		popup.find(".unit_container").show();
@@ -1815,20 +1721,16 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
 		popup.find(".zigbee_device_ieee_container").show();
 		popup.find(".zigbee_known_sensors_container").show();
-		popup.find(".zigbee_endpoint_cluster_attribute_container").show();
-		popup.find(".fac_div_offset_container").show();
-		// ZigBee sleeping sensors: fix RI to 900s (15 min) to match the default
-		// Configure Reporting interval sent to devices during scan.
-		popup.find(".ri").val(900).prop("readonly", true);
-		// Auto-load already-discovered devices from background scans
+		popup.find(".zigbee_endpoint_container").show();
+		popup.find(".zigbee_cluster_id_container").show();
+		popup.find(".zigbee_attribute_id_container").show();
+		popup.find(".fac_container").show();
+		popup.find(".div_container").show();
+		popup.find(".offset_container").show();
 		popup.find(".zigbee_scan_select_container").show();
-		OSApp.Analog.autoLoadZigBeeDevices(popup);
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
 		popup.find(".bluetooth_char_uuid_container").show();
 		popup.find(".bluetooth_format_container").show();
-		// Auto-load already-discovered devices from background scans
-		popup.find(".bluetooth_scan_select_container").show();
-		OSApp.Analog.autoLoadBluetoothDevices(popup);
 	}
 
 	// Show unit container for custom unit selection (independent of sensor type)
@@ -1880,25 +1782,8 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	}
 
 	OSApp.Analog.addToObjectInt(popup, ".ri", sensorOut);
-
-	// Validate Read Interval minimum
-	if (sensorOut.ri !== undefined && sensorOut.ri !== null && !isNaN(sensorOut.ri)) {
-		if (sensorOut.ri < 6) {
-			OSApp.Errors.showError(OSApp.Language._("Read Interval must be at least 6 seconds"));
-			return;
-		}
-	}
-
 	OSApp.Analog.addToObjectInt(popup, "#factor", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#divider", sensorOut);
-	if (Object.prototype.hasOwnProperty.call(sensorOut, "factor")) {
-		sensorOut.fac = sensorOut.factor;
-		delete sensorOut.factor;
-	}
-	if (Object.prototype.hasOwnProperty.call(sensorOut, "divider")) {
-		sensorOut.div = sensorOut.divider;
-		delete sensorOut.divider;
-	}
 	OSApp.Analog.addToObjectInt(popup, "#offset", sensorOut);
 	OSApp.Analog.addToObjectStr(popup, "#unit", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#unitid", sensorOut);
@@ -1927,12 +1812,6 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 		// poll_interval (ms) is derived from sensor read interval (ri seconds)
 		if (sensorOut.ri !== undefined && sensorOut.ri !== null && !isNaN(sensorOut.ri)) {
 			sensorOut.poll_interval = sensorOut.ri * 1000;
-		}
-
-		// Pass discovery timestamp as join_anchor for predictive boost
-		var discoveredAt = popup.data("zigbee_discovered_at");
-		if (discoveredAt && parseInt(discoveredAt, 10) > 0) {
-			sensorOut.join_anchor = parseInt(discoveredAt, 10);
 		}
 	}
 
@@ -1965,7 +1844,7 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 
 // Load ZigBee cluster definitions from online source
 OSApp.Analog.loadZigBeeClusterData = function() {
-	if (OSApp.Analog.zigbeeClusterData !== null && OSApp.Analog.zigbeeClusterData !== undefined) {
+	if (OSApp.Analog.zigbeeClusterData !== undefined) {
 		return Promise.resolve(OSApp.Analog.zigbeeClusterData);
 	}
 
@@ -2032,14 +1911,11 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 		var scanTimeout = null;
 		var selectedDevice = null;
 		var scanStartTime = Date.now();
+		var scanDuration = 10;
 		var lastFoundDevice = null;
-				void lastFoundDevice;
 		var requestInFlight = false;
 		var didCleanup = false;
-				void didCleanup;
 		var lastDeviceCount = 0;
-		var wifiConnected = false;
-		var pollingDone = false;
 
 		function normalizeZigBeeDevices(data) {
 			if (Array.isArray(data)) {
@@ -2074,32 +1950,16 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			try {
 				sel.selectmenu("refresh", true);
 			} catch (e) {
-				void e;
 				// ignore
 			}
 		})();
 
 		function updateScanUi() {
 			var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
-			var msg;
-			if (elapsed < 10) {
-				// Phase 1: ZigBee join window active (0–10s)
-				msg = OSApp.Language._("Scanning...");
-			} else if (!wifiConnected) {
-				// Phase 2: Polling /zd, waiting for device to come back online
-				msg = OSApp.Language._("Connecting to network...");
-			} else if (!pollingDone) {
-				// Phase 3: Connected — show device count for 10s before restoring button
-				msg = lastDeviceCount + " " + OSApp.Language._("device(s) found");
-			}
+			var remaining = Math.max(0, scanDuration - elapsed);
 			if (scanButton && originalButtonText) {
-				if (pollingDone) {
-					scanButton.text(originalButtonText).prop("disabled", false);
-				} else {
-					scanButton.text(msg);
-				}
+				scanButton.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + lastDeviceCount + ")");
 			}
-			scanDialog.find("#scanTimer").text(msg || "").show();
 		}
 
 		function updateDeviceList() {
@@ -2109,22 +1969,11 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			// Timer + button countdown UI is handled by updateScanUi() so it keeps updating even if /zd is slow.
 
 			requestInFlight = true;
-			OSApp.Firmware.sendToOS("/zd?pw=", "json", 3000).then(function (data) {
+			OSApp.Firmware.sendToOS("/zd?pw=", "json").then(function (data) {
 				requestInFlight = false;
-				var wasConnected = wifiConnected;
-				wifiConnected = true;
-				// First successful /zd response: stop polling, display count for 10s, then restore button
-				if (!wasConnected && !pollingDone) {
-					if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-					if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
-					scanTimeout = setTimeout(function() {
-						pollingDone = true;
-						if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
-						scanTimeout = null;
-					}, 10000);
-				}
 				var devices = normalizeZigBeeDevices(data);
-				lastDeviceCount = normalizeZigBeeCount(data, devices);
+				var deviceCount = normalizeZigBeeCount(data, devices);
+				lastDeviceCount = deviceCount;
 				scanDialog.data("zigbeeDevices", devices);
 
 				// Button countdown text is updated by updateScanUi().
@@ -2138,10 +1987,8 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 						var shortAddr = device.short_addr || "0x0000";
 						var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
 						var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
-						var vendor = device.vendor || "";
-						var displayModel = vendor ? vendor + " " + modelId : modelId;
 
-						var label = displayModel + " (" + manufacturer + ") | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
+						var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
 						sel.append($("<option>").val(String(i)).text(label));
 
 						// Track last found device
@@ -2154,7 +2001,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 							};
 							scanDialog.find("#lastDevice").html(
 								"<strong style='color: green;'>" + OSApp.Language._("Last found") + ":</strong> " +
-								OSApp.Utils.htmlEscape(displayModel) + " (" + OSApp.Utils.htmlEscape(manufacturer) + ")<br>" +
+								OSApp.Utils.htmlEscape(modelId) + " (" + OSApp.Utils.htmlEscape(manufacturer) + ")<br>" +
 								"<small>IEEE: " + OSApp.Utils.htmlEscape(ieeeAddr) + "</small>"
 							).show();
 						}
@@ -2162,7 +2009,6 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 					try {
 						sel.selectmenu("refresh", true);
 					} catch (e) {
-						void e;
 						// ignore
 					}
 				} else {
@@ -2170,12 +2016,18 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 					try {
 						sel.selectmenu("refresh", true);
 					} catch (e) {
-						void e;
 						// ignore
 					}
 				}
 			}, function () {
 				requestInFlight = false;
+				var sel = scanDialog.find("#zigbeeDeviceSelectScanner");
+				sel.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+				try {
+					sel.selectmenu("refresh", true);
+				} catch (e) {
+					// ignore
+				}
 			});
 		}
 
@@ -2198,8 +2050,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 				ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
 				short_addr: dev.short_addr || "0x0000",
 				model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
-				manufacturer: dev.manufacturer || OSApp.Language._("Unknown"),
-				discovered_at: dev.discovered_at || 0
+				manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
 			};
 
 			if (scanInterval) {
@@ -2248,7 +2099,6 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			try {
 				OSApp.Firmware.sendToOS("/zc?pw=", "json");
 			} catch (e) {
-				void e;
 				// ignore
 			}
 		}
@@ -2273,30 +2123,39 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 	$("#zigbeeScanner").remove();
 	scanDialog.css("max-width", "580px");
 	OSApp.UIDom.openPopup(scanDialog, { positionTo: "window" });
-	// Phase 1 (0-10s): ZigBee join window open — show pairing countdown, no polling
+	// Countdown is already shown in the scan button; hide the extra timer line
+	scanDialog.find("#scanTimer").hide();
+
+	// Update device list immediately
+	updateDeviceList();
 	updateScanUi();
 	uiInterval = setInterval(updateScanUi, 250);
 
-	// Phase 2 (after 10s): Start polling /zd for newly joined devices.
-	// The first successful response triggers phase 3 — show count for 10s, then restore button.
-	// Safety fallback: if no /zd response after 120s, force completion anyway.
+	// Update device list every second
+	scanInterval = setInterval(updateDeviceList, 1000);
+
+	// Stop scanning after 10 seconds, keep results visible
 	scanTimeout = setTimeout(function() {
+		if (scanInterval) {
+			clearInterval(scanInterval);
+			scanInterval = null;
+		}
+		if (uiInterval) {
+			clearInterval(uiInterval);
+			uiInterval = null;
+		}
+		scanDialog.find("#scanTimer").text(OSApp.Language._("Scan finished"));
+		scanDialog.find("#scanTimer").show();
+		// Best-effort: close/clear pairing window on backend (do not touch UI list)
+		try {
+			OSApp.Firmware.sendToOS("/zc?pw=", "json");
+		} catch (e) {
+			// ignore
+		}
+		if (scanButton && originalButtonText) {
+			scanButton.text(originalButtonText).prop("disabled", false);
+		}
 		scanTimeout = null;
-		updateDeviceList();
-		scanInterval = setInterval(updateDeviceList, 2000);
-		// Safety fallback: force phase 3 after 120s of polling regardless of connection state
-		scanTimeout = setTimeout(function() {
-			scanTimeout = null;
-			if (!pollingDone) {
-				if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-				wifiConnected = true;  // force phase-3 display
-				scanTimeout = setTimeout(function() {
-					pollingDone = true;
-					if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
-					scanTimeout = null;
-				}, 10000);
-			}
-		}, 120000);
 	}, 10000);
 }, function () {
 	// Error handler - reset button text on failure
@@ -2335,12 +2194,10 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 		var scanTimeout = null;
 		var selectedDevice = null;
 		var scanStartTime = Date.now();
-		var scanDuration = 20;  // Extended: +10s for WiFi reconnect after ZigBee pairing pause
+		var scanDuration = 10;
 		var lastFoundDevice = null;
-				void lastFoundDevice;
 		var requestInFlight = false;
 		var didCleanup = false;
-				void didCleanup;
 		var lastDeviceCount = 0;
 
 		function normalizeBluetoothDevices(data) {
@@ -2376,7 +2233,6 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 			try {
 				sel.selectmenu("refresh", true);
 			} catch (e) {
-				void e;
 				// ignore
 			}
 		})();
@@ -2440,7 +2296,6 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 					try {
 						sel.selectmenu("refresh", true);
 					} catch (e) {
-						void e;
 						// ignore
 					}
 				} else {
@@ -2448,7 +2303,6 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 					try {
 						sel.selectmenu("refresh", true);
 					} catch (e) {
-						void e;
 						// ignore
 					}
 				}
@@ -2459,7 +2313,6 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 				try {
 					sel.selectmenu("refresh", true);
 				} catch (e) {
-					void e;
 					// ignore
 				}
 			});
@@ -2536,7 +2389,6 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 			try {
 				OSApp.Firmware.sendToOS("/bc?pw=", "json");
 			} catch (e) {
-				void e;
 				// ignore
 			}
 		}
@@ -2588,7 +2440,6 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 		try {
 			OSApp.Firmware.sendToOS("/bc?pw=", "json");
 		} catch (e) {
-			void e;
 			// ignore
 		}
 		if (scanButton && originalButtonText) {
@@ -2607,124 +2458,16 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 
 
 
-// Auto-load ZigBee devices discovered by background scans (calls /zd without starting a scan)
-OSApp.Analog.autoLoadZigBeeDevices = function(popup) {
-	if (!popup || !popup.length) { return; }
-	// Don't overwrite the list while an active scan is running
-	if (popup.find("#zigbeesel").prop("disabled")) { return; }
-	var deviceSelect = popup.find("#zigbeeDeviceSelect");
-	if (!deviceSelect.length) { return; }
-
-	deviceSelect.empty().append($('<option value="">' + OSApp.Language._("Loading known devices...") + '</option>'));
-	try { deviceSelect.selectmenu("refresh", true); } catch (e) { void e; }
-
-	OSApp.Firmware.sendToOS("/zd?pw=", "json", 5000).then(function (data) {
-		var devices = [];
-		if (Array.isArray(data)) {
-			devices = data;
-		} else if (data && Array.isArray(data.devices)) {
-			devices = data.devices;
-		} else if (data && data.devices && typeof data.devices === "object") {
-			devices = Object.values(data.devices);
-		}
-		popup.data("zigbeeDevices", devices);
-		deviceSelect.empty();
-		if (devices && devices.length > 0) {
-			deviceSelect.append($('<option value="">' + OSApp.Language._("Select a device...") + '</option>'));
-			for (var i = 0; i < devices.length; i++) {
-				var device = devices[i] || {};
-				var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
-				var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
-				var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
-				var vendor = device.vendor || "";
-				var displayModel = vendor ? vendor + " " + modelId : modelId;
-				var label = displayModel + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
-				deviceSelect.append($('<option>').val(String(i)).text(label).attr("data-ieee", ieeeAddr));
-			}
-			// Restore previously selected device if a known IEEE is already filled in
-			var currentIeee = (popup.find("#device_ieee").val() || "").trim();
-			if (currentIeee) {
-				deviceSelect.find("option[data-ieee]").each(function () {
-					if ($(this).attr("data-ieee") === currentIeee) {
-						deviceSelect.val($(this).val());
-						return false;
-					}
-				});
-			}
-		} else {
-			deviceSelect.append($('<option value="">' + OSApp.Language._("No known devices. Use scan to find new devices.") + '</option>'));
-		}
-		try { deviceSelect.selectmenu("refresh", true); } catch (e) { void e; }
-	}, function () {
-		deviceSelect.empty().append($('<option value="">' + OSApp.Language._("No known devices. Use scan to find new devices.") + '</option>'));
-		try { deviceSelect.selectmenu("refresh", true); } catch (e) { void e; }
-	});
-};
-
-// Auto-load Bluetooth devices discovered by background scans (calls /bd without starting a scan)
-OSApp.Analog.autoLoadBluetoothDevices = function(popup) {
-	if (!popup || !popup.length) { return; }
-	// Don't overwrite the list while an active scan is running
-	if (popup.find("#bluetoothsel").prop("disabled")) { return; }
-	var deviceSelect = popup.find("#bluetoothDeviceSelect");
-	if (!deviceSelect.length) { return; }
-
-	deviceSelect.empty().append($('<option value="">' + OSApp.Language._("Loading known devices...") + '</option>'));
-	try { deviceSelect.selectmenu("refresh", true); } catch (e) { void e; }
-
-	OSApp.Firmware.sendToOS("/bd?pw=", "json", 5000).then(function (data) {
-		var devices = [];
-		if (Array.isArray(data)) {
-			devices = data;
-		} else if (data && Array.isArray(data.devices)) {
-			devices = data.devices;
-		} else if (data && data.devices && typeof data.devices === "object") {
-			devices = Object.values(data.devices);
-		}
-		popup.data("bluetoothDevices", devices);
-		deviceSelect.empty();
-		if (devices && devices.length > 0) {
-			deviceSelect.append($('<option value="">' + OSApp.Language._("Select a device...") + '</option>'));
-			for (var i = 0; i < devices.length; i++) {
-				var device = devices[i] || {};
-				var macAddr = device.address || device.mac_addr || device.mac || "00:00:00:00:00:00";
-				var name = device.name || OSApp.Language._("Unknown Device");
-				var rssi = (device.rssi === undefined || device.rssi === null) ? "N/A" : device.rssi;
-				var label = name + " | " + macAddr + " | RSSI: " + rssi;
-				deviceSelect.append($('<option>').val(String(i)).text(label).attr("data-mac", macAddr));
-			}
-			// Restore previously selected device if a known MAC is already filled in
-			var currentMac = (popup.find("#sensor_mac").val() || "").trim();
-			if (currentMac) {
-				deviceSelect.find("option[data-mac]").each(function () {
-					if ($(this).attr("data-mac") === currentMac) {
-						deviceSelect.val($(this).val());
-						return false;
-					}
-				});
-			}
-		} else {
-			deviceSelect.append($('<option value="">' + OSApp.Language._("No known devices. Use scan to find new devices.") + '</option>'));
-		}
-		try { deviceSelect.selectmenu("refresh", true); } catch (e) { void e; }
-	}, function () {
-		deviceSelect.empty().append($('<option value="">' + OSApp.Language._("No known devices. Use scan to find new devices.") + '</option>'));
-		try { deviceSelect.selectmenu("refresh", true); } catch (e) { void e; }
-	});
-};
-
 // Analog sensor editor
 OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) {
 
-	var doShow = function(supportedSensorTypes) {
+	OSApp.Firmware.sendToOS("/sf?pw=", "json").then(function (data) {
+		var supportedSensorTypes = data.sensorTypes;
 		var i;
 		var sensorFormat = parseInt(sensor.format, 10);
 		if (isNaN(sensorFormat)) {
 			sensorFormat = 0;
 		}
-		var batteryPercent = OSApp.Analog.getBatteryPercent(sensor.battery);
-		var batteryHtml = batteryPercent !== null ? OSApp.Analog.renderBatteryIcon(batteryPercent, true) : "";
-		var batteryStyle = batteryPercent !== null ? "" : "display:none;";
 
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
 
@@ -2738,22 +2481,17 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 		OSApp.Language._("Edit Sensor Configuration. ") +
 		OSApp.Language._("See help documentation for details.") +
 		"<br>" +
-		OSApp.Language._("Last") + ": " + (sensor.last === undefined ? "" : OSApp.Dates.dateToString(new Date(sensor.last * 1000), null, 1).slice(0, -3)) +
+		OSApp.Language._("Last") + ": " + (sensor.last === undefined ? "" : OSApp.Dates.dateToString(new Date(sensor.last * 1000))) +
 		"</p>" +
 
-"<div class='battery_container' style='" + batteryStyle + "'><label>" + OSApp.Language._("Battery") + "</label>" +
-	"<div class='battery_value' style='margin-top:4px;'>" + batteryHtml + "</div></div>" +
+"<div class='sensor_nr_label'><label for='sensor_nr'>" + OSApp.Language._("Sensor Nr.") + "</label>" +
+	"<input class='nr' id='sensor_nr' data-mini='true' type='number' inputmode='decimal' min='1' max='99999' required value='" + sensor.nr + (sensor.nr > 0 ? "' disabled='disabled'></div>" : "'></div>") +
 
-"<div class='sensor_nr_name_group_container' style='display: flex; gap: 12px; flex-wrap: wrap;'>" +
-"<div style='flex: 1; min-width: 100px;'><label for='sensor_nr'>" + OSApp.Language._("Sensor Nr.") + "</label>" +
-	"<input class='nr' id='sensor_nr' data-mini='true' type='number' inputmode='decimal' min='1' max='99999' required value='" + sensor.nr + (sensor.nr > 0 ? "' disabled='disabled' style='width: 100%;'></div>" : "' style='width: 100%;'></div>") +
+	"<div class='name_label'><label for='sensor_name'>" + OSApp.Language._("Name") + "</label>" +
+	"<input class='name' id='sensor_name' data-mini='true' type='text' maxlength='40' value='" + (sensor.name ? sensor.name : "") + "'></div>" +
 
-	"<div style='flex: 2; min-width: 150px;'><label for='sensor_name'>" + OSApp.Language._("Name") + "</label>" +
-	"<input class='name' id='sensor_name' data-mini='true' type='text' maxlength='40' value='" + (sensor.name ? sensor.name : "") + "' style='width: 100%;'></div>" +
-
-	"<div style='flex: 1; min-width: 100px;'><label for='sensor_group'>" + OSApp.Language._("Group") + "</label>" +
-	"<input class='group' id='sensor_group' data-mini='true' type='number' inputmode='decimal' min='0' max='255' value='" + (sensor.group ? sensor.group : "0") + "' style='width: 100%;'></div>" +
-"</div>" +
+	"<div class='group_label'><label for='sensor_group'>" + OSApp.Language._("Group") + "</label>" +
+	"<input class='group' id='sensor_group' data-mini='true' type='number' inputmode='decimal' min='0' max='255' value='" + (sensor.group ? sensor.group : "0") + "'></div>" +
 
 	"<div class='type_label'><label for='type'>" + OSApp.Language._("Type") + "</label>" +
 	"<select id='type' data-mini='true' required>";
@@ -2772,38 +2510,32 @@ list += "</select></div>" +
 		"<button data-mini='true' id='fytasel' style='margin:5px 0;'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>" +
 
 		//ZigBee device scanner button:
-	"<button data-mini='true' id='zigbeesel' style='display:none;margin:5px 0;'>" + OSApp.Language._("Scan / Join new ZigBee Device") + "</button>" +
+	"<button data-mini='true' id='zigbeesel' style='display:none;margin:5px 0;'>" + OSApp.Language._("Scan for ZigBee Devices") + "</button>" +
 	"<div class='zigbee_scan_select_container' style='display:none; margin: 10px 0;'>" +
 	"<div class='zigbee-device-select-container'>" +
-	"<label for='zigbeeDeviceSelect'>" + OSApp.Language._("Known ZigBee Devices") + "</label>" +
+	"<label for='zigbeeDeviceSelect'>" + OSApp.Language._("Discovered devices") + "</label>" +
 	"<select data-mini='true' id='zigbeeDeviceSelect'></select>" +
-	"</div>" +
-	"<div class='zigbee-db-cluster-container' style='display:none; margin-top:8px;'>" +
-	"<label for='zigbeeDbClusterSelect'>" + OSApp.Language._("Sensor / Cluster (from DB)") + "</label>" +
-	"<select data-mini='true' id='zigbeeDbClusterSelect'></select>" +
 	"</div>" +
 	"</div>" +
 	"<div id='zigbeeScanArea' class='ui-body ui-body-a' style='display:none; margin: 10px 0; padding: 10px; border-radius: 5px;'>" +
 	"<div id='zigbeeScanTimer' class='center' style='font-size: 16px; font-weight: bold; margin: 5px 0; color: #2196F3;'></div>" +
 	"</div>" +
 		//Bluetooth device scanner button:
-	"<button data-mini='true' id='bluetoothsel' style='display:none;margin:5px 0;'>" + OSApp.Language._("Scan for new Bluetooth Devices") + "</button>" +
+	"<button data-mini='true' id='bluetoothsel' style='display:none;margin:5px 0;'>" + OSApp.Language._("Scan for Bluetooth Devices") + "</button>" +
 	"<div class='bluetooth_scan_select_container' style='display:none; margin: 10px 0;'>" +
 	"<div class='bluetooth-device-select-container'>" +
-	"<label for='bluetoothDeviceSelect'>" + OSApp.Language._("Known Bluetooth Devices") + "</label>" +
+	"<label for='bluetoothDeviceSelect'>" + OSApp.Language._("Discovered devices") + "</label>" +
 	"<select data-mini='true' id='bluetoothDeviceSelect'></select>" +
 	"</div>" +
 	"</div>" +
 	"<div id='bluetoothScanArea' class='ui-body ui-body-a' style='display:none; margin: 10px 0; padding: 10px; border-radius: 5px;'>" +
 	"<div id='bluetoothScanTimer' class='center' style='font-size: 16px; font-weight: bold; margin: 5px 0; color: #2196F3;'></div>" +
 	"</div>" +
-"<div class='ip_port_container' style='display: flex; gap: 12px; flex-wrap: wrap;'>" +
-"<div style='flex: 2; min-width: 180px;'><label for='sensor_ip'>" + OSApp.Language._("IP Address") + "</label>" +
-	"<input class='ip' id='sensor_ip' data-mini='true' type='text' value='" + (sensor.ip ? OSApp.Analog.toByteArray(sensor.ip).join(".") : "") + "' style='width: 100%;'></div>" +
+"<div class='ip_label'><label for='sensor_ip'>" + OSApp.Language._("IP Address") + "</label>" +
+	"<input class='ip' id='sensor_ip' data-mini='true' type='text' value='" + (sensor.ip ? OSApp.Analog.toByteArray(sensor.ip).join(".") : "") + "'></div>" +
 
-"<div style='flex: 1; min-width: 120px;'><label for='sensor_port'>" + OSApp.Language._("Port") + "</label>" +
-	"<input class='port' id='sensor_port' data-mini='true' type='number' inputmode='decimal' min='0' max='65535' value='" + sensor.port + "' style='width: 100%;'></div>" +
-"</div>" +
+"<div class='port_label'><label for='sensor_port'>" + OSApp.Language._("Port") + "</label>" +
+	"<input class='port' id='sensor_port' data-mini='true' type='number' inputmode='decimal' min='0' max='65535' value='" + sensor.port + "'></div>" +
 
 "<div class='id_label'><label for='sensor_id'>" + OSApp.Language._("ID") + "</label>" +
 	"<input class='id' id='sensor_id' data-mini='true' type='number' inputmode='decimal' min='-2147483647' max='2147483647' value='" + sensor.id + "'></div>" +
@@ -2818,22 +2550,20 @@ list += "</select></div>" +
 			OSApp.Language._("Modbus ID: The sensor's Modbus address (1-247)") + "</p>" +
 			"</div>" +
 
-"<div class='rs485_port_modbus_container' style='display: flex; gap: 12px; flex-wrap: wrap;'>" +
-"<div style='flex: 1; min-width: 150px;'><label for='rs485_port'>" + OSApp.Language._("RS485 Device/Port") + "</label>" +
-	"<input class='rs485_port' id='rs485_port' data-mini='true' type='number' inputmode='decimal' min='0' max='65535' value='" + (sensor.port ? sensor.port : 0) + "' style='width: 100%;'></div>" +
+"<div class='rs485_port_label'><label for='rs485_port'>" + OSApp.Language._("RS485 Device/Port") + "</label>" +
+	"<input class='rs485_port' id='rs485_port' data-mini='true' type='number' inputmode='decimal' min='0' max='65535' value='" + (sensor.port ? sensor.port : 0) + "'></div>" +
 
-"<div style='flex: 1; min-width: 120px;'><label for='rs485_id'>" + OSApp.Language._("Modbus ID") + "</label>" +
-	"<input class='rs485_id' id='rs485_id' data-mini='true' type='number' inputmode='decimal' min='1' max='247' value='" + (sensor.id ? sensor.id : 1) + "' style='width: 100%;'></div>" +
-"</div>" +
+"<div class='rs485_id_label'><label for='rs485_id'>" + OSApp.Language._("Modbus ID") + "</label>" +
+	"<input class='rs485_id' id='rs485_id' data-mini='true' type='number' inputmode='decimal' min='1' max='247' value='" + (sensor.id ? sensor.id : 1) + "'></div>" +
 
-"<div class='fac_div_offset_container' style='display:none; display: flex; gap: 12px; flex-wrap: wrap;'>" +
-	"<div style='flex: 1; min-width: 120px;'><label for='factor'>" + OSApp.Language._("Factor") + "</label>" +
-		"<input type='number' id='factor' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.fac + "' style='width: 100%;'></div>" +
-	"<div style='flex: 1; min-width: 120px;'><label for='divider'>" + OSApp.Language._("Divider") + "</label>" +
-		"<input type='number' id='divider' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.div + "' style='width: 100%;'></div>" +
-	"<div style='flex: 1; min-width: 120px;'><label for='offset'>" + OSApp.Language._("Offset (mV)") + "</label>" +
-		"<input type='number' id='offset' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.offset + "' style='width: 100%;'></div>" +
-"</div>" +
+"<div class='fac_container' style='display:none;'><label for='factor'>" + OSApp.Language._("Factor") + "</label>" +
+	"<input type='number' id='factor' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.fac + "'></div>" +
+
+"<div class='div_container' style='display:none;'><label for='divider'>" + OSApp.Language._("Divider") + "</label>" +
+	"<input type='number' id='divider' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.div + "'></div>" +
+
+"<div class='offset_container' style='display:none;'><label for='offset'>" + OSApp.Language._("Offset (mV)") + "</label>" +
+	"<input type='number' id='offset' data-mini='true' inputmode='decimal' min='-32768' max='32767' value='" + sensor.offset + "'></div>" +
 
 	"<div class='chartunit_label'><label for='unitid'>" + OSApp.Language._("Chart Unit") + "</label>" +
 	"<select data-mini='true' id='unitid'>" +
@@ -2851,7 +2581,6 @@ list += "</select></div>" +
 			"<option value='11'>" + OSApp.Language._("DK") + "</option>" +
 			"<option value='12'>" + OSApp.Language._("Lumen (lm)") + "</option>" +
 			"<option value='13'>" + OSApp.Language._("LUX (lx)") + "</option>" +
-			"<option value='14'>" + OSApp.Language._("Liter (L)") + "</option>" +
 			"<option value='99'>" + OSApp.Language._("Custom Unit") + "</option>" +
 		"</select></div>" +
 "<div class='unit_container' style='display:none;'><label for='unit'>" + OSApp.Language._("Unit") + "</label>" +
@@ -2864,24 +2593,30 @@ list += "</select></div>" +
 	"<input type='text' id='filter' data-mini='true' maxlength='100' value='" + (sensor.filter ? sensor.filter : "") + "'></div>" +
 
 "<div class='zigbee_device_ieee_container' style='display:none;'><label for='device_ieee'>" + OSApp.Language._("ZigBee Device IEEE Address") + "</label>" +
-		"<input type='text' id='device_ieee' data-mini='true' value='" + (sensor.device_ieee ? sensor.device_ieee : "") + "'></div>" +
+		"<input type='text' id='device_ieee' data-mini='true' value='" + (sensor.device_ieee ? sensor.device_ieee : "") + "' readonly></div>" +
 
 "<div class='zigbee_known_sensors_container' style='display:none;'>" +
-		"<label for='known_zigbee_sensors'>" + OSApp.Language._("Known Sensor Types") + "</label>" +
-		"<select id='known_zigbee_sensors' data-mini='true'>" +
+		"<label>" + OSApp.Language._("Known Sensor Types") + "</label>" +
+		"<div style='position:relative;'>" +
+		"<input type='text' id='zigbee_sensor_search' data-mini='true' autocomplete='off' " +
+			"placeholder='" + OSApp.Language._("Search device (min. 3 chars)") + "...'>" +
+		"<ul id='zigbee_sensor_results' style='display:none;position:absolute;z-index:9999;" +
+			"background:#fff;border:1px solid #ccc;border-radius:4px;list-style:none;margin:0;padding:0;" +
+			"width:100%;max-height:220px;overflow-y:auto;box-shadow:0 4px 10px rgba(0,0,0,.15);'></ul>" +
+		"</div>" +
+		"<select id='known_zigbee_sensors' data-mini='true' style='display:none;margin-top:6px;'>" +
 		"<option value=''>" + OSApp.Language._("Sensor Template") + "</option>" +
-		"<option value='__report__'>" + OSApp.Language._("Report New Sensor") + "</option>" +
 		"</select>" +
 			"</div>" +
 
-"<div class='zigbee_endpoint_cluster_attribute_container' style='display:none; display: flex; gap: 12px; flex-wrap: wrap;'>" +
-	"<div style='flex: 1; min-width: 100px;'><label for='endpoint'>" + OSApp.Language._("Endpoint") + "</label>" +
-		"<input type='number' id='endpoint' data-mini='true' inputmode='decimal' min='1' max='255' value='" + (sensor.endpoint ? sensor.endpoint : "1") + "' style='width: 100%;'></div>" +
-	"<div style='flex: 1; min-width: 140px;'><label for='cluster_id'>" + OSApp.Language._("Cluster ID (hex)") + "</label>" +
-		"<input type='text' id='cluster_id' data-mini='true' value='" + (function() { if (!sensor.cluster_id && sensor.cluster_id !== 0) return "0x0408"; var val = sensor.cluster_id; if (typeof val === 'string') { val = val.startsWith('0x') ? parseInt(val, 16) : parseInt(val, 10); } return isNaN(val) ? "0x0408" : "0x" + val.toString(16).toUpperCase().padStart(4, '0'); })() + "' style='width: 100%;'></div>" +
-	"<div style='flex: 1; min-width: 140px;'><label for='attribute_id'>" + OSApp.Language._("Attribute ID (hex)") + "</label>" +
-		"<input type='text' id='attribute_id' data-mini='true' value='" + (function() { if (!sensor.attribute_id && sensor.attribute_id !== 0) return "0x0000"; var val = sensor.attribute_id; if (typeof val === 'string') { val = val.startsWith('0x') ? parseInt(val, 16) : parseInt(val, 10); } return isNaN(val) ? "0x0000" : "0x" + val.toString(16).toUpperCase().padStart(4, '0'); })() + "' style='width: 100%;'></div>" +
-"</div>" +
+"<div class='zigbee_endpoint_container' style='display:none;'><label for='endpoint'>" + OSApp.Language._("Endpoint") + "</label>" +
+		"<input type='number' id='endpoint' data-mini='true' inputmode='decimal' min='1' max='255' value='" + (sensor.endpoint ? sensor.endpoint : "1") + "'></div>" +
+
+"<div class='zigbee_cluster_id_container' style='display:none;'><label for='cluster_id'>" + OSApp.Language._("Cluster ID (hex)") + "</label>" +
+		"<input type='text' id='cluster_id' data-mini='true' value='" + (function() { if (!sensor.cluster_id && sensor.cluster_id !== 0) return "0x0408"; var val = sensor.cluster_id; if (typeof val === 'string') { val = val.startsWith('0x') ? parseInt(val, 16) : parseInt(val, 10); } return isNaN(val) ? "0x0408" : "0x" + val.toString(16).toUpperCase().padStart(4, '0'); })() + "'></div>" +
+
+"<div class='zigbee_attribute_id_container' style='display:none;'><label for='attribute_id'>" + OSApp.Language._("Attribute ID (hex)") + "</label>" +
+		"<input type='text' id='attribute_id' data-mini='true' value='" + (function() { if (!sensor.attribute_id && sensor.attribute_id !== 0) return "0x0000"; var val = sensor.attribute_id; if (typeof val === 'string') { val = val.startsWith('0x') ? parseInt(val, 16) : parseInt(val, 10); } return isNaN(val) ? "0x0000" : "0x" + val.toString(16).toUpperCase().padStart(4, '0'); })() + "'></div>" +
 
 "<div class='bluetooth_char_uuid_container' style='display:none;'><label for='char_uuid'>" + OSApp.Language._("Characteristic UUID") + "</label>" +
 		"<input type='text' id='char_uuid' data-mini='true' value='" + (sensor.char_uuid ? sensor.char_uuid : "") + "'></div>" +
@@ -2907,7 +2642,7 @@ list += "</select></div>" +
 		"</select></div>" +
 
 "<div class='ri_label'><label for='sensor_ri'>" + OSApp.Language._("Read Interval (s)") + "</label>" +
-	"<input class='ri' id='sensor_ri' data-mini='true' type='number' inputmode='decimal' min='6' max='999999' value='" + (sensor.ri || 60) + "'></div>" +
+	"<input class='ri' id='sensor_ri' data-mini='true' type='number' inputmode='decimal' min='1' max='999999' value='" + sensor.ri + "'></div>" +
 
 			"<label for='enable'><input data-mini='true' id='enable' type='checkbox' " + ((sensor.enable === 1) ? "checked='checked'" : "") + ">" +
 			OSApp.Language._("Sensor Enabled") + "</label>" +
@@ -2927,18 +2662,16 @@ list += "</select></div>" +
 
 			"</form>" +
 
-			"<button type='button' class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
+			"<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
 
-			"<div style='display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;'>" +
-			((row < 0) ? "" : ("<a data-role='button' class='show-sensor-log' value='" + sensor.nr + "' href='#' data-mini='true' data-icon='grid' style='flex: 1; min-width: 70px;'>" +
-				OSApp.Language._("Chart") + "</a>")) +
-			((row < 0) ? "" : ("<a data-role='button' class='show-sensor-log-table' value='" + sensor.nr + "' href='#' data-mini='true' data-icon='bars' style='flex: 1; min-width: 70px;'>" +
-				OSApp.Language._("View sensor data") + "</a>")) +
-			((row < 0) ? "" : ("<a data-role='button' class='copy-sensor' value='" + sensor.nr + "' href='#' data-mini='true' data-icon='plus' style='flex: 1; min-width: 70px;'>" +
-				OSApp.Language._("Copy") + "</a>")) +
-			((row < 0) ? "" : ("<a data-role='button' class='black delete-sensor' value='" + sensor.nr + "' row='" + row + "' href='#' data-icon='delete' data-mini='true' style='flex: 1; min-width: 70px;'>" +
+			((row < 0) ? "" : ("<a data-role='button' class='show-sensor-log' value='" + sensor.nr + "' href='#' data-mini='true' data-icon='grid'>" +
+				OSApp.Language._("Show Analog Sensor Log") + "</a>")) +
+
+			((row < 0) ? "" : ("<a data-role='button' class='copy-sensor' value='" + sensor.nr + "' href='#' data-mini='true' data-icon='plus'>" +
+				OSApp.Language._("Copy Sensor") + "</a>")) +
+
+			((row < 0) ? "" : ("<a data-role='button' class='black delete-sensor' value='" + sensor.nr + "' row='" + row + "' href='#' data-icon='delete'>" +
 				OSApp.Language._("Delete") + "</a>")) +
-			"</div>" +
 
 			"</div>" +
 			"</div>";
@@ -2956,101 +2689,46 @@ list += "</select></div>" +
 				input.val(val + dir);
 			};
 
-		popup.find("#type").change(function () {
-			var sensortype = parseInt($(this).val());
-			OSApp.Analog.updateSensorVisibility(popup, sensortype);
-		});
-
-		// Delegated device-selection handlers — registered on the popup so they survive
-		// the scan button's .off("change") calls on the select elements.
-		popup.on("change", "#zigbeeDeviceSelect", function () {
-			var idxStr = $(this).val();
-			var idx = parseInt(idxStr, 10);
-			if (idxStr === "" || isNaN(idx)) { return; }
-			var devices = popup.data("zigbeeDevices") || [];
-			if (idx < 0 || idx >= devices.length) { return; }
-			var dev = devices[idx];
-			if (!dev) { return; }
-			var ieee = dev.ieee || dev.ieee_addr || "0x0000000000000000";
-			var modelId = (dev.model && dev.model !== "unknown") ? dev.model :
-				((dev.model_id && dev.model_id !== "unknown") ? dev.model_id : OSApp.Language._("Unknown"));
-			var manufacturer = (dev.manufacturer && dev.manufacturer !== "unknown") ? dev.manufacturer :
-				OSApp.Language._("Unknown");
-			var cluster_id = dev.cluster_id || dev.cluster;
-			var attribute_id = dev.attribute_id || dev.attribute;
-			popup.find("#device_ieee").val(ieee).trigger("change");
-			popup.data("zigbee_manufacturer", manufacturer);
-			popup.data("zigbee_model", modelId);
-			if (dev.discovered_at) { popup.data("zigbee_discovered_at", dev.discovered_at); }
-			var currentName = popup.find(".name").val();
-			if (!currentName || currentName.trim() === "") {
-				popup.find(".name").val(modelId).trigger("change");
-				try { popup.find(".name").textinput("refresh"); } catch (e) { void e; }
-			}
-			if (dev.endpoint) { popup.find("#endpoint").val(dev.endpoint).trigger("change"); }
-			if (cluster_id && attribute_id) {
-				popup.find("#cluster_id").val("0x" + parseInt(cluster_id, 10).toString(16).toUpperCase().padStart(4, "0"));
-				popup.find("#attribute_id").val("0x" + parseInt(attribute_id, 10).toString(16).toUpperCase().padStart(4, "0"));
-			} else {
-				var m = modelId.toLowerCase();
-				if (m.indexOf("temp") !== -1) {
-					popup.find("#cluster_id").val("0x0402");
-					popup.find("#attribute_id").val("0x0000");
-				} else if (m.indexOf("humid") !== -1) {
-					popup.find("#cluster_id").val("0x0405");
-					popup.find("#attribute_id").val("0x0000");
-				} else if (m.indexOf("soil") !== -1 || m.indexOf("moist") !== -1) {
-					popup.find("#cluster_id").val("0x0408");
-					popup.find("#attribute_id").val("0x0000");
+		// Fetch current Bluetooth devices and populate the Discovered Devices dropdown
+		var preloadBluetoothDevices = function () {
+			OSApp.Firmware.sendToOS("/bd?pw=", "json").then(function (data) {
+				var devices;
+				if (Array.isArray(data)) {
+					devices = data;
+				} else if (data && Array.isArray(data.devices)) {
+					devices = data.devices;
+				} else if (data && data.devices && typeof data.devices === "object") {
+					devices = Object.values(data.devices);
+				} else {
+					devices = [];
 				}
-			}
-
-			// Look up per-cluster entries for this device in the DB and populate the cluster combobox
-			var $clusterWrap = popup.find(".zigbee-db-cluster-container");
-			var $clusterSel  = popup.find("#zigbeeDbClusterSelect");
-			$clusterSel.empty().append("<option value=''>" + OSApp.Language._("Loading from DB...") + "</option>");
-			if ( typeof OSApp.ESP32Mode !== "undefined" && OSApp.ESP32Mode.ZigbeeDeviceDB && manufacturer && manufacturer !== OSApp.Language._("Unknown") ) {
-				OSApp.ESP32Mode.ZigbeeDeviceDB.lookupForCombobox( manufacturer, modelId ).then( function( entries ) {
-					$clusterSel.empty();
-					if ( !entries || entries.length === 0 ) {
-						$clusterWrap.hide();
-						return;
+				popup.data("bluetoothDevices", devices);
+				var deviceSelect = popup.find("#bluetoothDeviceSelect");
+				deviceSelect.empty();
+				if (devices.length > 0) {
+					deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
+					for (var i = 0; i < devices.length; i++) {
+						var device = devices[i] || {};
+						var macAddr = device.address || device.mac_addr || device.mac || "00:00:00:00:00:00";
+						var name = device.name || OSApp.Language._("Unknown Device");
+						var rssi = (device.rssi === undefined || device.rssi === null) ? "N/A" : device.rssi;
+						var serviceUuid = device.service_uuid || "";
+						var serviceName = device.service_name || "";
+						var label = name + " | " + macAddr + " | RSSI: " + rssi;
+						if (serviceUuid) {
+							label += " | " + (serviceName || OSApp.Language._("Unknown")) + " (" + serviceUuid + ")";
+						}
+						deviceSelect.append($("<option>").val(String(i)).text(label));
 					}
-					$clusterSel.append("<option value=''>" + OSApp.Language._("Select sensor/cluster from DB") + "</option>");
-					$.each( entries, function( i, entry ) {
-						var label = ( entry.sensor_name || "" ) +
-							" (" + ( entry.cluster_id || "" ) + ")" +
-							( entry.unit ? " \u2014 " + entry.unit : "" ) +
-							( entry.endpoint > 1 ? " EP:" + entry.endpoint : "" );
-						$clusterSel.append("<option value='" + i + "'>" + label + "</option>");
-					} );
-					popup.data("zigbeeDbClusterEntries", entries);
-					$clusterWrap.show();
-					try { $clusterSel.selectmenu("refresh", true); } catch (e) { void e; }
-				} );
-			} else {
-				$clusterWrap.hide();
-			}
-		});
+				} else {
+					deviceSelect.append($("<option>").val("").text(OSApp.Language._("No devices found")));
+				}
+				try { deviceSelect.selectmenu("refresh", true); } catch (e) {}
+			});
+		};
 
-		popup.on("change", "#zigbeeDbClusterSelect", function () {
-			var idxStr = $(this).val();
-			if (idxStr === "" || idxStr === null) { return; }
-			var entries = popup.data("zigbeeDbClusterEntries") || [];
-			var entry   = entries[ parseInt(idxStr, 10) ];
-			if (!entry) { return; }
-			if (entry.cluster_id) { popup.find("#cluster_id").val(entry.cluster_id).trigger("change"); }
-			if (entry.attr_id)    { popup.find("#attribute_id").val(entry.attr_id).trigger("change"); }
-			if (entry.endpoint)   { popup.find("#endpoint").val(entry.endpoint).trigger("change"); }
-			if (entry.unitid !== undefined && entry.unitid !== null) {
-				popup.find("#unitid").val(entry.unitid).trigger("change");
-				try { popup.find("#unitid").selectmenu("refresh"); } catch (e) { void e; }
-			}
-			if (entry.factor  !== undefined) { popup.find("#factor").val(entry.factor).trigger("change"); }
-			if (entry.divider !== undefined) { popup.find("#divider").val(entry.divider).trigger("change"); }
-		});
-
-		popup.on("change", "#bluetoothDeviceSelect", function () {
+		// Standalone handler for BLE Discovered Devices select (active when no scan is running)
+		popup.find("#bluetoothDeviceSelect").on("change", function () {
 			var idxStr = $(this).val();
 			var idx = parseInt(idxStr, 10);
 			if (idxStr === "" || isNaN(idx)) { return; }
@@ -3058,43 +2736,97 @@ list += "</select></div>" +
 			if (idx < 0 || idx >= devices.length) { return; }
 			var dev = devices[idx];
 			if (!dev) { return; }
-			var selectedCharUuid = dev.char_uuid || dev.characteristic_uuid || dev.charUuid ||
-				dev.characteristicUuid || dev.charUUID || dev.characteristicUUID || dev.service_uuid || dev.serviceUuid || "";
-			var selectedFormat = dev.format;
-			if (selectedFormat === undefined || selectedFormat === null || selectedFormat === "") {
-				selectedFormat = dev.known_format;
-			}
-			if (selectedFormat === undefined || selectedFormat === null || selectedFormat === "") {
-				selectedFormat = dev.sensor_format;
-			}
-			if (selectedFormat === undefined || selectedFormat === null || selectedFormat === "") {
-				selectedFormat = dev.known_type;
-			}
+			var selectedCharUuid = dev.char_uuid || dev.characteristic_uuid || dev.charUuid || dev.characteristicUuid || dev.charUUID || dev.characteristicUUID || dev.service_uuid || dev.serviceUuid || "";
 			if (Array.isArray(selectedCharUuid)) { selectedCharUuid = selectedCharUuid[0] || ""; }
 			selectedCharUuid = String(selectedCharUuid || "");
 			var charField = popup.find("#char_uuid");
 			if (charField.length && selectedCharUuid) {
 				charField.val(selectedCharUuid).trigger("change");
-				try { charField.textinput("refresh"); } catch (e) { void e; }
-			}
-			if (selectedFormat !== undefined && selectedFormat !== null && selectedFormat !== "") {
-				var formatField = popup.find("#format");
-				var parsedFormat = parseInt(selectedFormat, 10);
-				if (formatField.length && !isNaN(parsedFormat)) {
-					formatField.val(String(parsedFormat)).trigger("change");
-					try { formatField.selectmenu("refresh", true); } catch (e) { void e; }
-				}
+				try { charField.textinput("refresh"); } catch (e) {}
 			}
 			var mac = dev.address || dev.mac_addr || dev.mac || "";
-			if (mac) {
-				var macField = popup.find(".mac");
-				if (macField.length) { macField.val(mac).trigger("change"); }
-			}
+			if (mac) { popup.find(".mac").val(mac).trigger("change"); }
 			var deviceName = dev.name || OSApp.Language._("Unknown Device");
 			var currentName = popup.find(".name").val();
 			if (!currentName || currentName.trim() === "") {
-				popup.find(".name").val(deviceName).trigger("change");
-				try { popup.find(".name").textinput("refresh"); } catch (e) { void e; }
+				var nameField = popup.find(".name");
+				nameField.val(deviceName).trigger("change");
+				try { nameField.textinput("refresh"); } catch (e) {}
+			}
+		});
+
+		// Fetch current ZigBee devices from coordinator and populate the Discovered Devices dropdown
+		var preloadZigBeeDevices = function () {
+			OSApp.Firmware.sendToOS("/zd?pw=", "json").then(function (data) {
+				var devices;
+				if (Array.isArray(data)) {
+					devices = data;
+				} else if (data && Array.isArray(data.devices)) {
+					devices = data.devices;
+				} else if (data && data.devices && typeof data.devices === "object") {
+					devices = Object.values(data.devices);
+				} else {
+					devices = [];
+				}
+				popup.data("zigbeeDevices", devices);
+				var deviceSelect = popup.find("#zigbeeDeviceSelect");
+				deviceSelect.empty();
+				if (devices.length > 0) {
+					deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
+					for (var i = 0; i < devices.length; i++) {
+						var device = devices[i] || {};
+						var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
+						var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
+						var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
+						deviceSelect.append($("<option>").val(String(i)).text(modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr));
+					}
+				} else {
+					deviceSelect.append($("<option>").val("").text(OSApp.Language._("No devices found")));
+				}
+				try { deviceSelect.selectmenu("refresh", true); } catch (e) {}
+			});
+		};
+
+		// Standalone handler for Discovered Devices select (active when no scan is running)
+		popup.find("#zigbeeDeviceSelect").on("change", function () {
+			var idxStr = $(this).val();
+			var idx = parseInt(idxStr, 10);
+			if (idxStr === "" || isNaN(idx)) { return; }
+			var devices = popup.data("zigbeeDevices") || [];
+			if (idx < 0 || idx >= devices.length) { return; }
+			var dev = devices[idx];
+			if (!dev) { return; }
+			var sel = {
+				ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
+				model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
+				manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
+			};
+			popup.find("#device_ieee").val(sel.ieee).trigger("change");
+			var currentName = popup.find(".name").val();
+			if (!currentName || currentName.trim() === "") {
+				var nameField = popup.find(".name");
+				nameField.val(sel.model).trigger("change");
+				try { nameField.textinput("refresh"); } catch (e) {}
+			}
+			if (sel.model.toLowerCase().indexOf("temp") !== -1) {
+				popup.find("#cluster_id").val("0x0402");
+				popup.find("#attribute_id").val("0x0000");
+			} else if (sel.model.toLowerCase().indexOf("humid") !== -1) {
+				popup.find("#cluster_id").val("0x0405");
+				popup.find("#attribute_id").val("0x0000");
+			} else if (sel.model.toLowerCase().indexOf("soil") !== -1 || sel.model.toLowerCase().indexOf("moist") !== -1) {
+				popup.find("#cluster_id").val("0x0408");
+				popup.find("#attribute_id").val("0x0000");
+			}
+		});
+
+		popup.find("#type").change(function () {
+			var sensortype = parseInt($(this).val());
+			OSApp.Analog.updateSensorVisibility(popup, sensortype);
+			if (sensortype === OSApp.Analog.Constants.SENSOR_ZIGBEE) {
+				preloadZigBeeDevices();
+			} else if (sensortype === OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
+				preloadBluetoothDevices();
 			}
 		});
 
@@ -3131,31 +2863,19 @@ list += "</select></div>" +
 			popup.find(".zigbee_scan_select_container").show();
 
 			var scanStartTime = Date.now();
+			var scanDuration = 10;
 			var lastFoundDevice = null;
-				void lastFoundDevice;
 			var scanInterval = null;
 			var uiInterval = null;
 			var scanTimeout = null;
-			var joinRenewInterval = null;
 			var requestInFlight = false;
-			var requestStartTime = 0;
-			var joinRequestInFlight = false;
+			var didCleanup = false;
 			var lastDeviceCount = 0;
-			var wifiConnected = false;
-			var deviceSelected = false;  // true once user picks a device; stops list refresh
 
 			function updateScanUi() {
 				var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
-				if (elapsed < 10) {
-					// Phase 1: ZigBee join window active (0–10s)
-					btn.text(OSApp.Language._("Scanning..."));
-				} else if (!wifiConnected) {
-					// Phase 2: Polling /zd, waiting for device to respond
-					btn.text(OSApp.Language._("Connecting to network..."));
-				} else {
-					// Phase 3: Connected — show device count (restored after 10s)
-					btn.text(lastDeviceCount + " " + OSApp.Language._("device(s) found"));
-				}
+				var remaining = Math.max(0, scanDuration - elapsed);
+				btn.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + lastDeviceCount + ")");
 			}
 
 			// Start countdown UI immediately (even if /zo is slow)
@@ -3188,429 +2908,183 @@ list += "</select></div>" +
 				return (devices || []).length;
 			}
 
-			// Prepare UI elements
-			var deviceSelect = popup.find("#zigbeeDeviceSelect");
-			deviceSelect.empty();
-			popup.data("zigbeeDevices", []);
-			deviceSelect.append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
-			try {
-				deviceSelect.selectmenu("refresh", true);
-			} catch (ex) {
-				void e;
-				// ignore
-			}
+			// Start ZigBee scan
+			OSApp.Firmware.sendToOS("/zo?pw=&duration=10", "json").then(function () {
 
-			function triggerJoinWindow() {
-				if (joinRequestInFlight) {
-					return;
+				// Prepare UI elements
+				var deviceSelect = popup.find("#zigbeeDeviceSelect");
+				deviceSelect.empty();
+				popup.data("zigbeeDevices", []);
+				deviceSelect.append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+				try {
+					deviceSelect.selectmenu("refresh", true);
+				} catch (e) {
+					// ignore
 				}
-				joinRequestInFlight = true;
-				OSApp.Firmware.sendToOS("/zo?pw=&duration=10", "json").always(function () {
-					joinRequestInFlight = false;
-				});
-			}
 
-			function updateDeviceList() {
-					// Once the user has selected a device, stop refreshing the list so the
-					// in-flight /zd response can no longer overwrite the dropdown selection.
-					if (deviceSelected) { requestInFlight = false; return; }
+				function updateDeviceList() {
 					if (requestInFlight) {
-						if ((Date.now() - requestStartTime) < 4000) {
-							return;
-						}
-						// Safety: allow a new request if the previous one stalled.
-						requestInFlight = false;
+						return;
 					}
 					// Timer UI is handled by updateScanUi() so it keeps updating even if /zd is slow.
 
 					requestInFlight = true;
-					requestStartTime = Date.now();
-					OSApp.Firmware.sendToOS("/zd?pw=", "json", 3000).then(function (data) {
+					OSApp.Firmware.sendToOS("/zd?pw=", "json").then(function (data) {
 						requestInFlight = false;
-						var wasConn = wifiConnected;
-						wifiConnected = true;
-						// First successful /zd response: stop polling, show count for 10s, then restore button
-						if (!wasConn) {
-							if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-							if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
-							if (joinRenewInterval) { clearInterval(joinRenewInterval); joinRenewInterval = null; }
-							scanTimeout = setTimeout(function() {
-								if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
-								popup.find("#zigbeeScanTimer").text(OSApp.Language._("Scan finished"));
-								popup.find("#zigbeeScanArea").hide();
-								try { OSApp.Firmware.sendToOS("/zc?pw=", "json"); } catch (e) { void e; }
-								btn.text(originalText).prop("disabled", false);
-								scanTimeout = null;
-							}, 10000);
-						}
 						var devices = normalizeZigBeeDevices(data);
 						popup.data("zigbeeDevices", devices);
 						lastDeviceCount = normalizeZigBeeCount(data, devices);
 
 						var deviceSelect = popup.find("#zigbeeDeviceSelect");
-						var tableBody = popup.find("#zigbeeDeviceTableBody");
 
 						if (devices && devices.length > 0) {
 							deviceSelect.empty();
 							deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
-							tableBody.empty();
-
 							for (var i = 0; i < devices.length; i++) {
 								var device = devices[i] || {};
 								var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
 								var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
 								var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
-								var clusterId = device.cluster_id || device.cluster || "";
-								var attributeId = device.attribute_id || device.attribute || "";
-								var endpoint = device.endpoint || "";
 
-								var clusterHex = clusterId ? "0x" + parseInt(clusterId, 10).toString(16).toUpperCase().padStart(4, "0") : "";
-								var attributeHex = attributeId ? "0x" + parseInt(attributeId, 10).toString(16).toUpperCase().padStart(4, "0") : "";
-
-								// Try to enrich label with a friendly name from the device DB cache.
-								var dbEntry = OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB ?
-						OSApp.ESP32Mode.ZigbeeDeviceDB.getCached(ieeeAddr) : null;
-								var directVendor = device.vendor || "";
-								var friendlyName = dbEntry && (dbEntry.vendor || dbEntry.description) ?
-						(dbEntry.vendor || "") + (dbEntry.vendor && dbEntry.description ? " — " : "") + (dbEntry.description || "")
-									: "";
-								var label = friendlyName ?
-						friendlyName + " (" + modelId + ") | IEEE: " + ieeeAddr
-									: directVendor ? directVendor + " " + modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr
-									: modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
-								if (endpoint) label += " | EP: " + endpoint;
-								if (clusterHex) label += " | CID: " + clusterHex;
-								if (attributeHex) label += " | AID: " + attributeHex;
-
+								var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
 								deviceSelect.append($("<option>").val(String(i)).text(label));
-
-								// Add row to table
-								var row = $("<tr>");
-								row.append($("<td>").text(modelId));
-								row.append($("<td>").text(manufacturer));
-								row.append($("<td>").text(ieeeAddr));
-								row.append($("<td>").text(endpoint || "-"));
-								row.append($("<td>").text(clusterHex || "-"));
-								row.append($("<td>").text(attributeHex || "-"));
-								tableBody.append(row);
 							}
 							try {
 								deviceSelect.selectmenu("refresh", true);
 							} catch (e) {
-								void e;
 								// ignore
 							}
 						} else {
 							deviceSelect.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
-							tableBody.empty();
 							try {
 								deviceSelect.selectmenu("refresh", true);
 							} catch (e) {
-								void e;
 								// ignore
 							}
 						}
 					}, function () {
 						requestInFlight = false;
+						var deviceSelectErr = popup.find("#zigbeeDeviceSelect");
+						deviceSelectErr.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+						try {
+							deviceSelectErr.selectmenu("refresh", true);
+						} catch (e) {
+							// ignore
+						}
 					});
 				}
 
-			// Scan-specific handler: stop timers + close ZigBee join window on device selection.
-			// Field values are applied by the delegated popup handler registered at editor init.
-			popup.find("#zigbeeDeviceSelect").on("change.zigbeeScan", function () {
-					// Mark selection done FIRST so updateDeviceList() stops refreshing
-					deviceSelected = true;
-					popup.find("#zigbeeDeviceSelect").off("change.zigbeeScan");
+				// Immediately apply selected ZigBee device to fields on combobox change
+				popup.find("#zigbeeDeviceSelect").off("change").on("change", function () {
+					var idxStr = popup.find("#zigbeeDeviceSelect").val();
+					var idx = parseInt(idxStr, 10);
+					if (idxStr === "" || isNaN(idx)) {
+						return;
+					}
+					var devices = popup.data("zigbeeDevices") || [];
+					if (!devices || idx < 0 || idx >= devices.length) {
+						return;
+					}
+					var dev = devices[idx] || null;
+					if (!dev) {
+						return;
+					}
+					var selectedDevice = {
+						ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
+						model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
+						manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
+					};
 
 					// Stop scanning timers but keep the device list visible
-					if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-					if (joinRenewInterval) { clearInterval(joinRenewInterval); joinRenewInterval = null; }
-					if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
-					if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
+					if (scanInterval) {
+						clearInterval(scanInterval);
+						scanInterval = null;
+					}
+					if (uiInterval) {
+						clearInterval(uiInterval);
+						uiInterval = null;
+					}
+					if (scanTimeout) {
+						clearTimeout(scanTimeout);
+						scanTimeout = null;
+					}
 
-					// Close ZigBee join window and restore scan UI
 					OSApp.Firmware.sendToOS("/zc?pw=", "json").always(function () {
 						popup.find("#zigbeeScanArea").hide();
 						btn.text(originalText).prop("disabled", false);
+
+						popup.find("#device_ieee").val(selectedDevice.ieee).trigger("change");
+
+						var currentName = popup.find(".name").val();
+						if (!currentName || currentName.trim() === "") {
+							var nameField = popup.find(".name");
+							nameField.val(selectedDevice.model).trigger("change");
+							try {
+								nameField.textinput("refresh");
+							} catch (e) {
+								// ignore
+							}
+						}
+
+						if (selectedDevice.model.toLowerCase().includes("temp")) {
+							popup.find("#cluster_id").val("0x0402");
+							popup.find("#attribute_id").val("0x0000");
+						} else if (selectedDevice.model.toLowerCase().includes("humid")) {
+							popup.find("#cluster_id").val("0x0405");
+							popup.find("#attribute_id").val("0x0000");
+						} else if (selectedDevice.model.toLowerCase().includes("soil") || selectedDevice.model.toLowerCase().includes("moist")) {
+							popup.find("#cluster_id").val("0x0408");
+							popup.find("#attribute_id").val("0x0000");
+						}
+
+						popup.find(".name").focus();
 					});
 				});
 
-
-			// Trigger initial ZigBee join window (firmware: WiFi off, ZigBee priority)
-			triggerJoinWindow();
-
-			// Renew join window every 8s to keep ZigBee in join mode
-			joinRenewInterval = setInterval(function () {
-				var elapsed = Math.floor((Date.now() - scanStartTime) / 1000);
-				if (elapsed < 20) {
-					triggerJoinWindow();
-				}
-			}, 8000);
-
-			// Phase 1 (0–10s): ZigBee join window open — no polling
-			// Phase 2 (after 10s): Start polling /zd; first success triggers phase 3
-			// Safety fallback: force completion after 120s if never connected
-			scanTimeout = setTimeout(function() {
-				scanTimeout = null;
+				// Update device list immediately
 				updateDeviceList();
+
+				// Update device list every second
 				scanInterval = setInterval(updateDeviceList, 1000);
-				// Safety fallback: force phase-3 display after 120s of polling
+
+				// Stop scanning after 10 seconds, keep results visible
 				scanTimeout = setTimeout(function() {
-					scanTimeout = null;
-					if (!wifiConnected) {
-						if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-						if (joinRenewInterval) { clearInterval(joinRenewInterval); joinRenewInterval = null; }
-						wifiConnected = true;  // force phase-3 display
-						scanTimeout = setTimeout(function() {
-							if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
-							popup.find("#zigbeeScanTimer").text(OSApp.Language._("Scan finished"));
-							popup.find("#zigbeeScanArea").hide();
-							try { OSApp.Firmware.sendToOS("/zc?pw=", "json"); } catch (e) { void e; }
-							btn.text(originalText).prop("disabled", false);
-							scanTimeout = null;
-						}, 10000);
+					// Stop scanning, but keep discovered devices visible for selection
+					if (scanInterval) {
+						clearInterval(scanInterval);
+						scanInterval = null;
 					}
-				}, 120000);
-			}, 10000);
+					if (uiInterval) {
+						clearInterval(uiInterval);
+						uiInterval = null;
+					}
+					popup.find("#zigbeeScanTimer").text(OSApp.Language._("Scan finished"));
+					// Collapse scan area, keep select visible
+					popup.find("#zigbeeScanArea").hide();
+					// Best-effort: close/clear pairing window on backend (do not touch UI list)
+					try {
+						OSApp.Firmware.sendToOS("/zc?pw=", "json");
+					} catch (e) {
+						// ignore
+					}
+					btn.text(originalText).prop("disabled", false);
+					scanTimeout = null;
+				}, 10000);
+
+			}, function () {
+				// Error handler
+				if (uiInterval) {
+					clearInterval(uiInterval);
+					uiInterval = null;
+				}
+				btn.text(originalText).prop("disabled", false);
+				popup.find("#zigbeeScanArea").hide();
+				popup.find(".zigbee_scan_select_container").hide();
+				OSApp.Errors.showError(OSApp.Language._("Failed to start ZigBee scanning. Please ensure ZigBee is supported."));
+			});
 
 			return false;
 		});
-	// Load ZigBee cluster data and populate dropdown
-	OSApp.Analog.populateZigBeeKnownSensors = function(targetPopup) {
-		var knownSensorsSelect = targetPopup.find("#known_zigbee_sensors");
-		if (!knownSensorsSelect.length) return;
-
-		var applyKnownTemplateSelection = function() {
-			var parseNumber = function(value) {
-				if (value === undefined || value === null || value === "") return null;
-				if (typeof value === "string" && value.toLowerCase().indexOf("0x") === 0) {
-					var parsedHex = parseInt(value, 16);
-					return isNaN(parsedHex) ? null : parsedHex;
-				}
-				var parsed = parseInt(value, 10);
-				return isNaN(parsed) ? null : parsed;
-			};
-
-			var endpoint = parseNumber(targetPopup.find("#endpoint").val());
-			var clusterId = parseNumber(targetPopup.find("#cluster_id").val());
-			var attributeId = parseNumber(targetPopup.find("#attribute_id").val());
-			var unitid = parseNumber(targetPopup.find("#unitid").val());
-			var factor = parseNumber(targetPopup.find("#factor").val());
-			var divider = parseNumber(targetPopup.find("#divider").val());
-			var offset = parseNumber(targetPopup.find("#offset").val());
-
-			if (endpoint === null || clusterId === null || attributeId === null) {
-				return;
-			}
-
-			var matchedId = "";
-			knownSensorsSelect.find("option").each(function() {
-				var option = $(this);
-				var sensorDef = option.data("sensor");
-				if (!sensorDef) return;
-
-				var defEndpoint = parseNumber(sensorDef.endpoint);
-				var defCluster = parseNumber(sensorDef.cluster_id);
-				var defAttribute = parseNumber(sensorDef.attribute_id);
-
-				if (defEndpoint !== endpoint || defCluster !== clusterId || defAttribute !== attributeId) {
-					return;
-				}
-
-				if (Object.prototype.hasOwnProperty.call(sensorDef, "unitid")) {
-					var defUnitid = parseNumber(sensorDef.unitid);
-					if (defUnitid !== unitid) return;
-				}
-
-				if (Object.prototype.hasOwnProperty.call(sensorDef, "factor") || Object.prototype.hasOwnProperty.call(sensorDef, "fac")) {
-					var defFactor = parseNumber(Object.prototype.hasOwnProperty.call(sensorDef, "factor") ? sensorDef.factor : sensorDef.fac);
-					if (defFactor !== factor) return;
-				}
-
-				if (Object.prototype.hasOwnProperty.call(sensorDef, "divider") || Object.prototype.hasOwnProperty.call(sensorDef, "div")) {
-					var defDivider = parseNumber(Object.prototype.hasOwnProperty.call(sensorDef, "divider") ? sensorDef.divider : sensorDef.div);
-					if (defDivider !== divider) return;
-				}
-
-				if (Object.prototype.hasOwnProperty.call(sensorDef, "offset")) {
-					var defOffset = parseNumber(sensorDef.offset);
-					if (defOffset !== offset) return;
-				}
-
-				matchedId = String(sensorDef.id || option.val() || "");
-				return false;
-			});
-
-			if (matchedId) {
-				knownSensorsSelect.val(matchedId);
-				try { knownSensorsSelect.selectmenu("refresh"); } catch ( e ) { void e; /* widget not yet initialized */ }
-			}
-		};
-
-		// Only populate if not already populated (check for existing sensor options)
-		if (knownSensorsSelect.find("option").filter(function() { return $(this).data("sensor"); }).length > 0) {
-			applyKnownTemplateSelection();
-			try { knownSensorsSelect.selectmenu("refresh"); } catch ( e ) { void e; /* widget not yet initialized */ }
-			return;
-		}
-		var zbMfr = targetPopup.data("zigbee_manufacturer");
-		var zbMdl = targetPopup.data("zigbee_model");
-
-		// Load generic ZigBee cluster templates
-		OSApp.Analog.loadZigBeeClusterData().then(function(clusterData) {
-			if (clusterData && clusterData.length > 0) {
-				var reportOption = knownSensorsSelect.find("option[value='__report__']");
-				clusterData.forEach(function(sensorDef) {
-					var optionText = sensorDef.name + " (" + sensorDef.description + ")";
-					var option = $("<option>").val(sensorDef.id).text(optionText).data("sensor", sensorDef);
-					if (reportOption.length) {
-						reportOption.before(option);
-					} else {
-						knownSensorsSelect.append(option);
-					}
-				});
-				applyKnownTemplateSelection();
-				try { knownSensorsSelect.selectmenu("refresh"); } catch ( e ) { void e; /* widget not yet initialized */ }
-			}
-		});
-
-		// Load device-specific sensors from Zigbee Device DB (if fingerprint is known)
-		if (zbMfr && zbMfr !== "unknown" && zbMdl && zbMdl !== "unknown") {
-			$.ajax({
-				url: "https://opensprinklershop.de/zigbee/devices_api.php?manufacturer=" + encodeURIComponent(zbMfr) + "&model=" + encodeURIComponent(zbMdl),
-				dataType: "json",
-				timeout: 6000
-			}).done(function(dbData) {
-				if (!dbData || !dbData.sensors || !dbData.sensors.length) { return; }
-				var firstOpt = knownSensorsSelect.find("option").first();
-				dbData.sensors.forEach(function(s) {
-					if (!s.name || !s.cluster_id) { return; }
-					var sensorDef = {
-						id:            "__db_" + s.name,
-						name:          ( dbData.vendor || zbMdl ) + ": " + s.description,
-						description:   s.unit || "",
-						endpoint:      s.endpoint || 1,
-						cluster_id:    s.cluster_id,
-						attribute_id:  s.attr_id || "0x0000",
-						unitid:        s.unitid || 0,
-						factor:        s.factor || 1,
-						divider:       s.divider || 1,
-						offset:        0
-					};
-					var optText = ( dbData.vendor || zbMdl ) + ": " + s.description + ( s.unit ? " [" + s.unit + "]" : "" );
-					var opt = $("<option>").val(sensorDef.id).text(optText).data("sensor", sensorDef);
-					if (firstOpt.length) {
-						firstOpt.before(opt);
-					} else {
-						knownSensorsSelect.append(opt);
-					}
-				});
-				applyKnownTemplateSelection();
-				try { knownSensorsSelect.selectmenu("refresh"); } catch (e) { void e; }
-			});
-		}
-	};
-	var lazyLoadZigBeeKnownSensors = function() {
-		OSApp.Analog.populateZigBeeKnownSensors(popup);
-	};
-	popup.find("#known_zigbee_sensors").one("focusin click", lazyLoadZigBeeKnownSensors);
-	popup.on("selectmenubeforeopen", "#known_zigbee_sensors", lazyLoadZigBeeKnownSensors);
-
-	// Handle known sensor selection
-		function reportZigBeeSensorFromPopup() {
-			var deviceIeee = popup.find("#device_ieee").val();
-			var endpoint = popup.find("#endpoint").val();
-			var clusterId = popup.find("#cluster_id").val();
-			var attributeId = popup.find("#attribute_id").val();
-			var sensorName = popup.find(".name").val();
-			var readInterval = popup.find(".ri").val();
-			var unitId = popup.find("#unitid").val();
-			var unit = popup.find("#unit").val();
-			var factor = popup.find("#factor").val();
-			var divider = popup.find("#divider").val();
-			var offset = popup.find("#offset").val();
-
-			var emailBody = "New ZigBee Sensor Report:\\n\\n" +
-				"Sensor Name: " + (sensorName || "N/A") + "\\n" +
-				"Device IEEE: " + (deviceIeee || "N/A") + "\\n" +
-				"Endpoint: " + (endpoint || "N/A") + "\\n" +
-				"Cluster ID: " + (clusterId || "N/A") + "\\n" +
-				"Attribute ID: " + (attributeId || "N/A") + "\\n" +
-				"Read Interval: " + (readInterval || "N/A") + " s\\n" +
-				"Unit ID: " + (unitId || "N/A") + "\\n" +
-				"Unit: " + (unit || "N/A") + "\\n" +
-				"Factor: " + (factor || "N/A") + "\\n" +
-				"Divider: " + (divider || "N/A") + "\\n" +
-				"Offset: " + (offset || "N/A") + "\\n\\n" +
-				"Please add this sensor to the database.";
-
-			var subject = "New ZigBee Sensor: " + (sensorName || "Unknown");
-			var mailtoLink = "mailto:info@opensprinklershop.de?subject=" +
-				encodeURIComponent(subject) +
-				"&body=" + encodeURIComponent(emailBody);
-
-			window.location.href = mailtoLink;
-		}
-
-		popup.find("#known_zigbee_sensors").on("change", function() {
-			var selectedOption = $(this).find("option:selected");
-			if (selectedOption.val() === "__report__") {
-				reportZigBeeSensorFromPopup();
-				$(this).val("");
-				try { $(this).selectmenu("refresh"); } catch ( e ) { void e; /* widget not yet initialized */ }
-				return;
-			}
-			var sensorData = selectedOption.data("sensor");
-
-			if (sensorData) {
-				// Update endpoint, cluster_id, and attribute_id fields
-				popup.find("#endpoint").val(sensorData.endpoint || "1");
-				// Convert cluster_id and attribute_id from integer to hex string
-				var clusterId = sensorData.cluster_id;
-				var clusterId_num = clusterId ? (typeof clusterId === 'string' ? (clusterId.startsWith('0x') ? parseInt(clusterId, 16) : parseInt(clusterId, 10)) : clusterId) : null;
-				popup.find("#cluster_id").val(clusterId_num !== null && !isNaN(clusterId_num) ? "0x" + clusterId_num.toString(16).toUpperCase().padStart(4, '0') : "0x0000");
-
-				var attributeId = sensorData.attribute_id;
-				var attributeId_num = attributeId ? (typeof attributeId === 'string' ? (attributeId.startsWith('0x') ? parseInt(attributeId, 16) : parseInt(attributeId, 10)) : attributeId) : null;
-				popup.find("#attribute_id").val(attributeId_num !== null && !isNaN(attributeId_num) ? "0x" + attributeId_num.toString(16).toUpperCase().padStart(4, '0') : "0x0000");
-
-				// Set unit ID if provided (allow 0)
-				if (Object.prototype.hasOwnProperty.call(sensorData, "unitid")) {
-					popup.find("#unitid").val(sensorData.unitid);
-					// Trigger change to show/hide unit field
-					popup.find("#unitid").change();
-				}
-
-				// Set custom unit if provided (allow empty string)
-				if (Object.prototype.hasOwnProperty.call(sensorData, "unit")) {
-					popup.find("#unit").val(sensorData.unit);
-				}
-
-				// Set factor if provided (allow 0)
-				if (Object.prototype.hasOwnProperty.call(sensorData, "factor") || Object.prototype.hasOwnProperty.call(sensorData, "fac")) {
-					popup.find("#factor").val(Object.prototype.hasOwnProperty.call(sensorData, "factor") ? sensorData.factor : sensorData.fac);
-				}
-
-				// Set divider if provided (allow 0)
-				if (Object.prototype.hasOwnProperty.call(sensorData, "divider") || Object.prototype.hasOwnProperty.call(sensorData, "div")) {
-					popup.find("#divider").val(Object.prototype.hasOwnProperty.call(sensorData, "divider") ? sensorData.divider : sensorData.div);
-				}
-
-				// Set offset if provided (allow 0)
-				if (Object.prototype.hasOwnProperty.call(sensorData, "offset")) {
-					popup.find("#offset").val(sensorData.offset);
-				}
-
-				// Update sensor name if empty
-				var currentName = popup.find(".name").val();
-				if (!currentName || currentName.trim() === "") {
-					popup.find(".name").val(sensorData.name);
-				}
-			}
-		});
-
-
-
 		//Bluetooth: Scan for devices
 		popup.find("#bluetoothsel").on("click", function (e) {
 			e.preventDefault();
@@ -3627,13 +3101,11 @@ list += "</select></div>" +
 			var scanStartTime = Date.now();
 			var scanDuration = 10;
 			var lastFoundDevice = null;
-				void lastFoundDevice;
 			var scanInterval = null;
 			var uiInterval = null;
 			var scanTimeout = null;
 			var requestInFlight = false;
 			var didCleanup = false;
-				void didCleanup;
 			var lastDeviceCount = 0;
 
 			function updateScanUi() {
@@ -3685,7 +3157,6 @@ list += "</select></div>" +
 				try {
 					deviceSelect.selectmenu("refresh", true);
 				} catch (e) {
-					void e;
 					// ignore
 				}
 
@@ -3727,7 +3198,6 @@ list += "</select></div>" +
 								try {
 									deviceSelect.selectmenu("refresh", true);
 								} catch (e) {
-									void e;
 									// ignore
 								}
 							} else {
@@ -3736,7 +3206,6 @@ list += "</select></div>" +
 								try {
 									deviceSelectEmpty.selectmenu("refresh", true);
 								} catch (e) {
-									void e;
 									// ignore
 								}
 							}
@@ -3747,23 +3216,80 @@ list += "</select></div>" +
 							try {
 								deviceSelectErr.selectmenu("refresh", true);
 							} catch (e) {
-								void e;
 								// ignore
 							}
 					});
 				}
 
-				// Scan-specific handler: stop timers + clear scan flags on device selection.
-				// Field values are applied by the delegated popup handler registered at editor init.
-				popup.find("#bluetoothDeviceSelect").on("change.bluetoothScan", function () {
-					popup.find("#bluetoothDeviceSelect").off("change.bluetoothScan");
+				// Immediately apply selected device to fields on combobox change
+				popup.find("#bluetoothDeviceSelect").off("change").on("change", function () {
+					var idxStr = popup.find("#bluetoothDeviceSelect").val();
+					var idx = parseInt(idxStr, 10);
+					if (idxStr === "" || isNaN(idx)) {
+						return;
+					}
+					var currentDevices = popup.data("bluetoothDevices") || [];
+					if (!currentDevices || idx < 0 || idx >= currentDevices.length) {
+						return;
+					}
+					var dev = currentDevices[idx] || null;
+					if (!dev) {
+						return;
+					}
+
+					var selectedCharUuid = dev.char_uuid || dev.characteristic_uuid || dev.charUuid || dev.characteristicUuid || dev.charUUID || dev.characteristicUUID || dev.service_uuid || dev.serviceUuid || "";
+					if (Array.isArray(selectedCharUuid)) {
+						selectedCharUuid = selectedCharUuid[0] || "";
+					}
+					selectedCharUuid = String(selectedCharUuid || "");
 
 					// Stop scanning timers but keep the device list visible
-					if (scanInterval) { clearInterval(scanInterval); scanInterval = null; }
-					if (uiInterval) { clearInterval(uiInterval); uiInterval = null; }
-					if (scanTimeout) { clearTimeout(scanTimeout); scanTimeout = null; }
+					if (scanInterval) {
+						clearInterval(scanInterval);
+						scanInterval = null;
+					}
+					if (uiInterval) {
+						clearInterval(uiInterval);
+						uiInterval = null;
+					}
+					if (scanTimeout) {
+						clearTimeout(scanTimeout);
+						scanTimeout = null;
+					}
 
-					// Clear scan flags on backend and restore scan UI
+					// Apply values
+					var charField = popup.find("#char_uuid");
+					if (charField.length && selectedCharUuid) {
+						charField.val(selectedCharUuid).trigger("change");
+						try {
+							charField.textinput("refresh");
+						} catch (e) {
+							// ignore
+						}
+					}
+
+					// Apply MAC address to MAC field
+					var mac = dev.address || dev.mac_addr || dev.mac || "";
+					if (mac) {
+						var macField = popup.find(".mac");
+						if (macField.length) {
+							macField.val(mac).trigger("change");
+						}
+					}
+
+					var deviceName = dev.name || OSApp.Language._("Unknown Device");
+					var currentName = popup.find(".name").val();
+					if (!currentName || currentName.trim() === "") {
+						var nameField = popup.find(".name");
+						nameField.val(deviceName).trigger("change");
+						try {
+							nameField.textinput("refresh");
+						} catch (e) {
+							// ignore
+						}
+					}
+
+					// Clear flags on backend after selection (ignore failures)
 					OSApp.Firmware.sendToOS("/bc?pw=", "json").always(function () {
 						popup.find("#bluetoothScanArea").hide();
 						btn.text(originalText).prop("disabled", false);
@@ -3796,7 +3322,6 @@ list += "</select></div>" +
 					try {
 						OSApp.Firmware.sendToOS("/bc?pw=", "json");
 					} catch (e) {
-						void e;
 						// ignore
 					}
 					btn.text(originalText).prop("disabled", false);
@@ -3835,7 +3360,7 @@ list += "</select></div>" +
 					request.open('GET', plant.thumb, true);
 					request.setRequestHeader('Authorization', 'Bearer ' + token);
 					request.responseType = 'arraybuffer';
-					request.onload = function() { // jshint ignore:line
+					request.onload = function() {
 					    var data = new Uint8Array(this.response);
 					    var raw = String.fromCharCode.apply(null, data);
 					    var base64 = btoa(raw);
@@ -3903,35 +3428,144 @@ list += "</select></div>" +
 			return false;
 		});
 
-		//Show Analog Sensor Log (Chart):
+		//Show Analog Sensor Log:
 		popup.find(".show-sensor-log").on("click", function () {
 			var sensorNr = $(this).attr("value");
 			popup.popup("close");
-			OSApp.Analog.showAnalogSensorCharts(sensorNr, "analogsensorconfig");
+			OSApp.Analog.showAnalogSensorCharts(sensorNr);
 			return false;
 		});
 
-		//Show Analog Sensor Log (Table):
-		popup.find(".show-sensor-log-table").on("click", function () {
-			var sensorNr = parseInt($(this).attr("value"), 10);
-			popup.popup("close");
-			if (typeof OSApp.AnalogLog === "undefined") {
-				console.error("OSApp.AnalogLog module not loaded");
-				OSApp.Errors.showError("Sensor log table module not loaded. Please refresh the page.");
-				return false;
+		// Helper: populate sensor select from a device's sensor array
+		var populateSensorsForDevice = function(dbData, zbMdlFallback) {
+			var select = popup.find("#known_zigbee_sensors");
+			select.empty().append($("<option>").val("").text(OSApp.Language._("Sensor Template")));
+			if (!dbData || !dbData.sensors || !dbData.sensors.length) { return; }
+			var deviceLabel = dbData.vendor || zbMdlFallback || dbData.model || "";
+			dbData.sensors.forEach(function(s) {
+				if (!s.name || !s.cluster_id) { return; }
+				var sensorDef = {
+					id:           "__db_" + s.name + "_" + s.cluster_id,
+					name:         deviceLabel + ": " + s.description,
+					description:  s.unit || "",
+					endpoint:     s.endpoint || 1,
+					cluster_id:   s.cluster_id,
+					attribute_id: s.attr_id || "0x0000",
+					unitid:       s.unitid !== undefined ? s.unitid : 0,
+					factor:       s.factor || 1,
+					divider:      s.divider || 1,
+					offset:       0
+				};
+				var optText = deviceLabel + ": " + s.description + (s.unit ? " [" + s.unit + "]" : "");
+				select.append($("<option>").val(sensorDef.id).text(optText).data("sensor", sensorDef));
+			});
+			select.show();
+			try { select.selectmenu("refresh"); } catch (e) { void e; }
+		};
+
+		// Pre-load sensors if this popup was opened for a known ZigBee device
+		var zbMfr = popup.data("zigbee_manufacturer");
+		var zbMdl = popup.data("zigbee_model");
+		if (zbMfr && zbMfr !== "unknown" && zbMdl && zbMdl !== "unknown") {
+			$.ajax({
+				url: "https://opensprinklershop.de/zigbee/devices_api.php?manufacturer=" +
+					encodeURIComponent(zbMfr) + "&model=" + encodeURIComponent(zbMdl),
+				dataType: "json",
+				timeout: 6000
+			}).done(function(dbData) {
+				if (dbData && dbData.sensors && dbData.sensors.length) {
+					var displayLabel = (dbData.vendor ? dbData.vendor + " " : "") + (dbData.model || zbMdl);
+					popup.find("#zigbee_sensor_search").val(displayLabel);
+					populateSensorsForDevice(dbData, zbMdl);
+				}
+			});
+		}
+
+		// Interactive device search
+		var zbSearchTimer = null;
+		popup.on("input", "#zigbee_sensor_search", function() {
+			var term = $(this).val().trim();
+			var resultsList = popup.find("#zigbee_sensor_results");
+			if (zbSearchTimer) { clearTimeout(zbSearchTimer); zbSearchTimer = null; }
+			if (term.length < 3) { resultsList.hide().empty(); return; }
+			zbSearchTimer = setTimeout(function() {
+				resultsList.empty().append(
+					$("<li>").text(OSApp.Language._("Searching...")).css({"padding":"8px 12px","color":"#888","fontStyle":"italic"})
+				).show();
+				$.ajax({
+					url: "https://opensprinklershop.de/zigbee/devices_api.php?search=" +
+						encodeURIComponent(term) + "&limit=100",
+					dataType: "json",
+					timeout: 6000
+				}).done(function(data) {
+					resultsList.empty();
+					var results = (data && data.results) ? data.results : [];
+					if (!results.length) {
+						resultsList.append($("<li>").text(OSApp.Language._("No devices found")).css({"padding":"8px 12px","color":"#888"})).show();
+						return;
+					}
+					results.forEach(function(dev) {
+						var label = (dev.vendor ? dev.vendor + " " : "") + (dev.model || dev.fingerprint || "?") +
+							(dev.description ? " \u2014 " + dev.description : "");
+						$("<li>").text(label).css({"padding":"8px 12px","cursor":"pointer","borderBottom":"1px solid #eee"})
+							.on("mouseenter", function() { $(this).css("background","#e8f4fd"); })
+							.on("mouseleave", function() { $(this).css("background",""); })
+							.on("click", function() {
+								resultsList.hide().empty();
+								popup.find("#zigbee_sensor_search").val(label);
+								populateSensorsForDevice(dev, dev.model || dev.fingerprint);
+							})
+							.appendTo(resultsList);
+					});
+					resultsList.show();
+				}).fail(function() {
+					resultsList.empty().append(
+						$("<li>").text(OSApp.Language._("Search failed")).css({"padding":"8px 12px","color":"#c00"})
+					).show();
+				});
+			}, 350);
+		});
+
+		// Dismiss results on outside click
+		$(document).on("click.zigbeesearch", function(e) {
+			if (!$(e.target).closest("#zigbee_sensor_search, #zigbee_sensor_results").length) {
+				popup.find("#zigbee_sensor_results").hide();
 			}
-			if (typeof OSApp.AnalogLog.show !== "function") {
-				console.error("OSApp.AnalogLog.show function not found");
-				OSApp.Errors.showError("Sensor log function not available.");
-				return false;
+		});
+		popup.on("popupafterclose", function() { $(document).off("click.zigbeesearch"); });
+
+		// Fill form fields when a sensor template is selected
+		popup.find("#known_zigbee_sensors").on("change", function() {
+			var selectedOption = $(this).find("option:selected");
+			var sensorData = selectedOption.data("sensor");
+			if (sensorData) {
+				popup.find("#endpoint").val(sensorData.endpoint || "1");
+				var clusterId = sensorData.cluster_id;
+				var clusterId_num = clusterId ? (typeof clusterId === 'string' ? (clusterId.startsWith('0x') ? parseInt(clusterId, 16) : parseInt(clusterId, 10)) : clusterId) : null;
+				popup.find("#cluster_id").val(clusterId_num !== null && !isNaN(clusterId_num) ? "0x" + clusterId_num.toString(16).toUpperCase().padStart(4, '0') : "0x0000");
+				var attributeId = sensorData.attribute_id;
+				var attributeId_num = attributeId ? (typeof attributeId === 'string' ? (attributeId.startsWith('0x') ? parseInt(attributeId, 16) : parseInt(attributeId, 10)) : attributeId) : null;
+				popup.find("#attribute_id").val(attributeId_num !== null && !isNaN(attributeId_num) ? "0x" + attributeId_num.toString(16).toUpperCase().padStart(4, '0') : "0x0000");
+				if (Object.prototype.hasOwnProperty.call(sensorData, "unitid")) {
+					popup.find("#unitid").val(sensorData.unitid).change();
+				}
+				if (Object.prototype.hasOwnProperty.call(sensorData, "unit")) {
+					popup.find("#unit").val(sensorData.unit);
+				}
+				if (Object.prototype.hasOwnProperty.call(sensorData, "factor") || Object.prototype.hasOwnProperty.call(sensorData, "fac")) {
+					popup.find("#factor").val(Object.prototype.hasOwnProperty.call(sensorData, "factor") ? sensorData.factor : sensorData.fac);
+				}
+				if (Object.prototype.hasOwnProperty.call(sensorData, "divider") || Object.prototype.hasOwnProperty.call(sensorData, "div")) {
+					popup.find("#divider").val(Object.prototype.hasOwnProperty.call(sensorData, "divider") ? sensorData.divider : sensorData.div);
+				}
+				if (Object.prototype.hasOwnProperty.call(sensorData, "offset")) {
+					popup.find("#offset").val(sensorData.offset);
+				}
+				var currentName = popup.find(".name").val();
+				if (!currentName || currentName.trim() === "") {
+					popup.find(".name").val(sensorData.name);
+				}
 			}
-			try {
-				OSApp.AnalogLog.show(sensorNr);
-			} catch (e) {
-				console.error("Error showing sensor log table:", e);
-				OSApp.Errors.showError("Error opening sensor log: " + e.message);
-			}
-			return false;
 		});
 
 		//Copy a sensor:
@@ -3987,11 +3621,8 @@ list += "</select></div>" +
 
 		popup.find("#unitid").val(sensor.unitid ? sensor.unitid : 0).change();
 
-		popup.find(".submit").on("click", function (e) {
-			e.preventDefault();
-			e.stopPropagation();
+		popup.find(".submit").on("click", function () {
 			OSApp.Analog.saveSensor(popup, sensor, callback);
-			return false;
 		});
 
 		popup.on("focus", "input[type='number']", function () {
@@ -4023,35 +3654,21 @@ list += "</select></div>" +
 
 		$("#sensorEditor").remove();
 
-		popup.css("max-width", "576px", "min-width", "300px");
+	popup.css("max-width", "576px");
 
 		// Initial visibility update based on sensor type
 		OSApp.Analog.updateSensorVisibility(popup, sensor.type);
-
-		// Preserve existing join_anchor for ZigBee sensors (predictive boost)
-		if (sensor.type == OSApp.Analog.Constants.SENSOR_ZIGBEE && sensor.join_anchor) {
-			popup.data("zigbee_discovered_at", sensor.join_anchor);
+		if (sensor.type === OSApp.Analog.Constants.SENSOR_ZIGBEE) {
+			preloadZigBeeDevices();
+		} else if (sensor.type === OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
+			preloadBluetoothDevices();
 		}
 
 		// Enhance jQuery Mobile elements before opening
 		popup.enhanceWithin();
 
-		// Populate ZigBee known sensors when opening the dialog
-		if (sensor.type == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
-			OSApp.Analog.populateZigBeeKnownSensors(popup);
-		}
-
-		OSApp.UIDom.openPopup(popup, { positionTo: "window" });
-	};
-
-	if (OSApp.Analog.cachedSensorTypes) {
-		doShow(OSApp.Analog.cachedSensorTypes);
-	} else {
-		OSApp.Firmware.sendToOS("/sf?pw=", "json").then(function (data) {
-			OSApp.Analog.cachedSensorTypes = data.sensorTypes;
-			doShow(data.sensorTypes);
-		});
-	}
+		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
+	});
 };
 
 
@@ -4060,7 +3677,6 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 	var page = $("<div data-role='page' id='analogsensorconfig'>" +
 		"<div class='ui-content' role='main' id='analogsensorlist'>" +
-		"<p style='text-align:center;padding:20px;'>" + OSApp.Language._("Loading") + "...</p>" +
 		"</div></div>");
 
 	page
@@ -4095,17 +3711,15 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 			OSApp.Analog.expandItem.add("sensors");
 			OSApp.Analog.showSensorEditor(sensor, row, function (sensorOut) {
+				sensorOut.nativedata = sensor.nativedata;
+				sensorOut.data = sensor.data;
+				sensorOut.last = sensor.last;
 				return OSApp.Analog.sendToOsObj("/sc?pw=", sensorOut).done(function (info) {
 					var result = info.result;
 					if (!result || result > 1)
 						OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
-					else {
-						// Preserve runtime-only display fields in memory (not sent to controller)
-						sensorOut.nativedata = sensor.nativedata;
-						sensorOut.data = sensor.data;
-						sensorOut.last = sensor.last;
+					else
 						OSApp.Analog.analogSensors[row] = sensorOut;
-					}
 					updateSensorContent();
 				});
 			}, updateSensorContent);
@@ -4151,13 +3765,6 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 					});
 				});
 			});
-		});
-
-		// Show single sensor log (from table row):
-		list.find(".show-sensor-log").on("click", function () {
-			var sensorNr = parseInt($(this).attr("value"), 10);
-			// Open chart view first
-			OSApp.Analog.showAnalogSensorCharts(sensorNr, "analogsensorconfig");
 		});
 
 		//Edit a program adjust:
@@ -4315,24 +3922,16 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			return false;
 		});
 
-		list.find(".show-sensor-data-table").on("click", function () {
-			OSApp.Analog.expandItem.add("sensorlog");
-			OSApp.AnalogLog.show(null);
-			return false;
-		});
-
-		// Chart options from Chart Options section
-		list.find("#tempconvert").on("change", function () {
+		// Chart option: Temperature conversion
+		list.find("input[name='chart-temp-convert']").on("change", function () {
 			OSApp.Analog.chartConvertTemp = parseInt($(this).val(), 10);
-		});
-
-		list.find("#combinemoisttemp").on("change", function () {
-			OSApp.Analog.chartCombineMoistTemp = $(this).is(":checked");
-		});
-
-		list.find(".save-chart-options").on("click", function () {
 			OSApp.Analog.saveChartOptions();
-			return false;
+		});
+
+		// Chart option: Combine soil moisture and temperature
+		list.find(".chart-combine-moist-temp").on("change", function () {
+			OSApp.Analog.chartCombineMoistTemp = $(this).is(":checked");
+			OSApp.Analog.saveChartOptions();
 		});
 
 		list.find(".fytasetup").on("click", function () {
@@ -4412,11 +4011,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		rightBtn: {
 			icon: "refresh",
 			text: screen.width >= 500 ? OSApp.Language._("Refresh") : "",
-			on: function() {
-				// Manual refresh: reset cache flag, re-fetch data from controller
-				OSApp.Analog.configPageLoaded = false;
-				loadData();
-			}
+			on: function() { updateSensorContent(); }
 		}
 	});
 
@@ -4424,29 +4019,24 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 	$.mobile.pageContainer.append(page);
 
-	// Load sensor data before displaying content - once per session
+	// Load sensor data before displaying content
 	var loadData = function() {
-		// If already loaded once, use cached data immediately
-		if (OSApp.Analog.configPageLoaded) {
-			updateSensorContent();
-			return;
-		}
-
 		var pa = $.Deferred(), mo = $.Deferred(), se = $.Deferred();
 
-		// Start all three requests in parallel
 		OSApp.Analog.updateProgramAdjustments(function() { pa.resolve(); })
 			.fail(function() { pa.resolve(); });
 
-		OSApp.Analog.updateMonitors(function() { mo.resolve(); })
-			.fail(function() { mo.resolve(); });
+		pa.done(function() {
+			OSApp.Analog.updateMonitors(function() { mo.resolve(); })
+				.fail(function() { mo.resolve(); });
+		});
 
-		OSApp.Analog.updateAnalogSensor(function() { se.resolve(); })
-			.fail(function() { se.resolve(); });
+		mo.done(function() {
+			OSApp.Analog.updateAnalogSensor(function() { se.resolve(); })
+				.fail(function() { se.resolve(); });
+		});
 
-		// Wait for all three to complete, then mark as loaded
-		$.when(pa, mo, se).done(function() {
-			OSApp.Analog.configPageLoaded = true;
+		se.done(function() {
 			updateSensorContent();
 		});
 	};
@@ -4533,7 +4123,6 @@ OSApp.Analog.getSectionOrder = function() {
 		try {
 			return JSON.parse(stored);
 		} catch (e) {
-			void e;
 			return ["sensors", "progadjust", "monitors"];
 		}
 	}
@@ -4551,7 +4140,6 @@ OSApp.Analog.getRowOrder = function(sectionId) {
 		try {
 			return JSON.parse(stored);
 		} catch (e) {
-			void e;
 			return [];
 		}
 	}
@@ -4743,7 +4331,7 @@ OSApp.Analog.toggleSortMode = function(container) {
 				});
 			});
 
-			rows.on("dragleave", function() {
+			rows.on("dragleave", function(e) {
 				$(this).css({
 					"background-color": "",
 					"border-top": ""
@@ -4762,7 +4350,7 @@ OSApp.Analog.toggleSortMode = function(container) {
 				}
 			});
 
-			rows.on("dragend", function() {
+			rows.on("dragend", function(e) {
 				$(this).removeClass("dragging");
 				$(this).css("opacity", "1");
 				table.find("tr").css({
@@ -4821,19 +4409,13 @@ OSApp.Analog.buildSensorConfig = function() {
 		if (detected & OSApp.Analog.Constants.RS485_TRUEBNER3) boards.push("RS485-Adapter Truebner 3");
 		if (detected & OSApp.Analog.Constants.RS485_TRUEBNER4) boards.push("RS485-Adapter Truebner 4");
 		if (detected & OSApp.Analog.Constants.OSPI_USB_RS485) boards.push("OSPI USB-RS485-Adapter");
-		if (detected & OSApp.Analog.Constants.I2C_RS485) boards.push("I2C-RS485-Adapter");
 		if (detected == 0) boards.push("No Boards detected");
 		if (detected && boards.length == 0) boards.push("Unknown Adapter");
 		detected_boards = ": " + boards.filter(Boolean).join(", ");
 	}
 
 	var list = "<fieldset data-role='collapsible' data-section-id='sensors' data-iconpos='left'" + (OSApp.Analog.expandItem.has("sensors") ? " data-collapsed='false'" : "") + ">" +
-		"<legend>" + OSApp.Language._("Sensors") + detected_boards + "</legend>" +
-		"<div style='padding: 4px 8px; font-size: 10px; color: #666; line-height: 1.4;'>" +
-		"<div style='margin-bottom: 2px;'><span style='display: inline-block; width: 10px; height: 10px; background-color: #eadcf7; border-radius: 1px; margin-right: 4px; vertical-align: middle;'></span>" + OSApp.Language._("No data") +
-		" <span style='display: inline-block; width: 10px; height: 10px; background-color: #ffd9d9; border-radius: 1px; margin-right: 4px; margin-left: 12px; vertical-align: middle;'></span>" + OSApp.Language._("Stale (>10x)") +
-		" <span style='display: inline-block; width: 10px; height: 10px; background-color: #fff4cc; border-radius: 1px; margin-right: 4px; margin-left: 12px; vertical-align: middle;'></span>" + OSApp.Language._("Old (>2x)") + "</div>" +
-		"</div>";
+		"<legend>" + OSApp.Language._("Sensors") + detected_boards + "</legend>";
 
 	var info = OSApp.Analog.checkFirmwareUpdate();
 	if (info === undefined)
@@ -4849,49 +4431,9 @@ OSApp.Analog.buildSensorConfig = function() {
 	var checkpng = "<img src=\"" + OSApp.UIDom.getAppURLPath() + "img/check-blue.png\">";
 
 	var row = 0;
-	var nowSec = Math.floor( Date.now() / 1000 );
 	$.each(OSApp.Analog.analogSensors, function (_i, item) {
-		var batteryPercent = OSApp.Analog.getBatteryPercent(item.battery);
-		var trendIndicator = OSApp.Analog.renderTrendIndicator(item.trend);
-		var dataCell = $("<td>");
-		if (!isNaN(item.data)) {
-			dataCell.text(OSApp.Analog.formatVal(item.data) + item.unit);
-		}
-		if (batteryPercent !== null) {
-			dataCell.append(" ").append($(OSApp.Analog.renderBatteryIcon(batteryPercent, false)));
-		}
-		if (trendIndicator) {
-			dataCell.append(trendIndicator);
-		}
 
-		var rowClass = "",
-			dataOk = ( item.data_ok === true || Number( item.data_ok ) === 1 ),
-			lastTs = Number( item.last ),
-			readInterval = Number( item.ri ),
-			rowBg = "";
-
-		if ( !dataOk ) {
-			rowClass = "sensor-data-notok";
-			rowBg = "#eadcf7";
-		} else if ( Number.isFinite( lastTs ) && Number.isFinite( readInterval ) && readInterval > 0 ) {
-			var ageSec = nowSec - lastTs;
-			if ( ageSec > ( readInterval * 10 ) ) {
-				rowClass = "sensor-stale-critical";
-				rowBg = "#ffd9d9";
-			} else if ( ageSec > ( readInterval * 2 ) ) {
-				rowClass = "sensor-stale-warning";
-				rowBg = "#fff4cc";
-			}
-		}
-
-		var lastText = "";
-		if ( Number.isFinite( lastTs ) && dataOk ) {
-			var _ld = new Date( lastTs * 1000 ), _p = function(n) { return n < 10 ? "0"+n : ""+n; };
-			lastText = _p(_ld.getDate()) + "." + _p(_ld.getMonth()+1) + "." + String(_ld.getFullYear()).slice(-2) +
-				" " + _p(_ld.getHours()) + ":" + _p(_ld.getMinutes());
-		}
-
-		var $tr = $("<tr>").addClass( rowClass ).append(
+		var $tr = $("<tr>").append(
 			$("<td>").text(item.nr),
 			$("<td class=\"hidecol\">").text(item.type),
 			$("<td class=\"hidecol\">").text(item.group ? item.group : ""),
@@ -4901,16 +4443,12 @@ OSApp.Analog.buildSensorConfig = function() {
 			$("<td class=\"hidecol\">").text(item.port ? (":" + item.port) : ""),
 			$("<td class=\"hidecol\">").text(isNaN(item.id) ? "" : (item.type < 1000 ? item.id : "")),
 			$("<td class=\"hidecol\">").text(isNaN(item.ri) ? "" : item.ri),
-			dataCell,
+			$("<td>").text(isNaN(item.data) ? "" : (OSApp.Analog.formatVal(item.data) + item.unit)),
 			"<td>" + (item.enable ? checkpng : "") + "</td>",
 			"<td class=\"hidecol\">" + (item.log ? checkpng : "") + "</td>",
 			"<td class=\"hidecol\">" + (item.show ? checkpng : "") + "</td>",
-			$("<td class=\"hidecol2\">").text(lastText, null, 2)
+			$("<td class=\"hidecol2\">").text(item.last === undefined ? "" : (item.data_ok ? OSApp.Dates.dateToString(new Date(item.last * 1000)) : ""), null, 2)
 		);
-		if ( rowBg ) {
-			$tr.attr( "style", "background-color:" + rowBg + " !important;" );
-			$tr.children( "td,th" ).attr( "style", "background-color:" + rowBg + " !important;" );
-		}
 		list += $tr.wrap("<p>").html() + "</tr>";
 		row++;
 	});
@@ -5081,37 +4619,43 @@ OSApp.Analog.buildSensorConfig = function() {
 		list += "</fieldset>";
 	}
 
-	//Chart options (Diagramm-Optionen):
-	{
-		var tmpCo = OSApp.Analog.chartConvertTemp;
-		var comb = OSApp.Analog.chartCombineMoistTemp ? 1 : 0;
-
-		list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("chartoptions") ? " data-collapsed='false'" : "") + ">" +
-			"<legend>" + OSApp.Language._("Chart Options") + "</legend>" +
-
-			"<label for='tempconvert'>" + OSApp.Language._("Temperature Conversion") + ":</label>" +
-			"<select id='tempconvert' data-mini='true'>" +
-			"<option value='0' " + (tmpCo === 0 ? "selected" : "") + ">" + OSApp.Language._("No conversion") + "</option>" +
-			"<option value='1' " + (tmpCo === 1 ? "selected" : "") + ">" + OSApp.Language._("Fahrenheit to Celsius") + "</option>" +
-			"<option value='2' " + (tmpCo === 2 ? "selected" : "") + ">" + OSApp.Language._("Celsius to Fahrenheit") + "</option>" +
-			"</select>" +
-
-			"<label for='combinemoisttemp'><input id='combinemoisttemp' type='checkbox' " + (comb === 1 ? "checked='checked'" : "") + ">" +
-			OSApp.Language._("Combine Soil Moisture and Temperature in one chart") + "</label>" +
-			"<a data-role='button' class='save-chart-options' href='#' data-mini='true' data-icon='check'>" + OSApp.Language._("Save") + "</a>" +
-
-			"</fieldset>";
-	}
-
 	//Analog sensor logs:
 	list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("sensorlog") ? " data-collapsed='false'" : "") + ">" +
-		"<legend>" + OSApp.Language._("Sensor Chart") + "</legend>";
+		"<legend>" + OSApp.Language._("Sensor Log") + "</legend>";
 	list += "<a data-role='button' class='red clear_sensor_logs' href='#' data-mini='true' data-icon='alert'>" +
 		OSApp.Language._("Clear Log") +
 		"</a>" +
 		"<a data-role='button' data-icon='action' class='download-log' href='#' data-mini='true'>" + OSApp.Language._("Download Log") + "</a>" +
-		"<a data-role='button' data-icon='grid' class='show-log' href='#' data-mini='true'>" + OSApp.Language._("Show Chart") + "</a>" +
-		"<a data-role='button' data-icon='bars' class='show-sensor-data-table' href='#' data-mini='true'>" + OSApp.Language._("View Sensor Data") + "</a>";
+		"<a data-role='button' data-icon='grid' class='show-log' href='#' data-mini='true'>" + OSApp.Language._("Show Log") + "</a>";
+
+	// Chart options: Temperature conversion and combined chart
+	var hasTempConversion = OSApp.currentSession.controller.options && typeof OSApp.currentSession.controller.options.tmpCo !== "undefined";
+	var hasCombineChart = OSApp.currentSession.controller.options && typeof OSApp.currentSession.controller.options.comb !== "undefined";
+	if ( hasTempConversion || hasCombineChart ) {
+		list += "<div style='margin-top: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 5px;'>" +
+			"<label><b>" + OSApp.Language._("Chart Options") + "</b></label>";
+
+		if ( hasTempConversion ) {
+			list += "<fieldset data-role='controlgroup' data-type='vertical' data-mini='true'>" +
+			"<legend>" + OSApp.Language._("Temperature Conversion") + "</legend>" +
+			"<input type='radio' name='chart-temp-convert' id='chart-temp-none' value='0'" + (OSApp.Analog.chartConvertTemp === 0 ? " checked='checked'" : "") + ">" +
+			"<label for='chart-temp-none'>" + OSApp.Language._("No conversion") + "</label>" +
+			"<input type='radio' name='chart-temp-convert' id='chart-temp-f2c' value='1'" + (OSApp.Analog.chartConvertTemp === 1 ? " checked='checked'" : "") + ">" +
+			"<label for='chart-temp-f2c'>" + OSApp.Language._("Fahrenheit to Celsius") + "</label>" +
+			"<input type='radio' name='chart-temp-convert' id='chart-temp-c2f' value='2'" + (OSApp.Analog.chartConvertTemp === 2 ? " checked='checked'" : "") + ">" +
+			"<label for='chart-temp-c2f'>" + OSApp.Language._("Celsius to Fahrenheit") + "</label>" +
+			"</fieldset>";
+		}
+
+		if ( hasCombineChart ) {
+			list += "<label for='chart-combine-moist-temp'>" +
+			"<input type='checkbox' id='chart-combine-moist-temp' class='chart-combine-moist-temp'" + (OSApp.Analog.chartCombineMoistTemp ? " checked='checked'" : "") + ">" +
+			OSApp.Language._("Combine Soil Moisture and Temperature in one chart") +
+			"</label>";
+		}
+
+		list += "</div>";
+	}
 
 	list += "</fieldset>";
 
@@ -5188,11 +4732,10 @@ OSApp.Analog.getMonitorName = function(monitorNr) {
 };
 
 // Show Sensor Charts with apexcharts
-OSApp.Analog.showAnalogSensorCharts = function(limit2sensor, returnPageId) {
+OSApp.Analog.showAnalogSensorCharts = function(limit2sensor) {
 
 	var max = OSApp.Analog.Constants.CHARTS;
-	/* jshint loopfunc:true */
-		for (let j = 0; j < OSApp.Analog.analogSensors.length; j++) {
+	for (let j = 0; j < OSApp.Analog.analogSensors.length; j++) {
 		if (!OSApp.Analog.analogSensors[j].log || !OSApp.Analog.analogSensors[j].enable)
 			continue;
 		var unitid = OSApp.Analog.analogSensors[j].unitid;
@@ -5206,26 +4749,19 @@ OSApp.Analog.showAnalogSensorCharts = function(limit2sensor, returnPageId) {
 		month += "<div id='myChartM" + j + "'></div>";
 	}
 
-	var tableHtml = limit2sensor ?
-		"<div id='sensorDataTable' style='margin-top:16px;overflow-x:auto;'></div>" : "";
-
 	var page = $("<div data-role='page' id='analogsensorchart'>" +
 		"<div class='ui-content' role='main' style='width: 95%'>" +
-		last + week + month + tableHtml +
+		last + week + month +
 		"</div></div>");
 
 	OSApp.UIDom.changeHeader({
-		title: OSApp.Language._("Analog Sensor Chart"),
+		title: OSApp.Language._("Analog Sensor Log"),
 		leftBtn: {
 			icon: "carat-l",
 			text: OSApp.Language._("Back"),
 			class: "ui-toolbar-back-btn",
 			on: function() {
-				if (returnPageId) {
-					OSApp.UIDom.changePage("#" + returnPageId);
-				} else {
-					OSApp.UIDom.goBack();
-				}
+				OSApp.UIDom.goBack();
 			},
 		},
 		rightBtn: {
@@ -5247,7 +4783,7 @@ OSApp.Analog.showAnalogSensorCharts = function(limit2sensor, returnPageId) {
 	$.mobile.pageContainer.pagecontainer("change", page);
 
 	OSApp.Analog.updateCharts(limit2sensor);
-};
+}
 OSApp.Analog.updateCharts = function(limit2sensor) {
 	var chart1 = new Array(OSApp.Analog.Constants.CHARTS),
 		chart2 = new Array(OSApp.Analog.Constants.CHARTS),
@@ -5272,71 +4808,10 @@ OSApp.Analog.updateCharts = function(limit2sensor) {
 			OSApp.UIDom.showLoading( "#myChartM0" );
 			OSApp.Firmware.sendToOS("/so?pw=&csv=2&log=2" + limit, "text", 90000).then(function (csv3) {
 				OSApp.Analog.buildGraph("#myChartM", chart3, csv3, OSApp.Language._("last months"), "MM.yyyy", tzo, 2);
-				if (limit2sensor) {
-					OSApp.Analog.buildSensorTable(csv1, limit2sensor);
-				}
 			});
 		});
 	});
-};
-
-OSApp.Analog.buildSensorTable = function(csv, sensorNr) {
-	var container = document.getElementById("sensorDataTable");
-	if (!container) { return; }
-
-	// Find sensor meta
-	var sensor = null;
-	for (var s = 0; s < OSApp.Analog.analogSensors.length; s++) {
-		if (OSApp.Analog.analogSensors[s].nr === sensorNr) {
-			sensor = OSApp.Analog.analogSensors[s];
-			break;
-		}
-	}
-	var unitStr = sensor ? (OSApp.Analog.getUnit(sensor) || sensor.unit || "") : "";
-
-	// Parse CSV (format: nr;timestamp;value)
-	var lines = csv.split(/[\r\n]+/);
-	var rows = [];
-	var nr = parseInt(sensorNr, 10);
-	var pad = function(n) { return n < 10 ? "0" + n : "" + n; };
-
-	for (var i = 0; i < lines.length; i++) {
-		var parts = lines[i].split(";");
-		if (parts.length < 3) { continue; }
-		if (parseInt(parts[0], 10) !== nr) { continue; }
-		var ts  = parseInt(parts[1], 10);
-		var val = parseFloat(parts[2]);
-		if (isNaN(ts)) { continue; }
-		var d = new Date(ts * 1000);
-		var timeStr = pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + String(d.getFullYear()).slice(-2) +
-			" " + pad(d.getHours()) + ":" + pad(d.getMinutes());
-		rows.push({ ts: ts, timeStr: timeStr, val: isNaN(val) ? null : val });
-	}
-	rows.sort(function(a, b) { return b.ts - a.ts; });
-
-	if (rows.length === 0) { return; }
-
-	var html = "<div style='margin-bottom:6px;font-size:0.85em;font-weight:600;color:#444;'>" +
-		OSApp.Language._("Sensor Data") + " (" + rows.length + " " + OSApp.Language._("Rows") + ")</div>" +
-		"<table style='border-collapse:collapse;width:100%;font-size:0.82em;'>" +
-		"<thead><tr>" +
-		"<th style='background:#1565c0;color:#fff;padding:5px 8px;text-align:left;'>" + OSApp.Language._("Timestamp") + "</th>" +
-		"<th style='background:#1565c0;color:#fff;padding:5px 8px;text-align:right;'>" + OSApp.Language._("Value") + "</th>" +
-		"<th style='background:#1565c0;color:#fff;padding:5px 8px;text-align:left;'>" + OSApp.Language._("Unit") + "</th>" +
-		"</tr></thead><tbody>";
-
-	for (var r = 0; r < rows.length; r++) {
-		var bg = r % 2 === 0 ? "#f8f9fa" : "#fff";
-		var valDisplay = rows[r].val !== null ? OSApp.Analog.formatVal(rows[r].val) : "-";
-		html += "<tr style='background:" + bg + ";border-bottom:1px solid rgba(0,0,0,.06);'>" +
-			"<td style='padding:4px 8px;color:#666;'>" + rows[r].timeStr + "</td>" +
-			"<td style='padding:4px 8px;text-align:right;font-weight:600;color:#1565c0;'>" + valDisplay + "</td>" +
-			"<td style='padding:4px 8px;color:#888;'>" + unitStr + "</td>" +
-			"</tr>";
-	}
-	html += "</tbody></table>";
-	container.innerHTML = html;
-};
+}
 
 OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, lvl) {
 	var csvlines = csv.split(/(?:\r\n|\n)+/).filter(function (el) { return el.length !== 0; });
@@ -5459,83 +4934,78 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 			switch (unitid) {
 				case 1: unit = OSApp.Language._("Soil moisture");
 					title = OSApp.Language._("Soil moisture") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; };
 					minFunc = 0;
 					maxFunc = 100;
 					break;
 				case 2: unit = OSApp.Language._("degree celsius temperature");
 					title = OSApp.Language._("Temperature") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + String.fromCharCode(176) + "C"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + String.fromCharCode(176) + "C"; };
 					break;
 				case 3: unit = OSApp.Language._("degree fahrenheit temperature");
 					title = OSApp.Language._("Temperature") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + String.fromCharCode(176) + "F"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + String.fromCharCode(176) + "F"; };
 					break;
 				case 4: unit = OSApp.Language._("Volt");
 					title = OSApp.Language._("Voltage") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " V"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " V"; };
 					minFunc = 0;
 					maxFunc = 4;
 					autoY = false;
 					break;
 				case 5: unit = OSApp.Language._("Humidity");
 					title = OSApp.Language._("Air Humidity") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; };
 					minFunc = 0;
 					maxFunc = 100;
 					break;
 				case 6: unit = OSApp.Language._("Rain");
 					title = OSApp.Language._("Rainfall") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " in"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " in"; };
 					break;
 				case 7: unit = OSApp.Language._("Rain");
 					title = OSApp.Language._("Rainfall") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " mm"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " mm"; };
 					minFunc = 0;
 					break;
 				case 8: unit = OSApp.Language._("Wind");
 					title = OSApp.Language._("Wind") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " mph"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " mph"; };
 					minFunc = 0;
 					break;
 				case 9: unit = OSApp.Language._("Wind");
 					title = OSApp.Language._("Wind") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " kmh"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " kmh"; };
 					minFunc = 0;
 					break;
 				case 10: unit = OSApp.Language._("Level");
 					title = OSApp.Language._("Level") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " %"; };
 					minFunc = 0;
 					maxFunc = 100;
 					autoY = false;
 					break;
 				case 11: unit = OSApp.Language._("DK");
 					title = OSApp.Language._("DK") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val); }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
 					minFunc = 0;
 					break;
 				case 12: unit = OSApp.Language._("lm");
 					title = OSApp.Language._("Lumen") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val); }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
 					minFunc = 0;
 					break;
 				case 13: unit = OSApp.Language._("lx");
 					title = OSApp.Language._("LUX") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val); }; // jshint ignore:line
-					minFunc = 0;
-					break;
-				case 14: unit = OSApp.Language._("L");
-					title = OSApp.Language._("Counter") + " " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " L"; }; // jshint ignore:line
+					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
 					minFunc = 0;
 					break;
 
 
 				default: unit = sensor.unit;
 					title = sensor.name + "~ " + titleAdd;
-					unitStr = function (val) { return OSApp.Analog.formatVal(val); }; // jshint ignore:line
-			}
+					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
+			};
 
 			let options = {
 				chart: {
@@ -5664,7 +5134,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 
 	for (let p = 0; p < OSApp.Analog.progAdjusts.length; p++) {
 		var adjust = OSApp.Analog.progAdjusts[p];
-		let sensor = adjust.sensor;
+		sensor = adjust.sensor;
 		for (let j = 0; j < OSApp.Analog.analogSensors.length; j++) {
 			if (OSApp.Analog.analogSensors[j].nr == sensor && AllOptions[OSApp.Analog.analogSensors[j].unitid]) {
 				let unitid = OSApp.Analog.analogSensors[j].unitid;
@@ -5779,17 +5249,13 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 		if (x) x.replaceChildren();
 		let options = AllOptions[c];
 		if (options) {
-			// Keep the plot area constant regardless of legend item count:
-			// each extra series adds approx 22px to the legend, so grow total height accordingly.
-			var nSeries = options.series ? options.series.length : 1;
-			options.chart.height = options.chart.height + Math.max(0, nSeries - 1) * 22;
 			chart[c] = new ApexCharts(document.querySelector(prefix + c), options);
 			chart[c].render();
 		}
 	}
 };
 
-OSApp.Analog.isNumber = function(n) { return !isNaN(parseFloat(n)) && !isNaN(n - 0); };
+OSApp.Analog.isNumber = function(n) { return !isNaN(parseFloat(n)) && !isNaN(n - 0) };
 
 /**
 * format value output with 2 decimals.
@@ -5826,7 +5292,6 @@ OSApp.Analog.getUnit = function(sensor) {
 		case 11: return "DK";
 		case 12: return "lm";
 		case 13: return "lx";
-		case 14: return "L";
 		default: return sensor.unit;
 	}
 };

@@ -560,7 +560,11 @@ OSApp.ESP32Mode.setupMatter = function() {
 	OSApp.Firmware.sendToOS( "/jm?pw=", "json" ).done( function( data ) {
 		$.mobile.loading( "hide" );
 
-		if ( data && data.qr_url ) {
+		if ( !data || !data.matter_enabled ) {
+			OSApp.Errors.showError( OSApp.Language._( "Matter is not the active firmware mode. Use Firmware Mode to switch." ) );
+		} else if ( data.commissioned ) {
+			OSApp.Errors.showError( OSApp.Language._( "Matter device is already commissioned." ) );
+		} else if ( data.qr_url ) {
 			// Open the QR code URL in the in-app browser or new window
 			if ( typeof cordova !== "undefined" && cordova.InAppBrowser ) {
 				// For mobile apps, use InAppBrowser
