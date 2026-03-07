@@ -415,10 +415,11 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 		}
 
 		var progAdjustDisp = new Array(OSApp.Analog.progAdjusts.length);
+		var disp;
 
 		for (i = 0; i < OSApp.Analog.progAdjusts.length; i++) {
 			var progAdjust = OSApp.Analog.progAdjusts[i];
-			var disp = {};
+			disp = {};
 			var current = Math.round(progAdjust.current * 100);
 
 			if (!progAdjust.name || progAdjust.name === "") {
@@ -433,7 +434,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 						sensorName = OSApp.Analog.analogSensors[j].name;
 					}
 				}
-				disp.label = progName + " (" + sensorName + ")"
+				disp.label = progName + " (" + sensorName + ")";
 			} else
 				disp.label = progAdjust.name;
 
@@ -472,6 +473,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 				return;
 			}
 
+			/* jshint loopfunc:true */
 			for (i = 0; i < progAdjustDisp.length; i++) {
 				disp = progAdjustDisp[i];
 				if (!disp) continue;
@@ -564,6 +566,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 				chart.render();
 				OSApp.Analog.progAdjusts[i]._chart = chart;
 			}
+			/* jshint loopfunc:false */
 		} else {
 			for (i = 0; i < progAdjustDisp.length; i++) {
 				disp = progAdjustDisp[i];
@@ -630,7 +633,7 @@ OSApp.Analog.getImportMethodSensors = function(restore_type, callback) {
 				data = JSON.parse($.trim(data).replace(/“|”|″/g, "\""));
 				popup.popup("close");
 				OSApp.Analog.importConfigSensors(data, restore_type, callback);
-			} catch {
+			} catch(e) {
 				popup.find("textarea").val("");
 				OSApp.Errors.showError(OSApp.Language._("Unable to read the configuration file. Please check the file and try again."));
 			}
@@ -1157,9 +1160,9 @@ OSApp.Analog.updateAdjustmentChart = function(popup) {
 };
 
 OSApp.Analog.requiredCheck = function(field, obj, property) {
-	if (obj['missingValue']) return;
+	if (obj.missingValue) return;
 	if (field.is(":visible") && field.prop("required") && !obj[property])
-		obj['missingValue'] = field;
+		obj.missingValue = field;
 };
 
 OSApp.Analog.addToObjectChk = function(popup, fieldId, obj) {
@@ -1289,7 +1292,7 @@ OSApp.Analog.monitorSelection = function(id, sel, ignore) {
 	}
 	list += "</select>";
 	return list;
-}
+};
 
 //Monitor editor
 OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel) {
@@ -1607,13 +1610,13 @@ OSApp.Analog.isRS485Sensor = function( sensorType ) {
 
 OSApp.Analog.isIPSensor = function(sensorType) {
 	return OSApp.Analog.isSmt100(sensorType) || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE;
-}
+};
 
 OSApp.Analog.isIDNeeded = function(sensorType) {
 	return sensorType < OSApp.Analog.Constants.SENSOR_OSPI_INTERNAL_TEMP || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE ||
 		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE ||
 		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE;
-}
+};
 
 //show and hide sensor editor fields
 OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
@@ -3349,6 +3352,7 @@ list += "</select></div>" +
 		return OSApp.Firmware.sendToOS("/fy?pw=", "json").then(function (result) {
 				var token = result.token;
 				var sel = "<ul class='fyta-plants' data-role='listview'>";
+				/* jshint loopfunc:true */
 				for (let i = 0; i < result.plants.length; i++) {
 					let plant = result.plants[i];
 					sel += "<li value='" + i + "'><a href='#'>" +
@@ -3369,6 +3373,7 @@ list += "</select></div>" +
 					};
 					request.send();
 				}
+				/* jshint loopfunc:false */
 				sel += "</ul>";
 				popup.find("#fytasel").html(sel).enhanceWithin();
 				$("ul.fyta-plants li").click(function() {
@@ -4783,7 +4788,7 @@ OSApp.Analog.showAnalogSensorCharts = function(limit2sensor) {
 	$.mobile.pageContainer.pagecontainer("change", page);
 
 	OSApp.Analog.updateCharts(limit2sensor);
-}
+};
 OSApp.Analog.updateCharts = function(limit2sensor) {
 	var chart1 = new Array(OSApp.Analog.Constants.CHARTS),
 		chart2 = new Array(OSApp.Analog.Constants.CHARTS),
@@ -4811,17 +4816,18 @@ OSApp.Analog.updateCharts = function(limit2sensor) {
 			});
 		});
 	});
-}
+};
 
 OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, lvl) {
 	var csvlines = csv.split(/(?:\r\n|\n)+/).filter(function (el) { return el.length !== 0; });
 
-	var legends = [], opacities = [], widths = [], colors = [], coloridx = 0;
+	var legends = [], opacities = [], widths = [], colors = [], coloridx = 0, sensor;
 	let canExport = !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS;
 	let combine = OSApp.Analog.chartCombineMoistTemp ? 1 : 0;
 	let AllOptions = [];
+	/* jshint loopfunc:true */
 	for (var j = 0; j < OSApp.Analog.analogSensors.length; j++) {
-		var sensor = OSApp.Analog.analogSensors[j];
+		sensor = OSApp.Analog.analogSensors[j];
 		let color = OSApp.Analog.Constants.COLORS[coloridx++ % OSApp.Analog.Constants.COLCOUNT];
 		if (!sensor.log || !sensor.enable) {
 			continue;
@@ -5005,7 +5011,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 				default: unit = sensor.unit;
 					title = sensor.name + "~ " + titleAdd;
 					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
-			};
+			}
 
 			let options = {
 				chart: {
@@ -5131,6 +5137,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 			AllOptions[unitid] = Object.assign(AllOptions[unitid], otherOptions);
 		}
 	}
+	/* jshint loopfunc:false */
 
 	for (let p = 0; p < OSApp.Analog.progAdjusts.length; p++) {
 		var adjust = OSApp.Analog.progAdjusts[p];
@@ -5225,6 +5232,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 				type: 'solid'
 			},
 			stroke: {
+
 				curve: "smooth",
 				colors: (colors[moistUnitId]||[]).concat(colors[tempUnitId]||[]),
 				width: (widths[moistUnitId]||[]).concat(widths[tempUnitId]||[]),
@@ -5255,7 +5263,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 	}
 };
 
-OSApp.Analog.isNumber = function(n) { return !isNaN(parseFloat(n)) && !isNaN(n - 0) };
+OSApp.Analog.isNumber = function(n) { return !isNaN(parseFloat(n)) && !isNaN(n - 0); };
 
 /**
 * format value output with 2 decimals.
