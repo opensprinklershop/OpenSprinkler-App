@@ -43,7 +43,7 @@
 ## Debug / Test Environment 🔧
 
 ### Device Connection
-- **Device IP**: `192.168.0.86`
+- **Device IP**: `192.168.0.151`
 - **Admin Password**: Required for API access (MD5 hash needed)
 
 ### Computing the Admin Password Hash
@@ -73,19 +73,19 @@ All OpenSprinkler endpoints accept `?pw=<md5hash>` (use the admin password hash 
 ADMIN_HASH="<YOUR_ADMIN_PASSWORD_HASH>"
 
 # Get all data (stations, programs, options, status)
-curl "http://192.168.0.86/ja?pw=${ADMIN_HASH}"
+curl "http://192.168.0.151/ja?pw=${ADMIN_HASH}"
 
 # Get options (firmware version, network settings)
-curl "http://192.168.0.86/jo?pw=${ADMIN_HASH}"
+curl "http://192.168.0.151/jo?pw=${ADMIN_HASH}"
 
 # Get station status
-curl "http://192.168.0.86/js?pw=${ADMIN_HASH}"
+curl "http://192.168.0.151/js?pw=${ADMIN_HASH}"
 
 # Get sensors
-curl "http://192.168.0.86/sl?pw=${ADMIN_HASH}"
+curl "http://192.168.0.151/sl?pw=${ADMIN_HASH}"
 ```
 
 ### UI Development with Device
 - When running `npm start`, the local dev server serves at `http://localhost:8080`
-- Point the UI to the device by entering `http://192.168.0.86` as the site IP in the app
+- Point the UI to the device by entering `http://192.168.0.151` as the site IP in the app
 - The UI communicates with the controller via AJAX calls to the REST API endpoints above

@@ -666,6 +666,13 @@ OSApp.UIDom.bindPanel = function() {
 		return false;
 	} );
 
+	panel.find( ".setup-online-update" ).on( "click", function() {
+		OSApp.UIDom.closePanel( function() {
+			OSApp.ESP32Mode.setupOnlineUpdate();
+		} );
+		return false;
+	} );
+
 	panel.find( ".open-irrigationdb-menu" ).on( "click", function() {
 		OSApp.UIDom.closePanel( function() {
 			window.open( "https://opensprinklershop.de/irrigationdb", OSApp.currentDevice.isOSXApp ? "_system" : "_blank" );
@@ -773,6 +780,9 @@ OSApp.UIDom.bindPanel = function() {
 					// that jQuery Mobile may have cached from initial enhancement
 					panel.find( ".esp32-mode-setup" ).removeClass( "hidden" ).css( "display", "" );
 
+					// Online Update is always available for ESP32 devices
+					panel.find( ".online-update-setup" ).removeClass( "hidden" ).css( "display", "" );
+
 					// Fetch radio info to determine mode-dependent menu visibility
 					OSApp.ESP32Mode.fetchRadioInfo().done( function() {
 
@@ -809,6 +819,7 @@ OSApp.UIDom.bindPanel = function() {
 					panel.find( ".matter-setup" ).addClass( "hidden" );
 					panel.find( ".zigbee-gateway-setup" ).addClass( "hidden" );
 					panel.find( ".zigbee-client-setup" ).addClass( "hidden" );
+					panel.find( ".online-update-setup" ).addClass( "hidden" );
 				}
 
 				listview.listview( "refresh" );

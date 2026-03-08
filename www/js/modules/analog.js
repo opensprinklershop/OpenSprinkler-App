@@ -344,6 +344,9 @@ OSApp.Analog.checkMonitorAlerts = function() {
 
 OSApp.Analog.updateSensorShowArea = function( page ) {
 	if (OSApp.Analog.checkAnalogSensorAvail()) {
+		OSApp.Analog.applyRowOrderToData("sensors");
+		OSApp.Analog.applyRowOrderToData("progadjust");
+		OSApp.Analog.applyRowOrderToData("monitors");
 		var showArea = page.find("#os-sensor-show");
 		var html = "", i, j;
 
@@ -1626,17 +1629,18 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	if (OSApp.Analog.isRS485Sensor(sensortype)) {
 		popup.find(".rs485_port_label").show();
 		popup.find(".rs485_port").show();
-		popup.find(".rs485_id_label").show();
-		popup.find(".rs485_id").show();
 		popup.find(".rs485_help").show();
 		// IP/Port nur für TCP/IP-basierte RS485-Adapter anzeigen
 		popup.find(".ip_label").show();
 		popup.find(".port_label").show();
 		popup.find(".ip").show();
 		popup.find(".port").show();
-		// ID-Feld verstecken, da wir rs485_id verwenden
-		popup.find(".id_label").hide();
-		popup.find(".id").hide();
+		// ID-Feld als Modbus ID anzeigen (kein separates rs485_id nötig)
+		popup.find(".id_label").show();
+		popup.find(".id_label label").text(OSApp.Language._("Modbus ID"));
+		popup.find(".id").attr("min", 1).attr("max", 247).show();
+		popup.find(".rs485_id_label").hide();
+		popup.find(".rs485_id").hide();
 	} else {
 		popup.find(".rs485_port_label").hide();
 		popup.find(".rs485_port").hide();
@@ -1657,7 +1661,8 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 		}
 		if (OSApp.Analog.isIDNeeded(sensortype)) {
 			popup.find(".id_label").show();
-			popup.find(".id").show();
+			popup.find(".id_label label").text(OSApp.Language._("ID"));
+			popup.find(".id").attr("min", -2147483647).attr("max", 2147483647).show();
 		} else {
 			popup.find(".id_label").hide();
 			popup.find(".id").hide();
@@ -1764,25 +1769,17 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	OSApp.Analog.addToObjectInt(popup, ".group", sensorOut);
 	OSApp.Analog.addToObjectStr(popup, ".name", sensorOut);
 
-	// Für RS485-Sensoren: Verwende rs485_port und rs485_id statt port und id
+	OSApp.Analog.addToObjectIPs(popup, ".ip", sensorOut);
 	if (OSApp.Analog.isRS485Sensor(parseInt(popup.find("#type").val()))) {
-		OSApp.Analog.addToObjectIPs(popup, ".ip", sensorOut);
 		OSApp.Analog.addToObjectInt(popup, ".rs485_port", sensorOut);
-		OSApp.Analog.addToObjectInt(popup, ".rs485_id", sensorOut);
-		// Kopiere rs485_port nach port und rs485_id nach id für Backend-Kompatibilität
 		if (sensorOut.rs485_port !== undefined) {
 			sensorOut.port = sensorOut.rs485_port;
 			delete sensorOut.rs485_port;
 		}
-		if (sensorOut.rs485_id !== undefined) {
-			sensorOut.id = sensorOut.rs485_id;
-			delete sensorOut.rs485_id;
-		}
 	} else {
-		OSApp.Analog.addToObjectIPs(popup, ".ip", sensorOut);
 		OSApp.Analog.addToObjectInt(popup, ".port", sensorOut);
-		OSApp.Analog.addToObjectInt(popup, ".id", sensorOut);
 	}
+	OSApp.Analog.addToObjectInt(popup, ".id", sensorOut);
 
 	OSApp.Analog.addToObjectInt(popup, ".ri", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#factor", sensorOut);
@@ -3596,6 +3593,8 @@ list += "</select></div>" +
 						var result = info.result;
 						if (!result || result > 1)
 							OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
+						else if (sensorOutNew.enable)
+							OSApp.Firmware.sendToOS("/sr?pw=&nr=" + sensorOutNew.nr);
 						OSApp.Analog.updateAnalogSensor(callbackCancel);
 					});
 				}, callbackCancel);
@@ -3753,6 +3752,8 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 					var result = info.result;
 					if (!result || result > 1)
 						OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
+					else if (sensorOut.enable)
+						OSApp.Firmware.sendToOS("/sr?pw=&nr=" + sensorOut.nr);
 					OSApp.Analog.updateAnalogSensor(function () {
 						updateSensorContent();
 					});
@@ -3995,6 +3996,18 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 		page.find("#analogsensorlist").html(list).enhanceWithin();
 
+		// OTA update button handlers
+		page.find(".ota-update-btn").on("click", function(e) {
+			e.preventDefault();
+			OSApp.Firmware.showOTAPopup("update");
+			return false;
+		});
+		page.find(".ota-manage-btn").on("click", function(e) {
+			e.preventDefault();
+			OSApp.Firmware.showOTAPopup("manage");
+			return false;
+		});
+
 		// Sort button handlers - bind after DOM elements are ready
 		page.find(".sort-section-toggle").on("click", function(e) {
 			e.preventDefault();
@@ -4050,9 +4063,16 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 };
 
 OSApp.Analog.checkFirmwareUpdate = function() {
-	if (OSApp.Firmware.checkOSVersion(OSApp.Analog.Constants.CURRENT_FW_ID) && OSApp.currentSession.controller.options.fwm >= OSApp.Analog.Constants.CURRENT_FW_MIN)
-		return "";
-	return OSApp.Language._("Please update firmware to ") + OSApp.Analog.Constants.CURRENT_FW;
+	var minVersionWarning = "";
+	if (!(OSApp.Firmware.checkOSVersion(OSApp.Analog.Constants.CURRENT_FW_ID) && OSApp.currentSession.controller.options.fwm >= OSApp.Analog.Constants.CURRENT_FW_MIN)) {
+		minVersionWarning = "<td colspan='13' style='padding: 4px; color: red;'>" +
+			OSApp.Language._("Please update firmware to ") + OSApp.Analog.Constants.CURRENT_FW + "</td></tr><tr>";
+	}
+
+	// Show firmware version info + OTA update status
+	var otaInfo = OSApp.Firmware.getOTAInfoHTML ? OSApp.Firmware.getOTAInfoHTML() : "";
+
+	return minVersionWarning + otaInfo;
 };
 
 OSApp.Analog.setupFytaCredentials = function() {

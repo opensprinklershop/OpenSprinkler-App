@@ -1055,6 +1055,9 @@ OSApp.Sites.newLoad = function() {
 			// Check if a firmware update is available
 			OSApp.Firmware.checkFirmwareUpdate();
 
+			// Check for OTA firmware updates (weekly, via device /uc endpoint)
+			OSApp.Firmware.initOTACheck();
+
 			// Check for unused expansion boards
 			OSApp.Firmware.detectUnusedExpansionBoards();
 
