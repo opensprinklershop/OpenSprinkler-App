@@ -27,6 +27,9 @@ OSApp.Logs.displayPage = function() {
 					<label for="log_timeline">${OSApp.Language._("Timeline")}</label>
 					<input data-mini="true" type="radio" name="log_type" id="log_table" value="table">
 					<label for="log_table">${OSApp.Language._("Table")}</label>
+					${ ( OSApp.currentSession.controller.options.sn1t === 2 || OSApp.currentSession.controller.options.sn2t === 2 ) ?
+						`<input data-mini="true" type="radio" name="log_type" id="log_monthly" value="monthly">
+					<label for="log_monthly">${OSApp.Language._("Monthly Water Report")}</label>` : "" }
 				</fieldset>
 				<fieldset data-role="collapsible" data-mini="true" id="log_options" class="center">
 					<legend>${OSApp.Language._("Options")}</legend>
@@ -257,11 +260,96 @@ OSApp.Logs.displayPage = function() {
 			$.mobile.loading( "hide" );
 		},
 		updateView = function() {
-			if ( page.find( "#log_table" ).prop( "checked" ) ) {
+			if ( page.find( "#log_monthly" ).prop( "checked" ) ) {
+				prepMonthly();
+			} else if ( data.length < 1 ) {
+				requestData();
+			} else if ( page.find( "#log_table" ).prop( "checked" ) ) {
 				prepTable();
 			} else if ( page.find( "#log_timeline" ).prop( "checked" ) ) {
 				prepTimeline();
 			}
+		},
+		prepMonthly = function() {
+			tableSort.hide();
+			logOptions.collapsible( "collapse" );
+			logsList.show();
+
+			$.mobile.loading( "show" );
+
+			OSApp.Firmware.sendToOS( "/jw?pw=", "json" ).then( function( result ) {
+				$.mobile.loading( "hide" );
+
+				if ( !result || typeof result !== "object" ) {
+					logsList.html( OSApp.Language._( "Error retrieving log data. Please refresh to try again." ) );
+					return;
+				}
+
+				var pulseRate = result.pr || 0,
+					records = result.records || [],
+					curr = result.curr || {},
+					html = "";
+
+				var ymToLabel = function( ym ) {
+					var y = Math.floor( ym / 12 ),
+						m = ( ym % 12 ) + 1;
+					return y + "/" + OSApp.Utils.pad( m );
+				};
+
+				var flowToVolume = function( count ) {
+					return parseFloat( ( count * pulseRate / 100 ).toFixed( 2 ) );
+				};
+
+				// Current month
+				if ( curr.ym ) {
+					html += "<div class='ui-body-a center'><h3>" + OSApp.Language._( "Current Month" ) +
+						" (" + ymToLabel( curr.ym ) + ")</h3>" +
+						"<div><span class='bold'>" + OSApp.Language._( "Flow Count" ) + "</span>: " + curr.flow + "</div>";
+
+					if ( pulseRate > 0 ) {
+						html += "<div><span class='bold'>" + OSApp.Language._( "Volume" ) + "</span>: " +
+							flowToVolume( curr.flow ) + " L</div>";
+					}
+
+					html += "</div>";
+				}
+
+				// History table
+				if ( records.length > 0 ) {
+					html += "<table data-role='table' class='ui-responsive table-stroke'>" +
+						"<thead><tr>" +
+						"<th>" + OSApp.Language._( "Month" ) + "</th>" +
+						"<th>" + OSApp.Language._( "Flow Count" ) + "</th>";
+
+					if ( pulseRate > 0 ) {
+						html += "<th>" + OSApp.Language._( "Volume" ) + " (L)</th>";
+					}
+
+					html += "</tr></thead><tbody>";
+
+					// Show most recent first
+					for ( var i = records.length - 1; i >= 0; i-- ) {
+						var rec = records[ i ];
+						html += "<tr><td>" + ymToLabel( rec.ym ) + "</td>" +
+							"<td>" + rec.flow + "</td>";
+
+						if ( pulseRate > 0 ) {
+							html += "<td>" + flowToVolume( rec.flow ) + "</td>";
+						}
+
+						html += "</tr>";
+					}
+
+					html += "</tbody></table>";
+				} else if ( !curr.ym ) {
+					html = OSApp.Language._( "No entries found in the selected date range" );
+				}
+
+				logsList.html( html ).enhanceWithin();
+			}, function() {
+				$.mobile.loading( "hide" );
+				logsList.html( OSApp.Language._( "Error retrieving log data. Please refresh to try again." ) );
+			} );
 		},
 		prepTimeline = function() {
 			if ( data.length < 1 ) {
@@ -324,6 +412,11 @@ OSApp.Logs.displayPage = function() {
 			} );
 
 			page.find( "#logs_list" ).empty();
+
+			if ( typeof vis === "undefined" ) {
+				logsList.html( "<p class='center'>" + OSApp.Language._( "Timeline library not available. Please reload the page." ) + "</p>" );
+				return;
+			}
 
 			var timeline = new vis.Timeline( logsList.get( 0 ), fullData, options );
 			timeline.setGroups( groups );
@@ -597,7 +690,13 @@ OSApp.Logs.displayPage = function() {
 		pagehide: function() {
 			page.detach();
 		},
-		pageshow: requestData
+		pageshow: function() {
+			if ( page.find( "#log_monthly" ).prop( "checked" ) ) {
+				prepMonthly();
+			} else {
+				requestData();
+			}
+		}
 	} );
 
 	page.find( "#log_timeline" ).prop( "checked", !isNarrow );

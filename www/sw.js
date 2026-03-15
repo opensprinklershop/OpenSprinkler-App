@@ -15,7 +15,7 @@
 
 // Define a name for the current cache
 // BUILD_TIMESTAMP will be replaced by the build script to bust the cache
-var cacheName = "OpenSprinkler-v20260302182436";
+var cacheName = "OpenSprinkler-v20260312120000";
 
 // Html
 var cacheFiles = [
@@ -74,6 +74,7 @@ cacheFiles = cacheFiles.concat([
 	"/vendor-js/jqm.js",
 	"/vendor-js/dataTables-2.1.8.min.js",
 	"/vendor-js/libs.js",
+	"/vendor-js/vis-timeline-graph2d.min.js",
 ]);
 
 // CSS and images

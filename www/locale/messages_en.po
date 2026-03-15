@@ -2026,7 +2026,115 @@ msgstr ""
 msgid "Edit Programs"
 msgstr ""
 
-msgid "Show Sensor Log"
+msgid "Show Sensor Chart"
+msgstr ""
+
+msgid "Update initiated on device"
+msgstr ""
+
+msgid "Waiting for device reboot..."
+msgstr ""
+
+msgid "Device rebooted successfully"
+msgstr ""
+
+msgid "Restoring configuration..."
+msgstr ""
+
+msgid "Configuration restored"
+msgstr ""
+
+msgid "Auto-restore failed"
+msgstr ""
+
+msgid "No backup found — manual restore needed"
+msgstr ""
+
+msgid "Could not detect device after reboot"
+msgstr ""
+
+msgid "Configuration backup failed. Continue with update anyway?"
+msgstr ""
+
+msgid "Device rebooted"
+msgstr ""
+
+msgid "Downloading and installing firmware..."
+msgstr ""
+
+msgid "Error starting update"
+msgstr ""
+
+msgid "Backing up configuration..."
+msgstr ""
+
+msgid "Configuration backed up"
+msgstr ""
+
+msgid "Starting firmware download..."
+msgstr ""
+
+msgid "Flashing partition 1"
+msgstr ""
+
+msgid "Partition 1 flashed"
+msgstr ""
+
+msgid "Rebooting for phase 2..."
+msgstr ""
+
+msgid "Rebooted for phase 2"
+msgstr ""
+
+msgid "Flashing partition 2"
+msgstr ""
+
+msgid "Partition 2 flashed"
+msgstr ""
+
+msgid "Failed to start update"
+msgstr ""
+
+msgid "Update failed"
+msgstr ""
+
+msgid "Firmware update sent"
+msgstr ""
+
+msgid "Waiting for device to restart..."
+msgstr ""
+
+msgid "Waiting for device..."
+msgstr ""
+
+msgid "Waiting for device to come back online..."
+msgstr ""
+
+msgid "Device rebooting — reconnect when ready"
+msgstr ""
+
+msgid "Automatically restore saved configuration after update"
+msgstr ""
+
+msgid "If enabled, the saved configuration is restored automatically after the device comes back online."
+msgstr ""
+
+msgid "Elapsed time"
+msgstr ""
+
+msgid "Applying saved configuration..."
+msgstr ""
+
+msgid "Restore failed. You can retry it below."
+msgstr ""
+
+msgid "Update complete. Configuration restored."
+msgstr ""
+
+msgid "Update complete. Device is back online."
+msgstr ""
+
+msgid "Device is back online."
 msgstr ""
 
 msgid "Hide"
@@ -2807,4 +2915,7 @@ msgid "Characteristic UUID"
 msgstr ""
 
 msgid "Unknown Device"
+msgstr ""
+
+msgid "Overall progress"
 msgstr ""

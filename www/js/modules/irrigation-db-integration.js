@@ -110,10 +110,18 @@ OSApp.Analog.IrrigationDB = {
 
         // Get zones first
         this.getZones(function(zones) {
+            $("#irrigationDBDialogOverlay").remove();
+
+            var closeDialog = function(dialog) {
+                $(document).off("click.irrigdb");
+                dialog.remove();
+            };
+
             var html =
-                "<div data-role='popup' data-theme='a' id='irrigationDBDialog' class='ui-content' style='max-width:600px; width:95%;'>" +
+                "<div id='irrigationDBDialogOverlay' style='position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:20000;overflow:auto;padding:24px 12px;'>" +
+                "<div id='irrigationDBDialog' class='ui-content' style='max-width:600px;width:95%;margin:0 auto;background:#fff;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.25);'>" +
                 "<div data-role='header' data-theme='b'>" +
-                "<a href='#' data-rel='back' data-role='button' data-theme='a' data-icon='delete' data-iconpos='notext' class='ui-btn-right'>Close</a>" +
+                "<a href='#' class='irrigdb-close ui-btn-right' data-role='button' data-theme='a' data-icon='delete' data-iconpos='notext'>Close</a>" +
                 "<h1>Irrigation Database</h1>" +
                 "</div>" +
                 "<div class='ui-content'>" +
@@ -141,10 +149,17 @@ OSApp.Analog.IrrigationDB = {
                 // Results Container
                 "<div id='irrigdb-results' style='margin-top:20px; display:none;'></div>" +
 
+                "</div>";
                 "</div>" +
                 "</div>";
 
             var popup = $(html);
+
+            popup.find(".irrigdb-close").on("click", function(e) {
+                e.preventDefault();
+                closeDialog(popup);
+                return false;
+            });
 
             // Zone change handler
             popup.find("#irrigdb-zone").on("change", function() {
@@ -264,7 +279,7 @@ OSApp.Analog.IrrigationDB = {
                         var maxValue = parseFloat(btn.data("max"));
                         var plantName = btn.data("plant");
 
-                        popup.popup("close");
+                        closeDialog(popup);
 
                         if (onSelect) {
                             onSelect({
@@ -289,13 +304,13 @@ OSApp.Analog.IrrigationDB = {
             });
 
             // Close suggestions when clicking outside
-            $(document).on("click", function(e) {
+            $(document).on("click.irrigdb", function(e) {
                 if (!$(e.target).closest("#irrigdb-plant, #irrigdb-suggestions").length) {
                     popup.find("#irrigdb-suggestions").hide();
                 }
             });
 
-            OSApp.UIDom.openPopup(popup);
+            popup.appendTo(document.body).enhanceWithin();
         });
     }
 };

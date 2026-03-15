@@ -163,6 +163,16 @@ OSApp.ImportExport.importConfig = function( data ) {
 		return;
 	}
 
+	if ( typeof data.stations !== "object" || !Array.isArray( data.stations.snames ) ) {
+		OSApp.Errors.showError( OSApp.Language._( "Invalid configuration" ) );
+		return;
+	}
+
+	if ( typeof data.programs !== "object" || !Array.isArray( data.programs.pd ) ) {
+		OSApp.Errors.showError( OSApp.Language._( "Invalid configuration" ) );
+		return;
+	}
+
 	if ( OSApp.Firmware.checkOSVersion( 210 ) && typeof data.options === "object" &&
 		( data.options.hp0 !== OSApp.currentSession.controller.options.hp0 || data.options.hp1 !== OSApp.currentSession.controller.options.hp1 ) ||
 		( data.options.dhcp !== OSApp.currentSession.controller.options.dhcp ) || ( data.options.devid !== OSApp.currentSession.controller.options.devid ) ) {
@@ -173,6 +183,11 @@ OSApp.ImportExport.importConfig = function( data ) {
 	OSApp.UIDom.areYouSure( OSApp.Language._( "Are you sure you want to restore the configuration?" ), warning, function() {
 		$.mobile.loading( "show" );
 
+		// Safety net: hide spinner after 60 s in case of unexpected failures
+		var loadingGuard = setTimeout( function() {
+			$.mobile.loading( "hide" );
+		}, 60000 );
+
 		var cs = "/cs?pw=",
 			co = "/co?pw=",
 			cpStart = "/cp?pw=",
@@ -180,6 +195,8 @@ OSApp.ImportExport.importConfig = function( data ) {
 			csi = new Array( ncs ).fill( "/cs?pw=" ),
 			isPi = OSApp.Firmware.isOSPi(),
 			i, k, key, option, station;
+
+		try {
 
 		var findKey = function( index ) { return OSApp.Constants.keyIndex[ index ] === key; };
 
@@ -343,6 +360,7 @@ OSApp.ImportExport.importConfig = function( data ) {
 			OSApp.Firmware.sendToOS( OSApp.Utils.transformKeysinString( co ) ),
 			OSApp.Firmware.sendToOS( cs ),
 			OSApp.Firmware.sendToOS( "/dp?pw=&pid=-1" ),
+			OSApp.Firmware.sendToOS( "/cv?pw=&rd=0" ),
 			$.each( csi, function( i, comm ) {
 				OSApp.Firmware.sendToOS( comm );
 			} ),
@@ -439,12 +457,14 @@ OSApp.ImportExport.importConfig = function( data ) {
 				setTimeout( function() {
 					OSApp.Sites.updateController(
 						function() {
+							clearTimeout( loadingGuard );
 							$.mobile.loading( "hide" );
 							OSApp.Errors.showError( OSApp.Language._( "Backup restored to your device" ) );
 							OSApp.Weather.updateWeather();
 							OSApp.UIDom.goHome( true );
 						},
 						function() {
+							clearTimeout( loadingGuard );
 							$.mobile.loading( "hide" );
 							OSApp.Network.networkFail();
 						}
@@ -452,9 +472,16 @@ OSApp.ImportExport.importConfig = function( data ) {
 				}, 1500 );
 			},
 			function() {
+				clearTimeout( loadingGuard );
 				$.mobile.loading( "hide" );
 				OSApp.Errors.showError( OSApp.Language._( "Unable to import configuration." ) );
 			}
 		);
+		//eslint-disable-next-line no-unused-vars
+		} catch ( _e ) {
+			clearTimeout( loadingGuard );
+			$.mobile.loading( "hide" );
+			OSApp.Errors.showError( OSApp.Language._( "Unable to import configuration." ) );
+		}
 	} );
 };

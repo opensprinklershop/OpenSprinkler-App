@@ -223,12 +223,12 @@ OSApp.Statistics.buildKPICards = function( data ) {
 
 // --- Build Charts ---
 OSApp.Statistics.buildDailyRuntimeChart = function( container, data, theme ) {
-	var days = Object.keys( data.dailyRuntime ).sort();
+	var endDay = OSApp.Statistics.dayKey( data.now );
+	var startDay = endDay - data.range;
 	var categories = [], values = [];
-	for ( var i = 0; i < days.length; i++ ) {
-		var d = OSApp.Statistics.dayToDate( days[ i ] );
-		categories.push( d.getTime() );
-		values.push( Math.round( data.dailyRuntime[ days[ i ] ] / 60 ) ); // minutes
+	for ( var d = startDay; d <= endDay; d++ ) {
+		categories.push( OSApp.Statistics.dayToDate( d ).getTime() );
+		values.push( Math.round( ( data.dailyRuntime[ d ] || 0 ) / 60 ) ); // minutes
 	}
 
 	var opts = $.extend( true, {}, OSApp.Statistics.baseChartOpts( theme ), {
@@ -263,14 +263,12 @@ OSApp.Statistics.buildDailyRuntimeChart = function( container, data, theme ) {
 };
 
 OSApp.Statistics.buildDailyVolumeChart = function( container, data, theme ) {
-	var days = Object.keys( data.dailyVolume ).sort();
-	if ( days.length === 0 ) { return; }
-
+	var endDay = OSApp.Statistics.dayKey( data.now );
+	var startDay = endDay - data.range;
 	var categories = [], values = [];
-	for ( var i = 0; i < days.length; i++ ) {
-		var d = OSApp.Statistics.dayToDate( days[ i ] );
-		categories.push( d.getTime() );
-		values.push( parseFloat( data.dailyVolume[ days[ i ] ].toFixed( 1 ) ) );
+	for ( var d = startDay; d <= endDay; d++ ) {
+		categories.push( OSApp.Statistics.dayToDate( d ).getTime() );
+		values.push( parseFloat( ( data.dailyVolume[ d ] || 0 ).toFixed( 1 ) ) );
 	}
 
 	var opts = $.extend( true, {}, OSApp.Statistics.baseChartOpts( theme ), {
@@ -353,14 +351,13 @@ OSApp.Statistics.buildStationRuntimeChart = function( container, data, theme ) {
 };
 
 OSApp.Statistics.buildWaterLevelChart = function( container, data, theme ) {
-	var days = Object.keys( data.dailyWaterLevel ).sort();
-	if ( days.length === 0 ) { return; }
-
+	if ( Object.keys( data.dailyWaterLevel ).length === 0 ) { return; }
+	var endDay = OSApp.Statistics.dayKey( data.now );
+	var startDay = endDay - data.range;
 	var categories = [], values = [];
-	for ( var i = 0; i < days.length; i++ ) {
-		var d = OSApp.Statistics.dayToDate( days[ i ] );
-		categories.push( d.getTime() );
-		values.push( data.dailyWaterLevel[ days[ i ] ] );
+	for ( var d = startDay; d <= endDay; d++ ) {
+		categories.push( OSApp.Statistics.dayToDate( d ).getTime() );
+		values.push( data.dailyWaterLevel[ d ] !== undefined ? data.dailyWaterLevel[ d ] : null );
 	}
 
 	var opts = $.extend( true, {}, OSApp.Statistics.baseChartOpts( theme ), {

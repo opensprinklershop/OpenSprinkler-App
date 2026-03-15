@@ -208,6 +208,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					case "o49":
 						opt.o49 = data & 0xff;
 						opt.o65 = ( data >> 8 ) & 0xff;
+						opt.o76 = ( data >> 16 ) & 0xff;
 						return true;
 					case "o31":
 						if ( parseInt( data ) === 3 && !OSApp.Utils.unescapeJSON( $( "#wto" )[ 0 ].value ).baseETo ) {
@@ -824,7 +825,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"</div>";
 
 			let ife2 = OSApp.currentSession.controller.options.ife2;
-			let ifev = ( ( typeof ife2 !== "undefined" ) ? ife2 * 256 : 0 ) + OSApp.currentSession.controller.options.ife;
+			let ife3 = OSApp.currentSession.controller.options.ife3;
+			let ifev = ( ( typeof ife3 !== "undefined" ) ? ife3 * 65536 : 0 ) +
+				( ( typeof ife2 !== "undefined" ) ? ife2 * 256 : 0 ) + OSApp.currentSession.controller.options.ife;
 			list += "<div class='ui-field-contain'><label for='o49'>" + OSApp.Language._( "Notification Events" ) +
 					"<button data-helptext='" +
 						OSApp.Language._( "Select notification events. Applicable to all of MQTT, Email, and IFTTT. <b>NOTE</b>: enabling too many events or notification methods may cause delays, missed responses, or skipped short watering events." ) +
@@ -1718,17 +1721,20 @@ OSApp.Options.showOptions = function( expandItem ) {
 			rain: OSApp.Language._( "Rain Delay Update" ),
 			station: OSApp.Language._( "Station Start" ),
 			flow_alert: OSApp.Language._( "Flow Alert" ),
-			//curr_alert: OSApp.Language._( "Current Sensor Alert" ),
+			curr_alert: OSApp.Language._( "Under/Overcurrent Fault" ),
+			monthly_report: OSApp.Language._( "Monthly Water Report" ),
+			noflow: OSApp.Language._( "No Flow Alert" ),
+			pipe_burst: OSApp.Language._( "Pipe Burst Alert" ),
 			warning_low: OSApp.Language._("Monitoring-warnings level low"),
 			warning_med: OSApp.Language._("Monitoring-warnings level medium"),
 			warning_high: OSApp.Language._("Monitoring-warnings level high"),
-			curr_alert: OSApp.Language._( "Under/Overcurrent Fault" ),
 		}, button = this, curr = parseInt( button.value ), inputs = "", a = 0, ife = 0;
 
 		let no_ife2 = typeof OSApp.currentSession.controller.options.ife2 === "undefined";
+		let no_ife3 = typeof OSApp.currentSession.controller.options.ife3 === "undefined";
 		$.each( events, function( i, val ) {
 			inputs += "<label for='notif-" + i + "'><input class='needsclick' data-iconpos='right' id='notif-" + i + "' type='checkbox' " +
-				( OSApp.Utils.getBitFromByte( curr, a ) ? "checked='checked'" : "" ) + ( no_ife2 && a >= 8 ? " disabled" : "" ) + ">" + val +
+				( OSApp.Utils.getBitFromByte( curr, a ) ? "checked='checked'" : "" ) + ( ( no_ife2 && a >= 8 ) || ( no_ife3 && a >= 16 ) ? " disabled" : "" ) + ">" + val +
 			"</label>";
 			a++;
 		} );
@@ -2011,6 +2017,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 				host: "smtp.gmail.com",
 				port: 465,
 				user: "",
+				login: "",
 				pass: "",
 				recipient: ""
 			}, OSApp.Utils.unescapeJSON( curr ) );
@@ -2049,6 +2056,17 @@ OSApp.Options.showOptions = function( expandItem ) {
 									( options.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "user@gmail.com" ) + "' value='" + options.user + "' required />" +
 							"</div>" +
 							"<div class='ui-block-a' style='width:40%'>" +
+								"<label for='smtplogin' style='padding-top:10px'>" + OSApp.Language._( "SMTP Username" ) +
+								"<button data-helptext='" +
+									OSApp.Language._( "Optional: SMTP login username. If empty, the sender email address is used for authentication." ) +
+									"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+								"</label>" +
+							"</div>" +
+							"<div class='ui-block-b' style='width:60%'>" +
+								"<input class='email-input' type='text' id='smtplogin' data-mini='true' maxlength='64' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
+									( options.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "optional" ) + "' value='" + ( options.login || "" ) + "' />" +
+							"</div>" +
+							"<div class='ui-block-a' style='width:40%'>" +
 								"<label for='password' style='padding-top:10px'>" + OSApp.Language._( "App Password" ) + "</label>" +
 							"</div>" +
 							"<div class='ui-block-b' style='width:60%'>" +
@@ -2077,11 +2095,13 @@ OSApp.Options.showOptions = function( expandItem ) {
 		} );
 
 		popup.find( ".submit" ).on( "click", function() {
+			var loginVal = popup.find( "#smtplogin" ).val().trim();
 			var options = {
 				en: ( popup.find( "#enable" ).prop( "checked" ) ? 1 : 0 ),
 				host: popup.find( "#server" ).val(),
 				port: parseInt( popup.find( "#port" ).val() ),
 				user: popup.find( "#username" ).val(),
+				login: loginVal,
 				pass: popup.find( "#password" ).val(),
 				recipient: popup.find( "#recipient" ).val()
 			};

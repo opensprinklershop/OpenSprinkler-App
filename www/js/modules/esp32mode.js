@@ -1,4 +1,4 @@
-/* global $, cordova */
+/* global $, cordova, md5 */
 
 /* OpenSprinkler App
  * Copyright (C) 2015 - present, Samer Albahra. All rights reserved.
@@ -346,6 +346,8 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo ) {
 	} );
 
 	// Cert tab: Upload & Validate
+	// Uses POST to avoid the 1536-byte URL length limit on ESP32 hardware servers.
+	// Password is kept in the URL query string; cert/key go in the request body.
 	popup.on( "click", ".cert-upload-btn", function() {
 		var certPem = popup.find( "#cert-pem-cert" ).val().trim(),
 			keyPem = popup.find( "#cert-pem-key" ).val().trim();
@@ -364,7 +366,25 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo ) {
 		}
 
 		$.mobile.loading( "show" );
-		OSApp.Firmware.sendToOS( "/tl?pw=&cert=" + encodeURIComponent( certPem ) + "&key=" + encodeURIComponent( keyPem ), "json" ).done( function( resp ) {
+
+		var pass = encodeURIComponent( OSApp.currentSession.pass ),
+			urlBase = OSApp.currentSession.token
+				? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
+				: OSApp.currentSession.prefix + OSApp.currentSession.ip,
+			ajaxCfg = {
+				url: urlBase + "/tl?pw=" + pass,
+				type: "POST",
+				data: "cert=" + encodeURIComponent( certPem ) + "&key=" + encodeURIComponent( keyPem ),
+				contentType: "application/x-www-form-urlencoded",
+				dataType: "json",
+				timeout: 30000
+			};
+
+		if ( OSApp.currentSession.auth ) {
+			ajaxCfg.headers = { Authorization: "Basic " + btoa( OSApp.currentSession.authUser + ":" + OSApp.currentSession.authPass ) };
+		}
+
+		$.ajax( ajaxCfg ).done( function( resp ) {
 			$.mobile.loading( "hide" );
 			if ( resp && resp.result === 1 ) {
 				popup.popup( "close" );
@@ -379,7 +399,7 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo ) {
 					);
 				}, 400 );
 			} else {
-				OSApp.Errors.showError( resp && resp.message ? resp.message : OSApp.Language._( "Certificate validation failed" ) );
+				OSApp.Errors.showError( resp && resp.error ? resp.error : OSApp.Language._( "Certificate validation failed" ) );
 			}
 		} ).fail( function() {
 			$.mobile.loading( "hide" );
@@ -483,6 +503,18 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	setCached: function( ieee, data ) {
 		this._mem[ ieee ] = data;
 		try { localStorage.setItem( "zb_dev_" + ieee, JSON.stringify( data ) ); } catch ( e ) { void e; }
+		// Also cache the human-readable display label for quick h4 pre-population
+		var label = ( data.vendor && data.description )
+			? data.vendor + " — " + data.description
+			: ( data.vendor || data.description || "" );
+		if ( label ) {
+			try { localStorage.setItem( "zb_name_" + ieee, label ); } catch ( e ) { void e; }
+		}
+	},
+
+	/** Returns the cached display label for a device by IEEE address, or null. */
+	getCachedLabel: function( ieee ) {
+		try { return localStorage.getItem( "zb_name_" + ieee ) || null; } catch ( e ) { return null; }
 	},
 
 	lookup: function( manufacturer, model ) {
@@ -509,9 +541,10 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	enrich: function( dev, $li ) {
 		var self = this;
 		var ieee = dev.ieee || "";
-		var mfr  = dev.manufacturer || "";
-		var mdl  = dev.model || "";
-		if ( !mfr || mfr === "unknown" ) { return; }
+		var mfr  = ( dev.manufacturer && dev.manufacturer !== "unknown" ) ? dev.manufacturer : "";
+		var mdl  = ( dev.model        && dev.model        !== "unknown" ) ? dev.model        : "";
+		// Skip only if there is nothing useful to look up
+		if ( !mfr && !mdl ) { return; }
 
 		var cached = this.getCached( ieee );
 		if ( cached ) { self._apply( $li, cached ); return; }
@@ -530,6 +563,8 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 			: ( data.vendor || data.description || "" );
 		if ( label ) {
 			$li.find( ".zb-db-info" ).text( label ).show();
+			// Update main device title so it shows the proper product name
+			$li.find( "h4" ).text( label );
 		}
 	}
 };
@@ -560,7 +595,10 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			var ieeeAttr = dev.ieee ? " data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'" : "";
 
 			content += "<li" + ( dev.is_new ? " data-theme='b'" : "" ) + ieeeAttr + ">";
-			content += "<h4>" + ( ( dev.model && dev.model !== "unknown" ) ? dev.model : OSApp.Language._( "Unknown Device" ) ) + "</h4>";
+			// Pre-populate from cached DB label (persisted by IEEE across page reloads)
+			var cachedDevLabel = ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) || null;
+			var deviceTitle = cachedDevLabel || ( ( dev.model && dev.model !== "unknown" ) ? dev.model : OSApp.Language._( "Unknown Device" ) );
+			content += "<h4>" + OSApp.Utils.htmlEscape( deviceTitle ) + "</h4>";
 			if ( onlineBadge ) {
 				content += "<p>" + onlineBadge + "</p>";
 			}
@@ -603,8 +641,8 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	if ( data.devices ) {
 		for ( var j = 0; j < data.devices.length; j++ ) {
 			var d = data.devices[ j ];
-			if ( d.ieee && d.manufacturer && d.manufacturer !== "unknown" ) {
-				var $li = popup.find( "li[data-ieee='" + d.ieee + "']" );
+			if ( d.ieee ) {
+				var $li = popup.find( "li[data-ieee='" + d.ieee.replace( /'/g, "" ) + "']" );
 				OSApp.ESP32Mode.ZigbeeDeviceDB.enrich( d, $li );
 			}
 		}
@@ -845,6 +883,139 @@ OSApp.ESP32Mode.formatFwVersion = function( v ) {
 	return major + "." + minor + "." + patch;
 };
 
+OSApp.ESP32Mode.getOnlineUpdateVariantLabel = function() {
+	if ( OSApp.Firmware.isOSPi() ) {
+		return OSApp.Language._( "OSPi Script Update" );
+	}
+	if ( OSApp.ESP32Mode.isESP32Supported() ) {
+		return OSApp.Language._( "ESP32 OTA" );
+	}
+	return OSApp.Language._( "ESP8266 Direct OTA" );
+};
+
+OSApp.ESP32Mode.OTA_EXPECTED_DURATION_SECONDS = 180;
+
+OSApp.ESP32Mode.getInteractiveOTAOptionsHtml = function() {
+	return "<div class='ota-auto-restore-area' style='margin:10px 0;padding:10px;background:#eef6ea;border-radius:6px;'>" +
+		"<label style='display:flex;align-items:center;gap:8px;font-size:0.95em;cursor:pointer;'>" +
+		"<input type='checkbox' class='ota-auto-restore' checked='checked'>" +
+		OSApp.Language._( "Automatically restore saved configuration after update" ) +
+		"</label>" +
+		"<div style='font-size:0.82em;color:#666;margin-top:6px;'>" +
+		OSApp.Language._( "If enabled, the saved configuration is restored automatically after the device comes back online." ) +
+		"</div>" +
+		"</div>" +
+		"<button class='ota-inline-restore ui-btn ui-mini' style='display:none;'>" + OSApp.Language._( "Restore Configuration" ) + "</button>";
+};
+
+OSApp.ESP32Mode.ensureOTAProgressArea = function( popup ) {
+	if ( !popup.find( "#ota-progress-area" ).length ) {
+		popup.find( "#ota-steps" ).after(
+			"<div id='ota-progress-area' style='margin:8px 0;'>" +
+			"<div style='background:#ddd;border-radius:4px;height:20px;'>" +
+			"<div id='ota-progress-bar' style='background:#4CAF50;height:100%;border-radius:4px;width:0%;transition:width 0.3s;'></div>" +
+			"</div>" +
+			"<div style='margin-top:6px;background:#ddd;border-radius:4px;height:14px;'>" +
+			"<div id='ota-overall-progress-bar' style='background:#1976D2;height:100%;border-radius:4px;width:0%;transition:width 0.3s;'></div>" +
+			"</div>" +
+			"<p id='ota-overall-msg' style='font-size:0.78em;margin:4px 0;color:#666;'></p>" +
+			"<p id='ota-progress-msg' style='font-size:0.85em;margin:4px 0;'></p>" +
+			"<p id='ota-elapsed-msg' style='font-size:0.8em;margin:4px 0;color:#666;'></p>" +
+			"</div>"
+		);
+	}
+};
+
+OSApp.ESP32Mode.markOTACompleted = function( popup ) {
+	popup.data( "otaFlowCompleted", true );
+	popup.find( "#ota-overall-progress-bar" ).css( "width", "100%" );
+	popup.find( "#ota-overall-msg" ).text(
+		OSApp.Language._( "Overall progress" ) + ": 100%"
+	);
+};
+
+OSApp.ESP32Mode.stopOTADurationTimer = function( popup ) {
+	var timerId = popup.data( "otaElapsedTimer" );
+	if ( timerId ) {
+		clearInterval( timerId );
+		popup.removeData( "otaElapsedTimer" );
+	}
+};
+
+OSApp.ESP32Mode.startOTADurationTimer = function( popup ) {
+	OSApp.ESP32Mode.ensureOTAProgressArea( popup );
+	OSApp.ESP32Mode.stopOTADurationTimer( popup );
+
+	var startedAt = Date.now();
+	popup.data( "otaElapsedStartedAt", startedAt );
+	popup.data( "otaFlowCompleted", false );
+
+	var updateElapsed = function() {
+		var elapsedSeconds = Math.max( 0, Math.floor( ( Date.now() - startedAt ) / 1000 ) );
+		var isDone = !!popup.data( "otaFlowCompleted" );
+		var overallPct = isDone
+			? 100
+			: Math.min( 99, Math.floor( ( elapsedSeconds / OSApp.ESP32Mode.OTA_EXPECTED_DURATION_SECONDS ) * 100 ) );
+
+		popup.find( "#ota-elapsed-msg" ).text(
+			OSApp.Language._( "Elapsed time" ) + ": " + elapsedSeconds + "s"
+		);
+		popup.find( "#ota-overall-progress-bar" ).css( "width", overallPct + "%" );
+		popup.find( "#ota-overall-msg" ).text(
+			OSApp.Language._( "Overall progress" ) + ": " + overallPct + "%"
+		);
+	};
+
+	updateElapsed();
+	popup.data( "otaElapsedTimer", setInterval( updateElapsed, 1000 ) );
+};
+
+OSApp.ESP32Mode.restoreFromAppBackupInPopup = function( popup ) {
+	var backup = OSApp.ESP32Mode.hasAppBackup();
+	if ( !backup ) {
+		popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
+			"&#9888; " + OSApp.Language._( "No backup found — manual restore needed" )
+		);
+		popup.find( ".ota-inline-restore" ).hide();
+		OSApp.ESP32Mode.stopOTADurationTimer( popup );
+		return;
+	}
+
+	popup.find( ".ota-inline-restore" ).hide();
+	popup.find( "#ota-step-5" ).css( "color", "#1976D2" ).html(
+		"&#9658; <b>" + OSApp.Language._( "Restoring configuration..." ) + "</b>"
+	);
+	popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Applying saved configuration..." ) );
+
+	OSApp.ESP32Mode.restoreFromAppBackup( backup.data, function() {
+		OSApp.Sites.updateController( function() {
+			OSApp.ESP32Mode.markOTACompleted( popup );
+			OSApp.ESP32Mode.stopOTADurationTimer( popup );
+			popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Update complete. Configuration restored." )
+			);
+			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is back online." ) );
+			popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+		}, function() {
+			OSApp.ESP32Mode.markOTACompleted( popup );
+			OSApp.ESP32Mode.stopOTADurationTimer( popup );
+			popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Update complete. Configuration restored." )
+			);
+			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is back online." ) );
+			popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+		} );
+	}, function() {
+		OSApp.ESP32Mode.stopOTADurationTimer( popup );
+		popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
+			"&#9888; " + OSApp.Language._( "Auto-restore failed" )
+		);
+		popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Restore failed. You can retry it below." ) );
+		popup.find( ".ota-inline-restore" ).show();
+		popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+	} );
+};
+
 /**
  * Show the Online Update popup with interactive backup/restore steps.
  * Calls /uc?pw= to check for updates and displays a stepped process:
@@ -853,6 +1024,11 @@ OSApp.ESP32Mode.formatFwVersion = function( v ) {
  *   Step 3: After reboot, offer config restore
  */
 OSApp.ESP32Mode.setupOnlineUpdate = function() {
+	if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
+		OSApp.Errors.showError( OSApp.Language._( "Online firmware update requires firmware version 2.4.0 or newer." ) );
+		return;
+	}
+
 	$.mobile.loading( "show" );
 
 	// Timeout 25s — firmware makes a blocking HTTPS request (15s timeout) to check the update server
@@ -875,9 +1051,13 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 		}
 
 		var curVer = OSApp.ESP32Mode.formatFwVersion( data.cur_version ) + "." + data.cur_minor;
+		var newVerHeader = ( data.available === 1 )
+			? ( OSApp.ESP32Mode.formatFwVersion( data.fw_version ) + "." + data.fw_minor )
+			: OSApp.Language._( "Latest" );
+		var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
 		var content = "<div class='ui-content'>";
-		content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + "</h3>";
-		content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
+		content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+		content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + " &nbsp; | &nbsp; <b>" + OSApp.Language._( "New version" ) + ":</b> " + newVerHeader + "</p>";
 
 		if ( data.available === 1 ) {
 			var newVer = OSApp.ESP32Mode.formatFwVersion( data.fw_version ) + "." + data.fw_minor;
@@ -900,6 +1080,7 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 			content += "<p id='ota-step-5' style='margin:2px 0;color:#999;'>" +
 				"&#9744; " + OSApp.Language._( "Step 5: Reboot & verify" ) + "</p>";
 			content += "</div>";
+			content += OSApp.ESP32Mode.getInteractiveOTAOptionsHtml();
 
 			content += "<button class='ota-start-interactive ui-btn ui-btn-b'>" + OSApp.Language._( "Start Update" ) + "</button>";
 		} else {
@@ -926,6 +1107,7 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 		var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='otaUpdatePopup'>" + content + "</div>" );
 
 		popup.on( "click", ".ota-cancel", function() {
+			OSApp.ESP32Mode.stopOTADurationTimer( popup );
 			popup.popup( "close" );
 			return false;
 		} );
@@ -953,10 +1135,16 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 		} );
 
 		popup.on( "click", ".ota-restore-backup", function() {
+			OSApp.ESP32Mode.stopOTADurationTimer( popup );
 			popup.popup( "close" );
 			setTimeout( function() {
 				OSApp.ESP32Mode.showRestorePopup();
 			}, 400 );
+			return false;
+		} );
+
+		popup.on( "click", ".ota-inline-restore", function() {
+			OSApp.ESP32Mode.restoreFromAppBackupInPopup( popup );
 			return false;
 		} );
 
@@ -967,6 +1155,389 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 			? OSApp.Language._( "Check device password and try again." )
 			: OSApp.Language._( "Error connecting to device. The update check may take up to 20 seconds." );
 		OSApp.Errors.showError( msg );
+	} );
+};
+
+/**
+ * Build a direct device base URL for classic firmware upload pages.
+ * Handles Cordova localhost edge cases by falling back to controller network IP.
+ */
+OSApp.ESP32Mode.getDirectDeviceBaseUrl = function() {
+	var rawIp = ( OSApp.currentSession && OSApp.currentSession.ip ) ? String( OSApp.currentSession.ip ).trim() : "";
+	var prefix = ( OSApp.currentSession && OSApp.currentSession.prefix ) ? OSApp.currentSession.prefix : "http://";
+
+	if ( /^https?:\/\//i.test( rawIp ) ) {
+		return rawIp.replace( /\/+$/, "" );
+	}
+
+	var isLocalHostIp = /^(localhost|127\.0\.0\.1)(:\d+)?$/i.test( rawIp );
+	if ( isLocalHostIp ) {
+		var opts = OSApp.currentSession && OSApp.currentSession.controller && OSApp.currentSession.controller.options;
+		if ( opts && typeof opts.ip1 !== "undefined" ) {
+			var ipParts = [ opts.ip1, opts.ip2, opts.ip3, opts.ip4 ];
+			if ( ipParts.join( "." ) !== "0.0.0.0" ) {
+				rawIp = ipParts.join( "." );
+			}
+		}
+	}
+
+	return ( prefix + rawIp ).replace( /\/+$/, "" );
+};
+
+OSApp.ESP32Mode.getDirectDeviceUpdateUrl = function() {
+	return OSApp.ESP32Mode.getDirectDeviceBaseUrl() + "/update";
+};
+
+/**
+ * Legacy online update flow (ESP8266 and non-ESP32 builds).
+ * Uses direct online update endpoints (/uc, /uu, /us).
+ */
+OSApp.ESP32Mode.setupLegacyOnlineUpdate = function() {
+	if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
+		OSApp.Errors.showError( OSApp.Language._( "Online firmware update requires firmware version 2.4.0 or newer." ) );
+		return;
+	}
+
+	var existingBackup = OSApp.ESP32Mode.hasAppBackup();
+	var isOtcConnection = !!OSApp.currentSession.token;
+	var curVer = OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion();
+	var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
+	var content = "<div class='ui-content'>";
+	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + " &nbsp; | &nbsp; <b>" + OSApp.Language._( "New version" ) + ":</b> " + OSApp.Language._( "Latest" ) + "</p>";
+	content += "<p style='font-size:0.9em;color:#666;'>" +
+		OSApp.Language._( "This device downloads and installs the firmware directly." ) +
+		"</p>";
+	if ( isOtcConnection ) {
+		content += "<div style='margin:12px 0;padding:10px;background:#fff3e0;color:#b26a00;border-radius:6px;'>" +
+			OSApp.Language._( "Firmware update is only available over a direct connection to the device. OTC connections are not supported for firmware updates." ) +
+			"</div>";
+	}
+	content += "<p style='font-size:0.85em;color:#666;'>" +
+		OSApp.Language._( "After flashing, WiFi/Ethernet parameters are restored from device flash backup." ) +
+		"</p>";
+
+	content += "<div id='ota-steps' style='margin:12px 0;padding:8px;background:#f0f0f0;border-radius:4px;font-size:0.9em;'>";
+	content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Update Process" ) + ":</b></p>";
+	content += "<p id='ota-step-1' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 1: Backup configuration" ) + "</p>";
+	content += "<p id='ota-step-2' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 2: Download and install firmware" ) + "</p>";
+	content += "<p id='ota-step-3' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 3: Device reboots" ) + "</p>";
+	content += "<p id='ota-step-4' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 4: Restore configuration" ) + "</p>";
+	content += "</div>";
+
+	if ( !isOtcConnection ) {
+		content += "<button class='legacy-ota-start ui-btn ui-btn-b'>" + OSApp.Language._( "Start Update" ) + "</button>";
+	}
+	content += "<button class='legacy-ota-after-reboot ui-btn' style='display:none;'>" + OSApp.Language._( "Device rebooted - Restore configuration" ) + "</button>";
+
+	if ( existingBackup ) {
+		content += "<div style='margin-top:10px;padding:8px;background:#fff3cd;border-radius:4px;'>";
+		content += "<p style='margin:2px 0;font-size:0.9em;'><b>" + OSApp.Language._( "Previous backup found" ) + "</b> (" +
+			$( "<span>" ).text( existingBackup.timestamp ).html() + ")</p>";
+		content += "<button class='ota-restore-backup ui-btn ui-mini'>" + OSApp.Language._( "Restore Configuration" ) + "</button>";
+		content += "</div>";
+	}
+
+	content += "<button class='ota-cancel ui-btn'>" + OSApp.Language._( "Close" ) + "</button>";
+	content += "</div>";
+
+	var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='otaLegacyPopup'>" + content + "</div>" );
+
+	popup.on( "click", ".ota-cancel", function() {
+		popup.popup( "close" );
+		return false;
+	} );
+
+	popup.on( "click", ".ota-restore-backup", function() {
+		popup.popup( "close" );
+		setTimeout( function() {
+			OSApp.ESP32Mode.showRestorePopup();
+		}, 400 );
+		return false;
+	} );
+
+	popup.on( "click", ".legacy-ota-start", function() {
+		var $btn = $( this );
+		$btn.prop( "disabled", true ).addClass( "ui-state-disabled" );
+		popup.find( "#ota-step-1" ).css( "color", "#1976D2" ).html(
+			"&#9658; <b>" + OSApp.Language._( "Backing up configuration..." ) + "</b>"
+		);
+
+		OSApp.ESP32Mode.backupConfigToApp().done( function() {
+			popup.find( "#ota-step-1" ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Configuration backed up" )
+			);
+			OSApp.ESP32Mode.runLegacyDirectOTA( popup );
+		} ).fail( function( errMsg ) {
+			popup.find( "#ota-step-1" ).css( "color", "#FF9800" ).html(
+				"&#9888; " + OSApp.Language._( "Backup warning" ) + ": " + $( "<span>" ).text( errMsg ).html()
+			);
+			OSApp.UIDom.areYouSure(
+				OSApp.Language._( "Configuration backup failed. Continue with update anyway?" ),
+				"",
+				function() {
+					OSApp.ESP32Mode.runLegacyDirectOTA( popup );
+				}
+			);
+		} );
+
+		return false;
+	} );
+
+	popup.on( "click", ".legacy-ota-after-reboot", function() {
+		popup.find( "#ota-step-3" ).css( "color", "#4CAF50" ).html(
+			"&#9745; " + OSApp.Language._( "Device rebooted" )
+		);
+		popup.find( "#ota-step-4" ).css( "color", "#1976D2" ).html(
+			"&#9658; <b>" + OSApp.Language._( "Restoring configuration..." ) + "</b>"
+		);
+		popup.popup( "close" );
+		setTimeout( function() {
+			OSApp.ESP32Mode.showRestorePopup();
+		}, 400 );
+		return false;
+	} );
+
+	OSApp.UIDom.openPopup( popup );
+};
+
+OSApp.ESP32Mode.setupOSPiOnlineUpdate = function() {
+	if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
+		OSApp.Errors.showError( OSApp.Language._( "Online firmware update requires firmware version 2.4.0 or newer." ) );
+		return;
+	}
+
+	var curVer = OSApp.Firmware.getOSVersion();
+	var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
+	var content = "<div class='ui-content'>";
+	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + " &nbsp; | &nbsp; <b>" + OSApp.Language._( "New version" ) + ":</b> " + OSApp.Language._( "Latest" ) + "</p>";
+	content += "<p style='font-size:0.9em;color:#666;'>" +
+		OSApp.Language._( "This OSPi device uses updater.sh for online updates." ) +
+		"</p>";
+	content += "<p style='font-size:0.9em;color:#666;'>" +
+		OSApp.Language._( "The update script will be started on the controller." ) +
+		"</p>";
+	content += "<button class='ospi-ota-start ui-btn ui-btn-b'>" + OSApp.Language._( "Start Update" ) + "</button>";
+	content += "<button class='ota-cancel ui-btn'>" + OSApp.Language._( "Close" ) + "</button>";
+	content += "</div>";
+
+	var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='ospiOtaPopup'>" + content + "</div>" );
+
+	popup.on( "click", ".ota-cancel", function() {
+		popup.popup( "close" );
+		return false;
+	} );
+
+	popup.on( "click", ".ospi-ota-start", function() {
+		var button = $( this );
+		button.prop( "disabled", true ).addClass( "ui-state-disabled" );
+		OSApp.Firmware.sendToOS( "/cv?pw=&update=1", "json", 30000 ).done( function() {
+			var statusHtml = [
+				"<div style='margin:0 0 12px 0;padding:10px;background:#e8f5e9;color:#1b5e20;border-radius:6px;'>",
+				OSApp.Language._( "The update script has been started on the controller. Reload the page after the device finishes updating." ),
+				"</div>"
+			].join( "" );
+			popup.find( ".ui-content" ).prepend( statusHtml );
+			button.remove();
+		} ).fail( function() {
+			button.prop( "disabled", false ).removeClass( "ui-state-disabled" );
+			OSApp.Errors.showError( OSApp.Language._( "Update did not complete." ) );
+		} );
+		return false;
+	} );
+
+	OSApp.UIDom.openPopup( popup );
+};
+
+OSApp.ESP32Mode.runLegacyDirectOTA = function( popup ) {
+	popup.find( "#ota-step-2" ).css( "color", "#1976D2" ).html(
+		"&#9658; <b>" + OSApp.Language._( "Downloading and installing firmware..." ) + "</b>"
+	);
+
+	OSApp.Firmware.sendToOS( "/uu?pw=", "json" ).done( function( resp ) {
+		if ( !resp || resp.result !== 1 ) {
+			popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
+				"&#9746; " + OSApp.Language._( "Failed to start update" ) +
+				( resp && resp.message ? ": " + $( "<span>" ).text( resp.message ).html() : "" )
+			);
+			return;
+		}
+
+		// OTA accepted — the device will now download, flash and reboot.
+		// It cannot serve HTTP while flashing, so skip progress polling
+		// and go straight to reboot detection.
+		popup.find( "#ota-step-2" ).css( "color", "#4CAF50" ).html(
+			"&#9745; " + OSApp.Language._( "Update initiated on device" )
+		);
+		popup.find( "#ota-step-3" ).css( "color", "#1976D2" ).html(
+			"&#9658; <b>" + OSApp.Language._( "Waiting for device reboot..." ) + "</b>"
+		);
+		popup.find( ".legacy-ota-start" ).hide();
+
+		// Start reboot detection polling after a short initial delay.
+		var originalPass = OSApp.currentSession.pass;
+		var defaultPass = md5( "opendoor" );
+		var baseUrl = OSApp.currentSession.prefix + OSApp.currentSession.ip;
+		var pollCount = 0;
+		var maxPolls = 120; // 120 × 3 s = 6 min
+		var polling = false;
+
+		setTimeout( function() {
+			var rebootPoll = setInterval( function() {
+				if ( polling ) { return; } // skip if previous request still pending
+				pollCount++;
+				polling = true;
+
+				// Try original password first (firmware may have restored it),
+				// fall back to default password on alternate attempts.
+				var tryPass = ( pollCount % 2 === 1 ) ? originalPass : defaultPass;
+				var url = baseUrl + "/jc?pw=" + encodeURIComponent( tryPass );
+
+				$.ajax( {
+					url: url,
+					type: "GET",
+					dataType: "json",
+					timeout: 3000
+				} ).done( function( data ) {
+					if ( !data ) { polling = false; return; }
+					clearInterval( rebootPoll );
+
+					// Device is back — update session password
+					OSApp.currentSession.pass = tryPass;
+
+					popup.find( "#ota-step-3" ).css( "color", "#4CAF50" ).html(
+						"&#9745; " + OSApp.Language._( "Device rebooted successfully" )
+					);
+
+					// Auto-restore configuration from app backup
+					var backup = OSApp.ESP32Mode.hasAppBackup();
+					if ( backup ) {
+						popup.find( "#ota-step-4" ).css( "color", "#1976D2" ).html(
+							"&#9658; <b>" + OSApp.Language._( "Restoring configuration..." ) + "</b>"
+						);
+						OSApp.ESP32Mode.directRestoreAfterOTA( backup.data, tryPass, function() {
+							// success
+							popup.find( "#ota-step-4" ).css( "color", "#4CAF50" ).html(
+								"&#9745; " + OSApp.Language._( "Configuration restored" )
+							);
+							localStorage.removeItem( OSApp.ESP32Mode.OTA_BACKUP_KEY );
+							setTimeout( function() {
+								popup.popup( "close" );
+								OSApp.Sites.updateController( function() {
+									OSApp.UIDom.goHome();
+								} );
+							}, 1500 );
+						}, function() {
+							// failure — offer manual restore button
+							popup.find( "#ota-step-4" ).css( "color", "#FF9800" ).html(
+								"&#9888; " + OSApp.Language._( "Auto-restore failed" )
+							);
+							popup.find( ".legacy-ota-after-reboot" ).show();
+						} );
+					} else {
+						popup.find( "#ota-step-4" ).css( "color", "#FF9800" ).html(
+							"&#9888; " + OSApp.Language._( "No backup found — manual restore needed" )
+						);
+						popup.find( ".legacy-ota-after-reboot" ).show();
+					}
+				} ).fail( function() {
+					polling = false;
+				} );
+
+				if ( pollCount >= maxPolls ) {
+					clearInterval( rebootPoll );
+					popup.find( "#ota-step-3" ).css( "color", "#FF9800" ).html(
+						"&#9888; " + OSApp.Language._( "Could not detect device after reboot" )
+					);
+					popup.find( ".legacy-ota-after-reboot" ).show();
+				}
+			}, 3000 );
+		}, 5000 ); // initial wait before first poll
+
+	} ).fail( function() {
+		popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
+			"&#9746; " + OSApp.Language._( "Error starting update" )
+		);
+	} );
+};
+
+/**
+ * Direct restore after OTA reboot — bypasses sendToOS/ajaxq to avoid
+ * queue contention and retry loops that can hang the restore step.
+ * First restores the password via /sp, then options via /co, using
+ * plain $.ajax with explicit password parameter.
+ */
+OSApp.ESP32Mode.directRestoreAfterOTA = function( data, currentDevicePass, onDone, onFail ) {
+	var baseUrl = OSApp.currentSession.prefix + OSApp.currentSession.ip;
+	var pw = encodeURIComponent( currentDevicePass );
+
+	var soptKeyMap = {
+		"1": "loc", "4": "wto", "5": "ifkey", "8": "mqtt",
+		"9": "otc", "10": "dname", "12": "email", "13": "fyta"
+	};
+	var params = "";
+	$.each( data.sopts || {}, function( key, val ) {
+		var named = soptKeyMap[ key ];
+		if ( named && val ) {
+			if ( params ) { params += "&"; }
+			params += named + "=" + encodeURIComponent( val );
+		}
+	} );
+
+	if ( data.iopts && data.iopts.length ) {
+		var ioptKeyMap = {
+			"3": "dhcp",
+			"4": "ip1", "5": "ip2", "6": "ip3", "7": "ip4",
+			"8": "gw1", "9": "gw2", "10": "gw3", "11": "gw4",
+			"12": "hp0", "13": "hp1",
+			"44": "dns1", "45": "dns2", "46": "dns3", "47": "dns4",
+			"60": "subn1", "61": "subn2", "62": "subn3", "63": "subn4",
+			"69": "wimod"
+		};
+		$.each( ioptKeyMap, function( idx, keyName ) {
+			var v = data.iopts[ parseInt( idx, 10 ) ];
+			if ( typeof v !== "undefined" && v !== null && v !== "" ) {
+				if ( params ) { params += "&"; }
+				params += keyName + "=" + encodeURIComponent( v );
+			}
+		} );
+	}
+
+	var chain = $.Deferred().resolve();
+
+	// Step 1: restore password
+	if ( data.sopts && data.sopts[ "0" ] ) {
+		chain = chain.then( function() {
+			var npw = encodeURIComponent( data.sopts[ "0" ] );
+			return $.ajax( {
+				url: baseUrl + "/sp?pw=" + pw + "&npw=" + npw + "&cpw=" + npw,
+				type: "GET", dataType: "json", timeout: 8000
+			} ).then( function( resp ) {
+				if ( resp && resp.result === 1 ) {
+					// Password changed — use new password for subsequent calls
+					pw = npw;
+					OSApp.currentSession.pass = data.sopts[ "0" ];
+				}
+				return resp;
+			} );
+		} );
+	}
+
+	// Step 2: restore options
+	if ( params ) {
+		chain = chain.then( function() {
+			return $.ajax( {
+				url: baseUrl + "/co?pw=" + pw + "&" + params,
+				type: "GET", dataType: "json", timeout: 8000
+			} );
+		} );
+	}
+
+	chain.done( function() {
+		if ( onDone ) { onDone(); }
+	} ).fail( function() {
+		if ( onFail ) { onFail(); }
 	} );
 };
 
@@ -990,7 +1561,8 @@ OSApp.ESP32Mode.showInteractiveOTAfromManifest = function( popup ) {
 		"<p id='ota-step-3' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 3: Reboot for phase 2" ) + "</p>" +
 		"<p id='ota-step-4' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 4: Flash partition 2" ) + "</p>" +
 		"<p id='ota-step-5' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 5: Reboot & verify" ) + "</p>" +
-		"</div>";
+		"</div>" +
+		OSApp.ESP32Mode.getInteractiveOTAOptionsHtml();
 	popup.find( "h3" ).after( stepHtml );
 
 	OSApp.ESP32Mode.runInteractiveOTA( popup );
@@ -1101,6 +1673,7 @@ OSApp.ESP32Mode.startOTAwithURLs = function( zigbeeUrl, matterUrl, verLabel ) {
 	content += "<p id='ota-step-4' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 4: Flash partition 2" ) + "</p>";
 	content += "<p id='ota-step-5' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 5: Reboot & verify" ) + "</p>";
 	content += "</div>";
+	content += OSApp.ESP32Mode.getInteractiveOTAOptionsHtml();
 
 	content += "<button class='ota-start-specific ui-btn ui-btn-b'>" + OSApp.Language._( "Start Install" ) + "</button>";
 	content += "<button class='ota-cancel ui-btn'>" + OSApp.Language._( "Cancel" ) + "</button>";
@@ -1109,6 +1682,7 @@ OSApp.ESP32Mode.startOTAwithURLs = function( zigbeeUrl, matterUrl, verLabel ) {
 	var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='otaUpdatePopup'>" + content + "</div>" );
 
 	popup.on( "click", ".ota-cancel", function() {
+		OSApp.ESP32Mode.stopOTADurationTimer( popup );
 		popup.popup( "close" );
 		return false;
 	} );
@@ -1116,6 +1690,11 @@ OSApp.ESP32Mode.startOTAwithURLs = function( zigbeeUrl, matterUrl, verLabel ) {
 	popup.on( "click", ".ota-start-specific", function() {
 		$( this ).prop( "disabled", true ).addClass( "ui-state-disabled" );
 		OSApp.ESP32Mode.runInteractiveOTA( popup, urlParams );
+		return false;
+	} );
+
+	popup.on( "click", ".ota-inline-restore", function() {
+		OSApp.ESP32Mode.restoreFromAppBackupInPopup( popup );
 		return false;
 	} );
 
@@ -1129,6 +1708,9 @@ OSApp.ESP32Mode.startOTAwithURLs = function( zigbeeUrl, matterUrl, verLabel ) {
  * @param {string} [urlParams]  Optional extra query params for /uu (e.g. "&zu=...&mu=...").
  */
 OSApp.ESP32Mode.runInteractiveOTA = function( popup, urlParams ) {
+	OSApp.ESP32Mode.ensureOTAProgressArea( popup );
+	OSApp.ESP32Mode.startOTADurationTimer( popup );
+	popup.find( ".ota-inline-restore" ).hide();
 
 	// --- Step 1: Backup config to app ---
 	popup.find( "#ota-step-1" ).css( "color", "#1976D2" ).html(
@@ -1147,6 +1729,7 @@ OSApp.ESP32Mode.runInteractiveOTA = function( popup, urlParams ) {
 
 		OSApp.ESP32Mode.runInteractiveOTA_step2( popup, urlParams );
 	} ).fail( function( errMsg ) {
+		OSApp.ESP32Mode.stopOTADurationTimer( popup );
 		// Backup failed — warn but allow continuing
 		popup.find( "#ota-step-1" ).css( "color", "#FF9800" ).html(
 			"&#9888; " + OSApp.Language._( "Backup warning" ) + ": " + $( "<span>" ).text( errMsg ).html()
@@ -1176,21 +1759,12 @@ OSApp.ESP32Mode.runInteractiveOTA = function( popup, urlParams ) {
  * @param {string} [urlParams]  Optional extra query params for /uu (e.g. "&zu=...&mu=...").
  */
 OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
-	// Add progress bar if not already present
-	if ( !popup.find( "#ota-progress-area" ).length ) {
-		popup.find( "#ota-steps" ).after(
-			"<div id='ota-progress-area' style='margin:8px 0;'>" +
-			"<div style='background:#ddd;border-radius:4px;height:20px;'>" +
-			"<div id='ota-progress-bar' style='background:#4CAF50;height:100%;border-radius:4px;width:0%;transition:width 0.3s;'></div>" +
-			"</div>" +
-			"<p id='ota-progress-msg' style='font-size:0.85em;margin:4px 0;'></p>" +
-			"</div>"
-		);
-	}
+	OSApp.ESP32Mode.ensureOTAProgressArea( popup );
 
 	var uuCmd = "/uu?pw=" + ( urlParams || "" );
 	OSApp.Firmware.sendToOS( uuCmd, "json" ).done( function( resp ) {
 		if ( !resp || resp.result !== 1 ) {
+			OSApp.ESP32Mode.stopOTADurationTimer( popup );
 			popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
 				"&#9746; " + OSApp.Language._( "Failed to start update" ) +
 				( resp && resp.message ? ": " + $( "<span>" ).text( resp.message ).html() : "" )
@@ -1202,11 +1776,91 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
 		var maxFails = 45; // 45 × 2s = 90s tolerance for mid-update reboot
 		var sawRebootPhase2 = false;
 		var phase2Started = false;
+		var lastProgress = 0;
+		var finalReconnectStarted = false;
+		var reconnectPoll = null;
+		var reconnectPending = false;
+
+		var startFinalReconnectWait = function() {
+			if ( finalReconnectStarted ) {
+				return;
+			}
+			finalReconnectStarted = true;
+			clearInterval( pollInterval );
+
+			popup.find( "#ota-step-2" ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Partition 1 flashed" )
+			);
+			popup.find( "#ota-step-3" ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Rebooted for phase 2" )
+			);
+			popup.find( "#ota-step-4" ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Partition 2 flashed" )
+			);
+			popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
+				"&#9658; <b>" + OSApp.Language._( "Waiting for device to come back online..." ) + "</b>"
+			);
+			popup.find( "#ota-progress-bar" ).css( "width", "100%" );
+			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Waiting for device to restart..." ) );
+			popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
+
+			var reconnectSeconds = 0;
+			reconnectPoll = setInterval( function() {
+				if ( reconnectPending ) {
+					return;
+				}
+				reconnectPending = true;
+				reconnectSeconds += 3;
+				popup.find( "#ota-progress-msg" ).text(
+					OSApp.Language._( "Waiting for device to restart..." ) +
+					" (" + reconnectSeconds + "s)"
+				);
+
+				OSApp.Firmware.sendToOS( "/jo?pw=", "json", 5000 ).done( function() {
+					reconnectPending = false;
+					clearInterval( reconnectPoll );
+					OSApp.ESP32Mode.markOTACompleted( popup );
+					popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is back online." ) );
+					if ( OSApp.ESP32Mode.hasAppBackup() ) {
+						if ( popup.find( ".ota-auto-restore" ).prop( "checked" ) ) {
+							OSApp.ESP32Mode.restoreFromAppBackupInPopup( popup );
+						} else {
+							OSApp.ESP32Mode.stopOTADurationTimer( popup );
+							popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
+								"&#9745; " + OSApp.Language._( "Update complete. Device is back online." )
+							);
+							popup.find( ".ota-inline-restore" ).show();
+							popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+						}
+					} else {
+						OSApp.ESP32Mode.stopOTADurationTimer( popup );
+						popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
+							"&#9745; " + OSApp.Language._( "Update complete. Device is back online." )
+						);
+						popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+					}
+				} ).fail( function() {
+					reconnectPending = false;
+					if ( reconnectSeconds >= 180 ) {
+						clearInterval( reconnectPoll );
+						OSApp.ESP32Mode.stopOTADurationTimer( popup );
+						popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
+							"&#9658; <b>" + OSApp.Language._( "Device rebooting — reconnect when ready" ) + "</b>"
+						);
+						if ( OSApp.ESP32Mode.hasAppBackup() ) {
+							popup.find( ".ota-inline-restore" ).show();
+						}
+						popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+					}
+				} );
+			}, 3000 );
+		};
 
 		var pollInterval = setInterval( function() {
 			OSApp.Firmware.sendToOS( "/us?pw=", "json" ).done( function( st ) {
 				if ( !st ) { return; }
 				failCount = 0;
+				lastProgress = Math.max( lastProgress, st.progress || 0 );
 
 				popup.find( "#ota-progress-msg" ).text( st.message || "" );
 				popup.find( "#ota-progress-bar" ).css( "width", st.progress + "%" );
@@ -1249,32 +1903,11 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
 
 				// Done (progress 100%)
 				if ( st.status === OSApp.ESP32Mode.OTA_STATUS.DONE ) {
-					clearInterval( pollInterval );
-					popup.find( "#ota-step-2" ).css( "color", "#4CAF50" ).html(
-						"&#9745; " + OSApp.Language._( "Partition 1 flashed" )
-					);
-					popup.find( "#ota-step-3" ).css( "color", "#4CAF50" ).html(
-						"&#9745; " + OSApp.Language._( "Rebooted for phase 2" )
-					);
-					popup.find( "#ota-step-4" ).css( "color", "#4CAF50" ).html(
-						"&#9745; " + OSApp.Language._( "Partition 2 flashed" )
-					);
-					popup.find( "#ota-progress-bar" ).css( "width", "100%" );
-
-					popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
-						"&#9658; <b>" + OSApp.Language._( "Device is rebooting..." ) + "</b>"
-					);
-
-					setTimeout( function() {
-						popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
-							"&#9745; " + OSApp.Language._( "Update complete. Restore configuration from the menu when ready." )
-						);
-						popup.find( ".ota-start-interactive" ).remove();
-						popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
-					}, 8000 );
+					startFinalReconnectWait();
 				} else if ( st.status >= OSApp.ESP32Mode.OTA_STATUS.ERROR_NETWORK &&
 							st.status <= OSApp.ESP32Mode.OTA_STATUS.ERROR_FLASH_MATTER ) {
 					clearInterval( pollInterval );
+					OSApp.ESP32Mode.stopOTADurationTimer( popup );
 					popup.find( "#ota-progress-bar" ).css( "background", "#f44336" );
 					var failStep = phase2Started ? "#ota-step-4" : "#ota-step-2";
 					popup.find( failStep ).css( "color", "#f44336" ).html(
@@ -1285,6 +1918,10 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
 			} ).fail( function() {
 				failCount++;
 				if ( sawRebootPhase2 ) {
+					if ( phase2Started && lastProgress >= 98 ) {
+						startFinalReconnectWait();
+						return;
+					}
 					popup.find( "#ota-progress-msg" ).text(
 						OSApp.Language._( "Waiting for device to restart..." ) +
 						" (" + ( failCount * 2 ) + "s)"
@@ -1299,6 +1936,7 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
 				}
 				if ( failCount >= maxFails ) {
 					clearInterval( pollInterval );
+					OSApp.ESP32Mode.stopOTADurationTimer( popup );
 					popup.find( "#ota-step-2" ).css( "color", "#FF9800" ).html(
 						"&#9745; " + OSApp.Language._( "Firmware update sent" )
 					);
@@ -1311,6 +1949,7 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
 			} );
 		}, 2000 );
 	} ).fail( function() {
+		OSApp.ESP32Mode.stopOTADurationTimer( popup );
 		popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
 			"&#9746; " + OSApp.Language._( "Error starting update" )
 		);
@@ -1418,10 +2057,14 @@ OSApp.ESP32Mode.showRestorePopup = function() {
  * Restore controller options from a backup data object.
  * Sends string options (sopts) back using their named /co keys,
  * and restores the password separately via /sp.
+ * @param {Object}   data       Backup data (from backupConfigToApp)
+ * @param {Function} [onDone]   Optional success callback
+ * @param {Function} [onFail]   Optional failure callback
  */
-OSApp.ESP32Mode.restoreFromAppBackup = function( data ) {
+OSApp.ESP32Mode.restoreFromAppBackup = function( data, onDone, onFail ) {
 	if ( !data || !data.sopts ) {
 		OSApp.Errors.showError( OSApp.Language._( "Invalid backup data" ) );
+		if ( onFail ) { onFail(); }
 		return;
 	}
 
@@ -1451,6 +2094,26 @@ OSApp.ESP32Mode.restoreFromAppBackup = function( data ) {
 		}
 	} );
 
+	// Restore network-relevant iopts (WiFi/Ethernet addressing + mode)
+	if ( data.iopts && data.iopts.length ) {
+		var ioptKeyMap = {
+			"3": "dhcp",
+			"4": "ip1",  "5": "ip2",  "6": "ip3",  "7": "ip4",
+			"8": "gw1",  "9": "gw2",  "10": "gw3", "11": "gw4",
+			"12": "hp0", "13": "hp1",
+			"44": "dns1", "45": "dns2", "46": "dns3", "47": "dns4",
+			"60": "subn1", "61": "subn2", "62": "subn3", "63": "subn4",
+			"69": "wimod"
+		};
+		$.each( ioptKeyMap, function( idx, keyName ) {
+			var v = data.iopts[ parseInt( idx, 10 ) ];
+			if ( typeof v !== "undefined" && v !== null && v !== "" ) {
+				if ( params ) { params += "&"; }
+				params += keyName + "=" + encodeURIComponent( v );
+			}
+		} );
+	}
+
 	// Build sequential restore chain: first password, then options
 	var restoreChain = $.Deferred().resolve();
 
@@ -1458,7 +2121,12 @@ OSApp.ESP32Mode.restoreFromAppBackup = function( data ) {
 	if ( data.sopts[ "0" ] ) {
 		restoreChain = restoreChain.then( function() {
 			var pwHash = encodeURIComponent( data.sopts[ "0" ] );
-			return OSApp.Firmware.sendToOS( "/sp?pw=&npw=" + pwHash + "&cpw=" + pwHash, "json" );
+			return OSApp.Firmware.sendToOS( "/sp?pw=&npw=" + pwHash + "&cpw=" + pwHash, "json" ).then( function( resp ) {
+				// After password change succeeds, update the session so
+				// subsequent requests (e.g. /co) authenticate correctly.
+				OSApp.currentSession.pass = data.sopts[ "0" ];
+				return resp;
+			} );
 		} );
 	}
 
@@ -1472,14 +2140,21 @@ OSApp.ESP32Mode.restoreFromAppBackup = function( data ) {
 	restoreChain.done( function() {
 		$.mobile.loading( "hide" );
 		localStorage.removeItem( OSApp.ESP32Mode.OTA_BACKUP_KEY );
-		OSApp.Errors.showError( OSApp.Language._( "Configuration restored successfully" ) );
-		// Refresh controller data
-		OSApp.Sites.updateController( function() {
-			OSApp.UIDom.goHome();
-		} );
+		if ( onDone ) {
+			onDone();
+		} else {
+			OSApp.Errors.showError( OSApp.Language._( "Configuration restored successfully" ) );
+			OSApp.Sites.updateController( function() {
+				OSApp.UIDom.goHome();
+			} );
+		}
 	} ).fail( function() {
 		$.mobile.loading( "hide" );
-		OSApp.Errors.showError( OSApp.Language._( "Error restoring configuration" ) );
+		if ( onFail ) {
+			onFail();
+		} else {
+			OSApp.Errors.showError( OSApp.Language._( "Error restoring configuration" ) );
+		}
 	} );
 };
 
@@ -1641,8 +2316,26 @@ OSApp.ESP32Mode.showCertManagementPopup = function( certInfo ) {
 
 		$.mobile.loading( "show" );
 
-		// Send PEM data URL-encoded via GET
-		OSApp.Firmware.sendToOS( "/tl?pw=&cert=" + encodeURIComponent( certPem ) + "&key=" + encodeURIComponent( keyPem ), "json" ).done( function( resp ) {
+		// Use POST to avoid the 1536-byte URL length limit on ESP32 hardware servers.
+		// Password stays in the URL query string; cert/key go in the request body.
+		var pass = encodeURIComponent( OSApp.currentSession.pass ),
+			urlBase = OSApp.currentSession.token
+				? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
+				: OSApp.currentSession.prefix + OSApp.currentSession.ip,
+			ajaxCfg = {
+				url: urlBase + "/tl?pw=" + pass,
+				type: "POST",
+				data: "cert=" + encodeURIComponent( certPem ) + "&key=" + encodeURIComponent( keyPem ),
+				contentType: "application/x-www-form-urlencoded",
+				dataType: "json",
+				timeout: 30000
+			};
+
+		if ( OSApp.currentSession.auth ) {
+			ajaxCfg.headers = { Authorization: "Basic " + btoa( OSApp.currentSession.authUser + ":" + OSApp.currentSession.authPass ) };
+		}
+
+		$.ajax( ajaxCfg ).done( function( resp ) {
 			$.mobile.loading( "hide" );
 
 			if ( resp && resp.result === 1 ) {
@@ -1658,7 +2351,7 @@ OSApp.ESP32Mode.showCertManagementPopup = function( certInfo ) {
 					);
 				}, 400 );
 			} else {
-				OSApp.Errors.showError( resp && resp.message ? resp.message : OSApp.Language._( "Certificate validation failed" ) );
+				OSApp.Errors.showError( resp && resp.error ? resp.error : OSApp.Language._( "Certificate validation failed" ) );
 			}
 		} ).fail( function() {
 			$.mobile.loading( "hide" );

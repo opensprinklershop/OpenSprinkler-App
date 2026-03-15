@@ -124,6 +124,7 @@ window.currLocal = true;
 	// Insert main application stylesheet
 	insertStyleSheet( assetLocation + "css/jqm.css" );
 	insertStyleSheet( assetLocation + "css/main.css" );
+	insertStyleSheet( assetLocation + "css/vis-timeline-graph2d.min.css" );
 	insertStyleSheet( assetLocation + "css/analog.css" );
 
 	// Insert favicon for web page
@@ -134,6 +135,9 @@ window.currLocal = true;
 
 		// Insert libraries
 		insertScript( assetLocation + "vendor-js/libs.js", function() {
+
+			// Insert timeline library for program preview and logs
+			insertScript( assetLocation + "vendor-js/vis-timeline-graph2d.min.js" );
 
 			// Insert charting library for analog support
 			insertScript( assetLocation + "vendor-js/apexcharts.min.js" );

@@ -349,6 +349,16 @@ OSApp.Firmware.checkOSPiVersion = function( check ) {
 	}
 };
 
+OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION = 240;
+OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION_OSPI = "2.4.0";
+
+OSApp.Firmware.isOnlineUpdateSupported = function() {
+	if ( OSApp.Firmware.isOSPi() ) {
+		return OSApp.Firmware.checkOSPiVersion( OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION_OSPI );
+	}
+	return OSApp.Firmware.checkOSVersion( OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION );
+};
+
 OSApp.Firmware.getOSVersion = function( fwv ) {
 	if ( !fwv && typeof OSApp.currentSession.controller.options === "object" ) {
 		fwv = OSApp.currentSession.controller.options.fwv;
@@ -466,7 +476,7 @@ OSApp.Firmware.checkFirmwareUpdate = function() {
 
 								popup.find( ".update" ).on( "click", function() {
 									if ( OSApp.currentSession.controller.options.hwv === 30 ) {
-										$( "<a class='hidden iab' href='" + OSApp.currentSession.prefix + OSApp.currentSession.ip + "/update'></a>" ).appendTo( popup ).click();
+										$( "<a class='hidden iab' href='" + OSApp.ESP32Mode.getDirectDeviceUpdateUrl() + "'></a>" ).appendTo( popup ).click();
 										return;
 									}
 

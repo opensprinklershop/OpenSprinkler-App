@@ -338,7 +338,7 @@ OSApp.UIDom.showHomeMenu = ( function() {
 
 				( OSApp.Analog.checkAnalogSensorAvail() ? (
 					"<li><a href='#analogsensorconfig'>" + OSApp.Language._( "Analog Sensor Config" ) + "</a></li>" +
-					"<li><a href='#analogsensorchart'>" + OSApp.Language._( "Show Sensor Log" ) + "</a></li>"
+					"<li><a href='#analogsensorchart'>" + OSApp.Language._( "Show Sensor Chart" ) + "</a></li>"
 				) : "" ) +
 			( id === "sprinklers" || id === "runonce" || id === "programs" || id === "manual" || id === "addprogram" ?
 				"</ul>" +
@@ -668,7 +668,19 @@ OSApp.UIDom.bindPanel = function() {
 
 	panel.find( ".setup-online-update" ).on( "click", function() {
 		OSApp.UIDom.closePanel( function() {
-			OSApp.ESP32Mode.setupOnlineUpdate();
+			if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
+				OSApp.Errors.showError( OSApp.Language._( "Online firmware update requires firmware version 2.4.0 or newer." ) );
+				return;
+			}
+			if ( OSApp.Firmware.isOSPi() ) {
+				OSApp.ESP32Mode.setupOSPiOnlineUpdate();
+				return;
+			}
+			if ( OSApp.ESP32Mode && OSApp.ESP32Mode.isESP32Supported() ) {
+				OSApp.ESP32Mode.setupOnlineUpdate();
+			} else {
+				OSApp.ESP32Mode.setupLegacyOnlineUpdate();
+			}
 		} );
 		return false;
 	} );
@@ -769,7 +781,8 @@ OSApp.UIDom.bindPanel = function() {
 		var panel = $( "#sprinklers-settings" ),
 			updateButtons = function() {
 				var operation = ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.en && OSApp.currentSession.controller.settings.en === 1 ) ? OSApp.Language._( "Disable" ) : OSApp.Language._( "Enable" ),
-					listview = panel.find( "ul[data-role='listview']" );
+					listview = panel.find( "ul[data-role='listview']" ),
+					onlineUpdateSupported = OSApp.Firmware.isOnlineUpdateSupported();
 
 				panel.find( ".toggleOperation span:first" ).html( operation ).attr( "data-translate", operation );
 
@@ -780,8 +793,11 @@ OSApp.UIDom.bindPanel = function() {
 					// that jQuery Mobile may have cached from initial enhancement
 					panel.find( ".esp32-mode-setup" ).removeClass( "hidden" ).css( "display", "" );
 
-					// Online Update is always available for ESP32 devices
-					panel.find( ".online-update-setup" ).removeClass( "hidden" ).css( "display", "" );
+					if ( onlineUpdateSupported ) {
+						panel.find( ".online-update-setup" ).removeClass( "hidden" ).css( "display", "" );
+					} else {
+						panel.find( ".online-update-setup" ).addClass( "hidden" );
+					}
 
 					// Fetch radio info to determine mode-dependent menu visibility
 					OSApp.ESP32Mode.fetchRadioInfo().done( function() {
@@ -819,7 +835,11 @@ OSApp.UIDom.bindPanel = function() {
 					panel.find( ".matter-setup" ).addClass( "hidden" );
 					panel.find( ".zigbee-gateway-setup" ).addClass( "hidden" );
 					panel.find( ".zigbee-client-setup" ).addClass( "hidden" );
-					panel.find( ".online-update-setup" ).addClass( "hidden" );
+					if ( onlineUpdateSupported ) {
+						panel.find( ".online-update-setup" ).removeClass( "hidden" ).css( "display", "" );
+					} else {
+						panel.find( ".online-update-setup" ).addClass( "hidden" );
+					}
 				}
 
 				listview.listview( "refresh" );
