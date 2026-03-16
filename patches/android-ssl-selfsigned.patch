@@ -1,6 +1,6 @@
 --- a/platforms/android/CordovaLib/src/org/apache/cordova/engine/SystemWebViewClient.java	2026-02-14 20:19:56.937611735 +0100
 +++ b/platforms/android/CordovaLib/src/org/apache/cordova/engine/SystemWebViewClient.java	2026-02-14 20:57:33.701513008 +0100
-@@ -288,25 +288,8 @@
+@@ -288,25 +288,39 @@
       */
      @Override
      public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
@@ -23,8 +23,39 @@
 -            // When it doubt, lock it out!
 -            super.onReceivedSslError(view, handler, error);
 -        }
-+        // Accept self-signed certificates for local OpenSprinkler devices
-+        handler.proceed();
++        // Only bypass SSL errors for private/local network hosts (OpenSprinkler devices).
++        // All other connections must pass normal certificate validation.
++        if (isPrivateNetworkUrl(error.getUrl())) {
++            handler.proceed();
++        } else {
++            handler.cancel();
++        }
++    }
++
++    /**
++     * Returns true if the URL points to a private or local network host.
++     * Covered ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, localhost, *.local
++     * No DNS lookup is performed to avoid blocking the main thread.
++     */
++    private boolean isPrivateNetworkUrl(String url) {
++        if (url == null) return false;
++        try {
++            String host = Uri.parse(url).getHost();
++            if (host == null) return false;
++            if (host.startsWith("[")) host = host.substring(1, host.length() - 1); // strip IPv6 brackets
++            if ("localhost".equalsIgnoreCase(host) || "::1".equals(host)) return true;
++            if (host.endsWith(".local")) return true;
++            String[] parts = host.split("\\.");
++            if (parts.length == 4) {
++                int a = Integer.parseInt(parts[0]);
++                int b = Integer.parseInt(parts[1]);
++                if (a == 10) return true;                          // 10.0.0.0/8
++                if (a == 172 && b >= 16 && b <= 31) return true;  // 172.16.0.0/12
++                if (a == 192 && b == 168) return true;             // 192.168.0.0/16
++                if (a == 127) return true;                         // 127.0.0.0/8 loopback
++            }
++        } catch (Exception e) { /* if parsing fails, deny */ }
++        return false;
      }
  
  
@@ -50,21 +81,52 @@
                  
                  // download event
                  
-@@ -1411,7 +1412,8 @@
+@@ -1411,7 +1412,13 @@
  
          @Override
          public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
 -            super.onReceivedSslError(view, handler, error);
-+            // Accept self-signed certificates for local OpenSprinkler devices
-+            handler.proceed();
++            // Only bypass SSL errors for private/local network hosts (OpenSprinkler devices).
++            // All other connections must pass normal certificate validation.
++            if (isPrivateNetworkUrl(error.getUrl())) {
++                handler.proceed();
++            } else {
++                handler.cancel();
++            }
              try {
                  JSONObject obj = new JSONObject();
                  obj.put("type", LOAD_ERROR_EVENT);
-@@ -1446,7 +1448,6 @@
+@@ -1446,7 +1453,32 @@
              } catch (JSONException ex) {
                  LOG.d(LOG_TAG, "Should never happen");
              }
 -            handler.cancel();
          }
  
++        /**
++         * Returns true if the URL points to a private or local network host.
++         * Covered ranges: 10.x.x.x, 172.16-31.x.x, 192.168.x.x, 127.x.x.x, localhost, *.local
++         * No DNS lookup is performed to avoid blocking the main thread.
++         */
++        private boolean isPrivateNetworkUrl(String url) {
++            if (url == null) return false;
++            try {
++                String host = Uri.parse(url).getHost();
++                if (host == null) return false;
++                if (host.startsWith("[")) host = host.substring(1, host.length() - 1); // strip IPv6 brackets
++                if ("localhost".equalsIgnoreCase(host) || "::1".equals(host)) return true;
++                if (host.endsWith(".local")) return true;
++                String[] parts = host.split("\\.");
++                if (parts.length == 4) {
++                    int a = Integer.parseInt(parts[0]);
++                    int b = Integer.parseInt(parts[1]);
++                    if (a == 10) return true;                          // 10.0.0.0/8
++                    if (a == 172 && b >= 16 && b <= 31) return true;  // 172.16.0.0/12
++                    if (a == 192 && b == 168) return true;             // 192.168.0.0/16
++                    if (a == 127) return true;                         // 127.0.0.0/8 loopback
++                }
++            } catch (Exception e) { /* if parsing fails, deny */ }
++            return false;
++        }
++
          /**

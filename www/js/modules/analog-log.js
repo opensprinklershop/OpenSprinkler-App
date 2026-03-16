@@ -122,6 +122,13 @@ return s +
 "</select></div>" +
 
 "<div class='sld-field' style='justify-content:flex-end;flex-direction:row;gap:4px;align-items:flex-end;'>" +
+"<button id='sld_f_today' class='ui-btn ui-btn-inline ui-mini ui-corner-all' style='margin:0;height:30px;line-height:30px;padding:0 10px;'>" +
+OSApp.Language._("Today") + "</button>" +
+"<button id='sld_f_yesterday' class='ui-btn ui-btn-inline ui-mini ui-corner-all' style='margin:0;height:30px;line-height:30px;padding:0 10px;'>" +
+OSApp.Language._("Yesterday") + "</button>" +
+"</div>" +
+
+"<div class='sld-field' style='justify-content:flex-end;flex-direction:row;gap:4px;align-items:flex-end;'>" +
 "<button id='sld_f_apply' class='ui-btn ui-btn-b ui-btn-inline ui-mini ui-corner-all' style='margin:0;height:30px;line-height:30px;padding:0 12px;'>" +
 OSApp.Language._("Apply") + "</button>" +
 "<button id='sld_f_reset' class='ui-btn ui-btn-inline ui-mini ui-corner-all' style='margin:0;height:30px;line-height:30px;padding:0 12px;'>" +
@@ -193,7 +200,12 @@ ordering:    true,
 deferRender: true,
 data:        [],
 order:       [[0, "desc"]],
+columnDefs: [
+    { targets: 0, visible: false },          // hide raw ts column, used only for sorting
+    { targets: 1, orderData: [0] }           // Timestamp column sorts by numeric ts
+],
 columns: [
+{ title: "ts",                              type: "num"                               },
 { title: OSApp.Language._("Timestamp"), type: "string" },
 { title: OSApp.Language._("Nr"),        type: "num",    className: "dt-center" },
 { title: OSApp.Language._("Name"),      type: "string" },
@@ -230,6 +242,22 @@ _fetchData();
 });
 
 page.find("#sld_f_apply").on("click", function () { _applyFilter(); });
+
+page.find("#sld_f_today").on("click", function () {
+var now = new Date();
+var d = now.getUTCFullYear() + "-" + _pad(now.getUTCMonth() + 1) + "-" + _pad(now.getUTCDate());
+page.find("#sld_f_from").val(d);
+page.find("#sld_f_to").val(d);
+_applyFilter();
+});
+
+page.find("#sld_f_yesterday").on("click", function () {
+var yesterday = new Date(Date.now() - 86400000);
+var d = yesterday.getUTCFullYear() + "-" + _pad(yesterday.getUTCMonth() + 1) + "-" + _pad(yesterday.getUTCDate());
+page.find("#sld_f_from").val(d);
+page.find("#sld_f_to").val(d);
+_applyFilter();
+});
 
 page.find("#sld_f_reset").on("click", function () {
 page.find("#sld_f_from").val("");
@@ -334,7 +362,7 @@ if (!_dtInstance) { return; }
 var arrays = [];
 for (var i = 0; i < rows.length; i++) {
 var r = rows[i];
-arrays.push([r.timeStr, r.nr, r.name, r.valStr, r.unit]);
+arrays.push([r.ts, r.timeStr, r.nr, r.name, r.valStr, r.unit]);
 }
 _dtInstance.clear().rows.add(arrays).draw();
 }
@@ -379,6 +407,7 @@ var toStr   = page.find("#sld_f_to").val();
 var vminStr = page.find("#sld_f_vmin").val();
 var vmaxStr = page.find("#sld_f_vmax").val();
 var unitStr = page.find("#sld_f_unit").val();
+// Interpret date inputs as UTC midnight (consistent with UTC-based timestamp display)
 var fromTs = fromStr ? (new Date(fromStr + "T00:00:00Z").getTime() / 1000) : null;
 var toTs   = toStr   ? (new Date(toStr   + "T23:59:59Z").getTime() / 1000) : null;
 var vmin   = (vminStr !== "") ? parseFloat(vminStr) : null;

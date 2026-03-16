@@ -4875,7 +4875,7 @@ OSApp.Analog.buildSensorConfig = function() {
 		"</a>" +
 		"<a data-role='button' data-icon='action' class='download-log' href='#' data-mini='true'>" + OSApp.Language._("Download Log") + "</a>" +
 		"<a data-role='button' data-icon='grid' class='show-log' href='#' data-mini='true'>" + OSApp.Language._("Show Chart") + "</a>" +
-		"<a data-role='button' data-icon='bars' class='show-sensor-data-table' href='#' data-mini='true'>" + OSApp.Language._("View Sensor Data") + "</a>";
+		"<a data-role='button' data-icon='bars' class='show-sensor-data-table' href='#' data-mini='true'>" + OSApp.Language._("Data") + "</a>";
 
 	// Chart options: Temperature conversion and combined chart
 	var hasTempConversion = OSApp.currentSession.controller.options && typeof OSApp.currentSession.controller.options.tmpCo !== "undefined";
@@ -5101,8 +5101,8 @@ OSApp.Analog.buildSensorTable = function(csv, sensorNr) {
 		var val = parseFloat(parts[2]);
 		if (isNaN(ts)) { continue; }
 		var d = new Date(ts * 1000);
-		var timeStr = pad(d.getDate()) + "." + pad(d.getMonth() + 1) + "." + String(d.getFullYear()).slice(-2) +
-			" " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+		var timeStr = pad(d.getUTCDate()) + "." + pad(d.getUTCMonth() + 1) + "." + String(d.getUTCFullYear()).slice(-2) +
+			" " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes());
 		rows.push({ ts: ts, timeStr: timeStr, val: isNaN(val) ? null : val });
 	}
 	rows.sort(function(a, b) { return b.ts - a.ts; });

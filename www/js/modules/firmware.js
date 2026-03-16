@@ -668,7 +668,12 @@ OSApp.Firmware.getOTAInfoHTML = function() {
 
 	var cache = OSApp.Firmware._otaCache;
 	if ( cache ) {
-		if ( cache.available === 1 ) {
+		var curFwv = OSApp.currentSession.controller.options.fwv || 0;
+		var curFwm = OSApp.currentSession.controller.options.fwm || 0;
+		var hasNewerVersion = ( cache.available === 1 ) &&
+			( cache.fw_version > curFwv || ( cache.fw_version === curFwv && ( cache.fw_minor || 0 ) > curFwm ) );
+
+		if ( hasNewerVersion ) {
 			html += "<a href='#' class='ota-update-btn ui-btn ui-btn-inline ui-mini ui-btn-b ui-corner-all' style='margin:0;'>" +
 				OSApp.Language._( "Update available" ) + ": " +
 				OSApp.Firmware.getOSVersion( cache.fw_version ) + " (" + cache.fw_minor + ")" +

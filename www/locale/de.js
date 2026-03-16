@@ -241,6 +241,8 @@
    "Table": "Verzeichnis",
    "View sensor data": "Sensordaten anzeigen",
    "View Sensor Data": "Sensordaten anzeigen",
+   "Today": "Heute",
+   "Yesterday": "Gestern",
    "All sensors": "Alle Sensoren",
    "Load more": "Weitere laden",
    "Timestamp": "Zeitstempel",
