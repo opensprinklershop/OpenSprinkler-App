@@ -807,6 +807,6 @@
    "Update complete. Configuration restored.": "Atualizacao concluida. Configuracao restaurada.",
    "Update complete. Device is back online.": "Atualizacao concluida. O dispositivo voltou a estar online.",
    "Device is back online.": "O dispositivo voltou a estar online.",
-   "Overall progress": "Progresso total",
+   "Overall progress": "Progresso total"
 }
 }

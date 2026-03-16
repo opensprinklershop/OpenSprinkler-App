@@ -905,6 +905,6 @@
    "Update complete. Configuration restored.": "Update voltooid. Configuratie hersteld.",
    "Update complete. Device is back online.": "Update voltooid. Apparaat is weer online.",
    "Device is back online.": "Apparaat is weer online.",
-   "Overall progress": "Totale voortgang",
+   "Overall progress": "Totale voortgang"
 }
 }

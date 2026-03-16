@@ -903,6 +903,6 @@
    "Update complete. Configuration restored.": "Aktualizacja zakonczona. Konfiguracja przywrocona.",
    "Update complete. Device is back online.": "Aktualizacja zakonczona. Urzadzenie ponownie online.",
    "Device is back online.": "Urzadzenie ponownie online.",
-   "Overall progress": "Postep calkowity",
+   "Overall progress": "Postep calkowity"
 }
 }

@@ -905,6 +905,6 @@
    "Update complete. Configuration restored.": "Aggiornamento completato. Configurazione ripristinata.",
    "Update complete. Device is back online.": "Aggiornamento completato. Dispositivo di nuovo online.",
    "Device is back online.": "Dispositivo di nuovo online.",
-   "Overall progress": "Avanzamento totale",
+   "Overall progress": "Avanzamento totale"
 }
 }
