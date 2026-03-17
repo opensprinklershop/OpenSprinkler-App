@@ -807,6 +807,8 @@
    "Update complete. Configuration restored.": "Update complete. Configuration restored.",
    "Update complete. Device is back online.": "Update complete. Device is back online.",
    "Device is back online.": "Device is back online.",
-   "Overall progress": "Overall progress"
+   "Overall progress": "Overall progress",
+   "Free Storage": "พื้นที่เก็บข้อมูลว่าง",
+   "Free Memory": "หน่วยความจำว่าง"
 }
 }

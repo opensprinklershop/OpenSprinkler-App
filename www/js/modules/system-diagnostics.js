@@ -76,7 +76,9 @@ OSApp.SystemDiagnostics.showDiagnostics = function() {
 				popup += "<tr><td>OpenThings Cloud</td><td>" + OSApp.SystemDiagnostics.resolveOTCStatus( OSApp.currentSession.controller.settings.otcs ) + "</td></tr>";
 			if (status) {
 				if (Object.hasOwn(status, "freeBytes"))
-					popup += "<tr><td>Free Bytes</td><td>" + OSApp.SystemDiagnostics.format2(status.freeBytes/1024) + " KB</td></tr>";
+					popup += "<tr><td>" + OSApp.Language._( "Free Storage" ) + "</td><td>" + OSApp.SystemDiagnostics.format2(status.freeBytes/1024) + " KB</td></tr>";
+				if (Object.hasOwn(status, "freeMemory"))
+					popup += "<tr><td>" + OSApp.Language._( "Free Memory" ) + "</td><td>" + OSApp.SystemDiagnostics.format2(status.freeMemory/1024) + " KB</td></tr>";
 				if (Object.hasOwn(status, "pingok"))
 					popup += "<tr><td>Ping check ok</td><td>" + status.pingok + "</td></tr>";
 				if (Object.hasOwn(status, "mqtt"))

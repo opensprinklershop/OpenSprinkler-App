@@ -908,6 +908,8 @@
    "Update complete. Configuration restored.": "Mise a jour terminee. Configuration restauree.",
    "Update complete. Device is back online.": "Mise a jour terminee. L'appareil est de nouveau en ligne.",
    "Device is back online.": "L'appareil est de nouveau en ligne.",
-   "Overall progress": "Progression globale"
+   "Overall progress": "Progression globale",
+   "Free Storage": "Stockage libre",
+   "Free Memory": "Mémoire libre"
 }
 }

@@ -1125,6 +1125,8 @@
    "Update complete. Configuration restored.": "Update abgeschlossen. Konfiguration wiederhergestellt.",
    "Update complete. Device is back online.": "Update abgeschlossen. Gerät ist wieder online.",
    "Device is back online.": "Gerät ist wieder online.",
-   "Overall progress": "Gesamtfortschritt"
+   "Overall progress": "Gesamtfortschritt",
+   "Free Storage": "Freier Speicher",
+   "Free Memory": "Freier Arbeitsspeicher"
 }
 }

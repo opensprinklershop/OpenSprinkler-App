@@ -679,7 +679,7 @@ OSApp.Firmware.getOTAInfoHTML = function() {
 				OSApp.Firmware.getOSVersion( cache.fw_version ) + " (" + cache.fw_minor + ")" +
 				"</a>";
 		} else {
-			html += "<span style='color: green; font-size: 0.85em;'>✓ " + OSApp.Language._( "Up to date" ) + "</span>" +
+			html += "<span style='color: green; font-size: 0.85em;'>&#10003; " + OSApp.Language._( "Up to date" ) + "</span>" +
 				" <a href='#' class='ota-manage-btn ui-btn ui-btn-inline ui-mini ui-corner-all' style='margin:0;'>" +
 				OSApp.Language._( "Manage" ) + "</a>";
 		}
@@ -947,16 +947,24 @@ OSApp.Firmware.initOTACheck = function() {
 	if ( !OSApp.Firmware.checkOSVersion( 233 ) ) return;
 
 	OSApp.Firmware.checkOTAUpdate( false ).then( function( data ) {
-		if ( data && data.available === 1 ) {
-			OSApp.Notifications.addNotification( {
-				title: OSApp.Language._( "Firmware update available" ) + ": " +
-					OSApp.Firmware.getOSVersion( data.fw_version ) + " (" + data.fw_minor + ")",
-				on: function() {
-					OSApp.Notifications.removeNotification( $( this ).parent() );
-					OSApp.Firmware.showOTAPopup( "update" );
-					return false;
-				}
-			} );
-		}
+		if ( !data || data.available !== 1 ) return;
+
+		// Guard against stale localStorage cache: verify the reported version
+		// is actually newer than the currently running firmware.
+		var curFwv = OSApp.currentSession.controller.options.fwv || 0;
+		var curFwm = OSApp.currentSession.controller.options.fwm || 0;
+		var isNewer = ( data.fw_version > curFwv ) ||
+		              ( data.fw_version === curFwv && ( data.fw_minor || 0 ) > curFwm );
+		if ( !isNewer ) return;
+
+		OSApp.Notifications.addNotification( {
+			title: OSApp.Language._( "Firmware update available" ) + ": " +
+				OSApp.Firmware.getOSVersion( data.fw_version ) + " (" + data.fw_minor + ")",
+			on: function() {
+				OSApp.Notifications.removeNotification( $( this ).parent() );
+				OSApp.Firmware.showOTAPopup( "update" );
+				return false;
+			}
+		} );
 	} );
 };

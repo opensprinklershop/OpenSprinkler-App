@@ -806,6 +806,8 @@
    "Update complete. Configuration restored.": "Update complete. Configuration restored.",
    "Update complete. Device is back online.": "Update complete. Device is back online.",
    "Device is back online.": "Device is back online.",
-   "Overall progress": "Overall progress"
+   "Overall progress": "Overall progress",
+   "Free Storage": "Vaba salvestusruum",
+   "Free Memory": "Vaba mälu"
 }
 }
