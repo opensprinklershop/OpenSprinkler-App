@@ -123,38 +123,28 @@ OSApp.Analog.success_callback = function() {
 };
 
 OSApp.Analog.syncChartOptionsFromController = function() {
-	var options = OSApp.currentSession.controller && OSApp.currentSession.controller.options ? OSApp.currentSession.controller.options : {};
-	var tmpCo = options.tmpCo;
-	var comb = options.comb;
-
-	if ( typeof tmpCo === "string" ) {
-		tmpCo = parseInt( tmpCo, 10 );
-	}
-	if ( typeof tmpCo === "number" && !isNaN( tmpCo ) ) {
-		OSApp.Analog.chartConvertTemp = Math.max( 0, Math.min( 2, tmpCo ) );
-	}
-
-	if ( typeof comb === "string" ) {
-		comb = parseInt( comb, 10 );
-	}
-	if ( typeof comb === "number" && !isNaN( comb ) ) {
-		OSApp.Analog.chartCombineMoistTemp = comb === 1;
-	}
+	// Chart display options are purely UI-side preferences stored in localStorage
+	try {
+		var stored = localStorage.getItem("OSApp.Analog.chartOptions");
+		if (stored) {
+			var opts = JSON.parse(stored);
+			if (typeof opts.tmpCo === "number" && !isNaN(opts.tmpCo)) {
+				OSApp.Analog.chartConvertTemp = Math.max(0, Math.min(2, opts.tmpCo));
+			}
+			if (typeof opts.comb === "number" && !isNaN(opts.comb)) {
+				OSApp.Analog.chartCombineMoistTemp = opts.comb === 1;
+			}
+		}
+	} catch (e) { void e; }
 };
 
 OSApp.Analog.saveChartOptions = function() {
-	var payload = {
-		tmpCo: OSApp.Analog.chartConvertTemp,
-		comb: OSApp.Analog.chartCombineMoistTemp ? 1 : 0
-	};
-
-	if ( !OSApp.currentSession.controller.options ) {
-		OSApp.currentSession.controller.options = {};
-	}
-	OSApp.currentSession.controller.options.tmpCo = payload.tmpCo;
-	OSApp.currentSession.controller.options.comb = payload.comb;
-
-	return OSApp.Analog.sendToOsObj( "/co?pw=", payload );
+	try {
+		localStorage.setItem("OSApp.Analog.chartOptions", JSON.stringify({
+			tmpCo: OSApp.Analog.chartConvertTemp,
+			comb: OSApp.Analog.chartCombineMoistTemp ? 1 : 0
+		}));
+	} catch (e) { void e; }
 };
 
 
@@ -4877,34 +4867,26 @@ OSApp.Analog.buildSensorConfig = function() {
 		"<a data-role='button' data-icon='grid' class='show-log' href='#' data-mini='true'>" + OSApp.Language._("Show Chart") + "</a>" +
 		"<a data-role='button' data-icon='bars' class='show-sensor-data-table' href='#' data-mini='true'>" + OSApp.Language._("Data") + "</a>";
 
-	// Chart options: Temperature conversion and combined chart
-	var hasTempConversion = OSApp.currentSession.controller.options && typeof OSApp.currentSession.controller.options.tmpCo !== "undefined";
-	var hasCombineChart = OSApp.currentSession.controller.options && typeof OSApp.currentSession.controller.options.comb !== "undefined";
-	if ( hasTempConversion || hasCombineChart ) {
-		list += "<div style='margin-top: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 5px;'>" +
-			"<label><b>" + OSApp.Language._("Chart Options") + "</b></label>";
+	// Chart options: Temperature conversion and combined chart (stored in localStorage)
+	list += "<div style='margin-top: 10px; padding: 8px; border: 1px solid #ccc; border-radius: 5px;'>" +
+		"<label><b>" + OSApp.Language._("Chart Options") + "</b></label>";
 
-		if ( hasTempConversion ) {
-			list += "<fieldset data-role='controlgroup' data-type='vertical' data-mini='true'>" +
-			"<legend>" + OSApp.Language._("Temperature Conversion") + "</legend>" +
-			"<input type='radio' name='chart-temp-convert' id='chart-temp-none' value='0'" + (OSApp.Analog.chartConvertTemp === 0 ? " checked='checked'" : "") + ">" +
-			"<label for='chart-temp-none'>" + OSApp.Language._("No conversion") + "</label>" +
-			"<input type='radio' name='chart-temp-convert' id='chart-temp-f2c' value='1'" + (OSApp.Analog.chartConvertTemp === 1 ? " checked='checked'" : "") + ">" +
-			"<label for='chart-temp-f2c'>" + OSApp.Language._("Fahrenheit to Celsius") + "</label>" +
-			"<input type='radio' name='chart-temp-convert' id='chart-temp-c2f' value='2'" + (OSApp.Analog.chartConvertTemp === 2 ? " checked='checked'" : "") + ">" +
-			"<label for='chart-temp-c2f'>" + OSApp.Language._("Celsius to Fahrenheit") + "</label>" +
-			"</fieldset>";
-		}
+	list += "<fieldset data-role='controlgroup' data-type='vertical' data-mini='true'>" +
+		"<legend>" + OSApp.Language._("Temperature Conversion") + "</legend>" +
+		"<input type='radio' name='chart-temp-convert' id='chart-temp-none' value='0'" + (OSApp.Analog.chartConvertTemp === 0 ? " checked='checked'" : "") + ">" +
+		"<label for='chart-temp-none'>" + OSApp.Language._("No conversion") + "</label>" +
+		"<input type='radio' name='chart-temp-convert' id='chart-temp-f2c' value='1'" + (OSApp.Analog.chartConvertTemp === 1 ? " checked='checked'" : "") + ">" +
+		"<label for='chart-temp-f2c'>" + OSApp.Language._("Fahrenheit to Celsius") + "</label>" +
+		"<input type='radio' name='chart-temp-convert' id='chart-temp-c2f' value='2'" + (OSApp.Analog.chartConvertTemp === 2 ? " checked='checked'" : "") + ">" +
+		"<label for='chart-temp-c2f'>" + OSApp.Language._("Celsius to Fahrenheit") + "</label>" +
+		"</fieldset>";
 
-		if ( hasCombineChart ) {
-			list += "<label for='chart-combine-moist-temp'>" +
-			"<input type='checkbox' id='chart-combine-moist-temp' class='chart-combine-moist-temp'" + (OSApp.Analog.chartCombineMoistTemp ? " checked='checked'" : "") + ">" +
-			OSApp.Language._("Combine Soil Moisture and Temperature in one chart") +
-			"</label>";
-		}
+	list += "<label for='chart-combine-moist-temp'>" +
+		"<input type='checkbox' id='chart-combine-moist-temp' class='chart-combine-moist-temp'" + (OSApp.Analog.chartCombineMoistTemp ? " checked='checked'" : "") + ">" +
+		OSApp.Language._("Combine Soil Moisture and Temperature in one chart") +
+		"</label>";
 
-		list += "</div>";
-	}
+	list += "</div>";
 
 	list += "</fieldset>";
 

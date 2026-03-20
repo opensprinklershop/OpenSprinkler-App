@@ -1036,6 +1036,8 @@ OSApp.UIDom.goBack = function() {
 			}
 			//eslint-disable-next-line
 		} catch ( err ) {}
+	} else if ( page === "analogsensorchart" ) {
+		OSApp.UIDom.changePage( "#sprinklers" );
 	} else {
 		if ( OSApp.uiState.pageHistoryCount > 0 ) {
 			OSApp.uiState.pageHistoryCount--;
