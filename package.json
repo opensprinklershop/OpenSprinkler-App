@@ -72,18 +72,22 @@
 		"lint-staged": "^15.2.10",
 		"mocha": "^10.8.2",
 		"po2json": "^0.4.5",
+		"qrcode-generator": "^1.4.4",
 		"sinon": "^19.0.2",
 		"sort-package-json": "^2.10.1",
 		"xml2js": "^0.6.2"
 	},
 	"cordova": {
 		"plugins": {
+			"cordova-plugin-background-fetch": {},
+			"cordova-plugin-background-mode": {},
 			"cordova-plugin-3dtouch": {},
 			"cordova-plugin-geolocation": {
 				"GPS_REQUIRED": "true"
 			},
 			"cordova-plugin-networkinterface": {},
 			"cordova-plugin-statusbar": {},
+			"cordova-plugin-timer": {},
 			"cordova-plugin-transport-security": {},
 			"cordova-plugin-inappbrowser": {},
 			"cordova-custom-config": {},

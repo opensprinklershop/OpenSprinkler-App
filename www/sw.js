@@ -75,6 +75,7 @@ cacheFiles = cacheFiles.concat([
 	"/vendor-js/dataTables-2.1.8.min.js",
 	"/vendor-js/libs.js",
 	"/vendor-js/vis-timeline-graph2d.min.js",
+	"/vendor-js/qrcode.min.js",
 ]);
 
 // CSS and images

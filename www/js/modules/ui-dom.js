@@ -666,6 +666,13 @@ OSApp.UIDom.bindPanel = function() {
 		return false;
 	} );
 
+	panel.find( ".setup-rainmaker" ).on( "click", function() {
+		OSApp.UIDom.closePanel( function() {
+			OSApp.ESP32Mode.setupRainMaker();
+		} );
+		return false;
+	} );
+
 	panel.find( ".setup-online-update" ).on( "click", function() {
 		OSApp.UIDom.closePanel( function() {
 			if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
@@ -799,6 +806,13 @@ OSApp.UIDom.bindPanel = function() {
 						panel.find( ".online-update-setup" ).addClass( "hidden" );
 					}
 
+					// RainMaker visibility (feature-based, not radio-mode-dependent)
+					if ( OSApp.ESP32Mode.isRainMakerSupported() ) {
+						panel.find( ".rainmaker-setup" ).removeClass( "hidden" ).css( "display", "" );
+					} else {
+						panel.find( ".rainmaker-setup" ).addClass( "hidden" );
+					}
+
 					// Fetch radio info to determine mode-dependent menu visibility
 					OSApp.ESP32Mode.fetchRadioInfo().done( function() {
 
@@ -835,6 +849,7 @@ OSApp.UIDom.bindPanel = function() {
 					panel.find( ".matter-setup" ).addClass( "hidden" );
 					panel.find( ".zigbee-gateway-setup" ).addClass( "hidden" );
 					panel.find( ".zigbee-client-setup" ).addClass( "hidden" );
+					panel.find( ".rainmaker-setup" ).addClass( "hidden" );
 					if ( onlineUpdateSupported ) {
 						panel.find( ".online-update-setup" ).removeClass( "hidden" ).css( "display", "" );
 					} else {
@@ -2393,9 +2408,10 @@ OSApp.UIDom.resetAllOptions = function( callback ) {
 		if ( OSApp.Firmware.isOSPi() ) {
 			co = "otz=32&ontp=1&onbrd=0&osdt=0&omas=0&omton=0&omtoff=0&orst=1&owl=100&orlp=0&ouwt=0&olg=1&oloc=Boston,MA";
 		} else {
-			co = "o2=1&o3=1&o12=80&o13=0&o15=0&o17=0&o18=0&o19=0&o20=0&o22=1&o23=100&o26=0&o27=110&o28=100&o29=15&" +
-				"o30=320&o31=0&o36=1&o37=0&o38=0&o39=0&o41=100&o42=0&o43=0&o44=8&o45=8&o46=8&o47=8&" +
-				"o48=0&o49=0&o50=0&o51=1&o52=0&o53=1&o54=0&o55=0&o56=0&o57=0&";
+			// Some option types use separate controller paths or trigger firmware-side validation
+			// on current ESP32 builds, so keep this reset payload to the safe /co subset.
+			co = "o2=1&o3=1&o12=80&o13=0&o15=0&o18=0&o22=1&o26=0&o27=110&o28=100&o29=15&" +
+				"o30=320&o31=0&o36=1&o37=0&o43=0&o48=0&o49=0&o50=0&o51=1&o52=0&o53=1&o54=0&o55=0&o56=0&o57=0&";
 			if ( OSApp.Firmware.checkOSVersion( 2199 ) ) {
 				co += "o32=0&o33=0&o34=0&o35=0&"; // For newer firmwares, resets ntp to 0.0.0.0
 			} else {

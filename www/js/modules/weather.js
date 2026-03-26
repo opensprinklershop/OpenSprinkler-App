@@ -68,14 +68,7 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 	$( ".ui-popup-active" ).find( "[data-role='popup']" ).popup( "close" );
 
 	// Sensitivity and baseline values for Humidity, Temp and Rainfall for Zimmerman adjustment
-	var options = $.extend( {}, {
-			h: 100,
-			t: 100,
-			r: 100,
-			bh: 30,
-			bt: 70,
-			br: 0
-		}, OSApp.Utils.unescapeJSON( button.value ) ),
+	var options = $.extend( {}, OSApp.Weather.getDefaultAdjustmentOptions( 1 ), OSApp.Utils.unescapeJSON( button.value ) ),
 
 		// Enable Zimmerman extension to set weather conditions as baseline for adjustment
 		hasBaseline = OSApp.Firmware.checkOSVersion( 2162 );
@@ -237,9 +230,7 @@ OSApp.Weather.showAutoRainDelayAdjustmentOptions = function( button, callback ) 
 	callback = callback || function() {};
 	$( ".ui-popup-active" ).find( "[data-role='popup']" ).popup( "close" );
 
-	var options = $.extend( {}, {
-		d: 24
-	}, OSApp.Utils.unescapeJSON( button.value ) );
+	var options = $.extend( {}, OSApp.Weather.getDefaultAdjustmentOptions( 2 ), OSApp.Utils.unescapeJSON( button.value ) );
 
 	var content = "<div data-role='popup' data-theme='a' id='adjustmentOptions'>" +
 			"<div data-role='header' data-theme='b'>" +
@@ -308,9 +299,7 @@ OSApp.Weather.showMonthlyAdjustmentOptions = function( button, callback ) {
 	callback = callback || function() {};
 	$( ".ui-popup-active" ).find( "[data-role='popup']" ).popup( "close" );
 
-	var options = $.extend( {}, {
-		scales: [ 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 ]
-	}, OSApp.Utils.unescapeJSON( button.value ) );
+	var options = $.extend( {}, OSApp.Weather.getDefaultAdjustmentOptions( 4 ), OSApp.Utils.unescapeJSON( button.value ) );
 
 	var popup = $( "<div data-role='popup' data-theme='a' id='adjustmentOptions'>" +
 			"<div data-role='header' data-theme='b'>" +
@@ -493,10 +482,7 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 	$( ".ui-popup-active" ).find( "[data-role='popup']" ).popup( "close" );
 
 	// Elevation and baseline ETo for ETo adjustment.
-	var options = $.extend( {}, {
-			baseETo: 0,
-			elevation: 600
-		},
+	var options = $.extend( {}, OSApp.Weather.getDefaultAdjustmentOptions( 3 ),
 		OSApp.Utils.unescapeJSON( button.value )
 	);
 
@@ -1026,6 +1012,37 @@ OSApp.Weather.getAdjustmentMethod = function( id ) {
 // TODO: does getAdjustmentMethod duplicate this logic? if so please refactor one or the other.
 OSApp.Weather.getCurrentAdjustmentMethodId = function() {
 	return OSApp.currentSession?.controller?.options?.uwt & ~( 1 << 7 );
+};
+
+OSApp.Weather.getDefaultAdjustmentOptions = function( id ) {
+	id = ( parseInt( id, 10 ) || 0 ) & ~( 1 << 7 );
+
+	switch ( id ) {
+		case 1:
+			return {
+				h: 100,
+				t: 100,
+				r: 100,
+				bh: 30,
+				bt: 70,
+				br: 0
+			};
+		case 2:
+			return {
+				d: 24
+			};
+		case 3:
+			return {
+				baseETo: 0,
+				elevation: 600
+			};
+		case 4:
+			return {
+				scales: [ 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 ]
+			};
+		default:
+			return {};
+	}
 };
 
 OSApp.Weather.getRestriction = function( id ) {

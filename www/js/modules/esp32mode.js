@@ -1,4 +1,4 @@
-/* global $, cordova, md5 */
+/* global $, md5 */
 
 /* OpenSprinkler App
  * Copyright (C) 2015 - present, Samer Albahra. All rights reserved.
@@ -79,6 +79,23 @@ OSApp.ESP32Mode.isESP32Supported = function() {
 };
 
 /**
+ * Check if RainMaker feature is supported (feature string contains "RAINMAKER")
+ */
+OSApp.ESP32Mode.isRainMakerSupported = function() {
+	if ( !OSApp.currentSession.controller || !OSApp.currentSession.controller.options ) {
+		return false;
+	}
+
+	var feature = OSApp.currentSession.controller.options.feature;
+	if ( !feature ) {
+		return false;
+	}
+
+	var featureStr = Array.isArray( feature ) ? feature.join( "," ) : String( feature );
+	return featureStr.toUpperCase().indexOf( "RAINMAKER" ) !== -1;
+};
+
+/**
  * Fetch the current IEEE 802.15.4 radio configuration from the /ir endpoint.
  * Caches the result in _radioInfo.
  * Returns a jQuery Deferred that resolves with the radio info object:
@@ -148,10 +165,17 @@ OSApp.ESP32Mode.setupESP32Mode = function() {
 		certDeferred.resolve( null );
 	} );
 
+	var acmeDeferred = $.Deferred();
+	OSApp.Firmware.sendToOS( "/ta?pw=", "json" ).done( function( data ) {
+		acmeDeferred.resolve( data );
+	} ).fail( function() {
+		acmeDeferred.resolve( null );
+	} );
+
 	OSApp.ESP32Mode.fetchRadioInfo( true ).done( function( radioInfo ) {
-		certDeferred.done( function( certInfo ) {
+		$.when( certDeferred, acmeDeferred ).done( function( certInfo, acmeInfo ) {
 			$.mobile.loading( "hide" );
-			OSApp.ESP32Mode.showESP32ModePopup( radioInfo, certInfo );
+			OSApp.ESP32Mode.showESP32ModePopup( radioInfo, certInfo, acmeInfo );
 		} );
 	} ).fail( function() {
 		$.mobile.loading( "hide" );
@@ -162,10 +186,11 @@ OSApp.ESP32Mode.setupESP32Mode = function() {
 /**
  * Display the ESP32 Mode / HTTPS Certificate tabbed popup
  */
-OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo ) {
+OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo ) {
 	var currentMode = radioInfo.activeMode,
 		currentLabel = OSApp.ESP32Mode.getModeLabel( currentMode ),
 		isCustom = certInfo && certInfo.type === "custom",
+		isAcme = certInfo && certInfo.type === "acme",
 		content = "";
 
 	content += "<div class='ui-content' role='main' style='max-width:500px;'>";
@@ -237,13 +262,18 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo ) {
 		content += "<legend>" + OSApp.Language._( "Certificate Mode" ) + "</legend>";
 		content += "<label for='cert-mode-internal'>";
 		content += "<input type='radio' name='cert-mode' id='cert-mode-internal' value='internal'";
-		if ( !isCustom ) { content += " checked='checked'"; }
+		if ( !isCustom && !isAcme ) { content += " checked='checked'"; }
 		content += "> " + OSApp.Language._( "Internal (built-in)" );
 		content += "</label>";
 		content += "<label for='cert-mode-custom'>";
 		content += "<input type='radio' name='cert-mode' id='cert-mode-custom' value='custom'";
 		if ( isCustom ) { content += " checked='checked'"; }
 		content += "> " + OSApp.Language._( "Custom Certificate" );
+		content += "</label>";
+		content += "<label for='cert-mode-acme'>";
+		content += "<input type='radio' name='cert-mode' id='cert-mode-acme' value='acme'";
+		if ( isAcme ) { content += " checked='checked'"; }
+		content += "> " + OSApp.Language._( "Let's Encrypt" );
 		content += "</label>";
 		content += "</fieldset>";
 
@@ -264,8 +294,62 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo ) {
 			"<input type='file' id='key-file-input' accept='.pem,.key' style='display:none;'>" +
 			"</label>";
 		content += "</div>";
-		content += "<button class='cert-upload-btn ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Upload & Validate" ) + "</button>";
+		content += "<button class='cert-upload-btn ui-btn ui-btn-b ui-corner-all'>" +
+			OSApp.Language._( "Upload Certificate" ) + "</button>";
 		content += "</div>"; // end cert-pem-editor
+
+		// ACME / Let's Encrypt config
+		content += "<div id='cert-acme-editor' style='" + ( isAcme ? "" : "display:none;" ) + "'>";
+
+		// ACME status display
+		if ( acmeInfo ) {
+			var statusLabels = [
+				OSApp.Language._( "Not configured" ),
+				OSApp.Language._( "Configured" ),
+				OSApp.Language._( "Requesting certificate..." ),
+				OSApp.Language._( "Active" ),
+				OSApp.Language._( "Renewal due" ),
+				OSApp.Language._( "Error" )
+			];
+			var statusClass = acmeInfo.status === 5 ? "color:#c00;" : ( acmeInfo.status === 3 ? "color:#090;" : "" );
+			content += "<div style='background:#f5f5f5;padding:8px;border-radius:4px;margin-bottom:10px;font-size:0.9em;'>";
+			content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "ACME Status" ) + ":</b> " +
+				"<span style='" + statusClass + "'>" + ( statusLabels[ acmeInfo.status ] || "?" ) + "</span></p>";
+			if ( acmeInfo.days_left >= 0 ) {
+				content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Days until expiry" ) + ":</b> " + acmeInfo.days_left + "</p>";
+			}
+			if ( acmeInfo.error ) {
+				content += "<p style='margin:2px 0;color:#c00;'><b>" + OSApp.Language._( "Error" ) + ":</b> " +
+					$( "<span>" ).text( acmeInfo.error ).html() + "</p>";
+			}
+			content += "</div>";
+		}
+
+		content += "<p style='font-size:0.9em;color:#666;margin-bottom:10px;'>" +
+			OSApp.Language._( "Automatically obtain and renew a free TLS certificate from Let's Encrypt. Your device must be reachable on port 80 from the internet." ) + "</p>";
+		content += "<label for='acme-domain'><b>" + OSApp.Language._( "Domain" ) + ":</b></label>";
+		content += "<input type='text' id='acme-domain' value='" + ( acmeInfo && acmeInfo.domain ? $( "<span>" ).text( acmeInfo.domain ).html() : "" ) +
+			"' placeholder='sprinkler.example.com' data-mini='true'>";
+		content += "<label for='acme-email'><b>" + OSApp.Language._( "E-Mail" ) + ":</b></label>";
+		content += "<input type='email' id='acme-email' value='" + ( acmeInfo && acmeInfo.email ? $( "<span>" ).text( acmeInfo.email ).html() : "" ) +
+			"' placeholder='admin@example.com' data-mini='true'>";
+		content += "<label for='acme-server'><b>" + OSApp.Language._( "ACME Server" ) + ":</b></label>";
+		content += "<select id='acme-server' data-mini='true'>";
+		var currentServer = acmeInfo && acmeInfo.server ? acmeInfo.server : "";
+		content += "<option value='https://acme-v02.api.letsencrypt.org/directory'" +
+			( currentServer.indexOf( "staging" ) < 0 ? " selected" : "" ) + ">" +
+			OSApp.Language._( "Production" ) + " (Let's Encrypt)</option>";
+		content += "<option value='https://acme-staging-v02.api.letsencrypt.org/directory'" +
+			( currentServer.indexOf( "staging" ) >= 0 ? " selected" : "" ) + ">" +
+			OSApp.Language._( "Staging" ) + " (" + OSApp.Language._( "Testing" ) + ")</option>";
+		content += "</select>";
+		content += "<button class='acme-save-btn ui-btn ui-btn-b ui-corner-all'>" +
+			OSApp.Language._( "Save & Request Certificate" ) + "</button>";
+		if ( isAcme ) {
+			content += "<button class='acme-delete-btn ui-btn ui-btn-c ui-corner-all' style='color:#c00;'>" +
+				OSApp.Language._( "Delete ACME Data" ) + "</button>";
+		}
+		content += "</div>"; // end cert-acme-editor
 
 		if ( isCustom ) {
 			content += "<button class='cert-delete-btn ui-btn ui-btn-c ui-corner-all' style='color:#c00;'>" +
@@ -319,12 +403,18 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo ) {
 		}, 400 );
 	} );
 
-	// Cert tab: toggle PEM editor
+	// Cert tab: toggle PEM editor / ACME editor
 	popup.on( "change", "input[name='cert-mode']", function() {
-		if ( $( this ).val() === "custom" ) {
+		var mode = $( this ).val();
+		if ( mode === "custom" ) {
 			popup.find( "#cert-pem-editor" ).show();
+			popup.find( "#cert-acme-editor" ).hide();
+		} else if ( mode === "acme" ) {
+			popup.find( "#cert-pem-editor" ).hide();
+			popup.find( "#cert-acme-editor" ).show();
 		} else {
 			popup.find( "#cert-pem-editor" ).hide();
+			popup.find( "#cert-acme-editor" ).hide();
 		}
 	} );
 
@@ -441,6 +531,93 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo ) {
 		return false;
 	} );
 
+	// ACME: Save & Request Certificate
+	popup.on( "click", ".acme-save-btn", function() {
+		var domain = popup.find( "#acme-domain" ).val().trim(),
+			email = popup.find( "#acme-email" ).val().trim(),
+			server = popup.find( "#acme-server" ).val();
+
+		if ( !domain || domain.length < 3 ) {
+			OSApp.Errors.showError( OSApp.Language._( "Please enter a valid domain name" ) );
+			return;
+		}
+		if ( !email || email.indexOf( "@" ) < 1 ) {
+			OSApp.Errors.showError( OSApp.Language._( "Please enter a valid e-mail address" ) );
+			return;
+		}
+
+		$.mobile.loading( "show" );
+
+		var pass = encodeURIComponent( OSApp.currentSession.pass ),
+			urlBase = OSApp.currentSession.token
+				? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
+				: OSApp.currentSession.prefix + OSApp.currentSession.ip,
+			ajaxCfg = {
+				url: urlBase + "/tc?pw=" + pass,
+				type: "POST",
+				data: "domain=" + encodeURIComponent( domain ) + "&email=" + encodeURIComponent( email ) +
+					"&server=" + encodeURIComponent( server ) + "&enabled=1&request=1",
+				contentType: "application/x-www-form-urlencoded",
+				dataType: "json",
+				timeout: 30000
+			};
+
+		if ( OSApp.currentSession.auth ) {
+			ajaxCfg.headers = { Authorization: "Basic " + btoa( OSApp.currentSession.authUser + ":" + OSApp.currentSession.authPass ) };
+		}
+
+		$.ajax( ajaxCfg ).done( function( resp ) {
+			$.mobile.loading( "hide" );
+			if ( resp && resp.result === 1 ) {
+				popup.popup( "close" );
+				setTimeout( function() {
+					OSApp.Errors.showError(
+						OSApp.Language._( "Certificate request started. This may take up to 2 minutes. The device must be reachable on port 80 from the internet during this process." )
+					);
+				}, 400 );
+			} else {
+				OSApp.Errors.showError( resp && resp.error ? resp.error : OSApp.Language._( "Failed to save ACME configuration" ) );
+			}
+		} ).fail( function() {
+			$.mobile.loading( "hide" );
+			OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+		} );
+		return false;
+	} );
+
+	// ACME: Delete all ACME data
+	popup.on( "click", ".acme-delete-btn", function() {
+		popup.popup( "close" );
+		setTimeout( function() {
+			OSApp.UIDom.areYouSure(
+				OSApp.Language._( "Delete all Let's Encrypt data and revert to internal certificate? A reboot will be required." ),
+				"",
+				function() {
+					$.mobile.loading( "show" );
+					OSApp.Firmware.sendToOS( "/tx?pw=", "json" ).done( function( resp ) {
+						$.mobile.loading( "hide" );
+						if ( resp && resp.result === 1 ) {
+							OSApp.UIDom.areYouSure(
+								OSApp.Language._( "ACME data removed. Reboot now to apply?" ),
+								"",
+								function() {
+									OSApp.Firmware.sendToOS( "/cv?pw=&rbt=1" );
+									OSApp.Errors.showError( OSApp.Language._( "OpenSprinkler is rebooting now" ) );
+								}
+							);
+						} else {
+							OSApp.Errors.showError( OSApp.Language._( "Failed to remove ACME data" ) );
+						}
+					} ).fail( function() {
+						$.mobile.loading( "hide" );
+						OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+					} );
+				}
+			);
+		}, 400 );
+		return false;
+	} );
+
 	OSApp.UIDom.openPopup( popup );
 };
 
@@ -459,6 +636,229 @@ OSApp.ESP32Mode.changeMode = function( newMode ) {
 		// notification in both success and failure cases.
 		OSApp.Errors.showError( OSApp.Language._( "OpenSprinkler is rebooting now" ) );
 	} );
+};
+
+/**
+ * Setup RainMaker — standalone menu popup.
+ * Fetches /rk and displays status, QR code for provisioning, and provisioning form.
+ */
+OSApp.ESP32Mode.setupRainMaker = function() {
+	$.mobile.loading( "show" );
+
+	OSApp.Firmware.sendToOS( "/rk?pw=", "json" ).done( function( rainmakerInfo ) {
+		$.mobile.loading( "hide" );
+
+		if ( !rainmakerInfo ) {
+			OSApp.Errors.showError( OSApp.Language._( "RainMaker information not available" ) );
+			return;
+		}
+
+		OSApp.ESP32Mode.showRainMakerPopup( rainmakerInfo );
+	} ).fail( function() {
+		$.mobile.loading( "hide" );
+		OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+	} );
+};
+
+/**
+ * Display the RainMaker popup with status and PoP PIN for On Network provisioning.
+ * Users add their OpenSprinkler via the ESP RainMaker phone app using
+ * "Add Device" → "On Network" and entering the PoP PIN when prompted.
+ */
+OSApp.ESP32Mode.showRainMakerPopup = function( rainmakerInfo ) {
+	var content = "",
+		isEth = !!rainmakerInfo.use_eth,
+		mappingState = rainmakerInfo.user_mapping || 0,
+		featureEnabled = !!rainmakerInfo.feature_enabled,
+		mappingLabel;
+
+	content += "<div class='ui-content' role='main' style='max-width:500px;'>";
+	content += "<h3 style='margin-top:0;'>ESP RainMaker</h3>";
+
+	// ── Enable/disable RainMaker feature toggle ───────────────────────────────
+	content += "<div style='display:flex;align-items:center;justify-content:space-between;padding:6px 0;border-bottom:1px solid #ddd;margin-bottom:10px;'>";
+	content += "<label for='rmaker-feature-toggle' style='margin:0;font-weight:bold;'>" + OSApp.Language._( "Enable RainMaker" ) + "</label>";
+	content += "<input type='checkbox' id='rmaker-feature-toggle' " + ( featureEnabled ? "checked" : "" ) + ">";
+	content += "</div>";
+
+	if ( featureEnabled ) {
+	content += "<div style='background:#f5f5f5;padding:8px;border-radius:4px;margin-bottom:10px;font-size:0.9em;'>";
+	content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Status" ) + ":</b> " +
+		( rainmakerInfo.unlinking
+			? "<span style='color:orange;'>" + OSApp.Language._( "Unlinking (rebooting)" ) + "</span>"
+			: rainmakerInfo.enabled
+			? "<span style='color:green;'>" + OSApp.Language._( "Enabled" ) + "</span>"
+			: "<span style='color:red;'>" + OSApp.Language._( "Not initialized" ) + "</span>" ) + "</p>";
+	if ( rainmakerInfo.node_id ) {
+		content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Node ID" ) + ":</b> " +
+			$( "<span>" ).text( rainmakerInfo.node_id ).html() + "</p>";
+	}
+	if ( rainmakerInfo.name ) {
+		content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Name" ) + ":</b> " +
+			$( "<span>" ).text( rainmakerInfo.name ).html() + "</p>";
+	}
+	if ( rainmakerInfo.fw_version ) {
+		content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Firmware" ) + ":</b> " +
+			$( "<span>" ).text( rainmakerInfo.fw_version ).html() + "</p>";
+	}
+	content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "MQTT" ) + ":</b> " +
+		( rainmakerInfo.mqtt_connected
+			? "<span style='color:green;'>" + OSApp.Language._( "Connected" ) + "</span>"
+			: "<span style='color:red;'>" + OSApp.Language._( "Disconnected" ) + "</span>" ) + "</p>";
+	content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Connection" ) + ":</b> " +
+		( isEth ? "Ethernet" : "WiFi" ) + "</p>";
+	content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Local Control" ) + ":</b> " +
+		( rainmakerInfo.local_ctrl_active
+			? "<span style='color:green;'>" + OSApp.Language._( "Active" ) + "</span>"
+			: "<span style='color:red;'>" + OSApp.Language._( "Inactive" ) + "</span>" ) + "</p>";
+
+	switch ( mappingState ) {
+		case 0: mappingLabel = OSApp.Language._( "Not started" ); break;
+		case 1: mappingLabel = OSApp.Language._( "Started" ); break;
+		case 2: mappingLabel = OSApp.Language._( "Request sent" ); break;
+		case 3: mappingLabel = "<span style='color:green;'>" + OSApp.Language._( "Done" ) + "</span>"; break;
+		default: mappingLabel = OSApp.Language._( "Unknown" );
+	}
+	content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "User Mapping" ) + ":</b> " + mappingLabel + "</p>";
+	content += "</div>";
+
+	// ── Provisioning instructions (On Network) ──────────────────────────────
+	if ( rainmakerInfo.enabled ) {
+
+		if ( mappingState >= 3 ) {
+			content += "<p style='color:green;font-size:0.9em;margin-bottom:8px;'>" +
+				OSApp.Language._( "This device is already linked to a RainMaker account." ) + "</p>";
+		} else {
+			content += "<p style='font-size:0.85em;color:#555;margin:4px 0 8px;'>" +
+				OSApp.Language._( "Add this device via the ESP RainMaker app:" ) + "</p>";
+			content += "<ul style='margin:4px 0 8px;padding-left:18px;font-size:0.85em;color:#555;'>";
+			content += "<li><b>" + OSApp.Language._( "On Network" ) + ":</b> " +
+				OSApp.Language._( "'Add Device' → 'On Network' (device and phone on same WiFi network)" ) + "</li>";
+			content += "</ul>";
+		}
+
+		if ( rainmakerInfo.pop ) {
+			content += "<div style='background:#e8f5e9;padding:10px;border-radius:4px;margin:8px 0;text-align:center;'>";
+			content += "<p style='margin:0 0 4px;font-size:0.85em;color:#555;'><b>" + OSApp.Language._( "PoP PIN" ) + "</b></p>";
+			content += "<code style='font-size:1.5em;font-weight:bold;letter-spacing:3px;'>" +
+				$( "<span>" ).text( rainmakerInfo.pop ).html() + "</code> ";
+			content += "<button class='rmaker-copy-pop ui-btn ui-btn-inline ui-mini ui-corner-all' " +
+				"data-pop='" + $( "<span>" ).text( rainmakerInfo.pop ).html() + "' " +
+				"style='margin:4px 0 0;padding:4px 10px;font-size:0.8em;'>" +
+				OSApp.Language._( "Copy" ) + "</button>";
+			content += "</div>";
+		}
+
+		if ( rainmakerInfo.prov_service ) {
+			content += "<p style='margin:2px 0;font-size:0.85em;color:#777;'><b>" + OSApp.Language._( "Service" ) + ":</b> " +
+				$( "<span>" ).text( rainmakerInfo.prov_service ).html() + "</p>";
+		}
+
+	} else {
+		content += "<p style='font-size:0.9em;color:#555;margin:12px 0;'>" +
+			OSApp.Language._( "RainMaker is disabled. When enabled, this device can be controlled via the ESP RainMaker cloud. A reboot is required after changing this setting." ) + "</p>";
+	}
+
+	content += "<button class='rmaker-refresh-btn ui-btn ui-corner-all'>" +
+		OSApp.Language._( "Refresh Status" ) + "</button>";
+
+	// ── Unlink (always visible when RainMaker enabled, shown last) ───────────
+	if ( featureEnabled && rainmakerInfo.enabled ) {
+		content += "<button class='rmaker-unlink-btn ui-btn ui-corner-all' style='margin-top:12px;background:#fff3f3;color:#b00020;border:1px solid #e0c0c0;'>" +
+			OSApp.Language._( "Unlink RainMaker" ) + "</button>";
+	}
+
+	} // end if ( featureEnabled )
+
+	content += "<button class='cancel-rmaker ui-btn ui-corner-all'>" + OSApp.Language._( "Close" ) + "</button>";
+	content += "</div>";
+
+	var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='rainMakerPopup'>" + content + "</div>" );
+
+	// Feature enable/disable toggle
+	popup.on( "change", "#rmaker-feature-toggle", function() {
+		var enable = $( this ).prop( "checked" ) ? 1 : 0;
+		$.mobile.loading( "show" );
+		OSApp.Firmware.sendToOS( "/co?pw=&rken=" + enable ).done( function() {
+			$.mobile.loading( "hide" );
+			if ( window.confirm( OSApp.Language._( "Reboot required for changes to take effect. Reboot now?" ) ) ) {
+				OSApp.Firmware.sendToOS( "/cv?pw=&rbt=1" );
+				OSApp.Errors.showError( OSApp.Language._( "OpenSprinkler is rebooting now" ) );
+				popup.popup( "close" );
+			}
+		} ).fail( function() {
+			$.mobile.loading( "hide" );
+			OSApp.Errors.showError( OSApp.Language._( "Error saving setting" ) );
+		} );
+		return false;
+	} );
+
+	// Close button
+	popup.on( "click", ".cancel-rmaker", function() {
+		popup.popup( "close" );
+		return false;
+	} );
+
+	// Copy PoP to clipboard
+	popup.on( "click", ".rmaker-copy-pop", function() {
+		var pop = $( this ).data( "pop" );
+		if ( navigator.clipboard && navigator.clipboard.writeText ) {
+			navigator.clipboard.writeText( pop ).then( function() {
+				OSApp.Errors.showError( OSApp.Language._( "PoP PIN copied to clipboard" ) );
+			} ).catch( function() {
+				OSApp.Errors.showError( OSApp.Language._( "Copy failed" ) );
+			} );
+		} else {
+			var tmp = $( "<input>" ).val( pop ).appendTo( "body" );
+			tmp[ 0 ].select();
+			document.execCommand( "copy" );
+			tmp.remove();
+			OSApp.Errors.showError( OSApp.Language._( "PoP PIN copied to clipboard" ) );
+		}
+		return false;
+	} );
+
+	// Refresh Status
+	popup.on( "click", ".rmaker-refresh-btn", function() {
+		$.mobile.loading( "show" );
+		OSApp.Firmware.sendToOS( "/rk?pw=", "json" ).done( function( data ) {
+			$.mobile.loading( "hide" );
+			if ( data ) {
+				popup.popup( "close" );
+				setTimeout( function() {
+					OSApp.ESP32Mode.showRainMakerPopup( data );
+				}, 400 );
+			}
+		} ).fail( function() {
+			$.mobile.loading( "hide" );
+			OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+		} );
+		return false;
+	} );
+
+	// Remove current RainMaker account mapping (unlink)
+	popup.on( "click", ".rmaker-unlink-btn", function() {
+		if ( !window.confirm( OSApp.Language._( "Unlink from RainMaker account? This will reset RainMaker credentials and reboot the device." ) ) ) {
+			return false;
+		}
+
+		$.mobile.loading( "show" );
+		OSApp.Firmware.sendToOS( "/ru?pw=", "json" ).done( function( data ) {
+			$.mobile.loading( "hide" );
+			if ( data && data.result === 1 ) {
+				OSApp.Errors.showError( OSApp.Language._( "RainMaker unlinked. Device is rebooting." ) );
+				popup.popup( "close" );
+			} else {
+				OSApp.Errors.showError( ( data && data.error ) ? data.error : OSApp.Language._( "Failed to unlink RainMaker" ) );
+			}
+		} ).fail( function() {
+			$.mobile.loading( "hide" );
+			OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+		} );
+		return false;
+	} );
+
+	OSApp.UIDom.openPopup( popup );
 };
 
 /**
@@ -514,7 +914,7 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 
 	/** Returns the cached display label for a device by IEEE address, or null. */
 	getCachedLabel: function( ieee ) {
-		try { return localStorage.getItem( "zb_name_" + ieee ) || null; } catch ( e ) { return null; }
+		try { return localStorage.getItem( "zb_name_" + ieee ) || null; } catch ( e ) { void e; return null; }
 	},
 
 	lookup: function( manufacturer, model ) {
@@ -1051,16 +1451,17 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 		}
 
 		var curVer = OSApp.ESP32Mode.formatFwVersion( data.cur_version ) + "." + data.cur_minor;
-		var newVerHeader = ( data.available === 1 )
-			? ( OSApp.ESP32Mode.formatFwVersion( data.fw_version ) + "." + data.fw_minor )
-			: OSApp.Language._( "Latest" );
 		var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
 		var content = "<div class='ui-content'>";
 		content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
-		content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + " &nbsp; | &nbsp; <b>" + OSApp.Language._( "New version" ) + ":</b> " + newVerHeader + "</p>";
-
+		content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer;
 		if ( data.available === 1 ) {
 			var newVer = OSApp.ESP32Mode.formatFwVersion( data.fw_version ) + "." + data.fw_minor;
+			content += " &nbsp; | &nbsp; <b>" + OSApp.Language._( "New version" ) + ":</b> " + newVer;
+		}
+		content += "</p>";
+
+		if ( data.available === 1 ) {
 			content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Update available" ) + ": " + newVer + "</p>";
 			if ( data.changelog ) {
 				content += "<p><b>" + OSApp.Language._( "Changelog" ) + ":</b><br>" + $( "<span>" ).text( data.changelog ).html() + "</p>";
@@ -1204,7 +1605,8 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function() {
 	var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
 	var content = "<div class='ui-content'>";
 	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
-	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + " &nbsp; | &nbsp; <b>" + OSApp.Language._( "New version" ) + ":</b> " + OSApp.Language._( "Latest" ) + "</p>";
+	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
+	content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Firmware is up to date" ) + "</p>";
 	content += "<p style='font-size:0.9em;color:#666;'>" +
 		OSApp.Language._( "This device downloads and installs the firmware directly." ) +
 		"</p>";
@@ -1311,7 +1713,8 @@ OSApp.ESP32Mode.setupOSPiOnlineUpdate = function() {
 	var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
 	var content = "<div class='ui-content'>";
 	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
-	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + " &nbsp; | &nbsp; <b>" + OSApp.Language._( "New version" ) + ":</b> " + OSApp.Language._( "Latest" ) + "</p>";
+	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
+	content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Firmware is up to date" ) + "</p>";
 	content += "<p style='font-size:0.9em;color:#666;'>" +
 		OSApp.Language._( "This OSPi device uses updater.sh for online updates." ) +
 		"</p>";
@@ -1998,6 +2401,7 @@ OSApp.ESP32Mode.hasAppBackup = function() {
 		var stored = localStorage.getItem( OSApp.ESP32Mode.OTA_BACKUP_KEY );
 		return stored ? JSON.parse( stored ) : null;
 	} catch ( e ) {
+		void e;
 		return null;
 	}
 };

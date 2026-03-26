@@ -45,6 +45,57 @@ OSApp.Options.showOptions = function( expandItem ) {
 				"</fieldset>" +
 			"</div>";
 		},
+		normalizeWeatherAdjustmentOptions = function( methodId ) {
+			var wtoButton = page.find( "#wto" ),
+				currentValue,
+				current,
+				retainOptions = {},
+				normalized;
+
+			if ( !wtoButton.length || wtoButton.val() === undefined ) {
+				return;
+			}
+
+			methodId = parseInt( methodId, 10 );
+			if ( isNaN( methodId ) || methodId === 0 ) {
+				return;
+			}
+
+			currentValue = wtoButton.val();
+			current = currentValue ? OSApp.Utils.unescapeJSON( currentValue ) : {};
+
+			[ "pws", "key", "provider", "mda", "cali", "rainAmt", "rainDays", "minTemp" ].forEach( function( key ) {
+				if ( typeof current[ key ] !== "undefined" ) {
+					retainOptions[ key ] = current[ key ];
+				}
+			} );
+
+			normalized = $.extend( {}, OSApp.Weather.getDefaultAdjustmentOptions( methodId ), retainOptions );
+
+			if ( currentValue !== OSApp.Utils.escapeJSON( normalized ) ) {
+				wtoButton.prop( "value", OSApp.Utils.escapeJSON( normalized ) );
+				header.eq( 2 ).prop( "disabled", false );
+				page.find( ".submit" ).addClass( "hasChanges" );
+			}
+		},
+		shouldSkipOptionControl = function( $item ) {
+			var type = ( $item.attr( "type" ) || "" ).toLowerCase(),
+				fieldContain = $item.closest( ".ui-field-contain" );
+
+			if ( $item.is( ":disabled" ) ) {
+				return true;
+			}
+
+			if ( fieldContain.length && ( fieldContain.hasClass( "hidden" ) || fieldContain.css( "display" ) === "none" ) ) {
+				return true;
+			}
+
+			if ( type !== "checkbox" && type !== "radio" && $item.css( "display" ) === "none" ) {
+				return true;
+			}
+
+			return false;
+		},
 		submitOptions = function() {
 			var opt = {},
 				invalid = false,
@@ -62,6 +113,10 @@ OSApp.Options.showOptions = function( expandItem ) {
 					ip;
 
 				if ( !id || ( !data && data !== "" ) ) {
+					return true;
+				}
+
+				if ( shouldSkipOptionControl( $item ) ) {
 					return true;
 				}
 
@@ -205,6 +260,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 							opt.o13 = ( data >> 8 ) & 0xff;
 						}
 						return true;
+					case "o17":
+						if ( typeof OSApp.currentSession.controller.options.sdt !== "undefined" &&
+							parseInt( data, 10 ) === parseInt( OSApp.currentSession.controller.options.sdt, 10 ) ) {
+							return true;
+						}
+						break;
 					case "o49":
 						opt.o49 = data & 0xff;
 						opt.o65 = ( data >> 8 ) & 0xff;
@@ -223,22 +284,11 @@ OSApp.Options.showOptions = function( expandItem ) {
 						}
 						break;
 					case "weatherRestriction":
-						if ( typeof OSApp.currentSession.controller?.settings?.wto !== "undefined" ){
-							if ( OSApp.currentSession.controller.settings.wto && OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) === data ) {
-								return true;
-							}
-						}
-						break;
+						return true;
 					case "weatherSelect":
-						if ( OSApp.currentSession.controller.settings.wto && OSApp.currentSession.controller.settings.wto.provider && OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto.provider ) === data ) {
-							return true;
-						}
-						break;
+						return true;
 					case "mda":
-						if ( OSApp.currentSession.controller.settings.wto && OSApp.currentSession.controller.settings.wto.mda && OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto.mda ) === data ) {
-							return true;
-						}
-						break;
+						return true;
 					case "tpdv":
 						var v = parseFloat( data );
 						if ( isNaN( v ) ) {
@@ -564,7 +614,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			if ( adjustmentMethod.minVersion && !OSApp.Firmware.checkOSVersion( adjustmentMethod.minVersion ) ) {
 				continue;
 			}
-			list += "<option " + ( ( adjustmentMethod.id === OSApp.Weather.getCurrentAdjustmentMethodId() ) ? "selected" : "" ) + " value='" + i + "'>" + OSApp.Language._(adjustmentMethod.name) + "</option>";
+			list += "<option " + ( ( adjustmentMethod.id === OSApp.Weather.getCurrentAdjustmentMethodId() ) ? "selected" : "" ) + " value='" + adjustmentMethod.id + "'>" + OSApp.Language._(adjustmentMethod.name) + "</option>";
 		}
 		list += "</select></div>";
 
@@ -898,14 +948,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"</label><button data-mini='true' id='o30' value='" + OSApp.currentSession.controller.options.bst + "'>" + OSApp.currentSession.controller.options.bst + "ms</button></div>";
 	}
 
-	if ( OSApp.Firmware.checkOSVersion( 222 ) && typeof OSApp.currentSession.controller.options.imin !== "undefined" ) {
-		list += "<div class='ui-field-contain duration-field'>" +
-			"<label for='imin'>" + OSApp.Language._( "Minimum Current Threshold" ) +
-				"<button data-helptext='" +
-					OSApp.Language._( "Minimum current threshold is the value that is used to trigger a station low current fault notification with a range from 0 to 1000 milliampere." ) +
-					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-			"</label><button data-mini='true' id='imin' value='" + OSApp.currentSession.controller.options.imin + "'>" + OSApp.currentSession.controller.options.imin + "mA</button></div>";
-	}
 	if ( OSApp.Firmware.checkOSVersion( 2214 ) && typeof OSApp.currentSession.controller.options.tpdv !== "undefined" && typeof OSApp.currentSession.controller.settings.apdv !== "undefined" && OSApp.currentSession.controller.settings.apdv > 0) {
 		list += "<div class='ui-field-contain'><label for='tpdv'>" + OSApp.Language._( "Target PD Voltage" ) +
 			"<button data-helptext='" +
@@ -1010,7 +1052,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 	list += "<button data-mini='true' class='center-div reset-programs'>" + OSApp.Language._( "Delete All Programs" ) + "</button>";
 	list += "<button data-mini='true' class='center-div reset-stations'>" + OSApp.Language._( "Reset Station Attributes" ) + "</button>";
 
-	if ( OSApp.currentSession.controller.options.hwv >= 30 && OSApp.currentSession.controller.options.hwv < 40 ) {
+	if ( typeof OSApp.currentSession.controller.options.wimod !== "undefined" ) {
 		list += "<hr class='divider'><button data-mini='true' class='center-div reset-wireless'>" + OSApp.Language._( "Reset Wireless Settings" ) + "</button>";
 	}
 
@@ -1683,13 +1725,20 @@ OSApp.Options.showOptions = function( expandItem ) {
 	} );
 
 	page.find( "#o31" ).on( "change", function() {
+		var methodId = parseInt( this.value, 10 ),
+			adjustmentOptions = page.find( "#wto" );
 
 		// Switch state of water level input based on weather algorithm status
-		page.find( "#o23" ).prop( "disabled", ( parseInt( this.value ) === 0 ? false : true ) );
+		page.find( "#o23" ).prop( "disabled", ( methodId === 0 ? false : true ) );
+
+		normalizeWeatherAdjustmentOptions( methodId );
 
 		// Switch the state of adjustment options based on the selected method
-		page.find( "#wto" ).click().parents( ".ui-field-contain" ).toggleClass( "hidden", parseInt( this.value ) === 0 ? true : false );
-		page.find( "#mda" ).parents( ".ui-field-contain" ).toggleClass("hidden", parseInt( this.value ) === 3 || parseInt( this.value ) === 1 ? false : true );
+		adjustmentOptions.parents( ".ui-field-contain" ).toggleClass( "hidden", methodId === 0 );
+		if ( methodId !== 0 ) {
+			adjustmentOptions.click();
+		}
+		page.find( "#mda" ).parents( ".ui-field-contain" ).toggleClass("hidden", methodId === 3 || methodId === 1 ? false : true );
 
 		// Ensure checkbox display is correct
 		if ( page.find( "#mda" ).is(':checked')) {

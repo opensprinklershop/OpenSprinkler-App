@@ -64,4 +64,12 @@ describe("General Function Checks", function () {
 		assert.equal("Zimmerman", OSApp.Weather.getAdjustmentMethod(1).name);
 		assert.equal("Zimmerman", OSApp.Weather.getAdjustmentMethod(129).name);
 	});
+
+	it("OSApp.Weather.getDefaultAdjustmentOptions(methodId) should return valid defaults for each supported method", function () {
+		assert.deepEqual({}, OSApp.Weather.getDefaultAdjustmentOptions(0));
+		assert.deepEqual({ h: 100, t: 100, r: 100, bh: 30, bt: 70, br: 0 }, OSApp.Weather.getDefaultAdjustmentOptions(1));
+		assert.deepEqual({ d: 24 }, OSApp.Weather.getDefaultAdjustmentOptions(2));
+		assert.deepEqual({ baseETo: 0, elevation: 600 }, OSApp.Weather.getDefaultAdjustmentOptions(3));
+		assert.deepEqual({ scales: [ 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100 ] }, OSApp.Weather.getDefaultAdjustmentOptions(4));
+	});
 });

@@ -93,10 +93,7 @@ OSApp.Analog.IrrigationDB = {
             },
             error: function(xhr) {
                 console.error('Error loading settings:', xhr);
-                callback(data);
-            },
-            error: function() {
-                callback([]);
+                callback(null);
             }
         });
     },

@@ -37,6 +37,7 @@ OSApp.Analog = {
 
 		COLORS : ["#F3B415", "#F27036", "#663F59", "#6A6E94", "#4E88B4", "#00A7C6", "#18D8D8", '#A9D794', '#46AF78', '#A93F55', '#8C5E58', '#2176FF', '#33A1FD', '#7A918D', '#BAFF29'],
 		COLCOUNT : 15,
+		NOTIFICATION_COLORS : ["#2E7D32", "#F9A825", "#C62828"],
 
 		//detected Analog Sensor Boards:
 		ASB_BOARD1 : 0x01,
@@ -122,6 +123,30 @@ OSApp.Analog = {
 OSApp.Analog.success_callback = function() {
 };
 
+OSApp.Analog.getLocalNotificationPlugin = function() {
+	if (!window.cordova || !window.cordova.plugins || !window.cordova.plugins.notification) return null;
+	return window.cordova.plugins.notification.local || null;
+};
+
+OSApp.Analog.getBackgroundModePlugin = function() {
+	if (!window.cordova || !window.cordova.plugins) return null;
+	return window.cordova.plugins.backgroundMode || null;
+};
+
+OSApp.Analog.requestNotificationPermission = function(callback) {
+	callback = callback || function() { };
+
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	if (!localNotification || typeof localNotification.registerPermission !== "function") {
+		callback(true);
+		return;
+	}
+
+	localNotification.registerPermission(function(granted) {
+		callback(granted !== false);
+	});
+};
+
 OSApp.Analog.syncChartOptionsFromController = function() {
 	// Chart display options are purely UI-side preferences stored in localStorage
 	try {
@@ -151,8 +176,15 @@ OSApp.Analog.saveChartOptions = function() {
 OSApp.Analog.asb_init = function() {
 	if (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS) return;
 
-	if (OSApp.currentDevice.isAndroid) {
-		window.cordova.plugins.notification.local.createChannel({
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	var backgroundMode = OSApp.Analog.getBackgroundModePlugin();
+
+	if (localNotification) {
+		OSApp.Analog.requestNotificationPermission();
+	}
+
+	if (OSApp.currentDevice.isAndroid && localNotification && typeof localNotification.createChannel === "function") {
+		localNotification.createChannel({
 			channelId: 'os_low',
 			channel:   'os_low',
 			channelName:'OpenSprinklerLowNotifications',
@@ -160,7 +192,7 @@ OSApp.Analog.asb_init = function() {
 			importance: 2, // int (optional) 0 to 4, default is IMPORTANCE_DEFAULT (3)
 			soundUsage: 5, // int (optional), default is USAGE_NOTIFICATION
 			}, OSApp.Analog.success_callback, this);
-		window.cordova.plugins.notification.local.createChannel({
+		localNotification.createChannel({
 			channelId: 'os_med',
 			channel:   'os_med',
 			channelName:'OpenSprinklerMedNotifications',
@@ -168,7 +200,7 @@ OSApp.Analog.asb_init = function() {
 			importance: 3, // int (optional) 0 to 4, default is IMPORTANCE_DEFAULT (3)
 			soundUsage: 5, // int (optional), default is USAGE_NOTIFICATION
 			}, OSApp.Analog.success_callback, this);
-		window.cordova.plugins.notification.local.createChannel({
+		localNotification.createChannel({
 			channelId: 'os_high',
 			channel:   'os_high',
 			channelName:'OpenSprinklerHighNotifications',
@@ -177,7 +209,7 @@ OSApp.Analog.asb_init = function() {
 			soundUsage: 5, // int (optional), default is USAGE_NOTIFICATION
 			}, OSApp.Analog.success_callback, this);
 	}
-	if (window.cordova && window.cordova.plugins) {
+	if (window.nativeTimer && backgroundMode) {
 
 		OSApp.Analog.timer = new window.nativeTimer();
 		OSApp.Analog.timer.onTick = function() {
@@ -186,14 +218,14 @@ OSApp.Analog.asb_init = function() {
 			});
 		};
 
-		window.cordova.plugins.backgroundMode.on('activate', function() {
+		backgroundMode.on('activate', function() {
 			OSApp.Analog.timer.start(1, 30*1000);
 		});
-	 	window.cordova.plugins.backgroundMode.on('deactivate', function() {
+		backgroundMode.on('deactivate', function() {
 			OSApp.Analog.timer.stop();
 		});
 
-		window.cordova.plugins.backgroundMode.setDefaults({
+		backgroundMode.setDefaults({
 			title: "OpenSprinklerASB",
 			text: OSApp.Language._("OpenSprinkler is running in background mode"),
 			subText: OSApp.Language._("active monitor and controlling notifications"),
@@ -226,11 +258,15 @@ OSApp.Analog.asb_init = function() {
 };
 
 OSApp.Analog.checkAnalogSensorAvail = function() {
-	return OSApp.currentSession.controller.options && OSApp.currentSession.controller.options.feature.includes("ASB");
+	var controllerOptions = OSApp.currentSession && OSApp.currentSession.controller && OSApp.currentSession.controller.options;
+	var features = controllerOptions && controllerOptions.feature;
+	return (typeof features === "string" || Array.isArray(features)) && features.includes("ASB");
 };
 
 OSApp.Analog.isESP32 = function() {
-	return OSApp.currentSession.controller.options && OSApp.currentSession.controller.options.feature.includes("ESP32");
+	var controllerOptions = OSApp.currentSession && OSApp.currentSession.controller && OSApp.currentSession.controller.options;
+	var features = controllerOptions && controllerOptions.feature;
+	return (typeof features === "string" || Array.isArray(features)) && features.includes("ESP32");
 };
 
 
@@ -271,13 +307,14 @@ OSApp.Analog.updateProgramAdjustments = function( callback ) {
 
 OSApp.Analog.checkBackgroundMode = function() {
 	if (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS) return;
-	if (!window.cordova) return;
+	var backgroundMode = OSApp.Analog.getBackgroundModePlugin();
+	if (!backgroundMode || typeof backgroundMode.isActive !== "function" || typeof backgroundMode.isEnabled !== "function" || typeof backgroundMode.setEnabled !== "function") return;
 	//Enable background mode only if we have a monitor configured:
 	if (OSApp.Analog.monitors && OSApp.Analog.monitors.length > 0) {
-		if (!window.cordova.plugins.backgroundMode.isActive() && !window.cordova.plugins.backgroundMode.isEnabled())
-			window.cordova.plugins.backgroundMode.setEnabled(true);
-	} else if (window.cordova.plugins.backgroundMode.isEnabled()) {
-		window.cordova.plugins.backgroundMode.setEnabled(false);
+		if (!backgroundMode.isActive() && !backgroundMode.isEnabled())
+			backgroundMode.setEnabled(true);
+	} else if (backgroundMode.isEnabled()) {
+		backgroundMode.setEnabled(false);
 	}
 };
 
@@ -311,7 +348,8 @@ OSApp.Analog.notification_action_callback = function() {
 };
 
 OSApp.Analog.checkMonitorAlerts = function() {
-	if (!window.cordova || !window.cordova.plugins || !OSApp.Analog.monitors || (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS))
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	if (!localNotification || !OSApp.Analog.monitors || (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS))
 		return;
 
 	for (let i = 0; i < OSApp.Analog.monitors.length; i++) {
@@ -325,13 +363,15 @@ OSApp.Analog.checkMonitorAlerts = function() {
 					dname = OSApp.currentSession.controller.settings.dname;
 				else
 				 	dname = "OpenSprinkler";
-				let prio = Object.prototype.hasOwnProperty.call(monitor, "prio")?monitor.prio:0;
+				let prio = Object.prototype.hasOwnProperty.call(monitor, "prio") ? parseInt(monitor.prio, 10) : 0;
+				if (isNaN(prio)) prio = 0;
+				prio = Math.max(0, Math.min(OSApp.Analog.Constants.NOTIFICATION_COLORS.length - 1, prio));
 
 				if (prio === 0) chan = 'os_low';
 				else if (prio === 1) chan = 'os_med';
 				else chan = 'os_high';
 
-				window.cordova.plugins.notification.local.schedule({
+				var scheduleOptions = {
 					id: monitor.nr,
 					channelId: chan,
 					channel: chan,
@@ -340,8 +380,10 @@ OSApp.Analog.checkMonitorAlerts = function() {
 					priority: prio,
 					beep: prio>=2,
 					lockscreen: true,
-					color: OSApp.Analog.Constants.NOTIFICATION_COLORS[prio],
-				}, OSApp.Analog.notification_action_callback, monitor);
+					color: OSApp.Analog.Constants.NOTIFICATION_COLORS[prio]
+				};
+
+				localNotification.schedule(scheduleOptions, OSApp.Analog.notification_action_callback, monitor);
 			}
 		}
 		else if (OSApp.Analog.monitorAlerts[monitor.nr]) {
@@ -688,7 +730,8 @@ OSApp.Analog.getImportMethodSensors = function(restore_type, callback) {
 				data = JSON.parse($.trim(data).replace(/“|”|″/g, "\""));
 				popup.popup("close");
 				OSApp.Analog.importConfigSensors(data, restore_type, callback);
-			} catch(e) {
+			} catch (e) {
+				void e;
 				popup.find("textarea").val("");
 				OSApp.Errors.showError(OSApp.Language._("Unable to read the configuration file. Please check the file and try again."));
 			}
@@ -2032,6 +2075,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			try {
 				sel.selectmenu("refresh", true);
 			} catch (e) {
+				void e;
 				// ignore
 			}
 		})();
@@ -2091,6 +2135,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 					try {
 						sel.selectmenu("refresh", true);
 					} catch (e) {
+						void e;
 						// ignore
 					}
 				} else {
@@ -2098,6 +2143,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 					try {
 						sel.selectmenu("refresh", true);
 					} catch (e) {
+						void e;
 						// ignore
 					}
 				}
@@ -2108,6 +2154,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 				try {
 					sel.selectmenu("refresh", true);
 				} catch (e) {
+					void e;
 					// ignore
 				}
 			});
@@ -2181,6 +2228,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			try {
 				OSApp.Firmware.sendToOS("/zc?pw=", "json");
 			} catch (e) {
+				void e;
 				// ignore
 			}
 		}
@@ -2232,6 +2280,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 		try {
 			OSApp.Firmware.sendToOS("/zc?pw=", "json");
 		} catch (e) {
+			void e;
 			// ignore
 		}
 		if (scanButton && originalButtonText) {
@@ -2315,6 +2364,7 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 			try {
 				sel.selectmenu("refresh", true);
 			} catch (e) {
+				void e;
 				// ignore
 			}
 		})();
@@ -2378,6 +2428,7 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 					try {
 						sel.selectmenu("refresh", true);
 					} catch (e) {
+						void e;
 						// ignore
 					}
 				} else {
@@ -2385,6 +2436,7 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 					try {
 						sel.selectmenu("refresh", true);
 					} catch (e) {
+						void e;
 						// ignore
 					}
 				}
@@ -2395,6 +2447,7 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 				try {
 					sel.selectmenu("refresh", true);
 				} catch (e) {
+					void e;
 					// ignore
 				}
 			});
@@ -2471,6 +2524,7 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 			try {
 				OSApp.Firmware.sendToOS("/bc?pw=", "json");
 			} catch (e) {
+				void e;
 				// ignore
 			}
 		}
@@ -2522,6 +2576,7 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 		try {
 			OSApp.Firmware.sendToOS("/bc?pw=", "json");
 		} catch (e) {
+			void e;
 			// ignore
 		}
 		if (scanButton && originalButtonText) {
@@ -2988,12 +3043,10 @@ list += "</select></div>" +
 
 			var scanStartTime = Date.now();
 			var scanDuration = 10;
-			var lastFoundDevice = null;
 			var scanInterval = null;
 			var uiInterval = null;
 			var scanTimeout = null;
 			var requestInFlight = false;
-			var didCleanup = false;
 			var lastDeviceCount = 0;
 
 			function updateScanUi() {
@@ -3043,6 +3096,7 @@ list += "</select></div>" +
 				try {
 					deviceSelect.selectmenu("refresh", true);
 				} catch (e) {
+					void e;
 					// ignore
 				}
 
@@ -3076,6 +3130,7 @@ list += "</select></div>" +
 							try {
 								deviceSelect.selectmenu("refresh", true);
 							} catch (e) {
+								void e;
 								// ignore
 							}
 						} else {
@@ -3083,6 +3138,7 @@ list += "</select></div>" +
 							try {
 								deviceSelect.selectmenu("refresh", true);
 							} catch (e) {
+								void e;
 								// ignore
 							}
 						}
@@ -3093,6 +3149,7 @@ list += "</select></div>" +
 						try {
 							deviceSelectErr.selectmenu("refresh", true);
 						} catch (e) {
+							void e;
 							// ignore
 						}
 					});
@@ -3148,6 +3205,7 @@ list += "</select></div>" +
 							try {
 								nameField.textinput("refresh");
 							} catch (e) {
+								void e;
 								// ignore
 							}
 						}
@@ -3192,6 +3250,7 @@ list += "</select></div>" +
 					try {
 						OSApp.Firmware.sendToOS("/zc?pw=", "json");
 					} catch (e) {
+						void e;
 						// ignore
 					}
 					btn.text(originalText).prop("disabled", false);
@@ -3227,12 +3286,10 @@ list += "</select></div>" +
 
 			var scanStartTime = Date.now();
 			var scanDuration = 10;
-			var lastFoundDevice = null;
 			var scanInterval = null;
 			var uiInterval = null;
 			var scanTimeout = null;
 			var requestInFlight = false;
-			var didCleanup = false;
 			var lastDeviceCount = 0;
 
 			function updateScanUi() {
@@ -3284,6 +3341,7 @@ list += "</select></div>" +
 				try {
 					deviceSelect.selectmenu("refresh", true);
 				} catch (e) {
+					void e;
 					// ignore
 				}
 
@@ -3325,6 +3383,7 @@ list += "</select></div>" +
 								try {
 									deviceSelect.selectmenu("refresh", true);
 								} catch (e) {
+									void e;
 									// ignore
 								}
 							} else {
@@ -3333,6 +3392,7 @@ list += "</select></div>" +
 								try {
 									deviceSelectEmpty.selectmenu("refresh", true);
 								} catch (e) {
+									void e;
 									// ignore
 								}
 							}
@@ -3343,6 +3403,7 @@ list += "</select></div>" +
 							try {
 								deviceSelectErr.selectmenu("refresh", true);
 							} catch (e) {
+								void e;
 								// ignore
 							}
 					});
@@ -3391,6 +3452,7 @@ list += "</select></div>" +
 						try {
 							charField.textinput("refresh");
 						} catch (e) {
+							void e;
 							// ignore
 						}
 					}
@@ -3412,6 +3474,7 @@ list += "</select></div>" +
 						try {
 							nameField.textinput("refresh");
 						} catch (e) {
+							void e;
 							// ignore
 						}
 					}
@@ -3449,6 +3512,7 @@ list += "</select></div>" +
 					try {
 						OSApp.Firmware.sendToOS("/bc?pw=", "json");
 					} catch (e) {
+						void e;
 						// ignore
 					}
 					btn.text(originalText).prop("disabled", false);
@@ -4308,6 +4372,7 @@ OSApp.Analog.getSectionOrder = function() {
 		try {
 			return JSON.parse(stored);
 		} catch (e) {
+			void e;
 			return ["sensors", "progadjust", "monitors"];
 		}
 	}
@@ -4325,6 +4390,7 @@ OSApp.Analog.getRowOrder = function(sectionId) {
 		try {
 			return JSON.parse(stored);
 		} catch (e) {
+			void e;
 			return [];
 		}
 	}
@@ -4516,7 +4582,7 @@ OSApp.Analog.toggleSortMode = function(container) {
 				});
 			});
 
-			rows.on("dragleave", function(e) {
+			rows.on("dragleave", function() {
 				$(this).css({
 					"background-color": "",
 					"border-top": ""
@@ -4535,7 +4601,7 @@ OSApp.Analog.toggleSortMode = function(container) {
 				}
 			});
 
-			rows.on("dragend", function(e) {
+			rows.on("dragend", function() {
 				$(this).removeClass("dragging");
 				$(this).css("opacity", "1");
 				table.find("tr").css({

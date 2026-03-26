@@ -286,7 +286,7 @@ OSApp.Logs.displayPage = function() {
 				}
 
 				var pulseRate = result.pr || 0,
-					records = result.records || [],
+					records = ( result.records || [] ).filter( function( r ) { return Math.floor( r.ym / 12 ) >= 2000; } ),
 					curr = result.curr || {},
 					html = "";
 
@@ -300,8 +300,8 @@ OSApp.Logs.displayPage = function() {
 					return parseFloat( ( count * pulseRate / 100 ).toFixed( 2 ) );
 				};
 
-				// Current month
-				if ( curr.ym ) {
+				// Current month (skip if timestamp is invalid, e.g. Jan 1970 = epoch 0)
+				if ( curr.ym && Math.floor( curr.ym / 12 ) >= 2000 ) {
 					html += "<div class='ui-body-a center'><h3>" + OSApp.Language._( "Current Month" ) +
 						" (" + ymToLabel( curr.ym ) + ")</h3>" +
 						"<div><span class='bold'>" + OSApp.Language._( "Flow Count" ) + "</span>: " + curr.flow + "</div>";

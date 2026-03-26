@@ -24,7 +24,8 @@ OSApp.SSL.fetchDeviceCert = function( host, callback ) {
 						return String.fromCharCode( b );
 					} ).join( "" );
 				callback( btoa( binary ) );
-			} catch ( e ) {
+			} catch ( err ) {
+				window.console.error( err );
 				callback( null );
 			}
 		},
@@ -58,7 +59,8 @@ OSApp.SSL.getCertFingerprint = function( derB64, callback ) {
 		} ).catch( function() {
 			callback( null );
 		} );
-	} catch ( e ) {
+	} catch ( err ) {
+		window.console.error( err );
 		callback( null );
 	}
 };
