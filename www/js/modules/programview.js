@@ -46,6 +46,18 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 		}
 	}
 
+	// Sync lastProgramRun from firmware's nqpid (currently manually-running program id).
+	// This allows the correct program % to be displayed when a program is started
+	// externally (e.g. via Rainmaker, Matter, Zigbee) without the UI setting lastProgramRun.
+	var nqpid = parseInt( OSApp.currentSession.controller.settings.nqpid || 0 );
+	if ( nqpid > 0 ) {
+		var nqidx = nqpid - 1;  // convert to 0-based program index
+		if ( nqidx !== parseInt( OSApp.ProgramView.lastProgramRun ) ) {
+			OSApp.ProgramView.lastProgramRun = nqidx;
+			localStorage.setItem( "lastProgramRun", nqidx );
+		}
+	}
+
 	width = window.screen.width < 400? 150 : 200;
 	if (width != OSApp.ProgramView.lastWidth) {
 		OSApp.ProgramView.lastWidth = width;
