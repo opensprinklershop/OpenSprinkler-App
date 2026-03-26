@@ -289,6 +289,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 						return true;
 					case "mda":
 						return true;
+					case "displayOption":
+						localStorage.setItem( "displayOption", data );
+						return true;
 					case "tpdv":
 						var v = parseFloat( data );
 						if ( isNaN( v ) ) {

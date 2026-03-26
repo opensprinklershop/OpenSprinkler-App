@@ -1821,7 +1821,7 @@ OSApp.Programs.pidToName = function( pid ) {
 		pname = OSApp.Language._( "Manual program" );
 	} else if ( pid === 254 || pid === 98 ) {
 		pname = OSApp.Language._( "Run-once program" );
-	} else if ( OSApp.Firmware.checkOSVersion( 210 ) && pid <= OSApp.currentSession.controller.programs.pd.length ) {
+	} else if ( OSApp.Firmware.checkOSVersion( 210 ) && pid >= 1 && pid <= OSApp.currentSession.controller.programs.pd.length && OSApp.currentSession.controller.programs.pd[ pid - 1 ] ) {
 		pname = OSApp.currentSession.controller.programs.pd[ pid - 1 ][ 5 ];
 	}
 
