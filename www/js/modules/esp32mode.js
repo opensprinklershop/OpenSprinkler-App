@@ -1166,6 +1166,23 @@ OSApp.ESP32Mode.isMatterActive = function() {
 };
 
 /**
+ * Check if Matter feature is available (feature string contains "MATTER")
+ */
+OSApp.ESP32Mode.isMatterAvailable = function() {
+	if ( !OSApp.currentSession.controller || !OSApp.currentSession.controller.options ) {
+		return false;
+	}
+
+	var feature = OSApp.currentSession.controller.options.feature;
+	if ( !feature ) {
+		return false;
+	}
+
+	var featureStr = Array.isArray( feature ) ? feature.join( "," ) : String( feature );
+	return featureStr.toUpperCase().indexOf( "MATTER" ) !== -1;
+};
+
+/**
  * Check if Matter feature is supported (feature string contains "MATTER")
  */
 OSApp.ESP32Mode.isMatterSupported = function() {
@@ -1296,7 +1313,7 @@ OSApp.ESP32Mode.getOnlineUpdateVariantLabel = function() {
 OSApp.ESP32Mode.OTA_EXPECTED_DURATION_SECONDS = 180;
 
 OSApp.ESP32Mode.getInteractiveOTAOptionsHtml = function() {
-	return "<div class='ota-auto-restore-area' style='margin:10px 0;padding:10px;background:#eef6ea;border-radius:6px;'>" +
+	var html = "<div class='ota-auto-restore-area' style='margin:10px 0;padding:10px;background:#eef6ea;border-radius:6px;'>" +
 		"<label style='display:flex;align-items:center;gap:8px;font-size:0.95em;cursor:pointer;'>" +
 		"<input type='checkbox' class='ota-auto-restore' checked='checked'>" +
 		OSApp.Language._( "Automatically restore saved configuration after update" ) +
@@ -1306,6 +1323,23 @@ OSApp.ESP32Mode.getInteractiveOTAOptionsHtml = function() {
 		"</div>" +
 		"</div>" +
 		"<button class='ota-inline-restore ui-btn ui-mini' style='display:none;'>" + OSApp.Language._( "Restore Configuration" ) + "</button>";
+
+	if ( OSApp.ESP32Mode.isMatterSupported() ) {
+		var activeVariant = OSApp.ESP32Mode.isMatterActive() ? "matter" : "zigbee";
+		html += "<div class='ota-variant-area' style='margin:10px 0;padding:10px;background:#e8f0fe;border-radius:6px;'>" +
+			"<div style='font-size:0.9em;font-weight:bold;margin-bottom:6px;'>" + OSApp.Language._( "Firmware variant to boot after update" ) + ":</div>" +
+			"<label style='display:inline-flex;align-items:center;gap:6px;margin-right:16px;cursor:pointer;font-size:0.95em;'>" +
+			"<input type='radio' name='ota-variant' value='zigbee'" + ( activeVariant === "zigbee" ? " checked" : "" ) + "> Zigbee" +
+			"</label>" +
+			"<label style='display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:0.95em;'>" +
+			"<input type='radio' name='ota-variant' value='matter'" + ( activeVariant === "matter" ? " checked" : "" ) + "> Matter" +
+			"</label>" +
+			"<div style='font-size:0.8em;color:#555;margin-top:6px;'>" +
+			OSApp.Language._( "Currently active" ) + ": <b>" + activeVariant + "</b></div>" +
+			"</div>";
+	}
+
+	return html;
 };
 
 OSApp.ESP32Mode.ensureOTAProgressArea = function( popup ) {
@@ -1431,8 +1465,22 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 
 	$.mobile.loading( "show" );
 
+	// Fetch radio info (needed for variant selector) only on ESP32 devices.
+	// fetchRadioInfo uses a cache so it's instant if already loaded.
+	// Always resolves (never rejects) to avoid blocking the update-check flow.
+	var radioDeferred = $.Deferred();
+	if ( OSApp.ESP32Mode.isESP32Supported() ) {
+		OSApp.ESP32Mode.fetchRadioInfo( false ).done( function( info ) {
+			radioDeferred.resolve( info );
+		} ).fail( function() {
+			radioDeferred.resolve( null );
+		} );
+	} else {
+		radioDeferred.resolve( null );
+	}
+
 	// Timeout 25s — firmware makes a blocking HTTPS request (15s timeout) to check the update server
-	OSApp.Firmware.sendToOS( "/uc?pw=", "json", 25000 ).done( function( data ) {
+	$.when( radioDeferred, OSApp.Firmware.sendToOS( "/uc?pw=", "json", 25000 ) ).done( function( radioResult, data ) {
 		$.mobile.loading( "hide" );
 
 		if ( !data || typeof data.status === "undefined" ) {
@@ -1515,7 +1563,10 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 
 		popup.on( "click", ".ota-start-interactive", function() {
 			$( this ).prop( "disabled", true ).addClass( "ui-state-disabled" );
-			OSApp.ESP32Mode.runInteractiveOTA( popup );
+			var variantParam = "";
+			var selectedVariant = popup.find( "input[name='ota-variant']:checked" ).val();
+			if ( selectedVariant ) { variantParam = "&vt=" + encodeURIComponent( selectedVariant ); }
+			OSApp.ESP32Mode.runInteractiveOTA( popup, variantParam );
 			return false;
 		} );
 
@@ -1968,7 +2019,10 @@ OSApp.ESP32Mode.showInteractiveOTAfromManifest = function( popup ) {
 		OSApp.ESP32Mode.getInteractiveOTAOptionsHtml();
 	popup.find( "h3" ).after( stepHtml );
 
-	OSApp.ESP32Mode.runInteractiveOTA( popup );
+	var variantParam = "";
+	var selectedVariant = popup.find( "input[name='ota-variant']:checked" ).val();
+	if ( selectedVariant ) { variantParam = "&vt=" + encodeURIComponent( selectedVariant ); }
+	OSApp.ESP32Mode.runInteractiveOTA( popup, variantParam );
 };
 
 /**
@@ -2092,7 +2146,10 @@ OSApp.ESP32Mode.startOTAwithURLs = function( zigbeeUrl, matterUrl, verLabel ) {
 
 	popup.on( "click", ".ota-start-specific", function() {
 		$( this ).prop( "disabled", true ).addClass( "ui-state-disabled" );
-		OSApp.ESP32Mode.runInteractiveOTA( popup, urlParams );
+		var extraParams = urlParams || "";
+		var selectedVariant = popup.find( "input[name='ota-variant']:checked" ).val();
+		if ( selectedVariant ) { extraParams += "&vt=" + encodeURIComponent( selectedVariant ); }
+		OSApp.ESP32Mode.runInteractiveOTA( popup, extraParams );
 		return false;
 	} );
 
