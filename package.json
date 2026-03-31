@@ -91,7 +91,8 @@
 			"cordova-plugin-transport-security": {},
 			"cordova-plugin-inappbrowser": {},
 			"cordova-custom-config": {},
-			"de.appplant.cordova.plugin.local-notification": {}
+			"de.appplant.cordova.plugin.local-notification": {},
+			"cordova-plugin-device": {}
 		},
 		"platforms": [
 			"ios",

@@ -803,12 +803,13 @@
    "If enabled, the saved configuration is restored automatically after the device comes back online.": "If enabled, the saved configuration is restored automatically after the device comes back online.",
    "Elapsed time": "Elapsed time",
    "Applying saved configuration...": "Applying saved configuration...",
-   "Restore failed. You can retry it below.": "Restore failed. You can retry it below.",
+   "Restore failed.": "Restore failed.",
    "Update complete. Configuration restored.": "Update complete. Configuration restored.",
    "Update complete. Device is back online.": "Update complete. Device is back online.",
    "Device is back online.": "Device is back online.",
    "Overall progress": "Overall progress",
    "Free Storage": "אחסון פנוי",
-   "Free Memory": "זיכרון פנוי"
+   "Free Memory": "זיכרון פנוי",
+   "The firmware update is still running in the background. Are you sure you want to close this window?": "The firmware update is still running in the background. Are you sure you want to close this window?"
 }
 }

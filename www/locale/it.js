@@ -901,12 +901,13 @@
    "If enabled, the saved configuration is restored automatically after the device comes back online.": "Se attivato, la configurazione salvata viene ripristinata automaticamente quando il dispositivo torna online.",
    "Elapsed time": "Tempo trascorso",
    "Applying saved configuration...": "Applicazione configurazione salvata...",
-   "Restore failed. You can retry it below.": "Ripristino non riuscito. Puoi riprovare qui sotto.",
+   "Restore failed.": "Ripristino non riuscito.",
    "Update complete. Configuration restored.": "Aggiornamento completato. Configurazione ripristinata.",
    "Update complete. Device is back online.": "Aggiornamento completato. Dispositivo di nuovo online.",
    "Device is back online.": "Dispositivo di nuovo online.",
    "Overall progress": "Avanzamento totale",
    "Free Storage": "Spazio di archiviazione libero",
-   "Free Memory": "Memoria libera"
+   "Free Memory": "Memoria libera",
+   "The firmware update is still running in the background. Are you sure you want to close this window?": "L'aggiornamento del firmware e ancora in esecuzione in background. Sei sicuro di voler chiudere questa finestra?"
 }
 }

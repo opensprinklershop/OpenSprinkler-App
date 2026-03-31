@@ -899,12 +899,13 @@
    "If enabled, the saved configuration is restored automatically after the device comes back online.": "Po wlaczeniu zapisana konfiguracja zostanie automatycznie przywrocona po ponownym pojawieniu sie urzadzenia online.",
    "Elapsed time": "Czas trwania",
    "Applying saved configuration...": "Stosowanie zapisanej konfiguracji...",
-   "Restore failed. You can retry it below.": "Przywracanie nie powiodlo sie. Mozesz sprobowac ponownie ponizej.",
+   "Restore failed.": "Przywracanie nie powiodlo sie.",
    "Update complete. Configuration restored.": "Aktualizacja zakonczona. Konfiguracja przywrocona.",
    "Update complete. Device is back online.": "Aktualizacja zakonczona. Urzadzenie ponownie online.",
    "Device is back online.": "Urzadzenie ponownie online.",
    "Overall progress": "Postep calkowity",
    "Free Storage": "Wolna pamięć masowa",
-   "Free Memory": "Wolna pamięć RAM"
+   "Free Memory": "Wolna pamięć RAM",
+   "The firmware update is still running in the background. Are you sure you want to close this window?": "Aktualizacja firmware nadal dziala w tle. Czy na pewno chcesz zamknac to okno?"
 }
 }

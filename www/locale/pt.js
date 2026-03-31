@@ -803,12 +803,13 @@
    "If enabled, the saved configuration is restored automatically after the device comes back online.": "Se ativado, a configuracao guardada e restaurada automaticamente quando o dispositivo voltar a estar online.",
    "Elapsed time": "Tempo decorrido",
    "Applying saved configuration...": "A aplicar configuracao guardada...",
-   "Restore failed. You can retry it below.": "A restauracao falhou. Pode tentar novamente abaixo.",
+   "Restore failed.": "A restauracao falhou.",
    "Update complete. Configuration restored.": "Atualizacao concluida. Configuracao restaurada.",
    "Update complete. Device is back online.": "Atualizacao concluida. O dispositivo voltou a estar online.",
    "Device is back online.": "O dispositivo voltou a estar online.",
    "Overall progress": "Progresso total",
    "Free Storage": "Armazenamento livre",
-   "Free Memory": "Memória livre"
+   "Free Memory": "Memória livre",
+   "The firmware update is still running in the background. Are you sure you want to close this window?": "A atualizacao do firmware ainda esta em execucao em segundo plano. Tem certeza de que deseja fechar esta janela?"
 }
 }

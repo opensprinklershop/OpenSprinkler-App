@@ -901,12 +901,13 @@
    "If enabled, the saved configuration is restored automatically after the device comes back online.": "Indien ingeschakeld wordt de opgeslagen configuratie automatisch hersteld zodra het apparaat weer online is.",
    "Elapsed time": "Verstreken tijd",
    "Applying saved configuration...": "Opgeslagen configuratie toepassen...",
-   "Restore failed. You can retry it below.": "Herstellen mislukt. Je kunt het hieronder opnieuw proberen.",
+   "Restore failed.": "Herstellen mislukt.",
    "Update complete. Configuration restored.": "Update voltooid. Configuratie hersteld.",
    "Update complete. Device is back online.": "Update voltooid. Apparaat is weer online.",
    "Device is back online.": "Apparaat is weer online.",
    "Overall progress": "Totale voortgang",
    "Free Storage": "Vrije opslag",
-   "Free Memory": "Vrij geheugen"
+   "Free Memory": "Vrij geheugen",
+   "The firmware update is still running in the background. Are you sure you want to close this window?": "De firmware-update wordt nog op de achtergrond uitgevoerd. Weet je zeker dat je dit venster wilt sluiten?"
 }
 }

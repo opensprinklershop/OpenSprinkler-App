@@ -849,9 +849,18 @@ OSApp.Firmware.showOTAPopup = function() {
 		return false;
 	} );
 
-	// Reinstall button — triggers update even if up-to-date
+	// Reinstall button — refresh device-side manifest cache first, then start update
 	popup.find( ".ota-reinstall" ).on( "click", function() {
-		OSApp.Firmware.startOTAUpdate( popup );
+		popup.find( ".ota-actions" ).hide();
+		popup.find( ".ota-progress" ).show();
+		popup.find( ".ota-progress-text" ).text( OSApp.Language._( "Checking for update..." ) );
+		OSApp.Firmware.checkOTAUpdate( true ).then( function() {
+			OSApp.Firmware.startOTAUpdate( popup );
+		}, function() {
+			OSApp.Errors.showError( OSApp.Language._( "Failed to connect to update server" ) );
+			popup.find( ".ota-progress" ).hide();
+			popup.find( ".ota-actions" ).show();
+		} );
 		return false;
 	} );
 

@@ -904,12 +904,13 @@
    "If enabled, the saved configuration is restored automatically after the device comes back online.": "Si active, la configuration enregistree est restauree automatiquement lorsque l'appareil revient en ligne.",
    "Elapsed time": "Temps ecoule",
    "Applying saved configuration...": "Application de la configuration enregistree...",
-   "Restore failed. You can retry it below.": "La restauration a echoue. Vous pouvez reessayer ci-dessous.",
+   "Restore failed.": "La restauration a echoue.",
    "Update complete. Configuration restored.": "Mise a jour terminee. Configuration restauree.",
    "Update complete. Device is back online.": "Mise a jour terminee. L'appareil est de nouveau en ligne.",
    "Device is back online.": "L'appareil est de nouveau en ligne.",
    "Overall progress": "Progression globale",
    "Free Storage": "Stockage libre",
-   "Free Memory": "Mémoire libre"
+   "Free Memory": "Mémoire libre",
+   "The firmware update is still running in the background. Are you sure you want to close this window?": "La mise a jour du firmware est encore en cours en arriere-plan. Etes-vous sur de vouloir fermer cette fenetre ?"
 }
 }

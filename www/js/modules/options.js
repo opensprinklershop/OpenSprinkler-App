@@ -62,7 +62,11 @@ OSApp.Options.showOptions = function( expandItem ) {
 			}
 
 			currentValue = wtoButton.val();
-			current = currentValue ? OSApp.Utils.unescapeJSON( currentValue ) : {};
+			try {
+				current = currentValue ? OSApp.Utils.unescapeJSON( currentValue ) : {};
+			} catch {
+				current = {};
+			}
 
 			[ "pws", "key", "provider", "mda", "cali", "rainAmt", "rainDays", "minTemp" ].forEach( function( key ) {
 				if ( typeof current[ key ] !== "undefined" ) {
@@ -632,7 +636,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					"<input data-mini='true' id='mda' type='checkbox' " + ( ( OSApp.currentSession.controller.settings.wto.mda === 100 ) ? "checked='checked'" : "" ) + ">" + OSApp.Language._( "Adjust Interval Programs Using Multiple Days of Weather Data" ) + "</label></div>";
 			}
 			list += "<div class='ui-field-contain" + ( method === 0  ? " hidden" : "" ) + "'><label for='wto'>" + OSApp.Language._( "Adjustment Method Options" ) + "</label>" +
-				"<button data-mini='true' id='wto' value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) + "'>" +
+				"<button data-mini='true' id='wto' value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) ) + "'>" +
 					OSApp.Language._( "Tap to Configure" ) +
 				"</button></div>";
 		}
@@ -646,7 +650,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					"</label>" +
 					"<button data-mini='true' id='weatherRestriction' " +
 						( ( ( typeof wto.rainDays !== "undefined" && typeof wto.rainAmt !== "undefined" && wto.rainDays > 0 && wto.rainAmt > 0 ) || ( typeof wto.minTemp !== "undefined" && wto.minTemp !== -40 ) || ( typeof wto.cali !== "undefined" && wto.cali ) ) ? "class='blue' " : "" ) +
-						"value='" + (OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto )) + "'>" +
+						"value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) ) + "'>" +
 							OSApp.Language._( "Tap to Configure" ) +
 					"</button></div>";
 			} else {
@@ -691,7 +695,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 							( ( OSApp.currentSession.controller.settings.wto.key && OSApp.currentSession.controller.settings.wto.key !== "" ) ? "" : "red " ) +
 							"ui-input-text controlgroup-textinput ui-btn ui-body-inherit ui-corner-all ui-mini ui-shadow-inset ui-input-has-clear'>" +
 								"<input data-role='none' data-mini='true' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false' " +
-									"type='text' id='wtkey' value='" + ( OSApp.currentSession.controller.settings.wto.key || "" ) + "'>" +
+									"type='text' id='wtkey' value='" + OSApp.Utils.htmlEscape( OSApp.currentSession.controller.settings.wto.key || "" ) + "'>" +
 								"<a href='#' tabindex='-1' aria-hidden='true' data-helptext='" + OSApp.Language._( "An invalid API key has been detected." ) +
 									"' class='hidden help-icon ui-input-clear ui-btn ui-icon-alert ui-btn-icon-notext ui-corner-all'>" +
 								"</a>" +
@@ -821,7 +825,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'>" +
 							"</button>" +
 						"</label>" +
-						"<button data-mini='true' id='otc' class=" + (OSApp.currentSession.controller.settings.otc.en ? "'blue'" : "''") + " value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.otc ) + "'>" +
+						"<button data-mini='true' id='otc' class=" + (OSApp.currentSession.controller.settings.otc.en ? "'blue'" : "''") + " value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.otc ) ) + "'>" +
 							OSApp.Language._( "Tap to Configure" ) +
 						"</button>" +
 					"</div>";
@@ -835,7 +839,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'>" +
 							"</button>" +
 						"</label>" +
-						"<button data-mini='true' id='mqtt' class=" + (OSApp.currentSession.controller.settings.mqtt.en ? "'blue'" : "''") + " value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.mqtt ) + "'>" +
+						"<button data-mini='true' id='mqtt' class=" + (OSApp.currentSession.controller.settings.mqtt.en ? "'blue'" : "''") + " value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.mqtt ) ) + "'>" +
 							OSApp.Language._( "Tap to Configure" ) +
 						"</button>" +
 					"</div>";
@@ -849,7 +853,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'>" +
 							"</button>" +
 						"</label>" +
-						"<button data-mini='true' id='influxdb' value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.influxdb ) + "'>" +
+						"<button data-mini='true' id='influxdb' value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.influxdb ) ) + "'>" +
 						OSApp.Language._( "Tap to Configure" ) +
 						"</button>" +
 					"</div>";
@@ -863,7 +867,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'>" +
 							"</button>" +
 						"</label>" +
-						"<button data-mini='true' id='email' class=" + (OSApp.currentSession.controller.settings.email.en ? "'blue'" : "''") + " value='" + OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.email ) + "'>" +
+						"<button data-mini='true' id='email' class=" + (OSApp.currentSession.controller.settings.email.en ? "'blue'" : "''") + " value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.email ) ) + "'>" +
 							OSApp.Language._( "Tap to Configure" ) +
 						"</button>" +
 					"</div>";
@@ -1206,14 +1210,21 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 	page.find( "#wto" ).on( "click", function() {
 		var self = this,
-			options = OSApp.Utils.unescapeJSON( this.value ),
-			retainOptions = { pws: options.pws, key: options.key, provider: options.provider, mda: options.mda, cali: options.cali, rainAmt: options.rainAmt, rainDays: options.rainDays, minTemp: options.minTemp },
+			options,
+			retainOptions,
 			method = parseInt( page.find( "#o31" ).val() ),
 			finish = function() {
 				self.value = OSApp.Utils.escapeJSON( $.extend( {}, OSApp.Utils.unescapeJSON( self.value ), retainOptions ) );
 				header.eq( 2 ).prop( "disabled", false );
 				page.find( ".submit" ).addClass( "hasChanges" );
 			};
+
+		try {
+			options = OSApp.Utils.unescapeJSON( this.value );
+		} catch {
+			options = {};
+		}
+		retainOptions = { pws: options.pws, key: options.key, provider: options.provider, mda: options.mda, cali: options.cali, rainAmt: options.rainAmt, rainDays: options.rainDays, minTemp: options.minTemp };
 
 		if ( method === 1 ) {
 			OSApp.Weather.showZimmermanAdjustmentOptions( this, finish );
@@ -1231,13 +1242,20 @@ OSApp.Options.showOptions = function( expandItem ) {
 			return;
 		}
 		var self = this,
-			options = $.extend( {}, {
-				cali: false,
-				rainDays: 0,
-				rainAmt: 0,
-				minTemp: -40
-			}, OSApp.currentSession.controller.settings.wto,
-			OSApp.Utils.unescapeJSON( self.value ) );
+			wtoValue,
+			options;
+		try {
+			wtoValue = OSApp.Utils.unescapeJSON( self.value );
+		} catch {
+			wtoValue = {};
+		}
+		options = $.extend( {}, {
+			cali: false,
+			rainDays: 0,
+			rainAmt: 0,
+			minTemp: -40
+		}, OSApp.currentSession.controller.settings.wto,
+			wtoValue );
 
 		var rainUnit = " in";
 		var tempUnit = " \u00B0F";

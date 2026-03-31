@@ -1545,13 +1545,13 @@ div.running-text{
     }
 }
 
-/* iPhone X rules */
+/* Bottom insets handled natively by Cordova (edge-to-edge) */
 #footer-running {
-	padding: 0 2px env(safe-area-inset-bottom) 2px;
+	padding: 0 2px 0 2px;
 }
 
 #footer-menu {
-	bottom: calc(env(safe-area-inset-bottom) + 10%) !important;
+	bottom: 10% !important;
 }
 
 /* temporary fix for Start Time input box in edit program menu*/
