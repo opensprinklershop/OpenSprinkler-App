@@ -61,7 +61,7 @@
             </dict>
         </config-file>
         <edit-config target="CFBundleShortVersionString" file="*-Info.plist" mode="overwrite">
-            <string>19949</string>
+            <string>19960</string>
         </edit-config>
         <config-file target="*-Info.plist" overwrite="true" parent="LSApplicationCategoryType">
             <string>public.app-category.utilities</string>
@@ -133,4 +133,8 @@
         <icon density="xhdpi" src="res/android/icons/xhdpi.png" />
         <icon density="xxhdpi" src="res/android/icons/xxhdpi.png" />
     </platform>
+
+    <hook type="before_prepare" src="hooks/before_prepare/01-hide-android-res.js" />
+    <hook type="after_prepare" src="hooks/after_prepare/01-restore-android-res.js" />
+    <hook type="after_prepare" src="hooks/after_prepare.js" />
 </widget>
