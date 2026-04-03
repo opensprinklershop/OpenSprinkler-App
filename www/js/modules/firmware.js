@@ -421,8 +421,10 @@ OSApp.Firmware.getHWType = function() {
 
 OSApp.Firmware.checkFirmwareUpdate = function() {
 
-	// Update checks are only be available for Arduino firmwares
-	if ( OSApp.Firmware.checkOSVersion( 200 ) && ( ( typeof parseFloat(OSApp.Firmware.getHWVersion()) === "number" && parseFloat(OSApp.Firmware.getHWVersion()) >= 3 ) || OSApp.Firmware.isOSPi() ) ) {
+	// Update checks are only be available for Arduino firmwares.
+	// Skip if the device supports the new OTA update system (firmware >= 2.3.3),
+	// which is handled by initOTACheck() and shows the version from the device directly.
+	if ( OSApp.Firmware.checkOSVersion( 200 ) && !OSApp.Firmware.checkOSVersion( 233 ) && ( ( typeof parseFloat(OSApp.Firmware.getHWVersion()) === "number" && parseFloat(OSApp.Firmware.getHWVersion()) >= 3 ) || OSApp.Firmware.isOSPi() ) ) {
 
 		// Github API to get releases for OpenSprinkler firmware
 		$.getJSON( "https://api.github.com/repos/opensprinkler/opensprinkler-firmware/releases" ).done( function( data ) {

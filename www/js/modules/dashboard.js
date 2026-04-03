@@ -979,7 +979,8 @@ OSApp.Dashboard.displayPage = function() {
 			OSApp.Dashboard.updateWaterLevel();
 			OSApp.Analog.updateSensorShowArea( page );
 
-			page.find( ".sitename" ).text( siteSelect.val() );
+			page.find( ".sitename" ).text( OSApp.currentSession.local ? OSApp.currentSession.controller.settings?.dname || "" : siteSelect.val() );
+			page.find( ".sitename" ).toggleClass( "hidden", OSApp.currentSession.local ? ( OSApp.currentSession.controller.settings?.dname ? false : true ) : false );
 
 			// New view: Show program instead of zones
 			var displayOption = OSApp.ProgramView.Constants.SHOW_ZONES;
