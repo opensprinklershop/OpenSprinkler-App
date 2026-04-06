@@ -36,12 +36,12 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 	if (!OSApp.Firmware.checkOSVersion( 210 ))
 		return;
 
-	var i, j, reset = false, sr = 0, width;
+	var i, j, reset = false, sr = 0, width, enabledPrograms = 0, renderedCharts;
 
 	if (OSApp.ProgramView.lastProgramRun == -2) {
 		OSApp.ProgramView.lastProgramRun = localStorage.getItem("lastProgramRun");
 		if (OSApp.ProgramView.lastProgramRun === undefined || OSApp.ProgramView.lastProgramRun == -2) {
-			OSApp.ProgramView.lastProgramRun == -1;
+			OSApp.ProgramView.lastProgramRun = -1;
 			reset = true;
 		}
 	}
@@ -80,6 +80,19 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 		return;
 	}
 
+	for (i = 0; i < OSApp.currentSession.controller.programs.pd.length; i++) {
+		if (OSApp.Programs.readProgram(OSApp.currentSession.controller.programs.pd[i]).en) {
+			enabledPrograms++;
+		}
+	}
+
+	// When the app returns from the background, the dashboard DOM can be recreated
+	// while the cached chart state still thinks everything is mounted.
+	renderedCharts = page.find("#os-program-show [id^='progChart-']").length;
+	if (renderedCharts !== enabledPrograms) {
+		reset = true;
+	}
+
 	var html = "<div class='ui-body ui-body-a center'><table border=1 frame=void rules=rows style='margin: 0px auto;'>";
 	for (i = 0; i < OSApp.currentSession.controller.programs.pd.length; i++) {
 
@@ -93,17 +106,15 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 			//html += "<p>"+(prog.en?"enabled":"")+" "+(prog.weather?"weather":"");
 
 			// Show station duration inputs
-			var timeSum = 0, timeSums = [];
+			var runTimes = [];
+			var remainingTimes = [];
+			var timeSum = 0;
 			var remaining = 0;
 			for ( j = 0; j < OSApp.currentSession.controller.stations.snames.length; j++ ) {
 				if ( !OSApp.Stations.isMaster( j ) ) {
 					let time = prog.stations[ j ] || 0;
 					if (time > 0) {
-						let gid = OSApp.currentSession.controller.stations.stn_grp ? OSApp.currentSession.controller.stations.stn_grp[ j ] : 0;
-						if (!timeSums[ gid ])
-							timeSums[ gid ] = time;
-						else
-							timeSums[ gid ] += time;
+						runTimes[ j ] = time;
 
 						var stationIsRunning = OSApp.Stations.isRunning(j);
 						if (stationIsRunning)
@@ -119,19 +130,13 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 							//pname  = pidname( pid );
 
 							let remainingStation = OSApp.Stations.getRemainingRuntime( j );
-							if ( OSApp.currentSession.controller.status[ j ] ) {
-								if (remainingStation > remaining)
-									remaining = remainingStation;
-							} else {
-								remaining += remainingStation;
-							}
+							remainingTimes[ j ] = remainingStation;
 						}
 					}
 				}
 			}
-			for (let t of timeSums) {
-				if (t > timeSum) timeSum = t;
-			}
+			timeSum = OSApp.Groups.calculateTotalRunningTime( runTimes );
+			remaining = OSApp.Groups.calculateTotalRunningTime( remainingTimes );
 			html += "</td></tr>";
 		}
 

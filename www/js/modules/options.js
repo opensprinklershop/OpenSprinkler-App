@@ -330,6 +330,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					case "o51":
 					case "o52":
 					case "o53":
+					case "o79":
 						data = $item.is( ":checked" ) ? 1 : 0;
 						if ( !OSApp.Firmware.checkOSVersion( 219 ) && !data ) {
 							return true;
@@ -576,6 +577,15 @@ OSApp.Options.showOptions = function( expandItem ) {
 	list += "</fieldset><fieldset data-role='collapsible'" +
 		( typeof expandItem === "string" && expandItem === "station" ? " data-collapsed='false'" : "" ) + "><legend>" +
 		OSApp.Language._( "Station Handling" ) + "</legend>";
+
+	if ( typeof OSApp.currentSession.controller.options.ginv !== "undefined" ) {
+		list += "<label for='o79'><input data-mini='true' id='o79' type='checkbox' " +
+				( ( OSApp.currentSession.controller.options.ginv === 1 ) ? "checked='checked'" : "" ) + ">" +
+			OSApp.Language._( "Invert Group Scheduling" ) +
+			"<button data-helptext='" +
+				OSApp.Language._( "When enabled: Stations in the same group run parallel, different groups sequential, group P always sequential. When disabled: traditional sequential behavior per group." ) +
+				"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button></label>";
+	}
 
 	if ( typeof OSApp.currentSession.controller.options.ext !== "undefined" ) {
 		list += "<div class='ui-field-contain'><label for='o15' class='select'>" +

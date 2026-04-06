@@ -71,32 +71,83 @@ OSApp.Groups.canPreempt = function( gid ) {
 	return OSApp.Firmware.checkOSVersion( 2214 ) && ( OSApp.Groups.numActiveStations( gid ) > 0 );
 };
 
+OSApp.Groups.calculateDefaultGroupRunningTime = function( runTimes, sdt ) {
+	var sequential = new Array( OSApp.Constants.options.NUM_SEQ_GROUPS ).fill( 0 ),
+		parallel = 0,
+		sequentialMax = 0;
+
+	$.each( OSApp.currentSession.controller.stations.snames, function( i ) {
+		var run = runTimes[ i ];
+		var gid = OSApp.Stations.getGIDValue( i );
+
+		if ( run > 0 ) {
+			if ( gid !== OSApp.Constants.options.PARALLEL_GID_VALUE ) {
+				sequential[ gid ] += ( run + sdt );
+			} else if ( run > parallel ) {
+				parallel = run;
+			}
+		}
+	} );
+
+	for ( var d = 0; d < OSApp.Constants.options.NUM_SEQ_GROUPS; d++ ) {
+		if ( sequential[ d ] > sdt ) {
+			sequential[ d ] -= sdt;
+		}
+		if ( sequential[ d ] > sequentialMax ) {
+			sequentialMax = sequential[ d ];
+		}
+	}
+
+	return Math.max( sequentialMax, parallel );
+};
+
+OSApp.Groups.calculateInvertedGroupRunningTime = function( runTimes, sdt ) {
+	var groupedParallel = new Array( OSApp.Constants.options.NUM_SEQ_GROUPS ).fill( 0 ),
+		sequentialParallelGroup = 0,
+		totalRuntime = 0;
+
+	$.each( OSApp.currentSession.controller.stations.snames, function( i ) {
+		var run = runTimes[ i ];
+		var gid = OSApp.Stations.getGIDValue( i );
+
+		if ( run <= 0 ) {
+			return;
+		}
+
+		if ( gid === OSApp.Constants.options.PARALLEL_GID_VALUE ) {
+			sequentialParallelGroup += ( run + sdt );
+		} else if ( run > groupedParallel[ gid ] ) {
+			groupedParallel[ gid ] = run;
+		}
+	} );
+
+	for ( var d = 0; d < OSApp.Constants.options.NUM_SEQ_GROUPS; d++ ) {
+		if ( groupedParallel[ d ] > 0 ) {
+			totalRuntime += groupedParallel[ d ] + sdt;
+		}
+	}
+
+	if ( sequentialParallelGroup > 0 ) {
+		totalRuntime += sequentialParallelGroup;
+	}
+
+	if ( totalRuntime > sdt ) {
+		totalRuntime -= sdt;
+	}
+
+	return totalRuntime;
+};
+
 // Tbh, not sure if this belongs here in groups.js (mellodev)
 OSApp.Groups.calculateTotalRunningTime = function( runTimes ) {
 	var sdt = OSApp.currentSession.controller.options.sdt,
 		sequential, parallel;
 	if ( OSApp.Supported.groups() ) {
-		sequential = new Array( OSApp.Constants.options.NUM_SEQ_GROUPS ).fill( 0 );
-		parallel = 0;
-		var sequentialMax = 0;
-		$.each( OSApp.currentSession.controller.stations.snames, function( i ) {
-			var run = runTimes[ i ];
-			var gid = OSApp.Stations.getGIDValue( i );
-			if ( run > 0 ) {
-				if ( gid !== OSApp.Constants.options.PARALLEL_GID_VALUE ) {
-					sequential[ gid ] += ( run + sdt );
-				} else {
-					if ( run > parallel ) {
-						parallel = run;
-					}
-				}
-			}
-		} );
-		for ( var d = 0; d < OSApp.Constants.options.NUM_SEQ_GROUPS; d++ )	{
-			if ( sequential[ d ] > sdt ) { sequential[ d ] -= sdt; }
-			if ( sequential[ d ] > sequentialMax ) { sequentialMax = sequential[ d ]; }
+		if ( OSApp.currentSession.controller.options.ginv === 1 ) {
+			return OSApp.Groups.calculateInvertedGroupRunningTime( runTimes, sdt );
 		}
-		return Math.max( sequentialMax, parallel );
+
+		return OSApp.Groups.calculateDefaultGroupRunningTime( runTimes, sdt );
 	} else {
 		sequential = 0;
 		parallel = 0;
