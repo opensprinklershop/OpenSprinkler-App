@@ -351,12 +351,31 @@ OSApp.Firmware.checkOSPiVersion = function( check ) {
 
 OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION = 240;
 OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION_OSPI = "2.4.0";
+OSApp.Firmware.CLASSIC_UPDATE_POST_MAX_BUILD = 193;
 
 OSApp.Firmware.isOnlineUpdateSupported = function() {
 	if ( OSApp.Firmware.isOSPi() ) {
 		return OSApp.Firmware.checkOSPiVersion( OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION_OSPI );
 	}
 	return OSApp.Firmware.checkOSVersion( OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION );
+};
+
+OSApp.Firmware.getCurrentBuildNumber = function() {
+	if ( OSApp.Firmware.isOSPi() ) {
+		return 0;
+	}
+	if ( typeof OSApp.currentSession.controller.options === "object" && typeof OSApp.currentSession.controller.options.fwm === "number" ) {
+		return OSApp.currentSession.controller.options.fwm;
+	}
+	return 0;
+};
+
+OSApp.Firmware.shouldUseClassicUpdatePost = function() {
+	if ( OSApp.Firmware.isOSPi() || !OSApp.Firmware.isOnlineUpdateSupported() ) {
+		return false;
+	}
+	return OSApp.Firmware.getCurrentBuildNumber() > 0 &&
+		OSApp.Firmware.getCurrentBuildNumber() <= OSApp.Firmware.CLASSIC_UPDATE_POST_MAX_BUILD;
 };
 
 OSApp.Firmware.getOSVersion = function( fwv ) {
@@ -593,10 +612,150 @@ OSApp.Firmware.getRebootReason = function( reason ) {
 // ── OTA Firmware Update (via device /uc endpoint) ──────────────────────────
 
 // Weekly update check interval (7 days in ms)
-OSApp.Firmware.OTA_CHECK_INTERVAL = 7 * 24 * 60 * 60 * 1000;
+OSApp.Firmware.OTA_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 
 // Cached update check result
 OSApp.Firmware._otaCache = null;
+
+OSApp.Firmware.getOTACurrentVersion = function() {
+	return {
+		fwv: OSApp.currentSession.controller.options.fwv || 0,
+		fwm: OSApp.currentSession.controller.options.fwm || 0
+	};
+};
+
+OSApp.Firmware.isESP8266Controller = function() {
+	var hwv = OSApp.currentSession.controller.options.hwv || 0;
+	return hwv > 0 && hwv < 40;
+};
+
+OSApp.Firmware.isDirectFirmwareUploadSupported = function() {
+	var hwv = OSApp.currentSession.controller.options.hwv || 0;
+	return hwv > 0 && hwv < 64;
+};
+
+OSApp.Firmware.isNewerOTAVersion = function( data, curFwv, curFwm ) {
+	if ( !data || typeof data !== "object" ) return false;
+	return ( data.fw_version > curFwv ) ||
+		( data.fw_version === curFwv && ( data.fw_minor || 0 ) > curFwm );
+};
+
+OSApp.Firmware.getVersionCatalogUrl = function() {
+	return "https://www.opensprinklershop.de/upgrade/versions.json";
+};
+
+OSApp.Firmware.buildOTAUpdateRequest = function( extraParams ) {
+	var cache = OSApp.Firmware._otaCache || {};
+	var request = "/uu?pw=";
+
+	if ( OSApp.Firmware.isESP8266Controller() ) {
+		if ( cache.esp8266_url ) {
+			request += "&fu=" + encodeURIComponent( cache.esp8266_url );
+		}
+	} else {
+		if ( cache.zigbee_url ) {
+			request += "&zu=" + encodeURIComponent( cache.zigbee_url );
+		}
+		if ( cache.matter_url ) {
+			request += "&mu=" + encodeURIComponent( cache.matter_url );
+		}
+		if ( cache.zigbee_sha256 ) {
+			request += "&zs=" + encodeURIComponent( cache.zigbee_sha256 );
+		}
+		if ( cache.matter_sha256 ) {
+			request += "&ms=" + encodeURIComponent( cache.matter_sha256 );
+		}
+	}
+
+	if ( extraParams ) {
+		request += extraParams;
+	}
+
+	return request;
+};
+
+OSApp.Firmware.buildOTACacheEntry = function( data ) {
+	var current = OSApp.Firmware.getOTACurrentVersion();
+	return {
+		timestamp: Date.now(),
+		controllerFwv: current.fwv,
+		controllerFwm: current.fwm,
+		data: data
+	};
+};
+
+OSApp.Firmware.buildOTACacheFromCatalogEntry = function( entry ) {
+	var current = OSApp.Firmware.getOTACurrentVersion();
+	return {
+		status: 2,
+		fw_version: entry.fw_version,
+		fw_minor: entry.fw_minor,
+		cur_version: current.fwv,
+		cur_minor: current.fwm,
+		versions_url: OSApp.Firmware.getVersionCatalogUrl(),
+		changelog: entry.changelog || "",
+		available: 1,
+		zigbee_url: entry.zigbee_url || "",
+		matter_url: entry.matter_url || "",
+		esp8266_url: entry.esp8266_url || "",
+		zigbee_sha256: entry.zigbee_sha256 || "",
+		matter_sha256: entry.matter_sha256 || "",
+		esp8266_sha256: entry.esp8266_sha256 || ""
+	};
+};
+
+OSApp.Firmware.getLatestCatalogUpdate = function( versions ) {
+	var current = OSApp.Firmware.getOTACurrentVersion();
+	var newest = null;
+
+	$.each( versions || [], function( _, version ) {
+		if ( OSApp.Firmware.isNewerOTAVersion( version, current.fwv, current.fwm ) ) {
+			newest = version;
+			return false;
+		}
+	} );
+
+	return newest;
+};
+
+OSApp.Firmware.getCatalogEntryForVersion = function( versions, fwv, fwm ) {
+	var found = null;
+
+	$.each( versions || [], function( _, version ) {
+		if ( version.fw_version === fwv && ( version.fw_minor || 0 ) === ( fwm || 0 ) ) {
+			found = version;
+			return false;
+		}
+	} );
+
+	return found;
+};
+
+OSApp.Firmware.buildCatalogOTAState = function( versions ) {
+	var current = OSApp.Firmware.getOTACurrentVersion();
+	var newest = OSApp.Firmware.getLatestCatalogUpdate( versions );
+	var currentEntry = OSApp.Firmware.getCatalogEntryForVersion( versions, current.fwv, current.fwm );
+	var displayEntry = newest || currentEntry || ( versions && versions.length ? versions[ 0 ] : null ) || {};
+
+	return {
+		status: newest ? 2 : 3,
+		fw_version: displayEntry.fw_version || current.fwv,
+		fw_minor: displayEntry.fw_minor || current.fwm,
+		cur_version: current.fwv,
+		cur_minor: current.fwm,
+		versions_url: OSApp.Firmware.getVersionCatalogUrl(),
+		changelog: displayEntry.changelog || "",
+		available: newest ? 1 : 0,
+		zigbee_url: displayEntry.zigbee_url || "",
+		matter_url: displayEntry.matter_url || "",
+		esp8266_url: displayEntry.esp8266_url || "",
+		zigbee_sha256: displayEntry.zigbee_sha256 || "",
+		matter_sha256: displayEntry.matter_sha256 || "",
+		esp8266_sha256: displayEntry.esp8266_sha256 || "",
+		current_entry: currentEntry || null,
+		latest_entry: versions && versions.length ? versions[ 0 ] : null
+	};
+};
 
 /**
  * Check the device for firmware updates via REST API /uc endpoint.
@@ -605,9 +764,9 @@ OSApp.Firmware._otaCache = null;
  */
 OSApp.Firmware.checkOTAUpdate = function( forceCheck ) {
 	var defer = $.Deferred();
+	var current = OSApp.Firmware.getOTACurrentVersion();
 
-	// Only works on ESP32 firmware >= 2.3.3
-	if ( !OSApp.Firmware.checkOSVersion( 233 ) ) {
+	if ( !OSApp.Firmware.isDirectFirmwareUploadSupported() ) {
 		defer.resolve( null );
 		return defer.promise();
 	}
@@ -618,7 +777,10 @@ OSApp.Firmware.checkOTAUpdate = function( forceCheck ) {
 		if ( cached ) {
 			try {
 				cached = JSON.parse( cached );
-				if ( cached.timestamp && ( Date.now() - cached.timestamp ) < OSApp.Firmware.OTA_CHECK_INTERVAL ) {
+				if ( cached.timestamp &&
+					 cached.controllerFwv === current.fwv &&
+					 cached.controllerFwm === current.fwm &&
+					 ( Date.now() - cached.timestamp ) < OSApp.Firmware.OTA_CHECK_INTERVAL ) {
 					OSApp.Firmware._otaCache = cached.data;
 					defer.resolve( cached.data );
 					return defer.promise();
@@ -629,25 +791,28 @@ OSApp.Firmware.checkOTAUpdate = function( forceCheck ) {
 		}
 	}
 
-	// Call the device /uc endpoint (25s timeout — firmware makes a blocking outbound HTTPS request)
-	OSApp.Firmware.sendToOS( "/uc?pw=", "json", 25000 ).then(
-		function( data ) {
-			if ( data && typeof data === "object" ) {
-				OSApp.Firmware._otaCache = data;
-				// Cache with timestamp
-				OSApp.Storage.setItemSync( "otaUpdateCheck", JSON.stringify( {
-					timestamp: Date.now(),
-					data: data
-				} ) );
-				defer.resolve( data );
-			} else {
-				defer.resolve( null );
-			}
-		},
-		function() {
-			defer.resolve( null );
+	var finalizeResult = function( data ) {
+		OSApp.Firmware._otaCache = data;
+		OSApp.Storage.setItemSync( "otaUpdateCheck", JSON.stringify( OSApp.Firmware.buildOTACacheEntry( data ) ) );
+		defer.resolve( data );
+	};
+
+	OSApp.Firmware.getVersionCatalog().then( function( versions ) {
+		if ( versions && versions.length ) {
+			finalizeResult( OSApp.Firmware.buildCatalogOTAState( versions ) );
+		} else {
+			finalizeResult( {
+				status: 3,
+				fw_version: current.fwv,
+				fw_minor: current.fwm,
+				cur_version: current.fwv,
+				cur_minor: current.fwm,
+				versions_url: OSApp.Firmware.getVersionCatalogUrl(),
+				changelog: "",
+				available: 0
+			} );
 		}
-	);
+	} );
 
 	return defer.promise();
 };
@@ -736,7 +901,9 @@ OSApp.Firmware.pollOTAProgress = function( popup ) {
  * Start the OTA firmware update on the device.
  */
 OSApp.Firmware.startOTAUpdate = function( popup ) {
-	OSApp.Firmware.sendToOS( "/uu?pw=", "json" ).then(
+	var request = OSApp.Firmware.buildOTAUpdateRequest();
+
+	OSApp.Firmware.sendToOS( request, "json" ).then(
 		function( data ) {
 			if ( data && data.result === 1 ) {
 				if ( popup && popup.find ) {
@@ -760,7 +927,7 @@ OSApp.Firmware.startOTAUpdate = function( popup ) {
  */
 OSApp.Firmware.getVersionCatalog = function() {
 	var defer = $.Deferred();
-	var manifestUrl = "https://opensprinklershop.de/upgrade/versions.json";
+	var manifestUrl = OSApp.Firmware.getVersionCatalogUrl();
 
 	$.getJSON( manifestUrl ).done( function( data ) {
 		if ( $.isArray( data ) ) {
@@ -955,7 +1122,7 @@ OSApp.Firmware.showOTAPopup = function() {
  * Checks the device for updates (weekly) and caches the result.
  */
 OSApp.Firmware.initOTACheck = function() {
-	if ( !OSApp.Firmware.checkOSVersion( 233 ) ) return;
+	if ( !OSApp.Firmware.isDirectFirmwareUploadSupported() ) return;
 
 	OSApp.Firmware.checkOTAUpdate( false ).then( function( data ) {
 		if ( !data || data.available !== 1 ) return;
@@ -973,7 +1140,7 @@ OSApp.Firmware.initOTACheck = function() {
 				OSApp.Firmware.getOSVersion( data.fw_version ) + " (" + data.fw_minor + ")",
 			on: function() {
 				OSApp.Notifications.removeNotification( $( this ).parent() );
-				OSApp.Firmware.showOTAPopup( "update" );
+				OSApp.ESP32Mode.startOnlineUpdateFlow();
 				return false;
 			}
 		} );

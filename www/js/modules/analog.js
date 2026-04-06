@@ -4228,11 +4228,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		// OTA update button handlers - delegate to Online Update flow
 		page.find(".ota-update-btn, .ota-manage-btn").on("click", function(e) {
 			e.preventDefault();
-			if (OSApp.ESP32Mode && OSApp.ESP32Mode.isESP32Supported()) {
-				OSApp.ESP32Mode.setupOnlineUpdate();
-			} else {
-				OSApp.ESP32Mode.setupLegacyOnlineUpdate();
-			}
+			OSApp.ESP32Mode.startOnlineUpdateFlow();
 			return false;
 		});
 
@@ -4264,6 +4260,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 	$("#analogsensorconfig").remove();
 
 	$.mobile.pageContainer.append(page);
+	$.mobile.pageContainer.pagecontainer("change", page);
 
 	// Load sensor data before displaying content
 	var loadData = function() {
