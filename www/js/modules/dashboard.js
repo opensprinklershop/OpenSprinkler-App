@@ -508,8 +508,19 @@ OSApp.Dashboard.displayPage = function() {
 
 			// Create sequential group selection menu
 			if ( OSApp.Supported.groups() && !OSApp.Stations.isMaster( sid ) ) {
+				var groupSchedulingLabel = "<div class='ui-bar-a ui-bar seq-container'>" + OSApp.Language._( "Sequential Group" ) + ":";
+
+				// Add info button showing current scheduling mode
+				if ( typeof OSApp.currentSession.controller.options.ginv !== "undefined" ) {
+					var invertHelpText = OSApp.currentSession.controller.options.ginv === 1 ?
+						OSApp.Language._( "Inverted mode: Same group parallel, different groups sequential, P always sequential" ) :
+						OSApp.Language._( "Default mode: Each group sequential, different groups parallel" );
+					groupSchedulingLabel += "<button data-helptext='" + invertHelpText + "' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>";
+				}
+				groupSchedulingLabel += "</div>";
+
 				select +=
-					"<div class='ui-bar-a ui-bar seq-container'>" + OSApp.Language._( "Sequential Group" ) + ":</div>" +
+					groupSchedulingLabel +
 					"<select id='gid' class='seqgrp' data-mini='true'></select>" +
 					"<div><p id='prohibit-change' class='center hidden' style='color: #ff0033;'>" + OSApp.Language._( "Changing group designation is prohibited while station is running" ) + "</p></div>";
 
@@ -979,7 +990,8 @@ OSApp.Dashboard.displayPage = function() {
 			OSApp.Dashboard.updateWaterLevel();
 			OSApp.Analog.updateSensorShowArea( page );
 
-			page.find( ".sitename" ).text( siteSelect.val() );
+			page.find( ".sitename" ).text( OSApp.currentSession.local ? OSApp.currentSession.controller.settings?.dname || "" : siteSelect.val() );
+			page.find( ".sitename" ).toggleClass( "hidden", OSApp.currentSession.local ? ( OSApp.currentSession.controller.settings?.dname ? false : true ) : false );
 
 			// New view: Show program instead of zones
 			var displayOption = OSApp.ProgramView.Constants.SHOW_ZONES;

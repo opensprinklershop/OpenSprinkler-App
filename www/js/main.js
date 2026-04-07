@@ -37,7 +37,7 @@ OSApp.Constants = {
 		"dns2":45, "dns3":46, "dns4":47, "sar":48, "ife":49, "sn1t":50, "sn1o":51, "sn2t":52, "sn2o":53, "sn1on":54,
 		"sn1of":55, "sn2on":56, "sn2of":57, "subn1":58, "subn2":59, "subn3":60, "subn4":61, "fwire":62, "laton":63, "latof":64,
 		"ife2":65, "imin":66, "imax":67, "tpdv":68, "tmpCo":69, "comb":70,
-		"belha":73, "belw1":74, "belw2":75, "ife3":76, "ife4":77, "rken":78
+		"belha":73, "belw1":74, "belw2":75, "ife3":76, "ife4":77, "rken":78, "ginv":79
 	},
 	options: { // Option constants
 		IGNORE_SENSOR_1: 1,

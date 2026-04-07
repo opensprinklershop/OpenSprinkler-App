@@ -1023,6 +1023,9 @@ msgstr ""
 msgid "Master Off Adjustment"
 msgstr ""
 
+msgid "Invert Group Scheduling (Same Group Parallel, Different Groups Sequential, P Always Sequential)"
+msgstr ""
+
 msgid "Station Handling"
 msgstr ""
 

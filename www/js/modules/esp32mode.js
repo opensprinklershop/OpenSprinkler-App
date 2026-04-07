@@ -1441,8 +1441,9 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 		radioDeferred.resolve( null );
 	}
 
-	// Timeout 25s — firmware makes a blocking HTTPS request (15s timeout) to check the update server
-	$.when( radioDeferred, OSApp.Firmware.sendToOS( "/uc?pw=", "json", 25000 ) ).done( function( radioResult, data ) {
+	// Use the shared OTA checker so this dialog stays consistent with the
+	// firmware overview and can fall back to versions.json when needed.
+	$.when( radioDeferred, OSApp.Firmware.checkOTAUpdate( true ) ).done( function( radioResult, data ) {
 		$.mobile.loading( "hide" );
 
 		if ( !data || typeof data.status === "undefined" ) {
@@ -1452,7 +1453,7 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 
 		// Handle firmware-side errors (e.g. device can't reach update server)
 		var st = OSApp.ESP32Mode.OTA_STATUS;
-		if ( data.status === st.ERROR_NETWORK || data.status === st.ERROR_PARSE ) {
+		if ( data.available !== 1 && ( data.status === st.ERROR_NETWORK || data.status === st.ERROR_PARSE ) ) {
 			var errMsg = data.status === st.ERROR_NETWORK
 				? OSApp.Language._( "Device could not reach the update server. Check internet connection." )
 				: OSApp.Language._( "Failed to parse update information from server." );
@@ -1589,6 +1590,516 @@ OSApp.ESP32Mode.getDirectDeviceUpdateUrl = function() {
 	return OSApp.ESP32Mode.getDirectDeviceBaseUrl() + "/update";
 };
 
+OSApp.ESP32Mode.getDirectDeviceUploadUrl = function() {
+	var baseUrl = OSApp.ESP32Mode.getDirectDeviceBaseUrl();
+	var match = baseUrl.match( /^(https?:\/\/)([^/:]+)(?::\d+)?/i );
+
+	if ( match ) {
+		return match[ 1 ] + match[ 2 ] + ":8080/update";
+	}
+
+	return baseUrl.replace( /\/+$/, "" ) + ":8080/update";
+};
+
+OSApp.ESP32Mode.getClassicUpdateOptionsHtml = function() {
+	var html = "<div class='ota-auto-restore-area' style='margin:10px 0;padding:10px;background:#eef6ea;border-radius:6px;'>" +
+		"<label style='display:flex;align-items:center;gap:8px;font-size:0.95em;cursor:pointer;'>" +
+		"<input type='checkbox' class='ota-auto-restore' checked='checked'>" +
+		OSApp.Language._( "Automatically restore saved configuration after update" ) +
+		"</label>" +
+		"<div style='font-size:0.82em;color:#666;margin-top:6px;'>" +
+		OSApp.Language._( "If enabled, the saved configuration is restored automatically after the device comes back online." ) +
+		"</div>" +
+		"</div>";
+
+	if ( !OSApp.ESP32Mode.isMatterSupported() ) {
+		return html;
+	}
+
+	var activeVariant = OSApp.ESP32Mode.isMatterActive() ? "matter" : "zigbee";
+	html += "<div class='ota-variant-area' style='margin:10px 0;padding:10px;background:#e8f0fe;border-radius:6px;'>" +
+		"<div style='font-size:0.9em;font-weight:bold;margin-bottom:6px;'>" + OSApp.Language._( "Firmware variant to upload" ) + ":</div>" +
+		"<label style='display:inline-flex;align-items:center;gap:6px;margin-right:16px;cursor:pointer;font-size:0.95em;'>" +
+		"<input type='radio' name='classic-ota-variant' value='zigbee'" + ( activeVariant === "zigbee" ? " checked" : "" ) + "> Zigbee" +
+		"</label>" +
+		"<label style='display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:0.95em;'>" +
+		"<input type='radio' name='classic-ota-variant' value='matter'" + ( activeVariant === "matter" ? " checked" : "" ) + "> Matter" +
+		"</label>" +
+		"</div>";
+
+	return html;
+};
+
+OSApp.ESP32Mode.getClassicPostedFirmwareUrl = function( entry, variant ) {
+	var source = entry || {};
+
+	if ( OSApp.Firmware.isESP8266Controller() ) {
+		return source.esp8266_url || "";
+	}
+
+	if ( variant === "matter" ) {
+		return source.matter_url || "";
+	}
+
+	return source.zigbee_url || "";
+};
+
+OSApp.ESP32Mode.getClassicUpdateEntryLabel = function( entry ) {
+	if ( !entry ) {
+		return OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion();
+	}
+
+	return OSApp.Firmware.getOSVersion( entry.fw_version ) + " (" + ( entry.fw_minor || 0 ) + ")";
+};
+
+OSApp.ESP32Mode.getClassicDefaultEntry = function( data ) {
+	if ( !data ) {
+		return null;
+	}
+
+	return data.latest_entry || data.current_entry || ( data.available === 1 ? data : null );
+};
+
+OSApp.ESP32Mode.buildClassicUpdateStepsHtml = function() {
+	return "<div id='ota-steps' style='display:none;margin:12px 0;padding:8px;background:#f0f0f0;border-radius:4px;font-size:0.9em;'>" +
+		"<p style='margin:2px 0;'><b>" + OSApp.Language._( "Update Process" ) + ":</b></p>" +
+		"<p id='ota-step-1' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 1: Backup configuration" ) + "</p>" +
+		"<p id='ota-step-2' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 2: Download firmware image" ) + "</p>" +
+		"<p id='ota-step-3' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 3: Upload firmware to device" ) + "</p>" +
+		"<p id='ota-step-4' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 4: Wait for device reboot" ) + "</p>" +
+		"<p id='ota-step-5' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 5: Restore configuration" ) + "</p>" +
+		"</div>" +
+		"<div id='ota-progress-area' style='display:none;margin:12px 0;padding:8px;background:#f0f0f0;border-radius:4px;'>" +
+		"<div style='background:#ddd;border-radius:4px;height:20px;position:relative;'>" +
+		"<div id='ota-progress-bar' style='background:#4CAF50;height:100%;border-radius:4px;width:0%;transition:width 0.3s;'></div>" +
+		"<span id='ota-progress-pct' style='position:absolute;top:0;left:0;right:0;text-align:center;line-height:20px;font-size:0.85em;font-weight:bold;color:#333;'>0%</span>" +
+		"</div>" +
+		"<p id='ota-progress-msg' style='font-size:0.85em;margin:4px 0;'></p>" +
+		"</div>";
+};
+
+OSApp.ESP32Mode.openClassicUpdatePopup = function( data, selectedEntry ) {
+	var isOtcConnection = !!OSApp.currentSession.token;
+	var curVer = OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion();
+	var variantLabel = OSApp.Language._( "Direct Firmware Upload" );
+	var targetEntry = selectedEntry || null;
+	var latestEntry = OSApp.ESP32Mode.getClassicDefaultEntry( data );
+	var currentEntry = data && data.current_entry ? data.current_entry : null;
+	var content = "<div class='ui-content'>";
+	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
+
+	if ( targetEntry ) {
+		content += "<p style='color:#1976d2;font-weight:bold;'>" +
+			OSApp.Language._( "Selected version" ) + ": " +
+			OSApp.ESP32Mode.getClassicUpdateEntryLabel( targetEntry ) + "</p>";
+	} else if ( data.available === 1 ) {
+		content += "<p style='color:green;font-weight:bold;'>" +
+			OSApp.Language._( "Update available" ) + ": " +
+			OSApp.Firmware.getOSVersion( data.fw_version ) + " (" + data.fw_minor + ")</p>";
+	} else {
+		content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Firmware is up to date" ) + "</p>";
+	}
+
+	if ( data.changelog ) {
+		content += "<div style='max-height:150px;overflow-y:auto;border:1px solid #ccc;padding:8px;margin:8px 0;font-size:0.85em;white-space:pre-wrap;'>" +
+			$( "<span>" ).text( data.changelog ).html() + "</div>";
+	}
+
+	content += "<p style='font-size:0.9em;color:#666;'>" +
+		OSApp.Language._( "The app downloads the firmware image and uploads it directly to the controller update endpoint." ) +
+		"</p>";
+
+	if ( isOtcConnection ) {
+		content += "<div style='margin:12px 0;padding:10px;background:#fff3e0;color:#b26a00;border-radius:6px;'>" +
+			OSApp.Language._( "Firmware update is only available over a direct connection to the device. OTC connections are not supported for firmware updates." ) +
+			"</div>";
+	}
+
+	content += OSApp.ESP32Mode.getClassicUpdateOptionsHtml();
+	content += OSApp.ESP32Mode.buildClassicUpdateStepsHtml();
+
+	if ( !isOtcConnection ) {
+		if ( targetEntry ) {
+			content += "<button class='classic-ota-start classic-ota-action ui-btn ui-btn-b'>" + OSApp.Language._( "Install Selected Version" ) + "</button>";
+		} else {
+			if ( latestEntry ) {
+				content += "<button class='classic-ota-start classic-ota-action ui-btn ui-btn-b'>" + ( data.available === 1 ? OSApp.Language._( "Start Update" ) : OSApp.Language._( "Install Latest Version" ) ) + "</button>";
+			}
+			if ( currentEntry ) {
+				content += "<button class='classic-ota-reinstall classic-ota-action ui-btn'>" + OSApp.Language._( "Reinstall current version" ) + "</button>";
+			}
+			content += "<button class='classic-ota-older classic-ota-action ui-btn'>" + OSApp.Language._( "Install older version..." ) + "</button>";
+		}
+	}
+
+	content += "<button class='ota-cancel ui-btn'>" + OSApp.Language._( "Close" ) + "</button>";
+	content += "</div>";
+
+	var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='classicOtaPopup'>" + content + "</div>" );
+
+	popup.on( "click", ".ota-cancel", function() {
+		popup.popup( "close" );
+		return false;
+	} );
+
+	popup.on( "click", ".classic-ota-start", function() {
+		OSApp.ESP32Mode.runClassicPostedUpdate( popup, targetEntry || latestEntry );
+		return false;
+	} );
+
+	popup.on( "click", ".classic-ota-reinstall", function() {
+		OSApp.ESP32Mode.runClassicPostedUpdate( popup, currentEntry );
+		return false;
+	} );
+
+	popup.on( "click", ".classic-ota-older", function() {
+		popup.popup( "close" );
+		setTimeout( function() {
+			OSApp.ESP32Mode.showClassicVersionPicker( data );
+		}, 400 );
+		return false;
+	} );
+
+	OSApp.UIDom.openPopup( popup );
+};
+
+OSApp.ESP32Mode.showClassicVersionPicker = function( checkData ) {
+	var versionsUrl = ( checkData && checkData.versions_url )
+		? checkData.versions_url
+		: OSApp.Firmware.getVersionCatalogUrl();
+
+	$.mobile.loading( "show" );
+	$.ajax( { url: versionsUrl, dataType: "json", timeout: 10000 } ).done( function( versions ) {
+		$.mobile.loading( "hide" );
+
+		if ( !versions || !versions.length ) {
+			OSApp.Errors.showError( OSApp.Language._( "No version history available" ) );
+			return;
+		}
+
+		var current = OSApp.Firmware.getOTACurrentVersion();
+		var content = "<div class='ui-content'>";
+		content += "<h3>" + OSApp.Language._( "Install Older Version" ) + "</h3>";
+		content += "<ul data-role='listview' data-inset='true' id='ota-version-list' style='margin:8px 0;'>";
+		versions.forEach( function( v ) {
+			var isCurrent = v.fw_version === current.fwv && ( v.fw_minor || 0 ) === current.fwm;
+			var verLabel = OSApp.ESP32Mode.getClassicUpdateEntryLabel( v );
+			content += "<li><a href='#' class='classic-version-item' data-index='" + versions.indexOf( v ) + "'>" +
+				"<b>" + verLabel + "</b>" +
+				( isCurrent ? " <span style='font-size:0.8em;color:#4CAF50;'>[" + OSApp.Language._( "current" ) + "]</span>" : "" ) +
+				( v.date ? " <span style='font-size:0.8em;color:#999;'>" + v.date + "</span>" : "" ) +
+				( v.changelog ? "<p class='ui-li-desc' style='white-space:normal;'>" + $( "<span>" ).text( v.changelog.substring( 0, 120 ) ).html() + ( v.changelog.length > 120 ? "…" : "" ) + "</p>" : "" ) +
+				"</a></li>";
+		} );
+		content += "</ul>";
+		content += "<button class='ota-version-cancel ui-btn'>&#8592; " + OSApp.Language._( "Back" ) + "</button>";
+		content += "</div>";
+
+		var picker = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='classicVersionPicker' style='max-height:80vh;overflow-y:auto;width:90vw;max-width:480px;'>" + content + "</div>" );
+
+		picker.on( "click", ".ota-version-cancel", function() {
+			picker.popup( "close" );
+			return false;
+		} );
+
+		picker.on( "click", ".classic-version-item", function() {
+			var selected = versions[ parseInt( $( this ).data( "index" ), 10 ) ];
+			picker.popup( "close" );
+			setTimeout( function() {
+				OSApp.ESP32Mode.openClassicUpdatePopup( checkData, selected );
+			}, 400 );
+			return false;
+		} );
+
+		OSApp.UIDom.openPopup( picker );
+		picker.trigger( "create" );
+	} ).fail( function() {
+		$.mobile.loading( "hide" );
+		OSApp.Errors.showError( OSApp.Language._( "Error loading version history" ) );
+	} );
+};
+
+OSApp.ESP32Mode.fetchClassicFirmwareBlob = function( url ) {
+	var defer = $.Deferred();
+	var xhr = new XMLHttpRequest();
+
+	xhr.open( "GET", url, true );
+	xhr.responseType = "blob";
+	xhr.timeout = 300000;
+	xhr.onload = function() {
+		if ( xhr.status >= 200 && xhr.status < 300 && xhr.response ) {
+			defer.resolve( xhr.response );
+		} else {
+			defer.reject( new Error( "download-status-" + xhr.status ) );
+		}
+	};
+	xhr.onerror = function() {
+		defer.reject( new Error( "download-error" ) );
+	};
+	xhr.ontimeout = function() {
+		defer.reject( new Error( "download-timeout" ) );
+	};
+	xhr.send();
+
+	return defer.promise();
+};
+
+OSApp.ESP32Mode.uploadClassicFirmwareBlob = function( blob, filename, variant ) {
+	var defer = $.Deferred();
+	var xhr = new XMLHttpRequest();
+	var formData = new FormData();
+
+	formData.append( "file", blob, filename );
+	formData.append( "pw", OSApp.currentSession.pass || "" );
+	if ( !OSApp.Firmware.isESP8266Controller() && variant ) {
+		formData.append( "slot", variant );
+	}
+
+	xhr.open( "POST", OSApp.ESP32Mode.getDirectDeviceUploadUrl(), true );
+	xhr.timeout = 300000;
+	xhr.onload = function() {
+		var resp = null;
+		try {
+			resp = JSON.parse( xhr.responseText );
+		} catch {
+			resp = null;
+		}
+
+		if ( xhr.status >= 200 && xhr.status < 300 && resp && ( resp.result === 0 || resp.result === 1 ) ) {
+			defer.resolve( resp );
+		} else {
+			defer.reject( resp && resp.result === 2 ? OSApp.Language._( "Authentication failed. Check device password and try again." ) : OSApp.Language._( "Firmware upload failed." ) );
+		}
+	};
+	xhr.onerror = function() {
+		defer.reject( OSApp.Language._( "A network error occurred during the upload." ) );
+	};
+	xhr.ontimeout = function() {
+		defer.reject( OSApp.Language._( "Upload timed out. Please try again." ) );
+	};
+	xhr.upload.onprogress = function( evt ) {
+		if ( evt.lengthComputable ) {
+			defer.notify( Math.max( 35, Math.min( 90, Math.round( 35 + ( evt.loaded / evt.total ) * 55 ) ) ) );
+		}
+	};
+	xhr.send( formData );
+
+	return defer.promise();
+};
+
+OSApp.ESP32Mode.waitForClassicUploadReboot = function( popup ) {
+	var originalPass = OSApp.currentSession.pass;
+	var defaultPass = md5( "opendoor" );
+	var baseUrl = OSApp.ESP32Mode.getDirectDeviceBaseUrl();
+	var pollCount = 0;
+	var maxPolls = 120;
+	var polling = false;
+	var autoRestore = popup.find( ".ota-auto-restore" ).prop( "checked" );
+	var backup = OSApp.ESP32Mode.hasAppBackup();
+
+	popup.find( "#ota-step-4" ).css( "color", "#1976D2" ).html(
+		"&#9658; <b>" + OSApp.Language._( "Waiting for device reboot..." ) + "</b>"
+	);
+	popup.find( "#ota-progress-bar" ).css( "width", "92%" );
+	popup.find( "#ota-progress-pct" ).text( "92%" );
+	popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Waiting for device to come back online..." ) );
+
+	setTimeout( function() {
+		var rebootPoll = setInterval( function() {
+			if ( polling ) { return; }
+			pollCount++;
+			if ( pollCount > maxPolls ) {
+				clearInterval( rebootPoll );
+				popup.find( "#ota-step-4" ).css( "color", "#FF9800" ).html(
+					"&#9888; " + OSApp.Language._( "Device rebooting — reconnect when ready" )
+				);
+				popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "The upload finished, but the device did not come back online in time." ) );
+				popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+				return;
+			}
+
+			polling = true;
+			var tryPass = ( pollCount % 2 === 1 ) ? originalPass : defaultPass;
+
+			$.ajax( {
+				url: baseUrl + "/jc?pw=" + encodeURIComponent( tryPass ),
+				type: "GET",
+				dataType: "json",
+				timeout: 3000
+			} ).done( function( resp ) {
+				polling = false;
+				if ( !resp ) { return; }
+
+				clearInterval( rebootPoll );
+				OSApp.currentSession.pass = tryPass;
+				popup.find( "#ota-step-4" ).css( "color", "#4CAF50" ).html(
+					"&#9745; " + OSApp.Language._( "Device rebooted successfully" )
+				);
+				popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is back online." ) );
+
+				if ( backup && autoRestore ) {
+					popup.find( "#ota-step-5" ).css( "color", "#1976D2" ).html(
+						"&#9658; <b>" + OSApp.Language._( "Restoring configuration..." ) + "</b>"
+					);
+					OSApp.ESP32Mode.directRestoreAfterOTA( backup.data, tryPass, function() {
+						localStorage.removeItem( OSApp.ESP32Mode.OTA_BACKUP_KEY );
+						OSApp.ESP32Mode.markOTACompleted( popup );
+						popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
+							"&#9745; " + OSApp.Language._( "Configuration restored" )
+						);
+						popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+						OSApp.Storage.setItemSync( "otaUpdateCheck", "" );
+						OSApp.Firmware._otaCache = null;
+						OSApp.Sites.updateController( function() {
+							OSApp.UIDom.goHome();
+						} );
+					}, function() {
+						popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
+							"&#9888; " + OSApp.Language._( "Auto-restore failed" )
+						);
+						popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+					} );
+				} else {
+					OSApp.ESP32Mode.markOTACompleted( popup );
+					popup.find( "#ota-step-5" ).css( "color", backup ? "#FF9800" : "#4CAF50" ).html(
+						backup
+							? "&#9888; " + OSApp.Language._( "Configuration backup kept for manual restore" )
+							: "&#9745; " + OSApp.Language._( "Update complete" )
+					);
+					popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+					OSApp.Storage.setItemSync( "otaUpdateCheck", "" );
+					OSApp.Firmware._otaCache = null;
+					OSApp.Sites.updateController();
+				}
+			} ).fail( function() {
+				polling = false;
+			} );
+		}, 3000 );
+	}, 7000 );
+};
+
+
+OSApp.ESP32Mode.runClassicPostedUpdate = function( popup, versionEntry ) {
+	var variant = popup.find( "input[name='classic-ota-variant']:checked" ).val() || "zigbee";
+	var firmwareUrl = OSApp.ESP32Mode.getClassicPostedFirmwareUrl( versionEntry, variant );
+	var filename = firmwareUrl.split( "/" ).pop() || "firmware.bin";
+
+	if ( !versionEntry || !firmwareUrl ) {
+		OSApp.Errors.showError( OSApp.Language._( "No firmware download URL available." ) );
+		return;
+	}
+
+	OSApp.ESP32Mode.startOTADurationTimer( popup );
+	popup.find( "#ota-steps, #ota-progress-area" ).show();
+	popup.find( ".classic-ota-action" ).prop( "disabled", true ).addClass( "ui-state-disabled" );
+	popup.find( "#ota-progress-msg" ).css( "color", "" );
+
+	var continueUpload = function() {
+		popup.find( "#ota-step-2" ).css( "color", "#1976D2" ).html(
+			"&#9658; <b>" + OSApp.Language._( "Downloading firmware image..." ) + "</b>"
+		);
+		popup.find( "#ota-progress-bar" ).css( "width", "15%" );
+		popup.find( "#ota-progress-pct" ).text( "15%" );
+		popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Downloading firmware image..." ) );
+
+		OSApp.ESP32Mode.fetchClassicFirmwareBlob( firmwareUrl ).done( function( blob ) {
+			popup.find( "#ota-step-2" ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Firmware image downloaded" )
+			);
+			popup.find( "#ota-step-3" ).css( "color", "#1976D2" ).html(
+				"&#9658; <b>" + OSApp.Language._( "Uploading firmware to device..." ) + "</b>"
+			);
+			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Uploading firmware to device..." ) );
+
+			OSApp.ESP32Mode.uploadClassicFirmwareBlob( blob, filename, variant ).progress( function( progress ) {
+				popup.find( "#ota-progress-bar" ).css( "width", progress + "%" );
+				popup.find( "#ota-progress-pct" ).text( progress + "%" );
+			} ).done( function() {
+				popup.find( "#ota-step-3" ).css( "color", "#4CAF50" ).html(
+					"&#9745; " + OSApp.Language._( "Firmware uploaded to device" )
+				);
+				popup.find( "#ota-progress-bar" ).css( "width", "92%" );
+				popup.find( "#ota-progress-pct" ).text( "92%" );
+				popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Upload successful. Device is rebooting..." ) );
+				OSApp.ESP32Mode.waitForClassicUploadReboot( popup );
+			} ).fail( function( message ) {
+				popup.find( "#ota-step-3" ).css( "color", "#f44336" ).html(
+					"&#9746; " + OSApp.Language._( "Firmware upload failed." )
+				);
+				popup.find( "#ota-progress-msg" ).css( "color", "#c00" ).text( message || OSApp.Language._( "Firmware upload failed." ) );
+				popup.find( ".classic-ota-action" ).prop( "disabled", false ).removeClass( "ui-state-disabled" );
+			} );
+		} ).fail( function() {
+			popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
+				"&#9746; " + OSApp.Language._( "Firmware download failed." )
+			);
+			popup.find( "#ota-progress-msg" ).css( "color", "#c00" ).text( OSApp.Language._( "Firmware download failed." ) );
+			popup.find( ".classic-ota-action" ).prop( "disabled", false ).removeClass( "ui-state-disabled" );
+		} );
+	};
+
+	popup.find( "#ota-step-1" ).css( "color", "#1976D2" ).html(
+		"&#9658; <b>" + OSApp.Language._( "Backing up configuration..." ) + "</b>"
+	);
+	popup.find( "#ota-progress-bar" ).css( "width", "5%" );
+	popup.find( "#ota-progress-pct" ).text( "5%" );
+	popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Backing up configuration..." ) );
+
+	OSApp.ESP32Mode.backupConfigToApp().done( function() {
+		popup.find( "#ota-step-1" ).css( "color", "#4CAF50" ).html(
+			"&#9745; " + OSApp.Language._( "Configuration backed up" )
+		);
+		continueUpload();
+	} ).fail( function( errMsg ) {
+		popup.find( "#ota-step-1" ).css( "color", "#FF9800" ).html(
+			"&#9888; " + OSApp.Language._( "Backup warning" ) + ": " + $( "<span>" ).text( errMsg ).html()
+		);
+		popup.popup( "close" );
+		setTimeout( function() {
+			OSApp.UIDom.areYouSure(
+				OSApp.Language._( "Configuration backup failed. Continue with update anyway?" ),
+				"",
+				function() {
+					OSApp.UIDom.openPopup( popup );
+					continueUpload();
+				}
+			);
+		}, 400 );
+	} );
+};
+
+OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
+	if ( OSApp.Firmware.isOSPi() ) {
+		OSApp.ESP32Mode.setupOSPiOnlineUpdate();
+		return;
+	}
+
+	if ( !OSApp.Firmware.isDirectFirmwareUploadSupported() ) {
+		OSApp.Errors.showError( OSApp.Language._( "Firmware upload is only available for ESP8266 and ESP32 controllers." ) );
+		return;
+	}
+
+	OSApp.ESP32Mode.setupClassicPostedUpdate();
+};
+
+OSApp.ESP32Mode.setupClassicPostedUpdate = function() {
+	$.mobile.loading( "show" );
+	OSApp.Firmware.checkOTAUpdate( true ).done( function( data ) {
+		$.mobile.loading( "hide" );
+
+		if ( !data || typeof data.status === "undefined" ) {
+			OSApp.Errors.showError( OSApp.Language._( "Error checking for updates" ) );
+			return;
+		}
+
+		OSApp.ESP32Mode.openClassicUpdatePopup( data );
+	} ).fail( function() {
+		$.mobile.loading( "hide" );
+		OSApp.Errors.showError( OSApp.Language._( "Error checking for updates" ) );
+	} );
+};
+
 /**
  * Legacy online update flow (ESP8266 and non-ESP32 builds).
  * Uses direct online update endpoints (/uc, /uu, /us).
@@ -1599,91 +2110,113 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function() {
 		return;
 	}
 
-	var isOtcConnection = !!OSApp.currentSession.token;
-	var curVer = OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion();
-	var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
-	var content = "<div class='ui-content'>";
-	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
-	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
-	content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Firmware is up to date" ) + "</p>";
-	content += "<p style='font-size:0.9em;color:#666;'>" +
-		OSApp.Language._( "This device downloads and installs the firmware directly." ) +
-		"</p>";
-	if ( isOtcConnection ) {
-		content += "<div style='margin:12px 0;padding:10px;background:#fff3e0;color:#b26a00;border-radius:6px;'>" +
-			OSApp.Language._( "Firmware update is only available over a direct connection to the device. OTC connections are not supported for firmware updates." ) +
-			"</div>";
-	}
-	content += "<p style='font-size:0.85em;color:#666;'>" +
-		OSApp.Language._( "After flashing, WiFi/Ethernet parameters are restored from device flash backup." ) +
-		"</p>";
+	$.mobile.loading( "show" );
+	OSApp.Firmware.checkOTAUpdate( true ).done( function( data ) {
+		$.mobile.loading( "hide" );
 
-	content += "<div id='ota-steps' style='margin:12px 0;padding:8px;background:#f0f0f0;border-radius:4px;font-size:0.9em;'>";
-	content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Update Process" ) + ":</b></p>";
-	content += "<p id='ota-step-1' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 1: Backup configuration" ) + "</p>";
-	content += "<p id='ota-step-2' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 2: Download and install firmware" ) + "</p>";
-	content += "<p id='ota-step-3' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 3: Device reboots" ) + "</p>";
-	content += "<p id='ota-step-4' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 4: Restore configuration" ) + "</p>";
-	content += "</div>";
+		if ( !data || typeof data.status === "undefined" ) {
+			OSApp.Errors.showError( OSApp.Language._( "Error checking for updates" ) );
+			return;
+		}
 
-	if ( !isOtcConnection ) {
-		content += "<button class='legacy-ota-start ui-btn ui-btn-b'>" + OSApp.Language._( "Start Update" ) + "</button>";
-	}
-	content += "<button class='legacy-ota-after-reboot ui-btn' style='display:none;'>" + OSApp.Language._( "Device rebooted - Restore configuration" ) + "</button>";
+		var isOtcConnection = !!OSApp.currentSession.token;
+		var curVer = OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion();
+		var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
+		var content = "<div class='ui-content'>";
+		content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+		content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
+		if ( data.available === 1 ) {
+			content += "<p style='color:green;font-weight:bold;'>" +
+				OSApp.Language._( "Update available" ) + ": " +
+				OSApp.Firmware.getOSVersion( data.fw_version ) + " (" + data.fw_minor + ")</p>";
+		} else {
+			content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Firmware is up to date" ) + "</p>";
+		}
+		if ( data.changelog ) {
+			content += "<div style='max-height:150px;overflow-y:auto;border:1px solid #ccc;padding:8px;margin:8px 0;font-size:0.85em;white-space:pre-wrap;'>" +
+				$( "<span>" ).text( data.changelog ).html() + "</div>";
+		}
+		content += "<p style='font-size:0.9em;color:#666;'>" +
+			OSApp.Language._( "This device downloads and installs the firmware directly." ) +
+			"</p>";
+		if ( isOtcConnection ) {
+			content += "<div style='margin:12px 0;padding:10px;background:#fff3e0;color:#b26a00;border-radius:6px;'>" +
+				OSApp.Language._( "Firmware update is only available over a direct connection to the device. OTC connections are not supported for firmware updates." ) +
+				"</div>";
+		}
+		content += "<p style='font-size:0.85em;color:#666;'>" +
+			OSApp.Language._( "After flashing, WiFi/Ethernet parameters are restored from device flash backup." ) +
+			"</p>";
 
-	content += "<button class='ota-cancel ui-btn'>" + OSApp.Language._( "Close" ) + "</button>";
-	content += "</div>";
+		content += "<div id='ota-steps' style='margin:12px 0;padding:8px;background:#f0f0f0;border-radius:4px;font-size:0.9em;'>";
+		content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Update Process" ) + ":</b></p>";
+		content += "<p id='ota-step-1' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 1: Backup configuration" ) + "</p>";
+		content += "<p id='ota-step-2' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 2: Download and install firmware" ) + "</p>";
+		content += "<p id='ota-step-3' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 3: Device reboots" ) + "</p>";
+		content += "<p id='ota-step-4' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 4: Restore configuration" ) + "</p>";
+		content += "</div>";
 
-	var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='otaLegacyPopup'>" + content + "</div>" );
+		if ( !isOtcConnection ) {
+			content += "<button class='legacy-ota-start ui-btn ui-btn-b'>" + OSApp.Language._( "Start Update" ) + "</button>";
+		}
+		content += "<button class='legacy-ota-after-reboot ui-btn' style='display:none;'>" + OSApp.Language._( "Device rebooted - Restore configuration" ) + "</button>";
+		content += "<button class='ota-cancel ui-btn'>" + OSApp.Language._( "Close" ) + "</button>";
+		content += "</div>";
 
-	popup.on( "click", ".ota-cancel", function() {
-		popup.popup( "close" );
-		return false;
-	} );
+		var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='otaLegacyPopup'>" + content + "</div>" );
 
-	popup.on( "click", ".legacy-ota-start", function() {
-		var $btn = $( this );
-		$btn.prop( "disabled", true ).addClass( "ui-state-disabled" );
-		popup.find( "#ota-step-1" ).css( "color", "#1976D2" ).html(
-			"&#9658; <b>" + OSApp.Language._( "Backing up configuration..." ) + "</b>"
-		);
-
-		OSApp.ESP32Mode.backupConfigToApp().done( function() {
-			popup.find( "#ota-step-1" ).css( "color", "#4CAF50" ).html(
-				"&#9745; " + OSApp.Language._( "Configuration backed up" )
-			);
-			OSApp.ESP32Mode.runLegacyDirectOTA( popup );
-		} ).fail( function( errMsg ) {
-			popup.find( "#ota-step-1" ).css( "color", "#FF9800" ).html(
-				"&#9888; " + OSApp.Language._( "Backup warning" ) + ": " + $( "<span>" ).text( errMsg ).html()
-			);
-			OSApp.UIDom.areYouSure(
-				OSApp.Language._( "Configuration backup failed. Continue with update anyway?" ),
-				"",
-				function() {
-					OSApp.ESP32Mode.runLegacyDirectOTA( popup );
-				}
-			);
+		popup.on( "click", ".ota-cancel", function() {
+			popup.popup( "close" );
+			return false;
 		} );
 
-		return false;
-	} );
+		popup.on( "click", ".legacy-ota-start", function() {
+			var $btn = $( this );
+			$btn.prop( "disabled", true ).addClass( "ui-state-disabled" );
+			popup.find( "#ota-step-1" ).css( "color", "#1976D2" ).html(
+				"&#9658; <b>" + OSApp.Language._( "Backing up configuration..." ) + "</b>"
+			);
 
-	popup.on( "click", ".legacy-ota-after-reboot", function() {
-		popup.find( "#ota-step-3" ).css( "color", "#4CAF50" ).html(
-			"&#9745; " + OSApp.Language._( "Device rebooted" )
-		);
-		popup.find( "#ota-step-4" ).css( "color", "#1976D2" ).html(
-			"&#9658; <b>" + OSApp.Language._( "Restoring configuration..." ) + "</b>"
-		);
-		popup.popup( "close" );
-		setTimeout( function() {
-			OSApp.ESP32Mode.showRestorePopup();
-		}, 400 );
-		return false;
-	} );
+			OSApp.ESP32Mode.backupConfigToApp().done( function() {
+				popup.find( "#ota-step-1" ).css( "color", "#4CAF50" ).html(
+					"&#9745; " + OSApp.Language._( "Configuration backed up" )
+				);
+				OSApp.ESP32Mode.runLegacyDirectOTA( popup );
+			} ).fail( function( errMsg ) {
+				popup.find( "#ota-step-1" ).css( "color", "#FF9800" ).html(
+					"&#9888; " + OSApp.Language._( "Backup warning" ) + ": " + $( "<span>" ).text( errMsg ).html()
+				);
+				OSApp.UIDom.areYouSure(
+					OSApp.Language._( "Configuration backup failed. Continue with update anyway?" ),
+					"",
+					function() {
+						OSApp.ESP32Mode.runLegacyDirectOTA( popup );
+					}
+				);
+			} );
 
-	OSApp.UIDom.openPopup( popup );
+			return false;
+		} );
+
+		popup.on( "click", ".legacy-ota-after-reboot", function() {
+			popup.find( "#ota-step-3" ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Device rebooted" )
+			);
+			popup.find( "#ota-step-4" ).css( "color", "#1976D2" ).html(
+				"&#9658; <b>" + OSApp.Language._( "Restoring configuration..." ) + "</b>"
+			);
+			popup.popup( "close" );
+			setTimeout( function() {
+				OSApp.ESP32Mode.showRestorePopup();
+			}, 400 );
+			return false;
+		} );
+
+		OSApp.UIDom.openPopup( popup );
+	} ).fail( function() {
+		$.mobile.loading( "hide" );
+		OSApp.Errors.showError( OSApp.Language._( "Error checking for updates" ) );
+	} );
 };
 
 OSApp.ESP32Mode.setupOSPiOnlineUpdate = function() {
@@ -1741,7 +2274,7 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup ) {
 		"&#9658; <b>" + OSApp.Language._( "Downloading and installing firmware..." ) + "</b>"
 	);
 
-	OSApp.Firmware.sendToOS( "/uu?pw=", "json" ).done( function( resp ) {
+	OSApp.Firmware.sendToOS( OSApp.Firmware.buildOTAUpdateRequest(), "json" ).done( function( resp ) {
 		if ( !resp || resp.result !== 1 ) {
 			popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
 				"&#9746; " + OSApp.Language._( "Failed to start update" ) +
@@ -1855,7 +2388,7 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup ) {
  * plain $.ajax with explicit password parameter.
  */
 OSApp.ESP32Mode.directRestoreAfterOTA = function( data, currentDevicePass, onDone, onFail ) {
-	var baseUrl = OSApp.currentSession.prefix + OSApp.currentSession.ip;
+	var baseUrl = OSApp.ESP32Mode.getDirectDeviceBaseUrl();
 	var pw = encodeURIComponent( currentDevicePass );
 
 	var soptKeyMap = {
@@ -1965,7 +2498,7 @@ OSApp.ESP32Mode.showInteractiveOTAfromManifest = function( popup ) {
 OSApp.ESP32Mode.showVersionPicker = function( checkData ) {
 	var versionsUrl = ( checkData && checkData.versions_url )
 		? checkData.versions_url
-		: "https://opensprinklershop.de/upgrade/versions.json";
+		: OSApp.Firmware.getVersionCatalogUrl();
 
 	$.mobile.loading( "show" );
 	$.ajax( { url: versionsUrl, dataType: "json", timeout: 10000 } ).done( function( versions ) {
@@ -2167,7 +2700,7 @@ OSApp.ESP32Mode.runInteractiveOTA = function( popup, urlParams ) {
 OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
 	OSApp.ESP32Mode.ensureOTAProgressArea( popup );
 
-	var uuCmd = "/uu?pw=" + ( urlParams || "" );
+	var uuCmd = OSApp.Firmware.buildOTAUpdateRequest( urlParams || "" );
 	OSApp.Firmware.sendToOS( uuCmd, "json" ).done( function( resp ) {
 		if ( !resp || resp.result !== 1 ) {
 			OSApp.ESP32Mode.stopOTADurationTimer( popup );

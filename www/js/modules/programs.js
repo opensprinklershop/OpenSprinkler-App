@@ -719,6 +719,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 			simminutes = 0,
 			simt = Date.UTC( year, month - 1, day, 0, 0, 0, 0 ),
 			simday = ( simt / 1000 / 3600 / 24 ) >> 0,
+			numSchedGroups = OSApp.Constants.options.NUM_SEQ_GROUPS + 1,
 			nstations = OSApp.currentSession.controller.settings.nbrd * 8,
 			startArray = new Array( nstations ),
 			programArray = new Array( nstations ),
@@ -732,8 +733,99 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 			qidArray = new Array( nstations ),
 			lastStopTime = 0,
 			lastSeqStopTime = 0,
-			lastSeqStopTimes = new Array( OSApp.Constants.options.NUM_SEQ_GROUPS ), // Use this array if seq group is available
+			lastSeqStopTimes = new Array( numSchedGroups ), // Includes scheduler-only slot for group P in inverted mode
 			busy, matchFound, prog, sid, qid, d, q, sqi, bid, bid2, s, s2;
+
+		var invertGroupSched = OSApp.currentSession.controller.options.ginv === 1,
+			getSchedGid = function( gid ) {
+				return gid < OSApp.Constants.options.NUM_SEQ_GROUPS ? gid : OSApp.Constants.options.NUM_SEQ_GROUPS;
+			},
+			scheduleInvertedGroupQueue = function( currTime, stationDelay ) {
+				var classPresent = new Array( numSchedGroups ).fill( 0 ),
+					classDuration = new Array( numSchedGroups ).fill( 0 ),
+					classStart = new Array( numSchedGroups ).fill( 0 ),
+					classCursor = new Array( numSchedGroups ).fill( 0 ),
+					classOrder = [],
+					baseStart = currTime,
+					cursor,
+					latestEnd = 0,
+					hasPending = false,
+					classEnd,
+					qi,
+					schedGid;
+
+				for ( qi = 0; qi < rtQueue.length; qi++ ) {
+					q = rtQueue[ qi ];
+					if ( q.dur === 0 ) {
+						continue;
+					}
+
+					if ( q.st >= 0 ) {
+						latestEnd = Math.max( latestEnd, q.st + q.dur );
+						continue;
+					}
+
+					hasPending = true;
+					schedGid = getSchedGid( q.gid );
+
+					if ( !classPresent[ schedGid ] ) {
+						classPresent[ schedGid ] = 1;
+						classOrder.push( schedGid );
+					}
+
+					if ( q.gid === OSApp.Constants.options.PARALLEL_GID_VALUE ) {
+						classDuration[ schedGid ] += q.dur + stationDelay;
+					} else {
+						classDuration[ schedGid ] = Math.max( classDuration[ schedGid ], q.dur );
+					}
+				}
+
+				if ( !hasPending ) {
+					return false;
+				}
+
+				if ( latestEnd > currTime ) {
+					baseStart = latestEnd + stationDelay;
+				}
+
+				cursor = baseStart;
+				for ( qi = 0; qi < classOrder.length; qi++ ) {
+					schedGid = classOrder[ qi ];
+					classStart[ schedGid ] = cursor;
+					classCursor[ schedGid ] = cursor;
+					cursor += classDuration[ schedGid ] + stationDelay;
+				}
+
+				for ( qi = 0; qi < rtQueue.length; qi++ ) {
+					q = rtQueue[ qi ];
+					if ( q.st >= 0 || q.dur === 0 ) {
+						continue;
+					}
+
+					schedGid = getSchedGid( q.gid );
+					if ( q.gid === OSApp.Constants.options.PARALLEL_GID_VALUE ) {
+						q.st = classCursor[ schedGid ];
+						classCursor[ schedGid ] += q.dur + stationDelay;
+					} else {
+						q.st = classStart[ schedGid ];
+					}
+				}
+
+				lastSeqStopTime = 0;
+				for ( qi = 0; qi < numSchedGroups; qi++ ) {
+					lastSeqStopTimes[ qi ] = 0;
+				}
+				for ( qi = 0; qi < classOrder.length; qi++ ) {
+					schedGid = classOrder[ qi ];
+					classEnd = classStart[ schedGid ] + classDuration[ schedGid ];
+					if ( classEnd > currTime ) {
+						lastSeqStopTimes[ schedGid ] = classEnd;
+						lastSeqStopTime = Math.max( lastSeqStopTime, classEnd );
+					}
+				}
+
+				return true;
+			};
 
 		for ( sid = 0; sid < nstations; sid++ ) {
 			startArray[ sid ] = -1;
@@ -742,7 +834,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 			plArray[ sid ] = 0;
 			qidArray[ sid ] = 0xFF;
 		}
-		for ( d = 0; d < OSApp.Constants.options.NUM_SEQ_GROUPS; d++ ) { lastSeqStopTimes[ d ] = 0; }
+		for ( d = 0; d < numSchedGroups; d++ ) { lastSeqStopTimes[ d ] = 0; }
 
 		do {
 			busy = 0;
@@ -846,7 +938,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 						seqAcctime = lastSeqStopTime + OSApp.currentSession.controller.options.sdt;
 					}
 
-					for ( d = 0; d < OSApp.Constants.options.NUM_SEQ_GROUPS; d++ ) {
+					for ( d = 0; d < numSchedGroups; d++ ) {
 						seqAcctimes[ d ] = acctime;
 						if ( lastSeqStopTimes[ d ] > acctime ) {
 							seqAcctimes[ d ] = lastSeqStopTimes[ d ] + OSApp.currentSession.controller.options.sdt;
@@ -854,6 +946,9 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 					}
 
 					if ( is216 ) {
+						if ( invertGroupSched && rtQueue.every( function( queueItem ) { return queueItem.gid !== -1; } ) ) {
+							busy = scheduleInvertedGroupQueue( acctime, OSApp.currentSession.controller.options.sdt ) ? 1 : busy;
+						} else {
 
 						// Schedule all stations
 						for ( qid = 0; qid < rtQueue.length; qid++ ) {
@@ -887,6 +982,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 
 							}
 							busy = 1;
+						}
 						}
 					} else { // !is216
 						for ( sid = 0; sid < nstations; sid++ ) {
@@ -982,7 +1078,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 
 				// Lastly, calculate lastSeqStopTime
 				lastSeqStopTime = 0;
-				for ( d = 0; d < OSApp.Constants.options.NUM_SEQ_GROUPS; d++ ) { lastSeqStopTime[ d ] = 0; }
+				for ( d = 0; d < numSchedGroups; d++ ) { lastSeqStopTimes[ d ] = 0; }
 				for ( qid = 0; qid < rtQueue.length; qid++ ) {
 					q = rtQueue[ qid ];
 					sid = q.sid;
@@ -996,9 +1092,13 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 							}
 						}
 					} else { // Group id is available
-						if ( q.gid !== OSApp.Constants.options.PARALLEL_GID_VALUE ) {
-							if ( sst > lastSeqStopTimes[ q.gid ] ) {
-								lastSeqStopTimes[ q.gid ] = sst;
+						var queueSchedGid = invertGroupSched ? getSchedGid( q.gid ) : q.gid;
+						if ( invertGroupSched || q.gid !== OSApp.Constants.options.PARALLEL_GID_VALUE ) {
+							if ( sst > lastSeqStopTimes[ queueSchedGid ] ) {
+								lastSeqStopTimes[ queueSchedGid ] = sst;
+							}
+							if ( sst > lastSeqStopTime ) {
+								lastSeqStopTime = sst;
 							}
 						}
 					}

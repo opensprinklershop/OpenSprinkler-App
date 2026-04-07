@@ -675,19 +675,7 @@ OSApp.UIDom.bindPanel = function() {
 
 	panel.find( ".setup-online-update" ).on( "click", function() {
 		OSApp.UIDom.closePanel( function() {
-			if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
-				OSApp.Errors.showError( OSApp.Language._( "Online firmware update requires firmware version 2.4.0 or newer." ) );
-				return;
-			}
-			if ( OSApp.Firmware.isOSPi() ) {
-				OSApp.ESP32Mode.setupOSPiOnlineUpdate();
-				return;
-			}
-			if ( OSApp.ESP32Mode && OSApp.ESP32Mode.isESP32Supported() ) {
-				OSApp.ESP32Mode.setupOnlineUpdate();
-			} else {
-				OSApp.ESP32Mode.setupLegacyOnlineUpdate();
-			}
+			OSApp.ESP32Mode.startOnlineUpdateFlow();
 		} );
 		return false;
 	} );
@@ -789,7 +777,7 @@ OSApp.UIDom.bindPanel = function() {
 			updateButtons = function() {
 				var operation = ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.en && OSApp.currentSession.controller.settings.en === 1 ) ? OSApp.Language._( "Disable" ) : OSApp.Language._( "Enable" ),
 					listview = panel.find( "ul[data-role='listview']" ),
-					onlineUpdateSupported = OSApp.Firmware.isOnlineUpdateSupported();
+					onlineUpdateSupported = OSApp.Firmware.isDirectFirmwareUploadSupported() || OSApp.Firmware.isOSPi();
 
 				panel.find( ".toggleOperation span:first" ).html( operation ).attr( "data-translate", operation );
 

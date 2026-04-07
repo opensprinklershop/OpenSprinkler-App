@@ -339,6 +339,10 @@ OSApp.Analog.updateAnalogSensor = function( callback ) {
 		OSApp.Analog.analogSensors = data.sensors;
 		if (Object.prototype.hasOwnProperty.call(data, "detected"))
 			OSApp.Analog.analogSensors.detected = data.detected;
+		if (Object.prototype.hasOwnProperty.call(data, "warnings"))
+			OSApp.Analog.analogSensors.warnings = data.warnings;
+		else
+			OSApp.Analog.analogSensors.warnings = [];
 		callback();
 	} );
 };
@@ -4224,11 +4228,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		// OTA update button handlers - delegate to Online Update flow
 		page.find(".ota-update-btn, .ota-manage-btn").on("click", function(e) {
 			e.preventDefault();
-			if (OSApp.ESP32Mode && OSApp.ESP32Mode.isESP32Supported()) {
-				OSApp.ESP32Mode.setupOnlineUpdate();
-			} else {
-				OSApp.ESP32Mode.setupLegacyOnlineUpdate();
-			}
+			OSApp.ESP32Mode.startOnlineUpdateFlow();
 			return false;
 		});
 
@@ -4260,6 +4260,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 	$("#analogsensorconfig").remove();
 
 	$.mobile.pageContainer.append(page);
+	$.mobile.pageContainer.pagecontainer("change", page);
 
 	// Load sensor data before displaying content
 	var loadData = function() {
@@ -4678,6 +4679,27 @@ OSApp.Analog.buildSensorConfig = function() {
 		" <span style='display:inline-block;width:10px;height:10px;background-color:#eadcf7;border-radius:1px;margin-right:4px;margin-left:4px;vertical-align:middle;'></span>" + OSApp.Language._("Data error") +
 		" <span style='display:inline-block;width:10px;height:10px;background-color:#ffd9d9;border-radius:1px;margin-right:4px;margin-left:12px;vertical-align:middle;'></span>" + OSApp.Language._("Stale (>10x)") +
 		" <span style='display:inline-block;width:10px;height:10px;background-color:#fff4cc;border-radius:1px;margin-right:4px;margin-left:12px;vertical-align:middle;'></span>" + OSApp.Language._("Old (>2x)") + "</div>";
+
+	// Interface warnings (sent by firmware)
+	var warnings = OSApp.Analog.analogSensors.warnings;
+	if (warnings && warnings.length > 0) {
+		var warningMessages = {
+			"I2C_NO_BOARD":       OSApp.Language._("I2C/Analog sensor configured, but no Analog Sensor Board detected (I2C)."),
+			"RS485_NO_ADAPTER":   OSApp.Language._("RS485 sensor configured, but no RS485 adapter detected."),
+			"MQTT_DISABLED":      OSApp.Language._("MQTT sensor configured, but MQTT is disabled in settings."),
+			"MQTT_DISCONNECTED":  OSApp.Language._("MQTT sensor configured, but MQTT is not connected."),
+			"ZIGBEE_WRONG_MODE":  OSApp.Language._("Zigbee sensor configured, but Zigbee mode is not active."),
+			"ZIGBEE_NOT_AVAILABLE": OSApp.Language._("Zigbee sensor configured, but Zigbee is not available in this firmware."),
+			"BLE_NOT_AVAILABLE":  OSApp.Language._("Bluetooth sensor configured, but BLE is not available in this firmware.")
+		};
+		list += "<div style='margin:6px 0;padding:8px 10px;background-color:#fff3cd;border:1px solid #ffc107;border-radius:4px;font-size:13px;color:#856404;'>";
+		list += "<b>&#9888; " + OSApp.Language._("Interface Warnings") + "</b><ul style='margin:4px 0 0 0;padding-left:18px;'>";
+		for (var w = 0; w < warnings.length; w++) {
+			var msg = warningMessages[warnings[w]] || warnings[w];
+			list += "<li>" + msg + "</li>";
+		}
+		list += "</ul></div>";
+	}
 
 	list +=
 		"<table style='width: 100%; clear: both;' id='analog_sensor_table'><tr>" +
