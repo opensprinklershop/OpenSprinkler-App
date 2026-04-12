@@ -1364,22 +1364,16 @@ OSApp.Sites.updateControllerSettings = function( callback ) {
 		return OSApp.Firmware.sendToOS( "/jc?pw=" ).then(
 			function( settings ) {
 				if ( typeof settings !== "object" ) {
-					try {
-						settings = JSON.parse( settings );
-						//eslint-disable-next-line no-unused-vars
-					} catch ( err ) {
-						var matchWTO = /,"wto":\{.*?\}/;
-						var wto = settings.match( matchWTO );
-						settings = settings.replace( matchWTO, "" );
-						try {
-							settings = JSON.parse( settings );
-							OSApp.Sites.handleCorruptedWeatherOptions( wto );
-							//eslint-disable-next-line no-unused-vars
-						} catch ( e ) {
-							// Corrupted JSON returned. Display error modal with fw update links
-							OSApp.Errors.showCorruptedJsonModal( settings, OSApp.currentSession );
-							return false;
-						}
+					var parsedSettings = OSApp.Sites.parseControllerSettings( settings );
+					if ( !parsedSettings ) {
+						// Corrupted JSON returned. Display error modal with fw update links
+						OSApp.Errors.showCorruptedJsonModal( settings, OSApp.currentSession );
+						return false;
+					}
+
+					settings = parsedSettings.settings;
+					if ( parsedSettings.corruptedWeatherOptions ) {
+						OSApp.Sites.handleCorruptedWeatherOptions( parsedSettings.corruptedWeatherOptions );
 					}
 				}
 
@@ -1406,6 +1400,40 @@ OSApp.Sites.updateControllerSettings = function( callback ) {
 				}
 			} );
 	}
+};
+
+OSApp.Sites.parseControllerSettings = function( settings ) {
+	var matchWTO = /,"wto":\{.*?\}/,
+		attempts = [ settings, settings.replace( /"2C"(?=[A-Za-z_][A-Za-z0-9_]*":)/g, "\",\"" ) ],
+		i, parsed, wto;
+
+	if ( typeof settings === "object" ) {
+		return { settings: settings };
+	}
+
+	for ( i = 0; i < attempts.length; i++ ) {
+		try {
+			parsed = JSON.parse( attempts[ i ] );
+			return { settings: parsed };
+			//eslint-disable-next-line no-unused-vars
+		} catch ( err ) {
+			wto = attempts[ i ].match( matchWTO );
+			if ( wto ) {
+				try {
+					parsed = JSON.parse( attempts[ i ].replace( matchWTO, "" ) );
+					return {
+						settings: parsed,
+						corruptedWeatherOptions: wto
+					};
+					//eslint-disable-next-line no-unused-vars
+				} catch ( e ) {
+					// Continue to the next recovery attempt.
+				}
+			}
+		}
+	}
+
+	return null;
 };
 
 OSApp.Sites.handleCorruptedWeatherOptions = function( wto ) {
@@ -1517,4 +1545,3 @@ OSApp.Sites.addFound = function( ip ) {
 		OSApp.Sites.showAddNew( ip );
 	} ).popup( "close" );
 };
-

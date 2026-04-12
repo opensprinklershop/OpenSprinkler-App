@@ -2209,7 +2209,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 	page.find( "#otc" ).on( "click", function() {
 		var button = this, curr = button.value,
-			options = $.extend( {}, {
+			currentOptions = $.extend( {}, {
 				en: 0,
 				token: "",
 				server: "ws.cloud.openthings.io",
@@ -2225,7 +2225,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 				"<div class='ui-content'>" +
 					"<label for='enable'>" + OSApp.Language._( "Enable" ) + "</label>" +
 					"<input class='needsclick otc_enable' data-mini='true' data-iconpos='right' id='enable' type='checkbox' " +
-						( options.en ? "checked='checked'" : "" ) + ">" +
+						( currentOptions.en ? "checked='checked'" : "" ) + ">" +
 					"<div class='ui-body'>" +
 						"<div class='ui-grid-a' style='display:table;'>" +
 							"<div class='ui-block-a' style='width:25%'>" +
@@ -2233,21 +2233,21 @@ OSApp.Options.showOptions = function( expandItem ) {
 							"</div>" +
 							"<div class='ui-block-b' style='width:75%'>" +
 								"<input class='otc-input' type='text' id='token' data-mini='true' maxlength='36' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
-									( options.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "token" ) + "' value='" + options.token + "' required />" +
+									( currentOptions.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "token" ) + "' value='" + currentOptions.token + "' required />" +
 							"</div>" +
 							"<div class='ui-block-a' style='width:25%'>" +
 								"<label for='server' style='padding-top:10px'>" + OSApp.Language._( "Server" ) + "</label>" +
 							"</div>" +
 							"<div class='ui-block-b' style='width:75%'>" +
 								"<input class='otc-input' type='text' id='server' data-mini='true' maxlength='50' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
-									( options.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "server" ) + "' value='" + options.server + "' required />" +
+									( currentOptions.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "server" ) + "' value='" + currentOptions.server + "' required />" +
 							"</div>" +
 							"<div class='ui-block-a' style='width:25%'>" +
 								"<label for='port' style='padding-top:10px'>" + OSApp.Language._( "Port" ) + "</label>" +
 							"</div>" +
 							"<div class='ui-block-b' style='width:75%'>" +
 								"<input class='otc-input' type='number' id='port' data-mini='true' pattern='[0-9]*' min='0' max='65535'" +
-									( options.en ? "" : "disabled='disabled'" ) + " placeholder='80' value='" + options.port + "' required />" +
+									( currentOptions.en ? "" : "disabled='disabled'" ) + " placeholder='80' value='" + currentOptions.port + "' required />" +
 							"</div>" +
 						"</div>" +
 					"</div>" +
@@ -2263,14 +2263,16 @@ OSApp.Options.showOptions = function( expandItem ) {
 			}
 		} );
 		popup.find( ".submit" ).on( "click", function() {
-			if ( popup.find( "#enable" ).prop( "checked" ) && popup.find( "#token" ).val().length !== 32 ) {
+			var token = popup.find( "#token" ).val();
+
+			if ( popup.find( "#enable" ).prop( "checked" ) && token !== currentOptions.token && token.length !== 32 ) {
 				OSApp.Errors.showError( OSApp.Language._( "OpenThings Token must be 32 characters long." ) );
 				return;
 			}
 
 			var options = {
 				en: ( popup.find( "#enable" ).prop( "checked" ) ? 1 : 0 ),
-				token: popup.find( "#token" ).val(),
+				token: token,
 				server: popup.find( "#server" ).val(),
 				port: parseInt( popup.find( "#port" ).val() )
 			};
