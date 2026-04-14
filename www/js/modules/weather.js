@@ -656,13 +656,14 @@ OSApp.Weather.updateWeather = function() {
 	encodeURIComponent( OSApp.currentSession.controller.settings.loc );
 
 	if ( provider ){
-		url += '&wto="provider":"' + provider + '"';
+		const wto = { provider: provider };
 		if ( key ){
-			url += ',"key":"' + key + '"';
+			wto.key = key;
 			if ( provider === "WU" ){
-				url += ',"pws":"' + pws + '"';
+				wto.pws = pws;
 			}
 		}
+		url += "&wto=" + encodeURIComponent( JSON.stringify( wto ) );
 	}
 
 	$.ajax( {

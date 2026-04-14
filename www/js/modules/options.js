@@ -1599,6 +1599,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 		page.find( "#wtkey" ).prop( "value", "" );
 		page.find( "#wtkey" ).parent().addClass( "red" );
 		page.find( "#wto" ).prop( "value", OSApp.Utils.escapeJSON(curr));
+		header.eq( 2 ).prop( "disabled", false );
+		page.find( ".submit" ).addClass( "hasChanges" );
 	} );
 
 	page.find( "#mda" ).on( "click", function() {
@@ -1881,7 +1883,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 		$( ".ui-popup-active" ).find( "[data-role='popup']" ).popup( "close" );
 
-		var largeSOPTSupport = OSApp.Firmware.checkOSVersion( 221 );
+		var largeSOPTSupport = OSApp.Firmware.checkOSVersion( 221 ) || OSApp.Firmware.isOSPi();
 		var popup = $( "<div data-role='popup' data-theme='a' id='mqttSettings'>" +
 				"<div data-role='header' data-theme='b'>" +
 					"<h1>" + OSApp.Language._( "MQTT Settings" ) + "</h1>" +

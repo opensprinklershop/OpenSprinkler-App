@@ -54,6 +54,9 @@ OSApp.Sites.displayPage = function() {
 			"<li data-icon='false'>" +
 			"<a href='#' id='site-add-manual'>" + OSApp.Language._( "Manually Add Device" ) + "</a>" +
 			"</li>" +
+			"<li data-icon='false'>" +
+			"<a href='#' id='site-add-setup'>" + OSApp.Language._( "Setup Assistant" ) + "</a>" +
+			"</li>" +
 			"</ul>" +
 			"</div>" ),
 		sites, header, total;
@@ -66,6 +69,13 @@ OSApp.Sites.displayPage = function() {
 
 	popup.find( "#site-add-manual" ).on( "click", function() {
 		OSApp.Sites.showAddNew( false, true );
+		return false;
+	} );
+
+	popup.find( "#site-add-setup" ).on( "click", function() {
+		popup.one( "popupafterclose", function() {
+			OSApp.Welcome.showSetupWizard();
+		} ).popup( "close" );
 		return false;
 	} );
 
@@ -624,15 +634,24 @@ OSApp.Sites.showSiteSelect = function( list ) {
 	} ).enhanceWithin().popup( "open" );
 };
 
-OSApp.Sites.showAddNew = function( autoIP, closeOld ) {
+OSApp.Sites.showAddNew = function( autoIP, closeOld, options ) {
 	$( "#addnew" ).popup( "destroy" ).remove();
 
+	options = options || {};
+
 	var isAuto = ( autoIP ) ? true : false,
+		defaultAddress = isAuto ? autoIP : ( options.address || "" ),
+		defaultPassword = options.password || "",
+		addressHelp = options.addressHelp || OSApp.Language._( "May be an IP, URL, or OTC Token" ),
+		addressPlaceholder = options.addressPlaceholder || "",
+		passwordHelp = options.passwordHelp || "",
+		helperText = options.helperText || "",
 		addnew = $( "<div data-role='popup' id='addnew' data-theme='a' data-overlay-theme='b'>" +
 			"<div data-role='header' data-theme='b'>" +
 				"<h1>" + OSApp.Language._( "New OpenSprinkler Device" ) + "</h1>" +
 			"</div>" +
 			"<div class='ui-content' id='addnew-content'>" +
+				( helperText ? "<p class='rain-desc'>" + helperText + "</p>" : "" ) +
 				"<form method='post' novalidate>" +
 					"<label for='os_name'>" + OSApp.Language._( "Device Name:" ) + "</label>" +
 					"<p class='smaller'>" +
@@ -643,14 +662,15 @@ OSApp.Sites.showAddNew = function( autoIP, closeOld ) {
 					( isAuto ? "" :
 						"<label class='url-field' for='os_url'>" + OSApp.Language._( "Device Address:" ) + "</label>" +
 					"<p class='smaller'>" +
-						OSApp.Language._( "May be an IP, URL, or OTC Token" ) +
+						addressHelp +
 					"</p>" ) +
 						"<input data-wrapper-class='url-field' " + ( isAuto ? "data-role='none' style='display:none' " : "" ) +
 							"autocomplete='off' autocorrect='off' autocapitalize='off' " +
 							"spellcheck='false' type='text' inputmode='url' pattern='' name='os_url' id='os_url' " +
-							"value='" + ( isAuto ? autoIP : "" ) + "'" +
+							"value='" + defaultAddress + "' placeholder='" + addressPlaceholder + "'>" +
 					"<label for='os_pw'>" + OSApp.Language._( "Device Password:" ) + "</label>" +
-					"<input type='password' name='os_pw' id='os_pw' value=''>" +
+					( passwordHelp ? "<p class='smaller'>" + passwordHelp + "</p>" : "" ) +
+					"<input type='password' name='os_pw' id='os_pw' value='" + defaultPassword + "'>" +
 					"<label for='save_pw'>" + OSApp.Language._( "Save Password" ) + "</label>" +
 					"<input type='checkbox' data-wrapper-class='save_pw' name='save_pw' " +
 						"id='save_pw' data-mini='true' checked='checked'>" +
@@ -669,6 +689,8 @@ OSApp.Sites.showAddNew = function( autoIP, closeOld ) {
 				"</form>" +
 			"</div>" +
 		"</div>" );
+
+	addnew.data( "setupOptions", options );
 
 	addnew.find( "form" ).on( "submit", function() {
 		OSApp.Sites.submitNewSite();
@@ -807,6 +829,9 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 					"sites": JSON.stringify( sites ),
 					"current_site": name
 				}, function() {
+					if ( OSApp.Welcome && typeof OSApp.Welcome.markSetupWizardSeen === "function" ) {
+						OSApp.Welcome.markSetupWizardSeen();
+					}
 					OSApp.Network.cloudSaveSites();
 					OSApp.Sites.updateSiteList( Object.keys( sites ), name );
 					OSApp.Sites.newLoad();

@@ -15,7 +15,7 @@
 
 describe("Logout / Clean up", function () {
 	it("Remove all variables", function (done) {
-		OSApp.Storage.remove(["sites", "current_site", "lang", "runonce"], function () {
+		OSApp.Storage.remove(["sites", "current_site", "lang", "runonce", "cloudToken", "setupWizardSeen"], function () {
 			done();
 		});
 	});
