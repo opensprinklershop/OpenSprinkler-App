@@ -429,6 +429,14 @@ hr.divider {
     vertical-align:text-top;
     margin: 2px 5px;
 }
+#imin + .ui-slider .ui-slider-input,
+#imax + .ui-slider .ui-slider-input {
+    width: 52px;
+}
+#imin + .ui-slider .ui-slider-track,
+#imax + .ui-slider .ui-slider-track {
+    margin-left: 80px;
+}
 .input_with_buttons input {
     text-align: center;
 }

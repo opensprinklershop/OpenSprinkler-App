@@ -1751,6 +1751,18 @@ OSApp.Options.showOptions = function( expandItem ) {
 				maximum: 1000,
 				helptext: helptext
 			} );
+		} else if ( id === "imax" ) {
+			OSApp.UIDom.showSingleDurationInput( {
+				data: dur.val(),
+				title: name,
+				callback: function( result ) {
+					dur.val( result ).text( result + "mA" );
+				},
+				label: OSApp.Language._( "Milliamperes" ),
+				maximum: 2550,
+				minimum: 0,
+				helptext: helptext
+			} );
 		}
 
 		return false;

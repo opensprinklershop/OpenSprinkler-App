@@ -1592,13 +1592,14 @@ OSApp.ESP32Mode.getDirectDeviceUpdateUrl = function() {
 
 OSApp.ESP32Mode.getDirectDeviceUploadUrl = function() {
 	var baseUrl = OSApp.ESP32Mode.getDirectDeviceBaseUrl();
-	var match = baseUrl.match( /^(https?:\/\/)([^/:]+)(?::\d+)?/i );
+	var match = baseUrl.match( /^https?:\/\/([^/:]+)(?::\d+)?/i );
 
 	if ( match ) {
-		return match[ 1 ] + match[ 2 ] + ":8080/update";
+		// The update server on port 8080 only supports HTTP — always use http://
+		return "http://" + match[ 1 ] + ":8080/update";
 	}
 
-	return baseUrl.replace( /\/+$/, "" ) + ":8080/update";
+	return baseUrl.replace( /^https:/, "http:" ).replace( /\/+$/, "" ) + ":8080/update";
 };
 
 OSApp.ESP32Mode.getClassicUpdateOptionsHtml = function() {
@@ -1612,20 +1613,11 @@ OSApp.ESP32Mode.getClassicUpdateOptionsHtml = function() {
 		"</div>" +
 		"</div>";
 
-	if ( !OSApp.ESP32Mode.isMatterSupported() ) {
-		return html;
+	if ( OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller() ) {
+		html += "<div style='margin:10px 0;padding:10px;background:#e8f0fe;border-radius:6px;font-size:0.85em;color:#555;'>" +
+			OSApp.Language._( "Both firmware variants (Zigbee and Matter) will be updated sequentially." ) +
+			"</div>";
 	}
-
-	var activeVariant = OSApp.ESP32Mode.isMatterActive() ? "matter" : "zigbee";
-	html += "<div class='ota-variant-area' style='margin:10px 0;padding:10px;background:#e8f0fe;border-radius:6px;'>" +
-		"<div style='font-size:0.9em;font-weight:bold;margin-bottom:6px;'>" + OSApp.Language._( "Firmware variant to upload" ) + ":</div>" +
-		"<label style='display:inline-flex;align-items:center;gap:6px;margin-right:16px;cursor:pointer;font-size:0.95em;'>" +
-		"<input type='radio' name='classic-ota-variant' value='zigbee'" + ( activeVariant === "zigbee" ? " checked" : "" ) + "> Zigbee" +
-		"</label>" +
-		"<label style='display:inline-flex;align-items:center;gap:6px;cursor:pointer;font-size:0.95em;'>" +
-		"<input type='radio' name='classic-ota-variant' value='matter'" + ( activeVariant === "matter" ? " checked" : "" ) + "> Matter" +
-		"</label>" +
-		"</div>";
 
 	return html;
 };
@@ -1661,11 +1653,17 @@ OSApp.ESP32Mode.getClassicDefaultEntry = function( data ) {
 };
 
 OSApp.ESP32Mode.buildClassicUpdateStepsHtml = function() {
+	var isDual = OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller();
+
 	return "<div id='ota-steps' style='display:none;margin:12px 0;padding:8px;background:#f0f0f0;border-radius:4px;font-size:0.9em;'>" +
 		"<p style='margin:2px 0;'><b>" + OSApp.Language._( "Update Process" ) + ":</b></p>" +
 		"<p id='ota-step-1' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 1: Backup configuration" ) + "</p>" +
-		"<p id='ota-step-2' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 2: Download firmware image" ) + "</p>" +
-		"<p id='ota-step-3' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 3: Upload firmware to device" ) + "</p>" +
+		"<p id='ota-step-2' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 2: Download firmware image" ) + ( isDual ? " (Zigbee)" : "" ) + "</p>" +
+		"<p id='ota-step-3' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 3: Upload firmware to device" ) + ( isDual ? " (Zigbee)" : "" ) + "</p>" +
+		( isDual
+			? "<p id='ota-step-3b' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 3b: Upload Matter firmware" ) + "</p>"
+			: ""
+		) +
 		"<p id='ota-step-4' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 4: Wait for device reboot" ) + "</p>" +
 		"<p id='ota-step-5' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 5: Restore configuration" ) + "</p>" +
 		"</div>" +
@@ -1888,6 +1886,51 @@ OSApp.ESP32Mode.uploadClassicFirmwareBlob = function( blob, filename, variant ) 
 	return defer.promise();
 };
 
+/**
+ * Wait for device to come back online after a firmware upload + reboot.
+ * Polls /jc until the device responds, then calls onReady().
+ * Calls onFail() if the device doesn't respond within ~90 seconds.
+ */
+OSApp.ESP32Mode.waitForDeviceReady = function( onReady, onFail ) {
+	var baseUrl = OSApp.ESP32Mode.getDirectDeviceBaseUrl();
+	var originalPass = OSApp.currentSession.pass;
+	var defaultPass = md5( "opendoor" );
+	var pollCount = 0;
+	var maxPolls = 30;
+	var polling = false;
+
+	// Wait 7 seconds before first poll (device needs time to reboot)
+	setTimeout( function() {
+		var rebootPoll = setInterval( function() {
+			if ( polling ) { return; }
+			pollCount++;
+			if ( pollCount > maxPolls ) {
+				clearInterval( rebootPoll );
+				onFail();
+				return;
+			}
+
+			polling = true;
+			var tryPass = ( pollCount % 2 === 1 ) ? originalPass : defaultPass;
+
+			$.ajax( {
+				url: baseUrl + "/jc?pw=" + encodeURIComponent( tryPass ),
+				type: "GET",
+				dataType: "json",
+				timeout: 3000
+			} ).done( function( resp ) {
+				polling = false;
+				if ( !resp ) { return; }
+				clearInterval( rebootPoll );
+				OSApp.currentSession.pass = tryPass;
+				onReady();
+			} ).fail( function() {
+				polling = false;
+			} );
+		}, 3000 );
+	}, 7000 );
+};
+
 OSApp.ESP32Mode.waitForClassicUploadReboot = function( popup ) {
 	var originalPass = OSApp.currentSession.pass;
 	var defaultPass = md5( "opendoor" );
@@ -1981,11 +2024,30 @@ OSApp.ESP32Mode.waitForClassicUploadReboot = function( popup ) {
 
 
 OSApp.ESP32Mode.runClassicPostedUpdate = function( popup, versionEntry ) {
-	var variant = popup.find( "input[name='classic-ota-variant']:checked" ).val() || "zigbee";
-	var firmwareUrl = OSApp.ESP32Mode.getClassicPostedFirmwareUrl( versionEntry, variant );
-	var filename = firmwareUrl.split( "/" ).pop() || "firmware.bin";
+	var isDual = OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller();
+	var source = versionEntry || {};
 
-	if ( !versionEntry || !firmwareUrl ) {
+	// For ESP32 dual-partition: upload zigbee first, then matter
+	// For ESP8266 or single-partition: upload one firmware only
+	var uploads = [];
+	if ( isDual ) {
+		if ( source.zigbee_url ) {
+			uploads.push( { url: source.zigbee_url, slot: "zigbee", label: "Zigbee" } );
+		}
+		if ( source.matter_url ) {
+			uploads.push( { url: source.matter_url, slot: "matter", label: "Matter" } );
+		}
+	} else if ( OSApp.Firmware.isESP8266Controller() ) {
+		if ( source.esp8266_url ) {
+			uploads.push( { url: source.esp8266_url, slot: "", label: "ESP8266" } );
+		}
+	} else {
+		if ( source.zigbee_url ) {
+			uploads.push( { url: source.zigbee_url, slot: "zigbee", label: "Zigbee" } );
+		}
+	}
+
+	if ( uploads.length === 0 ) {
 		OSApp.Errors.showError( OSApp.Language._( "No firmware download URL available." ) );
 		return;
 	}
@@ -1995,48 +2057,116 @@ OSApp.ESP32Mode.runClassicPostedUpdate = function( popup, versionEntry ) {
 	popup.find( ".classic-ota-action" ).prop( "disabled", true ).addClass( "ui-state-disabled" );
 	popup.find( "#ota-progress-msg" ).css( "color", "" );
 
-	var continueUpload = function() {
-		popup.find( "#ota-step-2" ).css( "color", "#1976D2" ).html(
-			"&#9658; <b>" + OSApp.Language._( "Downloading firmware image..." ) + "</b>"
+	var uploadIndex = 0;
+
+	var doUpload = function() {
+		var current = uploads[ uploadIndex ];
+		var isFirst = ( uploadIndex === 0 );
+		var isLast  = ( uploadIndex === uploads.length - 1 );
+		var stepLabel = isDual ? " (" + current.label + ")" : "";
+		var filename = current.url.split( "/" ).pop() || "firmware.bin";
+
+		// Step label for download
+		var dlStep = isFirst ? "#ota-step-2" : "#ota-step-3b";
+		var ulStep = isFirst ? "#ota-step-3" : "#ota-step-3b";
+
+		popup.find( dlStep ).css( "color", "#1976D2" ).html(
+			"&#9658; <b>" + OSApp.Language._( "Downloading firmware image..." ) + stepLabel + "</b>"
 		);
-		popup.find( "#ota-progress-bar" ).css( "width", "15%" );
-		popup.find( "#ota-progress-pct" ).text( "15%" );
-		popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Downloading firmware image..." ) );
+		var dlPct = isDual ? ( isFirst ? "10%" : "48%" ) : "15%";
+		popup.find( "#ota-progress-bar" ).css( "width", dlPct );
+		popup.find( "#ota-progress-pct" ).text( dlPct );
+		popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Downloading firmware image..." ) + stepLabel );
 
-		OSApp.ESP32Mode.fetchClassicFirmwareBlob( firmwareUrl ).done( function( blob ) {
-			popup.find( "#ota-step-2" ).css( "color", "#4CAF50" ).html(
-				"&#9745; " + OSApp.Language._( "Firmware image downloaded" )
+		OSApp.ESP32Mode.fetchClassicFirmwareBlob( current.url ).done( function( blob ) {
+			popup.find( dlStep ).css( "color", "#4CAF50" ).html(
+				"&#9745; " + OSApp.Language._( "Firmware image downloaded" ) + stepLabel
 			);
-			popup.find( "#ota-step-3" ).css( "color", "#1976D2" ).html(
-				"&#9658; <b>" + OSApp.Language._( "Uploading firmware to device..." ) + "</b>"
-			);
-			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Uploading firmware to device..." ) );
 
-			OSApp.ESP32Mode.uploadClassicFirmwareBlob( blob, filename, variant ).progress( function( progress ) {
-				popup.find( "#ota-progress-bar" ).css( "width", progress + "%" );
-				popup.find( "#ota-progress-pct" ).text( progress + "%" );
-			} ).done( function() {
-				popup.find( "#ota-step-3" ).css( "color", "#4CAF50" ).html(
-					"&#9745; " + OSApp.Language._( "Firmware uploaded to device" )
+			if ( isFirst && isDual ) {
+				popup.find( ulStep ).css( "color", "#1976D2" ).html(
+					"&#9658; <b>" + OSApp.Language._( "Uploading firmware to device..." ) + stepLabel + "</b>"
 				);
-				popup.find( "#ota-progress-bar" ).css( "width", "92%" );
-				popup.find( "#ota-progress-pct" ).text( "92%" );
-				popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Upload successful. Device is rebooting..." ) );
-				OSApp.ESP32Mode.waitForClassicUploadReboot( popup );
+			} else if ( !isDual ) {
+				popup.find( ulStep ).css( "color", "#1976D2" ).html(
+					"&#9658; <b>" + OSApp.Language._( "Uploading firmware to device..." ) + "</b>"
+				);
+			}
+			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Uploading firmware to device..." ) + stepLabel );
+
+			OSApp.ESP32Mode.uploadClassicFirmwareBlob( blob, filename, current.slot ).progress( function( progress ) {
+				var scaledPct;
+				if ( isDual ) {
+					// Map raw 35-90 to: first upload 10-45%, second upload 50-85%
+					var ratio = Math.max( 0, Math.min( 1, ( progress - 35 ) / 55 ) );
+					scaledPct = isFirst
+						? Math.round( 10 + ratio * 35 )
+						: Math.round( 50 + ratio * 35 );
+				} else {
+					scaledPct = progress;
+				}
+				popup.find( "#ota-progress-bar" ).css( "width", scaledPct + "%" );
+				popup.find( "#ota-progress-pct" ).text( scaledPct + "%" );
+			} ).done( function() {
+				if ( isFirst && isDual ) {
+					popup.find( ulStep ).css( "color", "#4CAF50" ).html(
+						"&#9745; " + OSApp.Language._( "Firmware uploaded to device" ) + stepLabel
+					);
+				} else if ( !isDual ) {
+					popup.find( ulStep ).css( "color", "#4CAF50" ).html(
+						"&#9745; " + OSApp.Language._( "Firmware uploaded to device" )
+					);
+				}
+
+				if ( !isLast ) {
+					// Wait for device reboot, then upload next firmware
+					popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is rebooting..." ) + " " + OSApp.Language._( "Waiting for device to come back online..." ) );
+					popup.find( "#ota-progress-bar" ).css( "width", "46%" );
+					popup.find( "#ota-progress-pct" ).text( "46%" );
+
+					OSApp.ESP32Mode.waitForDeviceReady( function() {
+						uploadIndex++;
+						doUpload();
+					}, function() {
+						popup.find( "#ota-step-3b" ).css( "color", "#f44336" ).html(
+							"&#9746; " + OSApp.Language._( "Device did not come back online after first upload." )
+						);
+						popup.find( "#ota-progress-msg" ).css( "color", "#c00" ).text( OSApp.Language._( "Device did not come back online after first upload." ) );
+						popup.find( ".classic-ota-action" ).prop( "disabled", false ).removeClass( "ui-state-disabled" );
+					} );
+				} else {
+					// Last upload done — wait for final reboot
+					popup.find( "#ota-progress-bar" ).css( "width", isDual ? "88%" : "92%" );
+					popup.find( "#ota-progress-pct" ).text( isDual ? "88%" : "92%" );
+					popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Upload successful. Device is rebooting..." ) );
+
+					if ( isDual ) {
+						popup.find( "#ota-step-3b" ).css( "color", "#4CAF50" ).html(
+							"&#9745; " + OSApp.Language._( "Firmware uploaded to device" ) + " (" + current.label + ")"
+						);
+					}
+
+					OSApp.ESP32Mode.waitForClassicUploadReboot( popup );
+				}
 			} ).fail( function( message ) {
-				popup.find( "#ota-step-3" ).css( "color", "#f44336" ).html(
-					"&#9746; " + OSApp.Language._( "Firmware upload failed." )
+				var failStep = isFirst ? "#ota-step-3" : "#ota-step-3b";
+				popup.find( failStep ).css( "color", "#f44336" ).html(
+					"&#9746; " + OSApp.Language._( "Firmware upload failed." ) + stepLabel
 				);
 				popup.find( "#ota-progress-msg" ).css( "color", "#c00" ).text( message || OSApp.Language._( "Firmware upload failed." ) );
 				popup.find( ".classic-ota-action" ).prop( "disabled", false ).removeClass( "ui-state-disabled" );
 			} );
 		} ).fail( function() {
-			popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
-				"&#9746; " + OSApp.Language._( "Firmware download failed." )
+			popup.find( dlStep ).css( "color", "#f44336" ).html(
+				"&#9746; " + OSApp.Language._( "Firmware download failed." ) + stepLabel
 			);
 			popup.find( "#ota-progress-msg" ).css( "color", "#c00" ).text( OSApp.Language._( "Firmware download failed." ) );
 			popup.find( ".classic-ota-action" ).prop( "disabled", false ).removeClass( "ui-state-disabled" );
 		} );
+	};
+
+	var continueUpload = function() {
+		doUpload();
 	};
 
 	popup.find( "#ota-step-1" ).css( "color", "#1976D2" ).html(
