@@ -192,7 +192,7 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 	} );
 
 	popup.on( "focus", "input[type='number']", function() {
-		this.value = "";
+		this.select();
 	} ).on( "blur", "input[type='number']", function() {
 
 		// Generic min/max checker for Temp/Rain/Hum baseline as well as 0-100%
@@ -281,7 +281,7 @@ OSApp.Weather.showAutoRainDelayAdjustmentOptions = function( button, callback ) 
 	} );
 
 	popup.on( "focus", "input[type='number']", function() {
-		this.value = "";
+		this.select();
 	} ).on( "blur", "input[type='number']", function() {
 		if ( this.value === "" || parseInt( this.value ) < 0 ) {
 			this.value = "0";
@@ -410,7 +410,7 @@ OSApp.Weather.showMonthlyAdjustmentOptions = function( button, callback ) {
 	} );
 
 	popup.on( "focus", "input[type='number']", function() {
-		this.value = "";
+		this.select();
 	} ).on( "blur", "input[type='number']", function() {
 		if ( this.value === "" || parseInt( this.value ) < 0 ) {
 			this.value = "0";
@@ -582,7 +582,7 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 	} );
 
 	popup.on( "focus", "input[type='number']", function() {
-		this.value = "";
+		this.select();
 	} ).on( "blur", "input[type='number']", function() {
 
 		// Generic min/max checker for each option.

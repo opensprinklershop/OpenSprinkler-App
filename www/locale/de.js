@@ -633,6 +633,8 @@
       "Do you want to stop the currently running program?": "Wollen Sie das laufende Programm beenden?",
       "Create a single-run program for repeat functionality?": "Ein Einmal-Programm für Wiederholungsfunktion erstellen?",
       "Current": "laufend",
+      "Valve Current": "Ventilstrom",
+      "Total": "Gesamt",
       "Configured as Extender": "Als Erweiterung konfiguriert",
       "Do you wish to disable extender mode?": "Wollen Sie den Erweiterungsmodus deaktivieren?",
       "System Disabled": "System deaktiviert",

@@ -60,7 +60,13 @@ OSApp.Status.changeStatus = function( seconds, color, line, onclick ) {
 	}
 
 	if ( OSApp.currentSession.isControllerConnected() && typeof OSApp.currentSession.controller.settings.curr !== "undefined" ) {
-		html += OSApp.Language._( "Current" ) + ": " + OSApp.currentSession.controller.settings.curr + " mA ";
+		var valveCurr = OSApp.currentSession.controller.settings.vcurr;
+		if ( typeof valveCurr !== "undefined" ) {
+			html += OSApp.Language._( "Valve Current" ) + ": " + valveCurr + " mA ";
+			html += "<span class='smaller'>(" + OSApp.Language._( "Total" ) + ": " + OSApp.currentSession.controller.settings.curr + " mA)</span> ";
+		} else {
+			html += OSApp.Language._( "Current" ) + ": " + OSApp.currentSession.controller.settings.curr + " mA ";
+		}
 	}
 
 	if (

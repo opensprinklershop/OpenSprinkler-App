@@ -216,7 +216,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 					case "wtkey":
 						return true;
 					case "wto":
+						console.log( "DEBUG case wto: raw data (from #wto.val) =", JSON.stringify( data ) );
 						data = OSApp.Utils.escapeJSON( $.extend( {}, OSApp.Utils.unescapeJSON( data ), { key: page.find( "#wtkey" ).val() } ) );
+						console.log( "DEBUG case wto: after escapeJSON =", JSON.stringify( data ) );
 
 						if ( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) === data ) {
 							return true;
@@ -376,7 +378,19 @@ OSApp.Options.showOptions = function( expandItem ) {
 			opt = OSApp.Utils.transformKeys( opt );
 			$.mobile.loading( "show" );
 
-			OSApp.Firmware.sendToOS( "/co?pw=&" + $.param( opt ) ).done( function() {
+			// DEBUG: capture exact wto value and full URL before sending
+			console.log( "DEBUG submitOptions: opt.wto =", JSON.stringify( opt.wto ) );
+			console.log( "DEBUG submitOptions: $.param(opt) =", $.param( opt ) );
+			var _debugUrl = "/co?pw=&" + $.param( opt );
+			console.log( "DEBUG submitOptions: full URL length =", _debugUrl.length );
+			// Extract just the wto param from the encoded URL
+			var _wtoMatch = $.param( opt ).match( /wto=([^&]*)/ );
+			if ( _wtoMatch ) {
+				console.log( "DEBUG submitOptions: encoded wto =", _wtoMatch[ 1 ] );
+				console.log( "DEBUG submitOptions: decoded wto =", decodeURIComponent( _wtoMatch[ 1 ] ) );
+			}
+
+			OSApp.Firmware.sendToOS( _debugUrl ).done( function() {
 				$.mobile.document.one( "pageshow", function() {
 					OSApp.Errors.showError( OSApp.Language._( "Settings have been saved" ) );
 				} );
@@ -1384,7 +1398,10 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 			// Change wto based on new values
 			const wto = OSApp.Utils.unescapeJSON(page.find( "#wto" ).val());
+			console.log( "DEBUG popup submit: options =", JSON.stringify( options ) );
+			console.log( "DEBUG popup submit: #wto before =", JSON.stringify( page.find( "#wto" ).val() ) );
 			page.find( "#wto" ).prop( "value", OSApp.Utils.escapeJSON( options ));
+			console.log( "DEBUG popup submit: #wto after =", JSON.stringify( page.find( "#wto" ).val() ) );
 
 			popup.popup( "close" );
 
@@ -1611,7 +1628,10 @@ OSApp.Options.showOptions = function( expandItem ) {
 		} else {
 			curr.mda = 0;
 		}
+		console.log( "DEBUG #mda click: curr =", JSON.stringify( curr ) );
+		console.log( "DEBUG #mda click: escapeJSON =", JSON.stringify( OSApp.Utils.escapeJSON(curr) ) );
 		page.find( "#wto" ).prop( "value", OSApp.Utils.escapeJSON(curr));
+		console.log( "DEBUG #mda click: #wto after =", JSON.stringify( page.find( "#wto" ).val() ) );
 	} );
 
 	page.find( ".help-icon" ).on( "click", OSApp.UIDom.showHelpText );
