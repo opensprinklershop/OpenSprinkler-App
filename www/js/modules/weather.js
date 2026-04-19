@@ -487,7 +487,7 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 	);
 
 	if ( OSApp.currentDevice.isMetric ) {
-		options.baseETo = Math.round( options.baseETo * 25.4 * 10 ) / 10;
+		options.baseETo = Math.round( options.baseETo * 25.4 * 100 ) / 100;
 		options.elevation = Math.round( options.elevation / 3.28 );
 	}
 
@@ -505,13 +505,13 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 						"<label class='center'>" +
 							OSApp.Language._( "Baseline ETo" ) + ( OSApp.currentDevice.isMetric ? " (mm" : "(in" ) + "/day)" +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='baseline-ETo' type='number' min='0' " + ( OSApp.currentDevice.isMetric ? "max='25' step='0.1'" : "max='1' step='0.01'" ) + " value='" + options.baseETo + "'>" +
+						"<input data-wrapper-class='pad_buttons' class='baseline-ETo' type='number' min='0' " + ( OSApp.currentDevice.isMetric ? "max='25' step='0.01'" : "max='1' step='0.01'" ) + " value='" + options.baseETo + "'>" +
 					"</div>" +
 					"<div class='ui-block-b'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Elevation" ) + ( OSApp.currentDevice.isMetric ? " (m)" : " (ft)" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='elevation' type='number' step='1'" + ( OSApp.currentDevice.isMetric ? "min='-400' max='9000'" : "min='-1400' max='30000'" ) + " value='" + options.elevation + "'>" +
+						"<input data-wrapper-class='pad_buttons' class='elevation' type='number' step='1' " + ( OSApp.currentDevice.isMetric ? "min='-400' max='9000'" : "min='-1400' max='30000'" ) + " value='" + options.elevation + "'>" +
 					"</div>" +
 				"</div>" +
 				"<button class='detect-baseline-eto'>" + OSApp.Language._( "Detect baseline ETo" ) + "</button>" +
@@ -619,29 +619,29 @@ OSApp.Weather.updateWeather = function() {
 		return;
 	}
 
-	var now = new Date().getTime();
+	var now = new Date().getTime(),
+		previousWeather = OSApp.currentSession.weather;
 
-	if ( OSApp.currentSession.weather && OSApp.currentSession.weather.providedLocation === OSApp.currentSession.controller.settings.loc && now - OSApp.currentSession.weather.lastUpdated < 60 * 60 * 100 ) {
+	if ( OSApp.currentSession.weather && OSApp.currentSession.weather.providedLocation === OSApp.currentSession.controller.settings.loc && now - OSApp.currentSession.weather.lastUpdated < 60 * 60 * 1000 ) {
 		OSApp.Weather.finishWeatherUpdate();
 		return;
-       } else {
-               var storedData = OSApp.Storage.getItemSync( "weatherData" );
-               if ( storedData ) {
-                       try {
-                               var weatherData = JSON.parse( storedData );
-                               if ( weatherData.providedLocation === OSApp.currentSession.controller.settings.loc && now - weatherData.lastUpdated < 60 * 60 * 100 ) {
-                                       OSApp.currentSession.weather = weatherData;
-                                       OSApp.Weather.finishWeatherUpdate();
-                                       return;
-                               }
-                               //eslint-disable-next-line
-                       } catch ( err ) {}
-               }
-       }
-
-	OSApp.currentSession.weather = undefined;
+	} else {
+		var storedData = OSApp.Storage.getItemSync( "weatherData" );
+		if ( storedData ) {
+			try {
+				var weatherData = JSON.parse( storedData );
+				if ( weatherData.providedLocation === OSApp.currentSession.controller.settings.loc && now - weatherData.lastUpdated < 60 * 60 * 1000 ) {
+					OSApp.currentSession.weather = weatherData;
+					OSApp.Weather.finishWeatherUpdate();
+					return;
+				}
+				//eslint-disable-next-line
+			} catch ( err ) {}
+		}
+	}
 
 	if ( OSApp.currentSession.controller.settings.loc === "" ) {
+		OSApp.currentSession.weather = undefined;
 		OSApp.Weather.hideWeather();
 		return;
 	}
@@ -652,40 +652,82 @@ OSApp.Weather.updateWeather = function() {
 	const key = OSApp.currentSession.controller.settings.wto?.key;
 	const pws = OSApp.currentSession.controller.settings.wto?.pws;
 
-	let url = OSApp.currentSession.weatherServerUrl + "/weatherData?loc=" +
+	var baseUrl = OSApp.currentSession.weatherServerUrl + "/weatherData?loc=" +
 	encodeURIComponent( OSApp.currentSession.controller.settings.loc );
 
-	if ( provider ){
-		const wto = { provider: provider };
-		if ( key ){
-			wto.key = key;
-			if ( provider === "WU" ){
-				wto.pws = pws;
-			}
-		}
-		url += "&wto=" + encodeURIComponent( JSON.stringify( wto ) );
+	var usedProvider = false;
+
+	// Only send provider-specific wto if the provider has the required credentials;
+	// WU needs a key – without one, fall back to the default provider (Apple Weather)
+	if ( provider && !( provider === "WU" && !key ) ){
+		usedProvider = true;
 	}
 
-	$.ajax( {
-		url: url,
-		contentType: "application/json; charset=utf-8",
-		success: function( data ) {
-
-			// Hide the weather if no data is returned
-			if ( typeof data !== "object" ) {
-				OSApp.Weather.hideWeather();
-				return;
+	var fetchWeather = function( withProvider ) {
+		var url = baseUrl;
+		if ( withProvider && provider ) {
+			var wto = { provider: provider };
+			if ( key ) {
+				wto.key = key;
+				if ( provider === "WU" ) {
+					wto.pws = pws;
+				}
 			}
+			url += "&wto=" + encodeURIComponent( JSON.stringify( wto ) );
+		}
 
-			OSApp.currentSession.coordinates = data.location;
+		$.ajax( {
+			url: url,
+			timeout: 10000,
+			dataType: "json",
+			success: function( data ) {
 
-			OSApp.currentSession.weather = data;
-			data.lastUpdated = new Date().getTime();
-                       data.providedLocation = OSApp.currentSession.controller.settings.loc;
-                       OSApp.Storage.setItemSync( "weatherData", JSON.stringify( data ) );
-                       OSApp.Weather.finishWeatherUpdate();
-               }
-       } );
+				// Hide the weather if no data is returned or response is incomplete
+				if ( typeof data !== "object" || typeof data.temp === "undefined" || !data.icon ) {
+
+					// Provider returned incomplete data – retry without provider (Apple Weather fallback)
+					if ( withProvider ) {
+						fetchWeather( false );
+						return;
+					}
+
+					if ( previousWeather ) {
+						OSApp.currentSession.weather = previousWeather;
+						OSApp.Weather.finishWeatherUpdate();
+					} else {
+						OSApp.Weather.hideWeather();
+					}
+					return;
+				}
+
+				OSApp.currentSession.coordinates = data.location;
+
+				OSApp.currentSession.weather = data;
+				data.lastUpdated = new Date().getTime();
+				data.providedLocation = OSApp.currentSession.controller.settings.loc;
+				OSApp.Storage.setItemSync( "weatherData", JSON.stringify( data ) );
+				OSApp.Weather.finishWeatherUpdate();
+			},
+			error: function() {
+
+				// Provider request failed (e.g. non-JSON response) – retry without provider
+				if ( withProvider ) {
+					fetchWeather( false );
+					return;
+				}
+
+				// Final fallback: restore previous weather data if available
+				if ( previousWeather ) {
+					OSApp.currentSession.weather = previousWeather;
+					OSApp.Weather.finishWeatherUpdate();
+				} else {
+					OSApp.Weather.hideWeather();
+				}
+			}
+		} );
+	};
+
+	fetchWeather( usedProvider );
 };
 
 OSApp.Weather.checkURLandUpdateWeather = function() {

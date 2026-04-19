@@ -4253,7 +4253,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		rightBtn: {
 			icon: "refresh",
 			text: screen.width >= 500 ? OSApp.Language._("Refresh") : "",
-			on: function() { updateSensorContent(); }
+			on: function() { loadData(); }
 		}
 	});
 
@@ -4262,7 +4262,17 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 	$.mobile.pageContainer.append(page);
 	$.mobile.pageContainer.pagecontainer("change", page);
 
-	// Load sensor data before displaying content
+	// Show cached data immediately if available (from fire-and-forget preload)
+	if (OSApp.Analog.analogSensors && OSApp.Analog.analogSensors.length > 0) {
+		updateSensorContent();
+	} else {
+		page.find("#analogsensorlist").html(
+			"<div style='text-align:center;padding:2em;'>" +
+			"<p>" + OSApp.Language._("Loading") + "...</p></div>"
+		);
+	}
+
+	// Always load fresh data from controller
 	var loadData = function() {
 		var pa = $.Deferred(), mo = $.Deferred(), se = $.Deferred();
 

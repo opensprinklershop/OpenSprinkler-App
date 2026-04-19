@@ -68,7 +68,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 				current = {};
 			}
 
-			[ "pws", "key", "provider", "mda", "cali", "rainAmt", "rainDays", "minTemp" ].forEach( function( key ) {
+			[ "pws", "key", "provider", "mda", "cali", "rainAmt", "rainDays", "minTemp", "baseETo", "elevation" ].forEach( function( key ) {
 				if ( typeof current[ key ] !== "undefined" ) {
 					retainOptions[ key ] = current[ key ];
 				}
