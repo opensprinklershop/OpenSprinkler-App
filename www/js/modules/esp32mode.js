@@ -1921,6 +1921,8 @@ OSApp.ESP32Mode.waitForDeviceReady = function( onReady, onFail ) {
 			} ).done( function( resp ) {
 				polling = false;
 				if ( !resp ) { return; }
+				// result === 2 means auth failed — keep polling with the other password
+				if ( resp.result === 2 ) { return; }
 				clearInterval( rebootPoll );
 				OSApp.currentSession.pass = tryPass;
 				onReady();

@@ -132,6 +132,9 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 							let remainingStation = OSApp.Stations.getRemainingRuntime( j );
 							remainingTimes[ j ] = remainingStation;
 						}
+					} else {
+						runTimes[ j ] = 0;
+						remainingTimes[ j ] = 0;
 					}
 				}
 			}
@@ -157,7 +160,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 			programChart.remaining = remaining;
 			programChart.updated++;
 		}
-		let running = remaining > 0.01;
+		let running = remaining > 0.001;
 		if (programChart.running != running) {
 			programChart.running = running;
 			programChart.updated++;
@@ -165,7 +168,6 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 				OSApp.ProgramView.lastProgramRun = -1;
 		}
 		let current = running ? (timeSum > 0 ? Math.round(remaining/timeSum * 100) : 0) : "Start";
-		if (running && current > 100) current = 100;
 		if (programChart.current != current) {
 			programChart.current = current;
 			programChart.updated++;
@@ -209,6 +211,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 									delete OSApp.uiState.timers[ "station-" + sid ];
 									OSApp.Status.refreshStatus();
 									OSApp.Errors.showError( OSApp.Language._( "Station has been stopped" ) );
+									remainingTimes[ j ] = 0;
 								});
 							});
 						} else {

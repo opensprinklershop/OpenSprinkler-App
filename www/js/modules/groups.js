@@ -90,7 +90,7 @@ OSApp.Groups.calculateDefaultGroupRunningTime = function( runTimes, sdt ) {
 	} );
 
 	for ( var d = 0; d < OSApp.Constants.options.NUM_SEQ_GROUPS; d++ ) {
-		if ( sequential[ d ] > sdt ) {
+		if ( sequential[ d ] && sequential[ d ] > sdt ) {
 			sequential[ d ] -= sdt;
 		}
 		if ( sequential[ d ] > sequentialMax ) {
