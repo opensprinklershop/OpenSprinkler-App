@@ -36,7 +36,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 	if (!OSApp.Firmware.checkOSVersion( 210 ))
 		return;
 
-	var i, j, reset = false, sr = 0, width, enabledPrograms = 0, renderedCharts;
+	var i, j, reset = false, width, enabledPrograms = 0, renderedCharts;
 
 	if (OSApp.ProgramView.lastProgramRun == -2) {
 		OSApp.ProgramView.lastProgramRun = localStorage.getItem("lastProgramRun");
@@ -98,6 +98,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 
 		let prog = OSApp.Programs.readProgram(OSApp.currentSession.controller.programs.pd[i]);
 		var name = prog.name;
+		var sr = 0;
 
 		if (prog.en) {
 			html += "<tr>";
@@ -116,7 +117,9 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 					if (time > 0) {
 						runTimes[ j ] = time;
 
-						var stationIsRunning = OSApp.Stations.isRunning(j);
+						var stationPid = OSApp.Stations.getPID( j ) - 1;
+						var stationMatchesProgram = ( stationPid == i ) || ( stationPid == 253 && i == OSApp.ProgramView.lastProgramRun );
+						var stationIsRunning = OSApp.Stations.isRunning( j ) && stationMatchesProgram;
 						if (stationIsRunning)
 							sr += OSApp.ProgramView.hashcode( OSApp.currentSession.controller.stations.snames[ j ] );
 
@@ -125,12 +128,17 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 							"ui-shadow ui-btn-inline ui-btn ui-corner-all ui-btn-b ui-mini' id='progStation-"+i+"-"+j+"' value='"+i+"_"+j+"'>" +
 							OSApp.currentSession.controller.stations.snames[ j ]+" ["+OSApp.Dates.getDurationText( time )+"]</button>";
 
-						let pid = OSApp.Stations.getPID( j ) - 1;
-						if (pid == i || (pid == 253 && i == OSApp.ProgramView.lastProgramRun)) {
-							//pname  = pidname( pid );
-
+						// Include both currently running AND queued (not yet started) stations
+						// for this program in remainingTimes, so calculateTotalRunningTime can
+						// apply the correct parallel/sequential/ginv logic to the full remaining
+						// program time — not just the currently active batch of stations.
+						// getRemainingRuntime returns the actual remaining seconds for running
+						// stations and the full programmed duration for queued stations.
+						if (stationMatchesProgram) {
 							let remainingStation = OSApp.Stations.getRemainingRuntime( j );
-							remainingTimes[ j ] = remainingStation;
+							if (remainingStation > 0) {
+								remainingTimes[ j ] = remainingStation;
+							}
 						}
 					} else {
 						runTimes[ j ] = 0;

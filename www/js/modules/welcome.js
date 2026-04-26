@@ -94,11 +94,16 @@ OSApp.Welcome.showSetupWizard = function() {
 	} );
 
 	popup.find( ".setup-cloud-login" ).on( "click", function() {
-		OSApp.Network.requestCloudAuth( function( didSucceed ) {
-			if ( didSucceed ) {
-				OSApp.Welcome.markSetupWizardSeen();
-			}
+		// jQuery Mobile does not support nested popups. Close the wizard first,
+		// then open the cloud login popup once the wizard has fully closed.
+		popup.one( "popupafterclose.cloudlogin", function() {
+			OSApp.Network.requestCloudAuth( function( didSucceed ) {
+				if ( didSucceed ) {
+					OSApp.Welcome.markSetupWizardSeen();
+				}
+			} );
 		} );
+		popup.popup( "close" );
 		return false;
 	} );
 

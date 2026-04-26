@@ -28,3 +28,19 @@ sed -i "s/OpenSprinkler-v$BUILD_TS/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.
 rm ./platforms/browser/platform_www/plugins/* -R 2>/dev/null
 rm ./platforms/browser/www/cordova.js ./platforms/browser/www/cordova_plugins.js 2>/dev/null
 #systemctl restart squid
+
+# === Deploy UI to local betaui.opensprinklershop.de (staging) ===
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SRC_DIR="$SCRIPT_DIR/platforms/browser/www/"
+BETAUI_TARGET="/srv/www/htdocs/ui-test/www"
+
+if [ ! -d "$SRC_DIR" ]; then
+	echo "ERROR: build output not found at $SRC_DIR" >&2
+	exit 1
+fi
+
+echo "=== Deploying UI to betaui.opensprinklershop.de ($BETAUI_TARGET) ==="
+mkdir -p "$BETAUI_TARGET"
+rsync -a --delete "$SRC_DIR" "$BETAUI_TARGET/"
+chown -R stefan:www "$BETAUI_TARGET" 2>/dev/null || true
+echo "=== betaui deploy done ==="
