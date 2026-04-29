@@ -1820,26 +1820,34 @@ OSApp.ESP32Mode.showClassicVersionPicker = function( checkData ) {
 
 OSApp.ESP32Mode.fetchClassicFirmwareBlob = function( url ) {
 	var defer = $.Deferred();
-	var xhr = new XMLHttpRequest();
 
-	xhr.open( "GET", url, true );
-	xhr.responseType = "blob";
-	xhr.timeout = 300000;
-	xhr.onload = function() {
-		if ( xhr.status >= 200 && xhr.status < 300 && xhr.response ) {
-			defer.resolve( xhr.response );
-		} else {
-			defer.reject( new Error( "download-status-" + xhr.status ) );
-		}
-	};
-	xhr.onerror = function() {
-		defer.reject( new Error( "download-error" ) );
-	};
-	xhr.ontimeout = function() {
-		defer.reject( new Error( "download-timeout" ) );
-	};
-	xhr.send();
+	function doFetch( fetchUrl, allowHttpFallback ) {
+		var xhr = new XMLHttpRequest();
+		xhr.open( "GET", fetchUrl, true );
+		xhr.responseType = "blob";
+		xhr.timeout = 300000;
+		xhr.onload = function() {
+			if ( xhr.status >= 200 && xhr.status < 300 && xhr.response ) {
+				defer.resolve( xhr.response );
+			} else {
+				defer.reject( new Error( "download-status-" + xhr.status ) );
+			}
+		};
+		xhr.onerror = function() {
+			// If the HTTPS download failed and the URL supports an HTTP fallback, retry once.
+			if ( allowHttpFallback && fetchUrl.indexOf( "https://" ) === 0 ) {
+				doFetch( fetchUrl.replace( "https://", "http://" ), false );
+			} else {
+				defer.reject( new Error( "download-error" ) );
+			}
+		};
+		xhr.ontimeout = function() {
+			defer.reject( new Error( "download-timeout" ) );
+		};
+		xhr.send();
+	}
 
+	doFetch( url, true );
 	return defer.promise();
 };
 
@@ -2041,7 +2049,11 @@ OSApp.ESP32Mode.runClassicPostedUpdate = function( popup, versionEntry ) {
 		}
 	} else if ( OSApp.Firmware.isESP8266Controller() ) {
 		if ( source.esp8266_url ) {
-			uploads.push( { url: source.esp8266_url, slot: "", label: "ESP8266" } );
+			// ESP8266 devices cannot handle TLS (BearSSL buffer overflow with Ionos).
+			// The app can download the binary fine; use plain HTTP to avoid any
+			// WebView/browser TLS issues too.
+			var esp8266DlUrl = source.esp8266_url.replace( /^https:\/\//i, "http://" );
+			uploads.push( { url: esp8266DlUrl, slot: "", label: "ESP8266" } );
 		}
 	} else {
 		if ( source.zigbee_url ) {
