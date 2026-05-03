@@ -2213,6 +2213,42 @@ OSApp.ESP32Mode.runClassicPostedUpdate = function( popup, versionEntry ) {
 	} );
 };
 
+/**
+ * Probe whether the on-device OTA upload server (port 8080) is reachable.
+ * Resolves with true when the server responds to an OPTIONS pre-flight or GET
+ * request within the timeout, false otherwise (connection refused, timeout, or
+ * any network error that indicates the server is not running).
+ */
+OSApp.ESP32Mode.probeUpdateServer = function() {
+	var defer = $.Deferred();
+	var url = OSApp.ESP32Mode.getDirectDeviceUploadUrl();
+	var xhr = new XMLHttpRequest();
+
+	xhr.open( "GET", url, true );
+	xhr.timeout = 5000;
+
+	xhr.onload = function() {
+		// Any HTTP response means the server is up (even 4xx/5xx).
+		defer.resolve( true );
+	};
+	xhr.onerror = function() {
+		// Connection refused or network error — server not running.
+		defer.resolve( false );
+	};
+	xhr.ontimeout = function() {
+		// No response within 5 s — treat as not available.
+		defer.resolve( false );
+	};
+
+	try {
+		xhr.send();
+	} catch ( ignored ) { // eslint-disable-line no-unused-vars
+		defer.resolve( false );
+	}
+
+	return defer.promise();
+};
+
 OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
 	if ( OSApp.Firmware.isOSPi() ) {
 		OSApp.ESP32Mode.setupOSPiOnlineUpdate();
@@ -2224,7 +2260,24 @@ OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
 		return;
 	}
 
-	OSApp.ESP32Mode.setupClassicPostedUpdate();
+	$.mobile.loading( "show" );
+
+	OSApp.ESP32Mode.probeUpdateServer().done( function( serverAvailable ) {
+		$.mobile.loading( "hide" );
+
+		if ( serverAvailable ) {
+			OSApp.ESP32Mode.setupClassicPostedUpdate();
+		} else if ( OSApp.Firmware.isOnlineUpdateSupported() ) {
+			// Port 8080 not reachable — the device firmware predates the browser-push
+			// upload server.  Fall back to device-side download via /uu (the device
+			// fetches the binary from the update server itself).
+			OSApp.ESP32Mode.setupLegacyOnlineUpdate();
+		} else {
+			OSApp.Errors.showError(
+				OSApp.Language._( "The firmware update server on this device is not reachable (port 8080). Please update the firmware via USB or install a firmware that supports online updates." )
+			);
+		}
+	} );
 };
 
 OSApp.ESP32Mode.setupClassicPostedUpdate = function() {

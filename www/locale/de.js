@@ -1415,6 +1415,7 @@
       "Firmware image downloaded": "Firmware-Image heruntergeladen",
       "Firmware upload failed.": "Firmware-Upload fehlgeschlagen.",
       "Firmware upload is only available for ESP8266 and ESP32 controllers.": "Firmware-Upload ist nur für ESP8266- und ESP32-Controller verfügbar.",
+      "The firmware update server on this device is not reachable (port 8080). Please update the firmware via USB or install a firmware that supports online updates.": "Der Firmware-Update-Server auf diesem Gerät ist nicht erreichbar (Port 8080). Bitte aktualisieren Sie die Firmware per USB oder installieren Sie eine Firmware, die Online-Updates unterstützt.",
       "Firmware uploaded to device": "Firmware auf Gerät hochgeladen",
       "Firmware variant to upload": "Hochzuladende Firmware-Variante",
       "Both firmware variants (Zigbee and Matter) will be updated sequentially.": "Beide Firmware-Varianten (Zigbee und Matter) werden nacheinander aktualisiert.",
