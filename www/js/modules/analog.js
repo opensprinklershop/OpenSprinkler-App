@@ -5081,9 +5081,20 @@ OSApp.Analog.showAnalogSensorCharts = function(limit2sensor, returnPageId) {
 	var tableHtml = limit2sensor ?
 		"<div id='sensorDataTable' style='margin-top:16px;overflow-x:auto;'></div>" : "";
 
+	var sensorHeadingHtml = "";
+	if (limit2sensor) {
+		for (var si = 0; si < OSApp.Analog.analogSensors.length; si++) {
+			if (OSApp.Analog.analogSensors[si].nr === limit2sensor) {
+				sensorHeadingHtml = "<h3 style='text-align:center;margin:8px 0 4px;'>" +
+					OSApp.Analog.analogSensors[si].name + "</h3>";
+				break;
+			}
+		}
+	}
+
 	var page = $("<div data-role='page' id='analogsensorchart'>" +
 		"<div class='ui-content' role='main' style='width: 95%'>" +
-		last + week + month + tableHtml +
+		sensorHeadingHtml + last + week + month + tableHtml +
 		"</div></div>");
 
 	OSApp.UIDom.changeHeader({
