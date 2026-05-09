@@ -2224,7 +2224,11 @@ OSApp.ESP32Mode.probeUpdateServer = function() {
 	var url = OSApp.ESP32Mode.getDirectDeviceUploadUrl();
 	var xhr = new XMLHttpRequest();
 
-	xhr.open( "GET", url, true );
+	// Use OPTIONS — the firmware registers on_update_options on port 8080
+	// which returns Access-Control-Allow-Origin: * so the CORS check passes.
+	// A plain GET has no CORS headers on port 8080, causing the browser to
+	// block the response and trigger onerror even when the server IS running.
+	xhr.open( "OPTIONS", url, true );
 	xhr.timeout = 5000;
 
 	xhr.onload = function() {
@@ -2480,24 +2484,71 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup ) {
 			return;
 		}
 
-		// OTA accepted — the device will now download, flash and reboot.
-		// It cannot serve HTTP while flashing, so skip progress polling
-		// and go straight to reboot detection.
-		popup.find( "#ota-step-2" ).css( "color", "#4CAF50" ).html(
-			"&#9745; " + OSApp.Language._( "Update initiated on device" )
-		);
-		popup.find( "#ota-step-3" ).css( "color", "#1976D2" ).html(
-			"&#9658; <b>" + OSApp.Language._( "Waiting for device reboot..." ) + "</b>"
+		// OTA accepted — poll /us for download/flash progress first,
+		// then switch to reboot detection once the flash is complete.
+		popup.find( "#ota-step-2" ).css( "color", "#1976D2" ).html(
+			"&#9658; <b>" + OSApp.Language._( "Downloading and installing firmware..." ) + "</b>"
 		);
 		popup.find( ".legacy-ota-start" ).hide();
 
-		// Start reboot detection polling after a short initial delay.
 		var originalPass = OSApp.currentSession.pass;
 		var defaultPass = md5( "opendoor" );
 		var baseUrl = OSApp.currentSession.prefix + OSApp.currentSession.ip;
-		var pollCount = 0;
-		var maxPolls = 120; // 120 × 3 s = 6 min
-		var polling = false;
+
+		// Phase 1: poll /us until flash is done (status 8) or failed (status >= 9).
+		// While the device is reachable it serves progress; once it reboots /us stops responding.
+		var statusPollCount = 0;
+		var maxStatusPolls = 90; // 90 × 2 s = 3 min max for download+flash phase
+		var statusTimer = setInterval( function() {
+			statusPollCount++;
+			OSApp.Firmware.sendToOS( "/us?pw=", "json" ).then( function( data ) {
+				if ( !data ) { return; }
+
+				var status = data.status;
+				var progress = data.progress || 0;
+				var message = data.message || "";
+
+				// Update step 2 label with progress percentage and status message
+				var progressText = progress > 0 ? " (" + progress + "%)" : "";
+				var labelText = message || OSApp.Language._( "Downloading and installing firmware..." );
+				popup.find( "#ota-step-2" ).css( "color", "#1976D2" ).html(
+					"&#9658; <b>" + labelText + progressText + "</b>"
+				);
+
+				if ( status === 8 ) {
+					// Flash complete — device will reboot now
+					clearInterval( statusTimer );
+					popup.find( "#ota-step-2" ).css( "color", "#4CAF50" ).html(
+						"&#9745; " + OSApp.Language._( "Firmware flashed successfully" )
+					);
+					popup.find( "#ota-step-3" ).css( "color", "#1976D2" ).html(
+						"&#9658; <b>" + OSApp.Language._( "Waiting for device reboot..." ) + "</b>"
+					);
+					startRebootPolling();
+				} else if ( status >= 9 ) {
+					// Download or flash error reported by firmware
+					clearInterval( statusTimer );
+					popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
+						"&#9746; " + OSApp.Language._( "Update failed" ) +
+						( message ? ": " + $( "<span>" ).text( message ).html() : " (status " + status + ")" )
+					);
+				}
+			} );
+
+			if ( statusPollCount >= maxStatusPolls ) {
+				// Device stopped responding to /us — assume it rebooted mid-flash or timed out
+				clearInterval( statusTimer );
+				popup.find( "#ota-step-3" ).css( "color", "#1976D2" ).html(
+					"&#9658; <b>" + OSApp.Language._( "Waiting for device reboot..." ) + "</b>"
+				);
+				startRebootPolling();
+			}
+		}, 2000 );
+
+		function startRebootPolling() {
+			var pollCount = 0;
+			var maxPolls = 120; // 120 × 3 s = 6 min
+			var polling = false;
 
 		setTimeout( function() {
 			var rebootPoll = setInterval( function() {
@@ -2570,6 +2621,7 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup ) {
 				}
 			}, 3000 );
 		}, 5000 ); // initial wait before first poll
+		} // end startRebootPolling
 
 	} ).fail( function() {
 		popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(

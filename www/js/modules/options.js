@@ -116,7 +116,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					data = $item.val(),
 					ip;
 
-				if ( !id || ( !data && data !== "" ) ) {
+			if ( !id || ( !data && data !== "" && data !== 0 ) ) {
 					return true;
 				}
 
