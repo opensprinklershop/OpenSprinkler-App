@@ -1,7 +1,7 @@
 #!/bin/bash
 # Upload firmware binaries / manifest to IONOS upgrade/ folder.
 # Usage: ./fw.sh [FILE ...]
-#   - No args: syncs the entire local /srv/www/htdocs/upgrade/ tree
+#   - No args: syncs the entire local /data/upgrade/ tree
 #   - Args:    uploads each given file directly into the remote upgrade/ root
 #
 # Reads credentials from ./.env (IONOS_SSH_*, IONOS_UPGRADE_TARGET).
@@ -64,7 +64,7 @@ echo "=== Ensuring $IONOS_UPGRADE_TARGET exists on $IONOS_SSH_HOST ==="
 sshpass -e ssh "${SSH_OPTS[@]}" "$REMOTE" "mkdir -p '$IONOS_UPGRADE_TARGET'"
 
 if [ "$#" -eq 0 ]; then
-	LOCAL_SRC="${LOCAL_UPGRADE_SRC:-/srv/www/htdocs/upgrade/}"
+	LOCAL_SRC="${LOCAL_UPGRADE_SRC:-/data/upgrade/}"
 	echo "=== Syncing $LOCAL_SRC -> $REMOTE:$IONOS_UPGRADE_TARGET/ ==="
 	sshpass -e rsync -az --info=stats2 \
 		-e "ssh -o StrictHostKeyChecking=accept-new -p $IONOS_SSH_PORT" \
