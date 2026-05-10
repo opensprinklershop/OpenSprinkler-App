@@ -95,6 +95,7 @@ OSApp.ESP32Mode.isRainMakerSupported = function() {
 	return featureStr.toUpperCase().indexOf( "RAINMAKER" ) !== -1;
 };
 
+
 /**
  * Fetch the current IEEE 802.15.4 radio configuration from the /ir endpoint.
  * Caches the result in _radioInfo.
@@ -385,6 +386,11 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo ) {
 	popup.on( "click", ".submit-esp32-mode", function() {
 		var selectedMode = parseInt( popup.find( "input[name='esp32-mode']:checked" ).val(), 10 );
 
+		if ( isNaN( selectedMode ) ) {
+			OSApp.Errors.showError( OSApp.Language._( "No valid mode selected" ) );
+			return;
+		}
+
 		if ( selectedMode === currentMode ) {
 			popup.popup( "close" );
 			return;
@@ -626,6 +632,8 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo ) {
  * Uses /iw?pw=&mode=X to set the mode, which triggers a device reboot after ~2 seconds.
  */
 OSApp.ESP32Mode.changeMode = function( newMode ) {
+	// Drop cached mode immediately so subsequent UI refreshes cannot show stale menu items.
+	OSApp.ESP32Mode._radioInfo = null;
 	$.mobile.loading( "show" );
 
 	OSApp.Firmware.sendToOS( "/iw?pw=&mode=" + newMode ).always( function() {
@@ -1608,9 +1616,6 @@ OSApp.ESP32Mode.getClassicUpdateOptionsHtml = function() {
 		"<input type='checkbox' class='ota-auto-restore' checked='checked'>" +
 		OSApp.Language._( "Automatically restore saved configuration after update" ) +
 		"</label>" +
-		"<div style='font-size:0.82em;color:#666;margin-top:6px;'>" +
-		OSApp.Language._( "If enabled, the saved configuration is restored automatically after the device comes back online." ) +
-		"</div>" +
 		"</div>";
 
 	if ( OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller() ) {
@@ -1620,6 +1625,44 @@ OSApp.ESP32Mode.getClassicUpdateOptionsHtml = function() {
 	}
 
 	return html;
+};
+
+OSApp.ESP32Mode.sanitizeClassicUploadChangelog = function( changelog ) {
+	if ( !changelog ) return "";
+
+	var lines = String( changelog ).split( /\r?\n/ );
+	var out = [];
+	var skippingFirmwareBinaries = false;
+
+	$.each( lines, function( _, line ) {
+		var raw = line || "";
+		var trimmed = raw.trim();
+		var normalized = trimmed.toLowerCase();
+
+		if ( /^firmware\s*binaries\s*:?$/i.test( trimmed ) || /^firmware-binaries\s*:?$/i.test( trimmed ) ) {
+			skippingFirmwareBinaries = true;
+			return;
+		}
+
+		if ( skippingFirmwareBinaries ) {
+			if ( /^-\s*firmware_/i.test( trimmed ) || /^firmware_/i.test( trimmed ) || trimmed === "" ) {
+				return;
+			}
+			skippingFirmwareBinaries = false;
+		}
+
+		if ( /^all\s+releases\s*:/i.test( trimmed ) || normalized === "all releases" ) {
+			return;
+		}
+
+		if ( /opensprinklershop\/opensprinkler-firmware\/releases/i.test( normalized ) ) {
+			return;
+		}
+
+		out.push( raw );
+	} );
+
+	return out.join( "\n" ).replace( /\n{3,}/g, "\n\n" ).trim();
 };
 
 OSApp.ESP32Mode.getClassicPostedFirmwareUrl = function( entry, variant ) {
@@ -1700,13 +1743,10 @@ OSApp.ESP32Mode.openClassicUpdatePopup = function( data, selectedEntry ) {
 	}
 
 	if ( data.changelog ) {
+		var filteredClassicChangelog = OSApp.ESP32Mode.sanitizeClassicUploadChangelog( data.changelog );
 		content += "<div style='max-height:150px;overflow-y:auto;border:1px solid #ccc;padding:8px;margin:8px 0;font-size:0.85em;white-space:pre-wrap;'>" +
-			$( "<span>" ).text( data.changelog ).html() + "</div>";
+			$( "<span>" ).text( filteredClassicChangelog ).html() + "</div>";
 	}
-
-	content += "<p style='font-size:0.9em;color:#666;'>" +
-		OSApp.Language._( "The app downloads the firmware image and uploads it directly to the controller update endpoint." ) +
-		"</p>";
 
 	if ( isOtcConnection ) {
 		content += "<div style='margin:12px 0;padding:10px;background:#fff3e0;color:#b26a00;border-radius:6px;'>" +

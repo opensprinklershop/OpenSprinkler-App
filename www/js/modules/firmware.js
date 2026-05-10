@@ -641,7 +641,7 @@ OSApp.Firmware.isNewerOTAVersion = function( data, curFwv, curFwm ) {
 };
 
 OSApp.Firmware.getVersionCatalogUrl = function() {
-	return "https://www.opensprinklershop.de/upgrade/versions.json";
+	return "https://opensprinklershop.de/upgrade/versions.json";
 };
 
 OSApp.Firmware.buildOTAUpdateRequest = function( extraParams ) {
