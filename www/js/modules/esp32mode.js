@@ -1263,6 +1263,8 @@ OSApp.ESP32Mode.setupMatter = function() {
 
 		if ( data.commissioned ) {
 			content += "<p>" + OSApp.Language._( "Status" ) + ": <strong>" + OSApp.Language._( "Commissioned" ) + "</strong></p>";
+			content += "<button class='matter-remove-commissioning ui-btn ui-btn-b ui-corner-all'>" +
+				OSApp.Language._( "Remove Matter Pairing" ) + "</button>";
 		} else {
 			content += "<p>" + OSApp.Language._( "Status" ) + ": <strong>" + OSApp.Language._( "Not commissioned" ) + "</strong></p>";
 			if ( data.pairing_code ) {
@@ -1291,6 +1293,12 @@ OSApp.ESP32Mode.setupMatter = function() {
 		popup.on( "click", ".matter-open-commissioning", function() {
 			popup.popup( "close" );
 			OSApp.ESP32Mode.matterOpenCommissioningWindow();
+			return false;
+		} );
+
+		popup.on( "click", ".matter-remove-commissioning", function() {
+			popup.popup( "close" );
+			OSApp.ESP32Mode.matterRemoveCommissioning();
 			return false;
 		} );
 
@@ -1325,6 +1333,33 @@ OSApp.ESP32Mode.matterOpenCommissioningWindow = function() {
 		$.mobile.loading( "hide" );
 		OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
 	} );
+};
+
+/**
+ * Remove all Matter fabrics/pairings from the device.
+ * Uses /md?pw=
+ */
+OSApp.ESP32Mode.matterRemoveCommissioning = function() {
+	OSApp.UIDom.areYouSure(
+		OSApp.Language._( "Remove Matter pairing from this device? You will need to remove it from your Matter controller app as well." ),
+		"",
+		function() {
+			$.mobile.loading( "show" );
+
+			OSApp.Firmware.sendToOS( "/md?pw=", "json" ).done( function( data ) {
+				$.mobile.loading( "hide" );
+				if ( data && data.result === 1 ) {
+					OSApp.Errors.showError( OSApp.Language._( "Matter pairing removed. The device can be paired again." ) );
+				} else {
+					var err = ( data && data.error ) ? data.error : OSApp.Language._( "Failed to remove Matter pairing." );
+					OSApp.Errors.showError( err );
+				}
+			} ).fail( function() {
+				$.mobile.loading( "hide" );
+				OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+			} );
+		}
+	);
 };
 
 /**
