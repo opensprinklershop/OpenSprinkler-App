@@ -37,6 +37,12 @@ OSApp.ESP32Mode.MODE_ZIGBEE_CLIENT = 3;
 OSApp.ESP32Mode._radioInfo = null;
 
 /**
+ * Cached debug info from /db endpoint
+ * Updated by fetchDebugInfo()
+ */
+OSApp.ESP32Mode._debugInfo = null;
+
+/**
  * Get the mode label for a given mode value
  */
 OSApp.ESP32Mode.getModeLabel = function( mode ) {
@@ -131,11 +137,33 @@ OSApp.ESP32Mode.fetchRadioInfo = function( forceRefresh ) {
  * Returns the mode value (0-3) or -1 if not available.
  */
 OSApp.ESP32Mode.getCurrentMode = function() {
-	if ( OSApp.ESP32Mode._radioInfo && typeof OSApp.ESP32Mode._radioInfo.activeMode !== "undefined" ) {
-		return OSApp.ESP32Mode._radioInfo.activeMode;
-	}
+if ( OSApp.ESP32Mode._radioInfo && typeof OSApp.ESP32Mode._radioInfo.activeMode !== "undefined" ) {
+	return OSApp.ESP32Mode._radioInfo.activeMode;
+}
 
 	return -1;
+};
+
+/**
+ * Fetch the current debug info from the /db endpoint.
+ * Used to detect whether the controller is currently on Ethernet.
+ */
+OSApp.ESP32Mode.fetchDebugInfo = function( forceRefresh ) {
+	var deferred = $.Deferred();
+
+	if ( !forceRefresh && OSApp.ESP32Mode._debugInfo !== null ) {
+		deferred.resolve( OSApp.ESP32Mode._debugInfo );
+		return deferred.promise();
+ 	}
+
+	OSApp.Firmware.sendToOS( "/db?pw=", "json" ).done( function( data ) {
+		OSApp.ESP32Mode._debugInfo = data || null;
+		deferred.resolve( data || null );
+	} ).fail( function() {
+		deferred.resolve( null );
+	} );
+
+	return deferred.promise();
 };
 
 /**
@@ -173,10 +201,17 @@ OSApp.ESP32Mode.setupESP32Mode = function() {
 		acmeDeferred.resolve( null );
 	} );
 
+	var debugDeferred = $.Deferred();
+	OSApp.ESP32Mode.fetchDebugInfo( false ).done( function( debugInfo ) {
+		debugDeferred.resolve( debugInfo );
+	} ).fail( function() {
+		debugDeferred.resolve( null );
+	} );
+
 	OSApp.ESP32Mode.fetchRadioInfo( true ).done( function( radioInfo ) {
-		$.when( certDeferred, acmeDeferred ).done( function( certInfo, acmeInfo ) {
+		$.when( certDeferred, acmeDeferred, debugDeferred ).done( function( certInfo, acmeInfo, debugInfo ) {
 			$.mobile.loading( "hide" );
-			OSApp.ESP32Mode.showESP32ModePopup( radioInfo, certInfo, acmeInfo );
+			OSApp.ESP32Mode.showESP32ModePopup( radioInfo, certInfo, acmeInfo, debugInfo );
 		} );
 	} ).fail( function() {
 		$.mobile.loading( "hide" );
@@ -187,9 +222,11 @@ OSApp.ESP32Mode.setupESP32Mode = function() {
 /**
  * Display the ESP32 Mode / HTTPS Certificate tabbed popup
  */
-OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo ) {
+OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo, debugInfo ) {
 	var currentMode = radioInfo.activeMode,
 		currentLabel = OSApp.ESP32Mode.getModeLabel( currentMode ),
+		isEth = !!( debugInfo && debugInfo.ETH ),
+		gatewayAllowed = isEth || currentMode === OSApp.ESP32Mode.MODE_ZIGBEE_GATEWAY,
 		isCustom = certInfo && certInfo.type === "custom",
 		isAcme = certInfo && certInfo.type === "acme",
 		content = "";
@@ -206,6 +243,11 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo ) {
 	content += "<div id='esp32-tab-mode' class='tab-content current' style='width:auto;'>";
 	content += "<p>" + OSApp.Language._( "Current IEEE 802.15.4 Mode" ) + ": <strong>" + currentLabel + "</strong></p>";
 	content += "<p>" + OSApp.Language._( "Select the desired operating mode for the IEEE 802.15.4 radio" ) + ":</p>";
+	if ( !isEth ) {
+		content += "<div style='margin:8px 0;padding:8px 10px;background:#fff3cd;border:1px solid #f0c36d;border-radius:4px;color:#8a5a00;font-size:0.9em;'>" +
+			OSApp.Language._( "ZigBee Gateway requires Ethernet. If the controller is connected over WiFi, only Matter or ZigBee Client can be selected." ) +
+			"</div>";
+	}
 	content += "<fieldset data-role='controlgroup'>";
 
 	content += "<label for='esp32-mode-disabled'>";
@@ -224,6 +266,7 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo ) {
 	content += "<label for='esp32-mode-zigbee-gw'>";
 	content += "<input type='radio' name='esp32-mode' id='esp32-mode-zigbee-gw' value='" + OSApp.ESP32Mode.MODE_ZIGBEE_GATEWAY + "'";
 	if ( currentMode === OSApp.ESP32Mode.MODE_ZIGBEE_GATEWAY ) { content += " checked='checked'"; }
+	if ( !gatewayAllowed ) { content += " disabled='disabled'"; }
 	content += "> " + OSApp.Language._( "ZigBee Gateway" );
 	content += " <em style='font-size:0.85em;color:#999'>( " + OSApp.Language._( "Ethernet required" ) + " )</em>";
 	content += "</label>";
@@ -393,6 +436,11 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo ) {
 
 		if ( selectedMode === currentMode ) {
 			popup.popup( "close" );
+			return;
+		}
+
+		if ( selectedMode === OSApp.ESP32Mode.MODE_ZIGBEE_GATEWAY && !isEth ) {
+			OSApp.Errors.showError( OSApp.Language._( "ZigBee Gateway requires Ethernet. Connect the controller with Ethernet first, or choose ZigBee Client instead." ) );
 			return;
 		}
 
@@ -636,13 +684,21 @@ OSApp.ESP32Mode.changeMode = function( newMode ) {
 	OSApp.ESP32Mode._radioInfo = null;
 	$.mobile.loading( "show" );
 
-	OSApp.Firmware.sendToOS( "/iw?pw=&mode=" + newMode ).always( function() {
+	OSApp.Firmware.sendToOS( "/iw?pw=&mode=" + newMode, "json" ).done( function( resp ) {
+		if ( resp && resp.result === 1 ) {
+			// The controller already schedules a reboot, but a direct reboot request
+			// makes the transition robust when the deferred timer is lost.
+			setTimeout( function() {
+				OSApp.Firmware.sendToOS( "/cv?pw=&rbt=1" );
+			}, 250 );
+			OSApp.Errors.showError( OSApp.Language._( "OpenSprinkler is rebooting now" ) );
+		} else {
+			OSApp.Errors.showError( resp && resp.error ? resp.error : OSApp.Language._( "Failed to change IEEE 802.15.4 mode" ) );
+		}
+	} ).fail( function() {
+		OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+	} ).always( function() {
 		$.mobile.loading( "hide" );
-
-		// The device reboots immediately after receiving the mode change command,
-		// so the connection will typically drop (fail handler). Show the reboot
-		// notification in both success and failure cases.
-		OSApp.Errors.showError( OSApp.Language._( "OpenSprinkler is rebooting now" ) );
 	} );
 };
 
@@ -902,23 +958,10 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	getCached: function( ieee ) {
 		if ( this._mem[ ieee ] ) { return this._mem[ ieee ]; }
 		try {
-			var raw = localStorage.getItem( "zb_dev_" + ieee );
-			if ( raw ) { return ( this._mem[ ieee ] = JSON.parse( raw ) ); }
-		} catch ( e ) { void e; }
-		return null;
+			return -1;
+		} catch ( e ) { void e; return -1; }
 	},
 
-	setCached: function( ieee, data ) {
-		this._mem[ ieee ] = data;
-		try { localStorage.setItem( "zb_dev_" + ieee, JSON.stringify( data ) ); } catch ( e ) { void e; }
-		// Also cache the human-readable display label for quick h4 pre-population
-		var label = ( data.vendor && data.description )
-			? data.vendor + " — " + data.description
-			: ( data.vendor || data.description || "" );
-		if ( label ) {
-			try { localStorage.setItem( "zb_name_" + ieee, label ); } catch ( e ) { void e; }
-		}
-	},
 
 	/** Returns the cached display label for a device by IEEE address, or null. */
 	getCachedLabel: function( ieee ) {
@@ -1233,6 +1276,8 @@ OSApp.ESP32Mode.setupMatter = function() {
 
 		content += "<button class='matter-open-commissioning ui-btn ui-btn-b ui-corner-all'>" +
 			OSApp.Language._( "Open Commissioning Window" ) + "</button>";
+		content += "<button class='matter-write-kvs ui-btn ui-corner-all'>" +
+			OSApp.Language._( "Write Matter KVS" ) + "</button>";
 		content += "<button class='cancel-matter ui-btn ui-corner-all'>" + OSApp.Language._( "Close" ) + "</button>";
 		content += "</div>";
 
@@ -1246,6 +1291,12 @@ OSApp.ESP32Mode.setupMatter = function() {
 		popup.on( "click", ".matter-open-commissioning", function() {
 			popup.popup( "close" );
 			OSApp.ESP32Mode.matterOpenCommissioningWindow();
+			return false;
+		} );
+
+		popup.on( "click", ".matter-write-kvs", function() {
+			popup.popup( "close" );
+			OSApp.ESP32Mode.matterWriteKVS();
 			return false;
 		} );
 
@@ -1269,6 +1320,32 @@ OSApp.ESP32Mode.matterOpenCommissioningWindow = function() {
 			OSApp.Errors.showError( OSApp.Language._( "Matter commissioning window opened (300 s). Use your Matter controller app to pair the device." ) );
 		} else {
 			OSApp.Errors.showError( OSApp.Language._( "Failed to open Matter commissioning window." ) );
+		}
+	} ).fail( function() {
+		$.mobile.loading( "hide" );
+		OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+	} );
+};
+
+/**
+ * Download matter_kvs.bin and write it to the matter_kvs partition.
+ * Uses /mk?pw=
+ */
+OSApp.ESP32Mode.matterWriteKVS = function() {
+	if ( !window.confirm( OSApp.Language._( "Write Matter KVS to device partition now?" ) ) ) {
+		return;
+	}
+
+	$.mobile.loading( "show" );
+
+	OSApp.Firmware.sendToOS( "/mk?pw=", "json", 120000 ).done( function( data ) {
+		$.mobile.loading( "hide" );
+		if ( data && data.result === 1 ) {
+			var bytes = ( typeof data.written === "number" ) ? data.written : 0;
+			OSApp.Errors.showError( OSApp.Language._( "Matter KVS written successfully" ) + " (" + bytes + " bytes)" );
+		} else {
+			var err = ( data && data.error ) ? data.error : OSApp.Language._( "Failed to write Matter KVS." );
+			OSApp.Errors.showError( err );
 		}
 	} ).fail( function() {
 		$.mobile.loading( "hide" );
@@ -2076,16 +2153,28 @@ OSApp.ESP32Mode.waitForClassicUploadReboot = function( popup ) {
 OSApp.ESP32Mode.runClassicPostedUpdate = function( popup, versionEntry ) {
 	var isDual = OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller();
 	var source = versionEntry || {};
+	var currentMode = OSApp.ESP32Mode.getCurrentMode();
+	var currentVariantIsMatter = ( currentMode === OSApp.ESP32Mode.MODE_MATTER );
 
-	// For ESP32 dual-partition: upload zigbee first, then matter
+	// For ESP32 dual-partition: upload the non-running variant first so the
+	// running slot is not targeted before the reboot completes.
 	// For ESP8266 or single-partition: upload one firmware only
 	var uploads = [];
 	if ( isDual ) {
-		if ( source.zigbee_url ) {
-			uploads.push( { url: source.zigbee_url, slot: "zigbee", label: "Zigbee" } );
-		}
-		if ( source.matter_url ) {
-			uploads.push( { url: source.matter_url, slot: "matter", label: "Matter" } );
+		if ( currentVariantIsMatter ) {
+			if ( source.zigbee_url ) {
+				uploads.push( { url: source.zigbee_url, slot: "zigbee", label: "Zigbee" } );
+			}
+			if ( source.matter_url ) {
+				uploads.push( { url: source.matter_url, slot: "matter", label: "Matter" } );
+			}
+		} else {
+			if ( source.matter_url ) {
+				uploads.push( { url: source.matter_url, slot: "matter", label: "Matter" } );
+			}
+			if ( source.zigbee_url ) {
+				uploads.push( { url: source.zigbee_url, slot: "zigbee", label: "Zigbee" } );
+			}
 		}
 	} else if ( OSApp.Firmware.isESP8266Controller() ) {
 		if ( source.esp8266_url ) {
