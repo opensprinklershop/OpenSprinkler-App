@@ -1177,6 +1177,7 @@
       "Open Commissioning Window": "Inbetriebnahme-Fenster öffnen",
       "Open QR Code": "QR-Code öffnen",
       "Pairing Code": "Kopplungscode",
+      "Pairing Code copied to clipboard": "Kopplungscode in die Zwischenablage kopiert",
       "Please enter both User ID and Secret Key": "Bitte Benutzer-ID und geheimen Schlüssel eingeben",
       "POP": "POP",
       "Previous backup found": "Vorheriges Backup gefunden",

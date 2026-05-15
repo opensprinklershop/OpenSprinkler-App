@@ -20,5 +20,6 @@
         "nativedata",
         "unitid",
         "USERDEF"
-    ]
+    ],
+    "cmake.ignoreCMakeListsMissing": true
 }

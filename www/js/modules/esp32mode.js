@@ -957,9 +957,7 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 
 	getCached: function( ieee ) {
 		if ( this._mem[ ieee ] ) { return this._mem[ ieee ]; }
-		try {
-			return -1;
-		} catch ( e ) { void e; return -1; }
+		return -1;
 	},
 
 
@@ -1268,7 +1266,11 @@ OSApp.ESP32Mode.setupMatter = function() {
 		} else {
 			content += "<p>" + OSApp.Language._( "Status" ) + ": <strong>" + OSApp.Language._( "Not commissioned" ) + "</strong></p>";
 			if ( data.pairing_code ) {
-				content += "<p>" + OSApp.Language._( "Pairing Code" ) + ": <code>" + data.pairing_code + "</code></p>";
+				content += "<p>" + OSApp.Language._( "Pairing Code" ) + ": <code>" +
+					$( "<span>" ).text( data.pairing_code ).html() + "</code> " +
+					"<button class='matter-copy-pairing-code ui-btn ui-btn-inline ui-mini ui-corner-all' " +
+					"data-pairing-code='" + $( "<span>" ).text( data.pairing_code ).html() + "'>" +
+					OSApp.Language._( "Copy" ) + "</button></p>";
 			}
 			if ( data.qr_url ) {
 				content += "<p><a href='" + data.qr_url + "' target='_blank' class='ui-btn ui-btn-inline ui-mini ui-corner-all'>" +
@@ -1299,6 +1301,24 @@ OSApp.ESP32Mode.setupMatter = function() {
 		popup.on( "click", ".matter-remove-commissioning", function() {
 			popup.popup( "close" );
 			OSApp.ESP32Mode.matterRemoveCommissioning();
+			return false;
+		} );
+
+		popup.on( "click", ".matter-copy-pairing-code", function() {
+			var pairingCode = $( this ).data( "pairing-code" );
+			if ( navigator.clipboard && navigator.clipboard.writeText ) {
+				navigator.clipboard.writeText( pairingCode ).then( function() {
+					OSApp.Errors.showError( OSApp.Language._( "Pairing Code copied to clipboard" ) );
+				} ).catch( function() {
+					OSApp.Errors.showError( OSApp.Language._( "Copy failed" ) );
+				} );
+			} else {
+				var tmp = $( "<input>" ).val( pairingCode ).appendTo( "body" );
+				tmp[ 0 ].select();
+				document.execCommand( "copy" );
+				tmp.remove();
+				OSApp.Errors.showError( OSApp.Language._( "Pairing Code copied to clipboard" ) );
+			}
 			return false;
 		} );
 
