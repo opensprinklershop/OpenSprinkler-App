@@ -957,7 +957,25 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 
 	getCached: function( ieee ) {
 		if ( this._mem[ ieee ] ) { return this._mem[ ieee ]; }
-		return -1;
+		try {
+			var raw = localStorage.getItem( "zb_dev_" + ieee );
+			if ( raw ) {
+				this._mem[ ieee ] = JSON.parse( raw );
+				return this._mem[ ieee ];
+			}
+		} catch ( e ) { void e; }
+		return null;
+	},
+
+	setCached: function( ieee, data ) {
+		this._mem[ ieee ] = data;
+		try { localStorage.setItem( "zb_dev_" + ieee, JSON.stringify( data ) ); } catch ( e ) { void e; }
+		var label = ( data.vendor && data.description )
+			? data.vendor + " - " + data.description
+			: ( data.vendor || data.description || "" );
+		if ( label ) {
+			try { localStorage.setItem( "zb_name_" + ieee, label ); } catch ( e ) { void e; }
+		}
 	},
 
 
@@ -1131,12 +1149,23 @@ OSApp.ESP32Mode.setupZigBeeClient = function() {
 		if ( data && data.result === 1 ) {
 			OSApp.ESP32Mode.showZigBeeClientPanel( data );
 		} else {
-			var errorMsg = ( data && data.error ) ? data.error : OSApp.Language._( "Unable to retrieve ZigBee Client information" );
-			OSApp.Errors.showError( errorMsg );
+			OSApp.ESP32Mode.showZigBeeClientPanel( {
+				result: 0,
+				active: OSApp.ESP32Mode.isZigBeeClientActive() ? 1 : 0,
+				connected: 0,
+				statusUnavailable: true,
+				error: ( data && data.error ) ? data.error : OSApp.Language._( "Unable to retrieve ZigBee Client information" )
+			} );
 		}
 	} ).fail( function() {
 		$.mobile.loading( "hide" );
-		OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+		OSApp.ESP32Mode.showZigBeeClientPanel( {
+			result: 0,
+			active: OSApp.ESP32Mode.isZigBeeClientActive() ? 1 : 0,
+			connected: 0,
+			statusUnavailable: true,
+			error: OSApp.Language._( "Error connecting to device" )
+		} );
 	} );
 };
 
@@ -1151,7 +1180,9 @@ OSApp.ESP32Mode.showZigBeeClientPanel = function( data ) {
 	content += "<h3>" + OSApp.Language._( "ZigBee Client" ) + "</h3>";
 
 	// Show connection status (data.active, data.connected from /zs)
-	if ( data.connected ) {
+	if ( data.statusUnavailable ) {
+		content += "<p><strong>" + OSApp.Language._( "Status" ) + ":</strong> " + $( "<span>" ).text( data.error ).html() + "</p>";
+	} else if ( data.connected ) {
 		content += "<p><strong>" + OSApp.Language._( "Status" ) + ":</strong> " + OSApp.Language._( "Connected to ZigBee network" ) + "</p>";
 	} else {
 		content += "<p><strong>" + OSApp.Language._( "Status" ) + ":</strong> " + OSApp.Language._( "Not connected to ZigBee network" ) + "</p>";
@@ -1161,6 +1192,8 @@ OSApp.ESP32Mode.showZigBeeClientPanel = function( data ) {
 	if ( !data.connected ) {
 		content += "<button class='zigbee-join-network ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Join ZigBee Network" ) + "</button>";
 	}
+	content += "<button class='zigbee-leave-network ui-btn ui-corner-all' style='background:#fff3f3;color:#b00020;border:1px solid #e0c0c0;'>" +
+		OSApp.Language._( "Leave ZigBee Network" ) + "</button>";
 
 	content += "<button class='cancel-zigbee-cl ui-btn ui-corner-all'>" + OSApp.Language._( "Cancel" ) + "</button>";
 	content += "</div>";
@@ -1178,13 +1211,20 @@ OSApp.ESP32Mode.showZigBeeClientPanel = function( data ) {
 		return false;
 	} );
 
+	popup.on( "click", ".zigbee-leave-network", function() {
+		popup.popup( "close" );
+		setTimeout( function() {
+			OSApp.ESP32Mode.zigBeeLeaveNetwork();
+		}, 400 );
+		return false;
+	} );
+
 	OSApp.UIDom.openPopup( popup );
 };
 
 /**
  * Send command to join/search for a ZigBee network (client mode).
  * Uses /zj?pw=&duration=60
- * Note: This triggers a factory reset and re-join attempt.
  */
 OSApp.ESP32Mode.zigBeeJoinNetwork = function() {
 	$.mobile.loading( "show" );
@@ -1201,6 +1241,33 @@ OSApp.ESP32Mode.zigBeeJoinNetwork = function() {
 		$.mobile.loading( "hide" );
 		OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
 	} );
+};
+
+/**
+ * Send command to leave/disconnect from the current ZigBee network (client mode).
+ * Uses /zl?pw= and lets the firmware reboot after the leave request.
+ */
+OSApp.ESP32Mode.zigBeeLeaveNetwork = function() {
+	OSApp.UIDom.areYouSure(
+		OSApp.Language._( "Are you sure you want to leave the ZigBee network?" ),
+		"",
+		function() {
+			$.mobile.loading( "show" );
+			OSApp.Firmware.sendToOS( "/zl?pw=&reboot=1", "json" ).done( function( data ) {
+				$.mobile.loading( "hide" );
+				if ( data && data.result === 1 ) {
+					OSApp.ESP32Mode._radioInfo = null;
+					OSApp.Errors.showError( OSApp.Language._( "Left ZigBee network" ) );
+				} else {
+					var errorMsg = ( data && data.error ) ? data.error : OSApp.Language._( "Error connecting to device" );
+					OSApp.Errors.showError( errorMsg );
+				}
+			} ).fail( function() {
+				$.mobile.loading( "hide" );
+				OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+			} );
+		}
+	);
 };
 
 // ============================================================================

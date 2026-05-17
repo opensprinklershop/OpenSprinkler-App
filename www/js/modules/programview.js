@@ -219,7 +219,7 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 									delete OSApp.uiState.timers[ "station-" + sid ];
 									OSApp.Status.refreshStatus();
 									OSApp.Errors.showError( OSApp.Language._( "Station has been stopped" ) );
-									remainingTimes[ j ] = 0;
+									remainingTimes[ sid ] = 0;
 								});
 							});
 						} else {

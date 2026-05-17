@@ -154,7 +154,8 @@ Triggers a ZigBee network join/search operation. Only available when the mode is
 | Parameter | Required | Description |
 |-----------|----------|-------------|
 | `pw` | Yes | Password |
-| `duration` | No | Search duration in seconds (1–600, default: 60) |
+| `duration` | No | Search duration in seconds (1–120, default: 60) |
+| `reset` | No | Set to `1` to request a client pairing-data reset before joining |
 
 **Response (success):**
 ```json
@@ -163,7 +164,9 @@ Triggers a ZigBee network join/search operation. Only available when the mode is
   "duration": 60,
   "status": "searching",
   "active": 1,
-  "connected": 1
+  "connected": 0,
+  "reset_requested": 0,
+  "reboot": 0
 }
 ```
 
@@ -177,14 +180,51 @@ Triggers a ZigBee network join/search operation. Only available when the mode is
 
 **Example:**
 ```
-# Start network search for 120 seconds
-GET /zj?pw=<hash>&duration=120
+# Start network search for 60 seconds
+GET /zj?pw=<hash>&duration=60
 ```
 
 **Notes:**
-- The ZigBee End Device will factory-reset its NVRAM and attempt to rejoin the nearest coordinator
-- A ZigBee coordinator (e.g., Zigbee2MQTT, deCONZ) must be active and accepting joins
+- The client starts ZigBee BDB Network Steering immediately; no reboot is required for the normal join/search flow.
+- `reset=1` only marks client pairing data for reset before the stack starts. Use `/zl` first if the client is already connected to another coordinator.
+- A ZigBee coordinator (e.g., FRITZ!Smart Gateway, Zigbee2MQTT, deCONZ) must be active and accepting joins
 - Use `/zs` to check connection status after initiating the search
+
+---
+
+### `/zl` — ZigBee Client: Leave Network
+
+Disconnects the ZigBee Client / End Device from its current coordinator and clears the client network state. This is intended before pairing with a different coordinator such as a FRITZ!Smart Gateway.
+
+**Availability:** ESP32-C5 only, ZigBee Client mode (`activeMode` 3).
+
+**Method:** GET
+
+**Parameters:**
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `pw` | Yes | Password |
+| `reboot` | No | Reboot after leave/reset (`1` default, `0` to skip reboot) |
+
+**Response (success):**
+```json
+{
+  "result": 1,
+  "action": "leave",
+  "active_before": 1,
+  "connected_before": 1,
+  "reboot": 1
+}
+```
+
+**Example:**
+```
+GET /zl?pw=<hash>
+```
+
+**Notes:**
+- When the ZigBee stack is running, the firmware requests a local ZigBee leave/reset so the coordinator sees the client leave the network.
+- The default reboot keeps the radio stack in a clean state before a new `/zj` join attempt.
 
 ---
 

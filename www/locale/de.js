@@ -1439,6 +1439,15 @@
       "Update complete": "Update abgeschlossen",
       "Upload successful. Device is rebooting...": "Upload erfolgreich. Gerät wird neu gestartet...",
       "Upload timed out. Please try again.": "Upload-Zeitüberschreitung. Bitte versuchen Sie es erneut.",
-      "Uploading firmware to device...": "Firmware wird auf das Gerät hochgeladen..."
+      "Uploading firmware to device...": "Firmware wird auf das Gerät hochgeladen...",
+      "ZigBee Gateway requires Ethernet. If the controller is connected over WiFi, only Matter or ZigBee Client can be selected.": "Das ZigBee-Gateway erfordert Ethernet. Wenn der Controller über WLAN verbunden ist, kann nur Matter oder ZigBee-Client ausgewählt werden.",
+      "No valid mode selected": "Kein gültiger Modus ausgewählt",
+      "ZigBee Gateway requires Ethernet. Connect the controller with Ethernet first, or choose ZigBee Client instead.": "Das ZigBee-Gateway erfordert Ethernet. Verbinden Sie den Controller zuerst per Ethernet oder wählen Sie stattdessen ZigBee-Client.",
+      "Failed to change IEEE 802.15.4 mode": "IEEE-802.15.4-Modus konnte nicht geändert werden",
+      "Write Matter KVS": "Matter KVS schreiben",
+      "Write Matter KVS to device partition now?": "Matter KVS jetzt in die Gerätepartition schreiben?",
+      "Matter KVS written successfully": "Matter KVS erfolgreich geschrieben",
+      "Failed to write Matter KVS.": "Matter KVS konnte nicht geschrieben werden.",
+      "Firmware flashed successfully": "Firmware erfolgreich geflasht"
    }
 }

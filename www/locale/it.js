@@ -1336,6 +1336,22 @@
       "Click 'Open Device URL' and accept the security warning in your browser.": "Fai clic su 'Apri URL dispositivo' e accetta l'avviso di sicurezza nel browser.",
       "Delete all Let's Encrypt data and revert to internal certificate? A reboot will be required.": "Eliminare tutti i dati di Let's Encrypt e tornare al certificato interno? Sarà necessario un riavvio.",
       "Invalid OTC token format. Token must start with 'OT' followed by 30 alphanumeric characters.": "Formato token OTC non valido. Il token deve iniziare con 'OT' seguito da 30 caratteri alfanumerici.",
-      "Let's Encrypt": "Let's Encrypt"
+      "Let's Encrypt": "Let's Encrypt",
+      "Valve Current": "Valve Current",
+      "ZigBee Gateway requires Ethernet. If the controller is connected over WiFi, only Matter or ZigBee Client can be selected.": "ZigBee Gateway requires Ethernet. If the controller is connected over WiFi, only Matter or ZigBee Client can be selected.",
+      "No valid mode selected": "No valid mode selected",
+      "ZigBee Gateway requires Ethernet. Connect the controller with Ethernet first, or choose ZigBee Client instead.": "ZigBee Gateway requires Ethernet. Connect the controller with Ethernet first, or choose ZigBee Client instead.",
+      "Failed to change IEEE 802.15.4 mode": "Failed to change IEEE 802.15.4 mode",
+      "Write Matter KVS": "Write Matter KVS",
+      "Pairing Code copied to clipboard": "Pairing Code copied to clipboard",
+      "Write Matter KVS to device partition now?": "Write Matter KVS to device partition now?",
+      "Matter KVS written successfully": "Matter KVS written successfully",
+      "Failed to write Matter KVS.": "Failed to write Matter KVS.",
+      "Both firmware variants (Zigbee and Matter) will be updated sequentially.": "Both firmware variants (Zigbee and Matter) will be updated sequentially.",
+      "Step 3b: Upload Matter firmware": "Step 3b: Upload Matter firmware",
+      "Device is rebooting...": "Device is rebooting...",
+      "Device did not come back online after first upload.": "Device did not come back online after first upload.",
+      "The firmware update server on this device is not reachable (port 8080). Please update the firmware via USB or install a firmware that supports online updates.": "The firmware update server on this device is not reachable (port 8080). Please update the firmware via USB or install a firmware that supports online updates.",
+      "Firmware flashed successfully": "Firmware flashed successfully"
    }
 }
