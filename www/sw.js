@@ -251,18 +251,40 @@ self.addEventListener("install", (e) => {
 });
 
 self.addEventListener("fetch", function (e) {
+    if (e.request.method !== "GET") {
+        e.respondWith(fetch(e.request));
+        return;
+    }
+
     e.respondWith(
         fetch(e.request).then(function (response) {
             // Network-first: always try to get fresh content
             return caches.open(cacheName).then(function (cache) {
                 console.log("[Service Worker] Updating cache: " + e.request.url);
-                cache.put(e.request, response.clone());
+                return cache.put(e.request, response.clone()).then(function () {
+                    return response;
+                }).catch(function (err) {
+                    console.warn("[Service Worker] Cache update failed: " + e.request.url, err);
+                    return response;
+                });
+            }).catch(function (err) {
+                console.warn("[Service Worker] Cache open failed: " + e.request.url, err);
                 return response;
             });
         }).catch(function () {
             // Fallback to cache when offline
             console.log("[Service Worker] Serving from cache: " + e.request.url);
-            return caches.match(e.request);
+            return caches.match(e.request).then(function (cachedResponse) {
+                if (cachedResponse) {
+                    return cachedResponse;
+                }
+
+                return new Response("Offline or blocked by network policy", {
+                    status: 503,
+                    statusText: "Service Unavailable",
+                    headers: { "Content-Type": "text/plain; charset=utf-8" }
+                });
+            });
         })
     );
 });

@@ -35,12 +35,20 @@ OSApp.ESP32Mode.MODE_ZIGBEE_CLIENT = 3;
  * Updated by fetchRadioInfo()
  */
 OSApp.ESP32Mode._radioInfo = null;
+OSApp.ESP32Mode._radioInfoRequest = null;
+OSApp.ESP32Mode._radioInfoRequestId = 0;
 
 /**
  * Cached debug info from /db endpoint
  * Updated by fetchDebugInfo()
  */
 OSApp.ESP32Mode._debugInfo = null;
+
+OSApp.ESP32Mode.clearRadioInfo = function() {
+	OSApp.ESP32Mode._radioInfo = null;
+	OSApp.ESP32Mode._radioInfoRequest = null;
+	OSApp.ESP32Mode._radioInfoRequestId++;
+};
 
 /**
  * Get the mode label for a given mode value
@@ -111,13 +119,27 @@ OSApp.ESP32Mode.isRainMakerSupported = function() {
 OSApp.ESP32Mode.fetchRadioInfo = function( forceRefresh ) {
 	var deferred = $.Deferred();
 
+	if ( forceRefresh ) {
+		OSApp.ESP32Mode.clearRadioInfo();
+	}
+
 	// Return cached data immediately if available and not forced refresh
 	if ( !forceRefresh && OSApp.ESP32Mode._radioInfo !== null ) {
 		deferred.resolve( OSApp.ESP32Mode._radioInfo );
 		return deferred.promise();
 	}
 
-	OSApp.Firmware.sendToOS( "/ir?pw=", "json" ).done( function( data ) {
+	if ( !forceRefresh && OSApp.ESP32Mode._radioInfoRequest !== null ) {
+		return OSApp.ESP32Mode._radioInfoRequest;
+	}
+
+	var requestId = OSApp.ESP32Mode._radioInfoRequestId;
+	OSApp.ESP32Mode._radioInfoRequest = deferred.promise();
+	OSApp.Firmware.sendToOS( "/ir?pw=&verbose=0", "json" ).done( function( data ) {
+		if ( requestId !== OSApp.ESP32Mode._radioInfoRequestId ) {
+			deferred.reject();
+			return;
+		}
 		if ( data && typeof data.activeMode !== "undefined" ) {
 			OSApp.ESP32Mode._radioInfo = data;
 			deferred.resolve( data );
@@ -126,9 +148,19 @@ OSApp.ESP32Mode.fetchRadioInfo = function( forceRefresh ) {
 		}
 	} ).fail( function() {
 		deferred.reject();
+	} ).always( function() {
+		if ( requestId === OSApp.ESP32Mode._radioInfoRequestId ) {
+			OSApp.ESP32Mode._radioInfoRequest = null;
+		}
 	} );
 
 	return deferred.promise();
+};
+
+OSApp.ESP32Mode.prefetchRadioInfo = function() {
+	if ( OSApp.ESP32Mode.isESP32Supported() ) {
+		OSApp.ESP32Mode.fetchRadioInfo( false ).fail( function() {} );
+	}
 };
 
 /**
@@ -208,7 +240,7 @@ OSApp.ESP32Mode.setupESP32Mode = function() {
 		debugDeferred.resolve( null );
 	} );
 
-	OSApp.ESP32Mode.fetchRadioInfo( true ).done( function( radioInfo ) {
+	OSApp.ESP32Mode.fetchRadioInfo( false ).done( function( radioInfo ) {
 		$.when( certDeferred, acmeDeferred, debugDeferred ).done( function( certInfo, acmeInfo, debugInfo ) {
 			$.mobile.loading( "hide" );
 			OSApp.ESP32Mode.showESP32ModePopup( radioInfo, certInfo, acmeInfo, debugInfo );
@@ -681,7 +713,7 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo, de
  */
 OSApp.ESP32Mode.changeMode = function( newMode ) {
 	// Drop cached mode immediately so subsequent UI refreshes cannot show stale menu items.
-	OSApp.ESP32Mode._radioInfo = null;
+	OSApp.ESP32Mode.clearRadioInfo();
 	$.mobile.loading( "show" );
 
 	OSApp.Firmware.sendToOS( "/iw?pw=&mode=" + newMode, "json" ).done( function( resp ) {
@@ -1256,7 +1288,7 @@ OSApp.ESP32Mode.zigBeeLeaveNetwork = function() {
 			OSApp.Firmware.sendToOS( "/zl?pw=&reboot=1", "json" ).done( function( data ) {
 				$.mobile.loading( "hide" );
 				if ( data && data.result === 1 ) {
-					OSApp.ESP32Mode._radioInfo = null;
+					OSApp.ESP32Mode.clearRadioInfo();
 					OSApp.Errors.showError( OSApp.Language._( "Left ZigBee network" ) );
 				} else {
 					var errorMsg = ( data && data.error ) ? data.error : OSApp.Language._( "Error connecting to device" );

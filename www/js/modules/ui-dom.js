@@ -801,8 +801,7 @@ OSApp.UIDom.bindPanel = function() {
 						panel.find( ".rainmaker-setup" ).addClass( "hidden" );
 					}
 
-					// Fetch fresh radio info to avoid stale mode cache after device reboot/mode switch
-					OSApp.ESP32Mode.fetchRadioInfo( true ).done( function() {
+					OSApp.ESP32Mode.fetchRadioInfo( false ).done( function() {
 
 						// Update Matter menu item visibility (only when Matter mode is active)
 						if ( OSApp.ESP32Mode.isMatterActive() ) {

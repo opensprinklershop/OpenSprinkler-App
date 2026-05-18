@@ -23,6 +23,11 @@ OSApp.Analog = {
 	_dashboardCharts : [],
 	zigbeeClusterData : null,
 	cachedSensorTypes : null,
+	sensorTypesRequest : null,
+	cachedAdjustmentTypes : null,
+	adjustmentTypesRequest : null,
+	cachedMonitorTypes : null,
+	monitorTypesRequest : null,
 	configPageLoaded : false,
 	chartConvertTemp : 0, // 0=no conversion, 1=F->C, 2=C->F
 	chartCombineMoistTemp : false, // combine soil moisture and temperature in one chart
@@ -278,6 +283,11 @@ OSApp.Analog.refresh = function() {
 
 OSApp.Analog.clearDeviceCache = function() {
 	OSApp.Analog.cachedSensorTypes  = null;
+	OSApp.Analog.sensorTypesRequest = null;
+	OSApp.Analog.cachedAdjustmentTypes = null;
+	OSApp.Analog.adjustmentTypesRequest = null;
+	OSApp.Analog.cachedMonitorTypes = null;
+	OSApp.Analog.monitorTypesRequest = null;
 	OSApp.Analog.zigbeeClusterData  = null;
 	OSApp.Analog.configPageLoaded   = false;
 	OSApp.Analog.lastSensorHtml     = "";
@@ -873,6 +883,126 @@ OSApp.Analog.sendToOsObj = function(params, obj) {
 	return OSApp.Firmware.sendToOS(params, "json");
 };
 
+OSApp.Analog.getSupportedSensorTypes = function(forceRefresh) {
+	if (!forceRefresh && Array.isArray(OSApp.Analog.cachedSensorTypes) && OSApp.Analog.cachedSensorTypes.length > 0) {
+		return $.Deferred().resolve(OSApp.Analog.cachedSensorTypes).promise();
+	}
+
+	if (!forceRefresh && OSApp.Analog.sensorTypesRequest) {
+		return OSApp.Analog.sensorTypesRequest;
+	}
+
+	OSApp.Analog.sensorTypesRequest = OSApp.Firmware.sendToOS("/sf?pw=", "json", 5000).then(function(data) {
+		var types = (data && Array.isArray(data.sensorTypes)) ? data.sensorTypes : [];
+		if (types.length > 0) {
+			OSApp.Analog.cachedSensorTypes = types;
+		}
+		return types;
+	}, function(err) {
+		if (Array.isArray(OSApp.Analog.cachedSensorTypes) && OSApp.Analog.cachedSensorTypes.length > 0) {
+			return OSApp.Analog.cachedSensorTypes;
+		}
+		return $.Deferred().reject(err).promise();
+	});
+
+	OSApp.Analog.sensorTypesRequest.always(function() {
+		OSApp.Analog.sensorTypesRequest = null;
+	});
+
+	return OSApp.Analog.sensorTypesRequest;
+};
+
+OSApp.Analog.getDefaultAdjustmentTypes = function() {
+	return [
+		{ type: 99, name: "No Adjustment" },
+		{ type: 1, name: "Linear scaling" },
+		{ type: 2, name: "Digital under min" },
+		{ type: 3, name: "Digital over max" },
+		{ type: 4, name: "Digital under min or over max" }
+	];
+};
+
+OSApp.Analog.getSupportedAdjustmentTypes = function(forceRefresh) {
+	if (!forceRefresh && Array.isArray(OSApp.Analog.cachedAdjustmentTypes) && OSApp.Analog.cachedAdjustmentTypes.length > 0) {
+		return $.Deferred().resolve(OSApp.Analog.cachedAdjustmentTypes).promise();
+	}
+
+	if (!forceRefresh && OSApp.Analog.adjustmentTypesRequest) {
+		return $.Deferred().resolve(OSApp.Analog.getDefaultAdjustmentTypes()).promise();
+	}
+
+	OSApp.Analog.adjustmentTypesRequest = OSApp.Firmware.sendToOS("/sh?pw=", "json", 5000).then(function(data) {
+		var types = (data && Array.isArray(data.progTypes)) ? data.progTypes : [];
+		if (types.length > 0) {
+			OSApp.Analog.cachedAdjustmentTypes = types;
+		}
+		return types;
+	}, function(err) {
+		if (Array.isArray(OSApp.Analog.cachedAdjustmentTypes) && OSApp.Analog.cachedAdjustmentTypes.length > 0) {
+			return OSApp.Analog.cachedAdjustmentTypes;
+		}
+		return $.Deferred().reject(err).promise();
+	});
+
+	OSApp.Analog.adjustmentTypesRequest.always(function() {
+		OSApp.Analog.adjustmentTypesRequest = null;
+	});
+
+	if (forceRefresh) {
+		return OSApp.Analog.adjustmentTypesRequest;
+	}
+
+	return $.Deferred().resolve(OSApp.Analog.getDefaultAdjustmentTypes()).promise();
+};
+
+OSApp.Analog.getDefaultMonitorTypes = function() {
+	return [
+		{ type: OSApp.Analog.Constants.MONITOR_MIN, name: "Min" },
+		{ type: OSApp.Analog.Constants.MONITOR_MAX, name: "Max" },
+		{ type: OSApp.Analog.Constants.MONITOR_SENSOR12, name: "SN 1/2" },
+		{ type: OSApp.Analog.Constants.MONITOR_SET_SENSOR12, name: "SET SN 1/2" },
+		{ type: OSApp.Analog.Constants.MONITOR_AND, name: "AND" },
+		{ type: OSApp.Analog.Constants.MONITOR_OR, name: "OR" },
+		{ type: OSApp.Analog.Constants.MONITOR_XOR, name: "XOR" },
+		{ type: OSApp.Analog.Constants.MONITOR_NOT, name: "NOT" },
+		{ type: OSApp.Analog.Constants.MONITOR_TIME, name: "TIME" },
+		{ type: OSApp.Analog.Constants.MONITOR_REMOTE, name: "REMOTE" }
+	];
+};
+
+OSApp.Analog.getSupportedMonitorTypes = function(forceRefresh) {
+	if (!forceRefresh && Array.isArray(OSApp.Analog.cachedMonitorTypes) && OSApp.Analog.cachedMonitorTypes.length > 0) {
+		return $.Deferred().resolve(OSApp.Analog.cachedMonitorTypes).promise();
+	}
+
+	if (!forceRefresh && OSApp.Analog.monitorTypesRequest) {
+		return $.Deferred().resolve(OSApp.Analog.getDefaultMonitorTypes()).promise();
+	}
+
+	OSApp.Analog.monitorTypesRequest = OSApp.Firmware.sendToOS("/mt?pw=", "json", 5000).then(function(data) {
+		var types = (data && Array.isArray(data.monitortypes)) ? data.monitortypes : [];
+		if (types.length > 0) {
+			OSApp.Analog.cachedMonitorTypes = types;
+		}
+		return types;
+	}, function(err) {
+		if (Array.isArray(OSApp.Analog.cachedMonitorTypes) && OSApp.Analog.cachedMonitorTypes.length > 0) {
+			return OSApp.Analog.cachedMonitorTypes;
+		}
+		return $.Deferred().reject(err).promise();
+	});
+
+	OSApp.Analog.monitorTypesRequest.always(function() {
+		OSApp.Analog.monitorTypesRequest = null;
+	});
+
+	if (forceRefresh) {
+		return OSApp.Analog.monitorTypesRequest;
+	}
+
+	return $.Deferred().resolve(OSApp.Analog.getDefaultMonitorTypes()).promise();
+};
+
 
 OSApp.Analog.getExportMethodSensors = function(backuptype) {
 	let storageName = (backuptype == 1) ? "backupSensors" : (backuptype == 2) ? "backupAdjustments" : (backuptype == 4) ? "backupMonitor" : "backupAll";
@@ -920,8 +1050,7 @@ OSApp.Analog.getExportMethodSensors = function(backuptype) {
 //Program adjustments editor
 OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callbackCancel ) {
 
-	OSApp.Firmware.sendToOS("/sh?pw=", "json").then(function (data) {
-		var supportedAdjustmentTypes = data.progTypes;
+	OSApp.Analog.getSupportedAdjustmentTypes().then(function (supportedAdjustmentTypes) {
 		var i;
 
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
@@ -1417,8 +1546,7 @@ OSApp.Analog.monitorSelection = function(id, sel, ignore) {
 //Monitor editor
 OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel) {
 
-	OSApp.Firmware.sendToOS("/mt?pw=", "json").then(function (data) {
-		var supportedMonitorTypes = data.monitortypes;
+	OSApp.Analog.getSupportedMonitorTypes().then(function (supportedMonitorTypes) {
 		var i;
 
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
@@ -2602,8 +2730,7 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 // Analog sensor editor
 OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) {
 
-	OSApp.Firmware.sendToOS("/sf?pw=", "json").then(function (data) {
-		var supportedSensorTypes = data.sensorTypes;
+	OSApp.Analog.getSupportedSensorTypes().then(function (supportedSensorTypes) {
 		var i;
 		var sensorFormat = parseInt(sensor.format, 10);
 		if (isNaN(sensorFormat)) {
@@ -4261,6 +4388,15 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 	$.mobile.pageContainer.append(page);
 	$.mobile.pageContainer.pagecontainer("change", page);
+	OSApp.Analog.getSupportedSensorTypes().fail(function() {
+		// Ignore prefetch errors; editor will request data again on demand.
+	});
+	OSApp.Analog.getSupportedAdjustmentTypes().fail(function() {
+		// Ignore prefetch errors; editor will request data again on demand.
+	});
+	OSApp.Analog.getSupportedMonitorTypes().fail(function() {
+		// Ignore prefetch errors; editor will request data again on demand.
+	});
 
 	// Show cached data immediately if available (from fire-and-forget preload)
 	if (OSApp.Analog.analogSensors && OSApp.Analog.analogSensors.length > 0) {

@@ -913,6 +913,10 @@ OSApp.Network.getWiFiRating = function( rssi ) {
 };
 
 OSApp.Network.networkFail = function() {
+	if ( OSApp.ESP32Mode && OSApp.ESP32Mode.clearRadioInfo ) {
+		OSApp.ESP32Mode.clearRadioInfo();
+	}
+
 	OSApp.Status.changeStatus( 0, "red", "<p class='running-text center'>" + OSApp.Language._( "Network Error" ) + "</p>",
 		function() {
 			OSApp.UIDom.showLoading( "#weather,#footer-running" );

@@ -40,6 +40,59 @@ OSApp.Firmware.Constants = {
 
 OSApp.Firmware.nativeHttpReady = false;
 
+OSApp.Firmware.isApiTimingDebugEnabled = function() {
+	return localStorage.getItem( "OS_API_TIMING_DEBUG" ) === "1";
+};
+
+OSApp.Firmware.getPerfNow = function() {
+	return ( window.performance && typeof window.performance.now === "function" ) ? window.performance.now() : Date.now();
+};
+
+OSApp.Firmware.logApiTiming = function( label, endpoint, elapsedMs, details ) {
+	if ( !OSApp.Firmware.isApiTimingDebugEnabled() ) {
+		return;
+	}
+
+	var msg = "[API-Timing] " + label + " " + Math.round( elapsedMs ) + "ms " + endpoint;
+	if ( details ) {
+		msg += " " + details;
+	}
+	console.log( msg );
+};
+
+OSApp.Firmware.normalizeDirectHost = function( host, prefix ) {
+	if ( typeof host !== "string" || !host ) {
+		return host;
+	}
+
+	var url;
+	try {
+		url = new URL( ( prefix || "http://" ) + host );
+	} catch {
+		if ( prefix === "https://" ) {
+			return host.replace( /:80(?=(?:$|\/|\?))/i, "" );
+		}
+		if ( prefix === "http://" ) {
+			return host.replace( /:443(?=(?:$|\/|\?))/i, "" );
+		}
+		return host;
+	}
+
+	if ( prefix === "https://" ) {
+		url.protocol = "https:";
+		if ( url.port === "80" || url.port === "443" ) {
+			url.port = "";
+		}
+	} else if ( prefix === "http://" ) {
+		url.protocol = "http:";
+		if ( url.port === "80" || url.port === "443" ) {
+			url.port = "";
+		}
+	}
+
+	return ( url.host + url.pathname ).replace( /\/$/, "" ) + url.search;
+};
+
 OSApp.Firmware.canUseNativeHttp = function( url ) {
 	return !!(
 		OSApp.currentDevice.isAndroid &&
@@ -127,6 +180,9 @@ OSApp.Firmware.nativeHttpRequest = function( obj ) {
 
 // Wrapper function to communicate with OpenSprinkler
 OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
+	var requestPath = dest;
+	var sanitizedPath = requestPath.replace( /pw=[^&]*/i, "pw=***" );
+	var startedAt = OSApp.Firmware.getPerfNow();
 
 	// Inject password into the request
 	dest = dest.replace( "pw=", "pw=" + encodeURIComponent( OSApp.currentSession.pass ) );
@@ -139,8 +195,9 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 		// Use POST when sending data to the controller (requires firmware 2.1.8 or newer)
 		usePOST = ( isChange && OSApp.Firmware.checkOSVersion( 300 ) ),
 		urlDest = usePOST ? dest.split( "?" )[ 0 ] : dest,
+		normalizedIp = OSApp.currentSession.token ? OSApp.currentSession.ip : OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix ),
 		obj = {
-			url: OSApp.currentSession.token ? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + urlDest : OSApp.currentSession.prefix + OSApp.currentSession.ip + urlDest,
+			url: OSApp.currentSession.token ? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + urlDest : OSApp.currentSession.prefix + normalizedIp + urlDest,
 			type: usePOST ? "POST" : "GET",
 			data: usePOST ? OSApp.Firmware.getUrlVars( dest ) : null,
 			dataType: type,
@@ -177,6 +234,7 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 	defer = request.then(
 		function( data ) {
+			OSApp.Firmware.logApiTiming( "OK", sanitizedPath, OSApp.Firmware.getPerfNow() - startedAt, "type=" + ( usePOST ? "POST" : "GET" ) );
 
 			// In case the data type was incorrect, attempt to fix.
 			// If fix not possible, return string
@@ -228,6 +286,7 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 		},
 		function( e ) {
+			OSApp.Firmware.logApiTiming( "ERR", sanitizedPath, OSApp.Firmware.getPerfNow() - startedAt, "status=" + ( e && typeof e.status !== "undefined" ? e.status : "n/a" ) + " statusText=" + ( e && e.statusText ? e.statusText : "n/a" ) );
 			if ( ( e.statusText === "timeout" || e.status === 0 ) && /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|cm)/.exec( dest ) ) {
 
 				// Handle the connection timing out but only show error on setting change

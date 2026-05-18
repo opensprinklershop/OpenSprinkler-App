@@ -584,6 +584,10 @@ OSApp.Sites.checkConfigured = function( firstLoad ) {
 			OSApp.currentSession.prefix = "http://";
 		}
 
+		if ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) {
+			OSApp.currentSession.ip = OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix );
+		}
+
 		if ( typeof sites[ current ].auth_user !== "undefined" &&
 			typeof sites[ current ].auth_pw !== "undefined" ) {
 
@@ -1038,6 +1042,9 @@ OSApp.Sites.newLoad = function() {
 	if ( OSApp.Analog && OSApp.Analog.clearDeviceCache ) {
 		OSApp.Analog.clearDeviceCache();
 	}
+	if ( OSApp.ESP32Mode && OSApp.ESP32Mode.clearRadioInfo ) {
+		OSApp.ESP32Mode.clearRadioInfo();
+	}
 
 	//Clear the current queued AJAX requests (used for previous OSApp.currentSession.controller connection)
 	$.ajaxq.abort( "default" );
@@ -1167,6 +1174,9 @@ OSApp.Sites.updateController = function( callback, fail ) {
 	var finish = function() {
 		$( "html" ).trigger( "datarefresh" );
 		OSApp.Status.checkStatus();
+		if ( OSApp.ESP32Mode && OSApp.ESP32Mode.prefetchRadioInfo ) {
+			OSApp.ESP32Mode.prefetchRadioInfo();
+		}
 		callback();
 	};
 
