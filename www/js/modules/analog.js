@@ -1057,6 +1057,12 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 
 	OSApp.Analog.getSupportedAdjustmentTypes().then(function (supportedAdjustmentTypes) {
 		var i;
+		if (!Object.prototype.hasOwnProperty.call(progAdjust, "stale_timeout")) progAdjust.stale_timeout = 0;
+		if (!Object.prototype.hasOwnProperty.call(progAdjust, "stale_policy")) progAdjust.stale_policy = 0;
+		if (!Object.prototype.hasOwnProperty.call(progAdjust, "stale_fallback")) progAdjust.stale_fallback = 1;
+		progAdjust.stale_timeout = parseInt(progAdjust.stale_timeout, 10) || 0;
+		progAdjust.stale_policy = parseInt(progAdjust.stale_policy, 10) || 0;
+		progAdjust.stale_fallback = parseFloat(progAdjust.stale_fallback) || 1;
 
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
 
@@ -1152,6 +1158,24 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"</label>" +
 			"<input class='max' type='number' inputmode='decimal' value='" + progAdjust.max + "'>" +
 
+			"<label>" +
+			OSApp.Language._("Stale timeout in minutes") +
+			"</label>" +
+			"<input class='stale-timeout' type='number' inputmode='decimal' min='0' value='" + Math.round(progAdjust.stale_timeout / 60) + "'>" +
+
+			"<label for='stale-policy' class='select'>" +
+			OSApp.Language._("When sensor value is stale") +
+			"</label><select data-mini='true' id='stale-policy'>" +
+			"<option value='0'" + (progAdjust.stale_policy === 0 ? " selected" : "") + ">" + OSApp.Language._("Use last value") + "</option>" +
+			"<option value='1'" + (progAdjust.stale_policy === 1 ? " selected" : "") + ">" + OSApp.Language._("Disable adjustment") + "</option>" +
+			"<option value='2'" + (progAdjust.stale_policy === 2 ? " selected" : "") + ">" + OSApp.Language._("Use fallback adjustment") + "</option>" +
+			"</select>" +
+
+			"<label>" +
+			OSApp.Language._("Fallback adjustment in %") +
+			"</label>" +
+			"<input class='stale-fallback' type='number' inputmode='decimal' min='0' max='200' value='" + Math.round(progAdjust.stale_fallback * 100) + "'>" +
+
 			"</div>" +
 			"<div id='adjchart'></div>" +
 			"<button class='submit' data-theme='b' style='width:100%; margin-top:12px; padding:12px; font-size:1.1em;'>" + OSApp.Language._("Submit") + "</button>" +
@@ -1206,6 +1230,12 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 		popup.find(".factor2").change(adjFunc);
 		popup.find(".min").change(adjFunc);
 		popup.find(".max").change(adjFunc);
+		popup.find("#stale-policy").change(function () {
+			var showFallback = parseInt(this.value, 10) === 2,
+				fallback = popup.find(".stale-fallback");
+			fallback.toggle(showFallback).prev("label").toggle(showFallback);
+			fallback.closest(".ui-input-text").toggle(showFallback);
+		});
 
 		popup.find(".submit").on("click", function () {
 
@@ -1261,6 +1291,7 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 		$("#progAdjustEditor").remove();
 
 		popup.css("max-width", "580px");
+		popup.find("#stale-policy").change();
 
 		adjFunc();
 		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
@@ -1277,7 +1308,10 @@ OSApp.Analog.getProgAdjust = function(popup) {
 		factor1: parseFloat(popup.find(".factor1").val() / 100),
 		factor2: parseFloat(popup.find(".factor2").val() / 100),
 		min: parseFloat(popup.find(".min").val()),
-		max: parseFloat(popup.find(".max").val())
+		max: parseFloat(popup.find(".max").val()),
+		stale_timeout: Math.max(0, parseInt(popup.find(".stale-timeout").val(), 10) || 0) * 60,
+		stale_policy: parseInt(popup.find("#stale-policy").val(), 10),
+		stale_fallback: Math.max(0, Math.min(200, parseFloat(popup.find(".stale-fallback").val()) || 0)) / 100
 	};
 };
 
