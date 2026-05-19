@@ -33,8 +33,12 @@ OSApp.Analog = {
 	chartCombineMoistTemp : false, // combine soil moisture and temperature in one chart
 
 	Constants: {
-		CHARTS: 14,
+		CHARTS: 18,
 		USERDEF_UNIT: 99,
+		UNIT_LITER: 14,
+		UNIT_GALLON: 15,
+		UNIT_LITER_CONSUMPTION: 16,
+		UNIT_GALLON_CONSUMPTION: 17,
 
 		CURRENT_FW : "2.3.3(172)",
 		CURRENT_FW_ID : 231,
@@ -98,6 +102,7 @@ OSApp.Analog = {
 
 	SENSOR_ZIGBEE                   : 95, // ZigBee sensor
 	SENSOR_BLUETOOTH                : 96, // Bluetooth sensor
+	SENSOR_FLOW_PULSE               : 97, // Integrated pulse driven water meter
 
 	SENSOR_REMOTE                   : 100, // Remote sensor of an remote opensprinkler
 	SENSOR_WEATHER_TEMP_F           : 101, // Weather service - temperature (Fahrenheit)
@@ -685,7 +690,7 @@ OSApp.Analog.shortenSensorTypeName = function(name) {
 	return name
 		.replace(/^Truebner\s+/, "")
 		.replace(/\s+RS485 Modbus,?\s*/g, " ")
-		.replace(/^RS485\/MODBUS RTU generic sensor$/i, "RS485 Generic")
+		.replace(/^RS485\/MODBUS RTU generic sensor( \/ water meter)?$/i, "RS485 Generic")
 		.replace(/^ASB\s*-\s*/, "ASB ")
 		.replace(/^OSPi analog input\s*-\s*/, "OSPi ")
 		.replace(/^Weather data\s*-\s*/, "Weather ")
@@ -1958,6 +1963,7 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	popup.find(".zigbee_endpoint_cluster_attribute_container").hide();
 	popup.find(".bluetooth_char_uuid_container").hide();
 	popup.find(".bluetooth_format_container").hide();
+	popup.find(".stdlog_container").hide();
 
 	// Standard fields are already visible (never hidden), no need to show them again
 
@@ -1990,6 +1996,10 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	// Also show unit container for ZigBee sensors with custom unit
 	if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE && unitid == OSApp.Analog.Constants.USERDEF_UNIT) {
 		popup.find(".unit_container").show();
+	}
+
+	if (sensortype == OSApp.Analog.Constants.SENSOR_FLOW_PULSE || unitid == OSApp.Analog.Constants.UNIT_LITER || unitid == OSApp.Analog.Constants.UNIT_GALLON || unitid == OSApp.Analog.Constants.UNIT_LITER_CONSUMPTION || unitid == OSApp.Analog.Constants.UNIT_GALLON_CONSUMPTION) {
+		popup.find(".stdlog_container").show();
 	}
 };
 
@@ -2030,6 +2040,7 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	OSApp.Analog.addToObjectInt(popup, "#unitid", sensorOut);
 	OSApp.Analog.addToObjectChk(popup, "#enable", sensorOut);
 	OSApp.Analog.addToObjectChk(popup, "#log", sensorOut);
+	OSApp.Analog.addToObjectChk(popup, "#stdlog", sensorOut);
 	OSApp.Analog.addToObjectChk(popup, "#show", sensorOut);
 	OSApp.Analog.addToObjectStr(popup, "#topic", sensorOut);
 	OSApp.Analog.addToObjectStr(popup, "#filter", sensorOut);
@@ -2091,6 +2102,7 @@ OSApp.Analog.zigbeeStandardTemplates = [
 	{ id: "press",   name: "Pressure (0x0403)",           cluster_id: 0x0403, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 10,  offset: 0, unitid: 99, unit: "hPa" },
 	{ id: "illum",   name: "Illuminance (0x0400)",        cluster_id: 0x0400, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 13, unit: "" },
 	{ id: "flow",    name: "Flow (0x0404)",               cluster_id: 0x0404, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 10,  offset: 0, unitid: 0,  unit: "" },
+	{ id: "water",   name: "Water Meter (0x0702)",        cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 14, unit: "" },
 	{ id: "leaf",    name: "Leaf Wetness (0x0407)",       cluster_id: 0x0407, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 100, offset: 0, unitid: 10, unit: "" },
 	{ id: "occup",   name: "Occupancy (0x0406)",          cluster_id: 0x0406, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 0,  unit: "" },
 	{ id: "battery", name: "Battery % (0x0001:0x0021)",   cluster_id: 0x0001, attribute_id: 0x0021, endpoint: 1, factor: 1, divider: 2,   offset: 0, unitid: 10, unit: "" },
@@ -2851,6 +2863,10 @@ list += "</select></div>" +
 			"<option value='11'>" + OSApp.Language._("DK") + "</option>" +
 			"<option value='12'>" + OSApp.Language._("Lumen (lm)") + "</option>" +
 			"<option value='13'>" + OSApp.Language._("LUX (lx)") + "</option>" +
+			"<option value='14'>" + OSApp.Language._("Liter (L)") + "</option>" +
+			"<option value='15'>" + OSApp.Language._("Gallons (gal)") + "</option>" +
+			"<option value='16'>" + OSApp.Language._("Liter Consumption (L)") + "</option>" +
+			"<option value='17'>" + OSApp.Language._("Gallon Consumption (gal)") + "</option>" +
 			"<option value='99'>" + OSApp.Language._("Custom Unit") + "</option>" +
 		"</select></div>" +
 "<div class='unit_container' style='display:none;'><label for='unit'>" + OSApp.Language._("Unit") + "</label>" +
@@ -2925,6 +2941,10 @@ list += "</select></div>" +
 			OSApp.Language._("download log") + "</a>" +
 			"<a href='#' data-role='button' data-mini='true' id='delete-sen-log' value='" + sensor.nr + "' data-icon='delete' data-inline='true' style='margin-left: 9px;'>" +
 			OSApp.Language._("delete log") + "</a>" +
+			"</label>" +
+
+			"<label class='stdlog_container' for='stdlog'><input data-mini='true' id='stdlog' type='checkbox' " + ((sensor.stdlog === 1) ? "checked='checked'" : "") + ">" +
+			OSApp.Language._("Add water consumption to standard log") +
 			"</label>" +
 
 			"<label for='show'><input data-mini='true' id='show' type='checkbox' " + ((sensor.show === 1) ? "checked='checked'" : "") + ">" +
@@ -5377,7 +5397,8 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 			rngdata = [],
 			logmap = new Map(),
 			unitid = sensor.unitid,
-			lastdate = 0;
+			lastdate = 0,
+			lastMeterValue = null;
 
 		// Temperature conversion: determine if this sensor needs conversion
 		var convertTemp = 0; // 0=none, 1=F->C, 2=C->F
@@ -5386,6 +5407,10 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 		// Override unitid for chart grouping when converting
 		if (convertTemp === 1) unitid = 2; // show in Celsius chart
 		if (convertTemp === 2) unitid = 3; // show in Fahrenheit chart
+		var isAbsoluteWaterMeter = unitid === OSApp.Analog.Constants.UNIT_LITER || unitid === OSApp.Analog.Constants.UNIT_GALLON;
+		var isWaterConsumption = unitid === OSApp.Analog.Constants.UNIT_LITER_CONSUMPTION || unitid === OSApp.Analog.Constants.UNIT_GALLON_CONSUMPTION;
+		var isWaterMeter = isAbsoluteWaterMeter || isWaterConsumption;
+		var isCumulativeWaterLog = isAbsoluteWaterMeter && lvl === 0;
 
 		for (var k = 1; k < csvlines.length; k++) {
 			var line = csvlines[k].split(";");
@@ -5398,8 +5423,18 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 				// Apply temperature conversion
 				if (convertTemp === 1) value = (value - 32) * 5 / 9; // F->C
 				else if (convertTemp === 2) value = value * 9 / 5 + 32; // C->F
-				if (unitid != 3 && unitid != OSApp.Analog.Constants.USERDEF_UNIT && value > 100) continue;
+				if (unitid != 3 && !isWaterMeter && unitid != OSApp.Analog.Constants.USERDEF_UNIT && value > 100) continue;
 				if (unitid == 1 && value < 0) continue;
+				if (isCumulativeWaterLog) {
+					if (lastMeterValue === null) {
+						lastMeterValue = value;
+						continue;
+					}
+					var delta = value - lastMeterValue;
+					lastMeterValue = value;
+					if (delta < 0) continue;
+					value = delta;
+				}
 				if (lvl == 0) //day values
 					logdata.push({ x: (date - tzo) * 1000, y: value });
 				else {
@@ -5412,7 +5447,9 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 					key = Math.trunc(date / fac) * fac * 1000;
 
 					var minmax = logmap.get(key);
-					if (!minmax)
+					if (isWaterMeter)
+						minmax = { min: 0, max: (minmax ? minmax.max : 0) + value };
+					else if (!minmax)
 						minmax = { min: value, max: value };
 					else
 						minmax = { min: Math.min(minmax.min, value), max: Math.max(minmax.max, value) };
@@ -5424,21 +5461,25 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 		if (lvl > 0) {
 			for (let [key, value] of logmap) {
 				rngdata.push({ x: key, y: [value.min, value.max] });
-				logdata.push({ x: key, y: (value.max + value.min) / 2 });
+				logdata.push({ x: key, y: isWaterMeter ? value.max : (value.max + value.min) / 2 });
 			}
 		}
 
-		if (logdata.length < 2) continue;
+		if (logdata.length < (isWaterMeter ? 1 : 2)) continue;
 
 		//add current value as forecast data:
 		let date = new Date();
 		date.setMinutes(date.getMinutes() - date.getTimezoneOffset() - tzo / 60);
 
-		let value = sensor.data ? sensor.data : logdata.slice(-1)[0].y;
-		logdata.push({ x: date, y: value });
-		var fkdp = lvl < 1 ? 1 : 0;
+		let value = logdata.slice(-1)[0].y;
+		var fkdp = 0;
+		if (!isWaterMeter) {
+			value = sensor.data ? sensor.data : value;
+			logdata.push({ x: date, y: value });
+			fkdp = lvl < 1 ? 1 : 0;
+		}
 
-		if (lvl > 0) {
+		if (lvl > 0 && !isWaterMeter) {
 			let rng = rngdata.slice(-1)[0].y;
 			let diff = (rng[1] - rng[0]) / 2;
 			rngdata.push({ x: date, y: [value - diff, value + diff] });
@@ -5470,7 +5511,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 		else
 			colors[unitid].push(color);
 
-		var series = { name: sensor.name, type: (sensor.unitid === OSApp.Analog.Constants.USERDEF_UNIT? "area" : "line"), data: logdata, color: color };
+		var series = { name: sensor.name, type: (isWaterMeter ? "column" : (sensor.unitid === OSApp.Analog.Constants.USERDEF_UNIT? "area" : "line")), data: logdata, color: color };
 
 		if (!AllOptions[unitid]) {
 			var unit, title, unitStr,
@@ -5546,6 +5587,26 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 					unitStr = function (val) { return OSApp.Analog.formatVal(val); };
 					minFunc = 0;
 					break;
+				case 14: unit = OSApp.Language._("Liter");
+					title = OSApp.Language._("Water Consumption") + " " + titleAdd;
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " L"; };
+					minFunc = 0;
+					break;
+				case 15: unit = OSApp.Language._("Gallon");
+					title = OSApp.Language._("Water Consumption") + " " + titleAdd;
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " gal"; };
+					minFunc = 0;
+					break;
+				case 16: unit = OSApp.Language._("Liter Consumption");
+					title = OSApp.Language._("Water Consumption") + " " + titleAdd;
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " L"; };
+					minFunc = 0;
+					break;
+				case 17: unit = OSApp.Language._("Gallon Consumption");
+					title = OSApp.Language._("Water Consumption") + " " + titleAdd;
+					unitStr = function (val) { return OSApp.Analog.formatVal(val) + " gal"; };
+					minFunc = 0;
+					break;
 
 
 				default: unit = sensor.unit;
@@ -5555,7 +5616,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 
 			let options = {
 				chart: {
-					type: lvl > 0 ? 'rangeArea' : 'area',
+					type: isWaterMeter ? 'bar' : (lvl > 0 ? 'rangeArea' : 'area'),
 					animations: {
 						speed: 500
 					},
@@ -5651,7 +5712,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 			AllOptions[unitid].series = AllOptions[unitid].series.concat(series);
 		}
 
-		if (lvl > 0) {
+		if (lvl > 0 && !isWaterMeter) {
 			opacities[unitid].push(0.24);
 			widths[unitid].push(0);
 			colors[unitid].push(color);
@@ -5891,6 +5952,10 @@ OSApp.Analog.getUnit = function(sensor) {
 		case 11: return "DK";
 		case 12: return "lm";
 		case 13: return "lx";
+		case 14: return "L";
+		case 15: return "gal";
+		case 16: return "L Verbrauch";
+		case 17: return "gal Verbrauch";
 		default: return sensor.unit;
 	}
 };

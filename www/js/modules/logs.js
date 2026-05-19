@@ -192,6 +192,30 @@ OSApp.Logs.displayPage = function() {
 			var wlSorted = [],
 				flSorted = [];
 
+			var flowLogVolume = function( item ) {
+				var unitid = parseInt( item[ 4 ], 10 );
+				if ( unitid === 14 || unitid === 15 || unitid === 16 || unitid === 17 ) {
+					return { value: parseFloat( item[ 0 ] ) || 0, unit: ( unitid === 15 || unitid === 17 ) ? "gal" : "L" };
+				}
+				return { value: OSApp.Utils.flowCountToVolume( item[ 0 ] ), unit: "L" };
+			};
+			var addVolume = function( totals, volume ) {
+				totals[ volume.unit ] = ( totals[ volume.unit ] || 0 ) + volume.value;
+				return totals;
+			};
+			var formatVolume = function( volume ) {
+				return parseFloat( volume.value.toFixed( 2 ) ) + " " + volume.unit;
+			};
+			var formatTotals = function( totals ) {
+				var parts = [];
+				Object.keys( totals || {} ).forEach( function( unit ) {
+					if ( totals[ unit ] > 0 ) {
+						parts.push( parseFloat( totals[ unit ].toFixed( 2 ) ) + " " + unit );
+					}
+				} );
+				return parts.join( " / " );
+			};
+
 			if ( waterlog.length ) {
 				stats.avgWaterLevel = 0;
 				$.each( waterlog, function() {
@@ -202,9 +226,9 @@ OSApp.Logs.displayPage = function() {
 			}
 
 			if ( flowlog.length ) {
-				stats.totalVolume = 0;
+				stats.totalVolume = {};
 				$.each( flowlog, function() {
-					var volume = OSApp.Utils.flowCountToVolume( this[ 0 ] );
+					var volume = flowLogVolume( this );
 
 					if ( type === "timeline" ) {
 						var date = new Date( parseInt( this[ 3 ] * 1000 ) ),
@@ -215,7 +239,7 @@ OSApp.Logs.displayPage = function() {
 							"start": new Date( utc.getTime() - parseInt( this[ 2 ] * 1000 ) ),
 							"end": utc,
 							"className": "",
-							"content": volume + " L",
+							"content": formatVolume( volume ),
 							"group": OSApp.Language._( "Flow Sensor" )
 						} );
 						if ( !groups.some( elem => elem.id === OSApp.Language._( "Flow Sensor" ) ) ) {
@@ -227,10 +251,11 @@ OSApp.Logs.displayPage = function() {
 					} else {
 						var day = Math.floor( this[ 3 ] / 60 / 60 / 24 );
 
-						flSorted[ day ] = flSorted[ day ] ? flSorted[ day ] + volume : volume;
+						flSorted[ day ] = addVolume( flSorted[ day ] || {}, volume );
 					}
-					stats.totalVolume += volume;
+					stats.totalVolume = addVolume( stats.totalVolume, volume );
 				} );
+				stats.totalVolumeText = formatTotals( stats.totalVolume );
 			}
 
 			return [ wlSorted, flSorted, stats ];
@@ -506,7 +531,9 @@ OSApp.Logs.displayPage = function() {
 
 					if ( flSorted[ group ] ) {
 						groupArray[ i ] += "<span style='border:none' class='ui-body ui-body-a'>" +
-							OSApp.Language._( "Total Water Used" ) + ": " + flSorted[ group ] + " L" +
+							OSApp.Language._( "Total Water Used" ) + ": " + Object.keys( flSorted[ group ] ).map( function( unit ) {
+								return parseFloat( flSorted[ group ][ unit ].toFixed( 2 ) ) + " " + unit;
+							} ).join( " / " ) +
 							"</span>";
 					}
 
@@ -585,8 +612,8 @@ OSApp.Logs.displayPage = function() {
 						( stats.avgWaterLevel !== 100 ? ( stats.avgWaterLevel < 100 ? "green-text" : "red-text" ) : "" ) +
 						"'>" + stats.avgWaterLevel + "%</span></div>" : ""
 				) +
-				( typeof stats.totalVolume !== "undefined" && stats.totalVolume > 0 ? "<div><span class='bold'>" + OSApp.Language._( "Total Water Used" ) + "</span>: " + stats.totalVolume + " L" +
-					( hasWater && stats.avgWaterLevel < 100 ? " (<span class='green-text'>" + ( stats.totalVolume - ( stats.totalVolume * ( stats.avgWaterLevel / 100 ) ) ).toFixed( 2 ) + "L saved</span>)" : "" ) +
+				( stats.totalVolumeText ? "<div><span class='bold'>" + OSApp.Language._( "Total Water Used" ) + "</span>: " + stats.totalVolumeText +
+					( hasWater && stats.avgWaterLevel < 100 && stats.totalVolume && stats.totalVolume.L ? " (<span class='green-text'>" + ( stats.totalVolume.L - ( stats.totalVolume.L * ( stats.avgWaterLevel / 100 ) ) ).toFixed( 2 ) + "L saved</span>)" : "" ) +
 					"</div>" : "" ) +
 				"</div>";
 		},
