@@ -1861,39 +1861,8 @@ OSApp.ESP32Mode.getClassicUpdateOptionsHtml = function() {
 OSApp.ESP32Mode.sanitizeClassicUploadChangelog = function( changelog ) {
 	if ( !changelog ) return "";
 
-	var lines = String( changelog ).split( /\r?\n/ );
-	var out = [];
-	var skippingFirmwareBinaries = false;
-
-	$.each( lines, function( _, line ) {
-		var raw = line || "";
-		var trimmed = raw.trim();
-		var normalized = trimmed.toLowerCase();
-
-		if ( /^firmware\s*binaries\s*:?$/i.test( trimmed ) || /^firmware-binaries\s*:?$/i.test( trimmed ) ) {
-			skippingFirmwareBinaries = true;
-			return;
-		}
-
-		if ( skippingFirmwareBinaries ) {
-			if ( /^-\s*firmware_/i.test( trimmed ) || /^firmware_/i.test( trimmed ) || trimmed === "" ) {
-				return;
-			}
-			skippingFirmwareBinaries = false;
-		}
-
-		if ( /^all\s+releases\s*:/i.test( trimmed ) || normalized === "all releases" ) {
-			return;
-		}
-
-		if ( /opensprinklershop\/opensprinkler-firmware\/releases/i.test( normalized ) ) {
-			return;
-		}
-
-		out.push( raw );
-	} );
-
-	return out.join( "\n" ).replace( /\n{3,}/g, "\n\n" ).trim();
+	// Preserve changelog content exactly as delivered (no trimming/cropping)
+	return String( changelog );
 };
 
 OSApp.ESP32Mode.getClassicPostedFirmwareUrl = function( entry, variant ) {
@@ -1973,8 +1942,17 @@ OSApp.ESP32Mode.openClassicUpdatePopup = function( data, selectedEntry ) {
 		content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Firmware is up to date" ) + "</p>";
 	}
 
-	if ( data.changelog ) {
-		var filteredClassicChangelog = OSApp.ESP32Mode.sanitizeClassicUploadChangelog( data.changelog );
+	var classicChangelog = "";
+	if ( targetEntry && targetEntry.changelog ) {
+		classicChangelog = targetEntry.changelog;
+	} else if ( data.latest_entry && data.latest_entry.changelog ) {
+		classicChangelog = data.latest_entry.changelog;
+	} else {
+		classicChangelog = data.changelog || "";
+	}
+
+	if ( classicChangelog ) {
+		var filteredClassicChangelog = OSApp.ESP32Mode.sanitizeClassicUploadChangelog( classicChangelog );
 		content += "<div style='max-height:150px;overflow-y:auto;border:1px solid #ccc;padding:8px;margin:8px 0;font-size:0.85em;white-space:pre-wrap;'>" +
 			$( "<span>" ).text( filteredClassicChangelog ).html() + "</div>";
 	}
@@ -2058,7 +2036,7 @@ OSApp.ESP32Mode.showClassicVersionPicker = function( checkData ) {
 				"<b>" + verLabel + "</b>" +
 				( isCurrent ? " <span style='font-size:0.8em;color:#4CAF50;'>[" + OSApp.Language._( "current" ) + "]</span>" : "" ) +
 				( v.date ? " <span style='font-size:0.8em;color:#999;'>" + v.date + "</span>" : "" ) +
-				( v.changelog ? "<p class='ui-li-desc' style='white-space:normal;'>" + $( "<span>" ).text( v.changelog.substring( 0, 120 ) ).html() + ( v.changelog.length > 120 ? "…" : "" ) + "</p>" : "" ) +
+				( v.changelog ? "<p class='ui-li-desc' style='white-space:pre-wrap;'>" + $( "<span>" ).text( v.changelog ).html() + "</p>" : "" ) +
 				"</a></li>";
 		} );
 		content += "</ul>";
@@ -2616,9 +2594,12 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function() {
 		} else {
 			content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Firmware is up to date" ) + "</p>";
 		}
-		if ( data.changelog ) {
+		var legacyChangelog = ( data.latest_entry && data.latest_entry.changelog )
+			? data.latest_entry.changelog
+			: ( data.changelog || "" );
+		if ( legacyChangelog ) {
 			content += "<div style='max-height:150px;overflow-y:auto;border:1px solid #ccc;padding:8px;margin:8px 0;font-size:0.85em;white-space:pre-wrap;'>" +
-				$( "<span>" ).text( data.changelog ).html() + "</div>";
+				$( "<span>" ).text( legacyChangelog ).html() + "</div>";
 		}
 		content += "<p style='font-size:0.9em;color:#666;'>" +
 			OSApp.Language._( "This device downloads and installs the firmware directly." ) +
@@ -3059,7 +3040,7 @@ OSApp.ESP32Mode.showVersionPicker = function( checkData ) {
 				: "";
 			var dateStr = v.date ? " <span style='font-size:0.8em;color:#999;'>(" + v.date + ")</span>" : "";
 			var changelogSnippet = v.changelog
-				? $( "<span>" ).text( v.changelog.substring( 0, 120 ) ).html() + ( v.changelog.length > 120 ? "…" : "" )
+				? $( "<span>" ).text( v.changelog ).html()
 				: "";
 
 			content += "<li>" +
@@ -3071,7 +3052,7 @@ OSApp.ESP32Mode.showVersionPicker = function( checkData ) {
 				" data-ver='" + verLabel + "'>" +
 				"<b>v" + verLabel + "</b>" + badge + dateStr;
 			if ( changelogSnippet ) {
-				content += "<p class='ui-li-desc' style='white-space:normal;'>" + changelogSnippet + "</p>";
+				content += "<p class='ui-li-desc' style='white-space:pre-wrap;'>" + changelogSnippet + "</p>";
 			}
 			content += "</a></li>";
 		} );

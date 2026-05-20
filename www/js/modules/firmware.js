@@ -40,26 +40,6 @@ OSApp.Firmware.Constants = {
 
 OSApp.Firmware.nativeHttpReady = false;
 
-OSApp.Firmware.isApiTimingDebugEnabled = function() {
-	return localStorage.getItem( "OS_API_TIMING_DEBUG" ) === "1";
-};
-
-OSApp.Firmware.getPerfNow = function() {
-	return ( window.performance && typeof window.performance.now === "function" ) ? window.performance.now() : Date.now();
-};
-
-OSApp.Firmware.logApiTiming = function( label, endpoint, elapsedMs, details ) {
-	if ( !OSApp.Firmware.isApiTimingDebugEnabled() ) {
-		return;
-	}
-
-	var msg = "[API-Timing] " + label + " " + Math.round( elapsedMs ) + "ms " + endpoint;
-	if ( details ) {
-		msg += " " + details;
-	}
-	console.log( msg );
-};
-
 OSApp.Firmware.normalizeDirectHost = function( host, prefix ) {
 	if ( typeof host !== "string" || !host ) {
 		return host;
@@ -180,9 +160,6 @@ OSApp.Firmware.nativeHttpRequest = function( obj ) {
 
 // Wrapper function to communicate with OpenSprinkler
 OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
-	var requestPath = dest;
-	var sanitizedPath = requestPath.replace( /pw=[^&]*/i, "pw=***" );
-	var startedAt = OSApp.Firmware.getPerfNow();
 
 	// Inject password into the request
 	dest = dest.replace( "pw=", "pw=" + encodeURIComponent( OSApp.currentSession.pass ) );
@@ -234,8 +211,6 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 	defer = request.then(
 		function( data ) {
-			OSApp.Firmware.logApiTiming( "OK", sanitizedPath, OSApp.Firmware.getPerfNow() - startedAt, "type=" + ( usePOST ? "POST" : "GET" ) );
-
 			// In case the data type was incorrect, attempt to fix.
 			// If fix not possible, return string
 			if ( typeof data === "string" ) {
@@ -286,7 +261,6 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 		},
 		function( e ) {
-			OSApp.Firmware.logApiTiming( "ERR", sanitizedPath, OSApp.Firmware.getPerfNow() - startedAt, "status=" + ( e && typeof e.status !== "undefined" ? e.status : "n/a" ) + " statusText=" + ( e && e.statusText ? e.statusText : "n/a" ) );
 			if ( ( e.statusText === "timeout" || e.status === 0 ) && /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|cm)/.exec( dest ) ) {
 
 				// Handle the connection timing out but only show error on setting change
@@ -703,6 +677,25 @@ OSApp.Firmware.getVersionCatalogUrl = function() {
 	return "https://opensprinklershop.de/upgrade/versions.json";
 };
 
+OSApp.Firmware.compareCatalogVersions = function( a, b ) {
+	var aFwv = Number( a && a.fw_version ) || 0;
+	var aFwm = Number( a && a.fw_minor ) || 0;
+	var bFwv = Number( b && b.fw_version ) || 0;
+	var bFwm = Number( b && b.fw_minor ) || 0;
+
+	if ( aFwv !== bFwv ) {
+		return aFwv - bFwv;
+	}
+
+	return aFwm - bFwm;
+};
+
+OSApp.Firmware.sortCatalogVersionsDesc = function( versions ) {
+	return ( versions || [] ).slice().sort( function( a, b ) {
+		return OSApp.Firmware.compareCatalogVersions( b, a );
+	} );
+};
+
 OSApp.Firmware.buildOTAUpdateRequest = function( extraParams ) {
 	var cache = OSApp.Firmware._otaCache || {};
 	var request = "/uu?pw=";
@@ -765,9 +758,10 @@ OSApp.Firmware.buildOTACacheFromCatalogEntry = function( entry ) {
 
 OSApp.Firmware.getLatestCatalogUpdate = function( versions ) {
 	var current = OSApp.Firmware.getOTACurrentVersion();
+	var orderedVersions = OSApp.Firmware.sortCatalogVersionsDesc( versions );
 	var newest = null;
 
-	$.each( versions || [], function( _, version ) {
+	$.each( orderedVersions, function( _, version ) {
 		if ( OSApp.Firmware.isNewerOTAVersion( version, current.fwv, current.fwm ) ) {
 			newest = version;
 			return false;
@@ -791,10 +785,11 @@ OSApp.Firmware.getCatalogEntryForVersion = function( versions, fwv, fwm ) {
 };
 
 OSApp.Firmware.buildCatalogOTAState = function( versions ) {
+	var orderedVersions = OSApp.Firmware.sortCatalogVersionsDesc( versions );
 	var current = OSApp.Firmware.getOTACurrentVersion();
-	var newest = OSApp.Firmware.getLatestCatalogUpdate( versions );
-	var currentEntry = OSApp.Firmware.getCatalogEntryForVersion( versions, current.fwv, current.fwm );
-	var displayEntry = newest || currentEntry || ( versions && versions.length ? versions[ 0 ] : null ) || {};
+	var newest = OSApp.Firmware.getLatestCatalogUpdate( orderedVersions );
+	var currentEntry = OSApp.Firmware.getCatalogEntryForVersion( orderedVersions, current.fwv, current.fwm );
+	var displayEntry = newest || currentEntry || ( orderedVersions.length ? orderedVersions[ 0 ] : null ) || {};
 
 	return {
 		status: newest ? 2 : 3,
@@ -812,7 +807,7 @@ OSApp.Firmware.buildCatalogOTAState = function( versions ) {
 		matter_sha256: displayEntry.matter_sha256 || "",
 		esp8266_sha256: displayEntry.esp8266_sha256 || "",
 		current_entry: currentEntry || null,
-		latest_entry: versions && versions.length ? versions[ 0 ] : null
+		latest_entry: orderedVersions.length ? orderedVersions[ 0 ] : null
 	};
 };
 
@@ -1137,6 +1132,7 @@ OSApp.Firmware.showOTAPopup = function() {
 					popup.find( ".ota-version-changelog" )
 						.text( selected.changelog )
 						.css( "white-space", "pre-wrap" )
+						.scrollTop( 0 )
 						.show();
 				} else {
 					popup.find( ".ota-version-changelog" ).hide();
