@@ -1448,6 +1448,8 @@
       "Write Matter KVS to device partition now?": "Matter KVS jetzt in die Gerätepartition schreiben?",
       "Matter KVS written successfully": "Matter KVS erfolgreich geschrieben",
       "Failed to write Matter KVS.": "Matter KVS konnte nicht geschrieben werden.",
-      "Firmware flashed successfully": "Firmware erfolgreich geflasht"
+      "Firmware flashed successfully": "Firmware erfolgreich geflasht",
+      "OTC connection detected. The update will run via device-side online update flow.": "OTC-Verbindung erkannt. Das Update wird im geräteseitigen Online-Update-Modus ausgeführt.",
+      "Update over OTC is enabled. The device will download and install firmware directly.": "Update über OTC ist aktiviert. Das Gerät lädt die Firmware herunter und installiert sie direkt."
    }
 }

@@ -1339,6 +1339,8 @@
       "Device is rebooting...": "Device is rebooting...",
       "Device did not come back online after first upload.": "Device did not come back online after first upload.",
       "The firmware update server on this device is not reachable (port 8080). Please update the firmware via USB or install a firmware that supports online updates.": "The firmware update server on this device is not reachable (port 8080). Please update the firmware via USB or install a firmware that supports online updates.",
-      "Firmware flashed successfully": "Firmware flashed successfully"
+      "Firmware flashed successfully": "Firmware flashed successfully",
+      "OTC connection detected. The update will run via device-side online update flow.": "OTC இணைப்பு கண்டறியப்பட்டது. புதுப்பிப்பு சாதனத்தின் ஆன்லைன் புதுப்பிப்பு செயல்முறையின் மூலம் இயங்கும்.",
+      "Update over OTC is enabled. The device will download and install firmware directly.": "OTC வழியாக புதுப்பிப்பு இயக்கப்பட்டுள்ளது. சாதனம் firmware-ஐ நேரடியாக பதிவிறக்கி நிறுவும்."
    }
 }

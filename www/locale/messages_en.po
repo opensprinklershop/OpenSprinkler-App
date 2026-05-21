@@ -2922,3 +2922,9 @@ msgstr ""
 
 msgid "Overall progress"
 msgstr ""
+
+msgid "OTC connection detected. The update will run via device-side online update flow."
+msgstr ""
+
+msgid "Update over OTC is enabled. The device will download and install firmware directly."
+msgstr ""

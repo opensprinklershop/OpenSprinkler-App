@@ -1664,6 +1664,12 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 		return;
 	}
 
+	// OTC sessions cannot use browser upload to port 8080; use the device-side OTA flow.
+	if ( OSApp.currentSession && OSApp.currentSession.token ) {
+		OSApp.ESP32Mode.setupLegacyOnlineUpdate();
+		return;
+	}
+
 	$.mobile.loading( "show" );
 
 	// Fetch radio info (needed for variant selector) only on ESP32 devices.
@@ -1805,7 +1811,19 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
  */
 OSApp.ESP32Mode.getDirectDeviceBaseUrl = function() {
 	var rawIp = ( OSApp.currentSession && OSApp.currentSession.ip ) ? String( OSApp.currentSession.ip ).trim() : "";
-	var prefix = ( OSApp.currentSession && OSApp.currentSession.prefix ) ? OSApp.currentSession.prefix : "http://";
+	var prefix = ( OSApp.currentSession && OSApp.currentSession.prefix ) ? String( OSApp.currentSession.prefix ).trim() : "http://";
+
+	if ( /^https?:$/i.test( prefix ) ) {
+		prefix += "//";
+	} else if ( /^https?$/i.test( prefix ) ) {
+		prefix += "://";
+	}
+
+	if ( !/^https?:\/\//i.test( prefix ) ) {
+		prefix = "http://";
+	}
+
+	prefix = /^https:/i.test( prefix ) ? "https://" : "http://";
 
 	if ( /^https?:\/\//i.test( rawIp ) ) {
 		return rawIp.replace( /\/+$/, "" );
@@ -1822,6 +1840,10 @@ OSApp.ESP32Mode.getDirectDeviceBaseUrl = function() {
 		}
 	}
 
+	if ( !rawIp ) {
+		return prefix.replace( /\/+$/, "" );
+	}
+
 	return ( prefix + rawIp ).replace( /\/+$/, "" );
 };
 
@@ -1832,13 +1854,19 @@ OSApp.ESP32Mode.getDirectDeviceUpdateUrl = function() {
 OSApp.ESP32Mode.getDirectDeviceUploadUrl = function() {
 	var baseUrl = OSApp.ESP32Mode.getDirectDeviceBaseUrl();
 	var match = baseUrl.match( /^https?:\/\/([^/:]+)(?::\d+)?/i );
+	var host = match ? match[ 1 ] : "";
 
-	if ( match ) {
-		// The update server on port 8080 only supports HTTP — always use http://
-		return "http://" + match[ 1 ] + ":8080/update";
+	if ( !host ) {
+		var looseMatch = String( baseUrl || "" ).match( /^(?:https?:\/\/)?([^/:?#]+)(?::\d+)?/i );
+		host = looseMatch ? looseMatch[ 1 ] : "";
 	}
 
-	return baseUrl.replace( /^https:/, "http:" ).replace( /\/+$/, "" ) + ":8080/update";
+	if ( host ) {
+		// The update server on port 8080 only supports HTTP — always use http://
+		return "http://" + host + ":8080/update";
+	}
+
+	return "";
 };
 
 OSApp.ESP32Mode.getClassicUpdateOptionsHtml = function() {
@@ -1958,8 +1986,8 @@ OSApp.ESP32Mode.openClassicUpdatePopup = function( data, selectedEntry ) {
 	}
 
 	if ( isOtcConnection ) {
-		content += "<div style='margin:12px 0;padding:10px;background:#fff3e0;color:#b26a00;border-radius:6px;'>" +
-			OSApp.Language._( "Firmware update is only available over a direct connection to the device. OTC connections are not supported for firmware updates." ) +
+		content += "<div style='margin:12px 0;padding:10px;background:#e8f0fe;color:#1f4fa3;border-radius:6px;'>" +
+			OSApp.Language._( "OTC connection detected. The update will run via device-side online update flow." ) +
 			"</div>";
 	}
 
@@ -1978,6 +2006,8 @@ OSApp.ESP32Mode.openClassicUpdatePopup = function( data, selectedEntry ) {
 			}
 			content += "<button class='classic-ota-older classic-ota-action ui-btn'>" + OSApp.Language._( "Install older version..." ) + "</button>";
 		}
+	} else {
+		content += "<button class='classic-ota-legacy ui-btn ui-btn-b'>" + OSApp.Language._( "Start Update" ) + "</button>";
 	}
 
 	content += "<button class='ota-cancel ui-btn'>" + OSApp.Language._( "Close" ) + "</button>";
@@ -1992,6 +2022,14 @@ OSApp.ESP32Mode.openClassicUpdatePopup = function( data, selectedEntry ) {
 
 	popup.on( "click", ".classic-ota-start", function() {
 		OSApp.ESP32Mode.runClassicPostedUpdate( popup, targetEntry || latestEntry );
+		return false;
+	} );
+
+	popup.on( "click", ".classic-ota-legacy", function() {
+		popup.popup( "close" );
+		setTimeout( function() {
+			OSApp.ESP32Mode.setupLegacyOnlineUpdate();
+		}, 300 );
 		return false;
 	} );
 
@@ -2485,11 +2523,21 @@ OSApp.ESP32Mode.probeUpdateServer = function() {
 	var url = OSApp.ESP32Mode.getDirectDeviceUploadUrl();
 	var xhr = new XMLHttpRequest();
 
+	if ( !/^https?:\/\/[^/]+/i.test( String( url || "" ) ) ) {
+		defer.resolve( false );
+		return defer.promise();
+	}
+
 	// Use OPTIONS — the firmware registers on_update_options on port 8080
 	// which returns Access-Control-Allow-Origin: * so the CORS check passes.
 	// A plain GET has no CORS headers on port 8080, causing the browser to
 	// block the response and trigger onerror even when the server IS running.
-	xhr.open( "OPTIONS", url, true );
+	try {
+		xhr.open( "OPTIONS", url, true );
+	} catch ( ignored ) { // eslint-disable-line no-unused-vars
+		defer.resolve( false );
+		return defer.promise();
+	}
 	xhr.timeout = 5000;
 
 	xhr.onload = function() {
@@ -2517,6 +2565,11 @@ OSApp.ESP32Mode.probeUpdateServer = function() {
 OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
 	if ( OSApp.Firmware.isOSPi() ) {
 		OSApp.ESP32Mode.setupOSPiOnlineUpdate();
+		return;
+	}
+
+	if ( OSApp.currentSession && OSApp.currentSession.token ) {
+		OSApp.ESP32Mode.setupLegacyOnlineUpdate();
 		return;
 	}
 
@@ -2605,8 +2658,8 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function() {
 			OSApp.Language._( "This device downloads and installs the firmware directly." ) +
 			"</p>";
 		if ( isOtcConnection ) {
-			content += "<div style='margin:12px 0;padding:10px;background:#fff3e0;color:#b26a00;border-radius:6px;'>" +
-				OSApp.Language._( "Firmware update is only available over a direct connection to the device. OTC connections are not supported for firmware updates." ) +
+			content += "<div style='margin:12px 0;padding:10px;background:#e8f0fe;color:#1f4fa3;border-radius:6px;'>" +
+				OSApp.Language._( "Update over OTC is enabled. The device will download and install firmware directly." ) +
 				"</div>";
 		}
 		content += "<p style='font-size:0.85em;color:#666;'>" +
@@ -2621,9 +2674,7 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function() {
 		content += "<p id='ota-step-4' style='margin:2px 0;color:#999;'>&#9744; " + OSApp.Language._( "Step 4: Restore configuration" ) + "</p>";
 		content += "</div>";
 
-		if ( !isOtcConnection ) {
-			content += "<button class='legacy-ota-start ui-btn ui-btn-b'>" + OSApp.Language._( "Start Update" ) + "</button>";
-		}
+		content += "<button class='legacy-ota-start ui-btn ui-btn-b'>" + OSApp.Language._( "Start Update" ) + "</button>";
 		content += "<button class='legacy-ota-after-reboot ui-btn' style='display:none;'>" + OSApp.Language._( "Device rebooted - Restore configuration" ) + "</button>";
 		content += "<button class='ota-cancel ui-btn'>" + OSApp.Language._( "Close" ) + "</button>";
 		content += "</div>";
