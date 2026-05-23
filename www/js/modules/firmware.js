@@ -313,6 +313,74 @@ OSApp.Firmware.checkOSVersion = function( check ) {
 	}
 };
 
+// Check if Gardena API is available (requires ESP32 and firmware 2.4.0 with minor build >= 202)
+OSApp.Firmware.isGardenaAvailable = function() {
+	if ( $.isEmptyObject( OSApp.currentSession.controller ) ) {
+		return false;
+	}
+	if ( OSApp.Firmware.isOSPi() ) {
+		return false;
+	}
+
+	// Must be an ESP32 device
+	var isEsp32 = false;
+	if ( OSApp.Analog && typeof OSApp.Analog.isESP32 === "function" ) {
+		isEsp32 = OSApp.Analog.isESP32();
+	} else {
+		var controllerOptions = OSApp.currentSession.controller.options;
+		var features = controllerOptions && controllerOptions.feature;
+		isEsp32 = (typeof features === "string" || Array.isArray(features)) && features.includes("ESP32");
+	}
+	if ( !isEsp32 ) {
+		return false;
+	}
+
+	var fwv = OSApp.currentSession.controller.options.fwv;
+	var fwm = OSApp.currentSession.controller.options.fwm;
+
+	// Gardena available from firmware 2.4.0 (240) build 202 onwards
+	if ( fwv > 240 ) {
+		return true;
+	} else if ( fwv === 240 && fwm >= 202 ) {
+		return true;
+	}
+	return false;
+};
+
+// Check if Zigbee Station/Zone Control is available (requires ESP32 and firmware 2.4.0 with minor build >= 202)
+OSApp.Firmware.isZigbeeAvailable = function() {
+	if ( $.isEmptyObject( OSApp.currentSession.controller ) ) {
+		return false;
+	}
+	if ( OSApp.Firmware.isOSPi() ) {
+		return false;
+	}
+
+	// Must be an ESP32 device
+	var isEsp32 = false;
+	if ( OSApp.Analog && typeof OSApp.Analog.isESP32 === "function" ) {
+		isEsp32 = OSApp.Analog.isESP32();
+	} else {
+		var controllerOptions = OSApp.currentSession.controller.options;
+		var features = controllerOptions && controllerOptions.feature;
+		isEsp32 = (typeof features === "string" || Array.isArray(features)) && features.includes("ESP32");
+	}
+	if ( !isEsp32 ) {
+		return false;
+	}
+
+	var fwv = OSApp.currentSession.controller.options.fwv;
+	var fwm = OSApp.currentSession.controller.options.fwm;
+
+	// Zigbee zone control/station available from firmware 2.4.0 (240) build 202 onwards
+	if ( fwv > 240 ) {
+		return true;
+	} else if ( fwv === 240 && fwm >= 202 ) {
+		return true;
+	}
+	return false;
+};
+
 OSApp.Firmware.isOSPi = function() {
 	if ( OSApp.currentSession.controller &&
 		typeof OSApp.currentSession.controller.options === "object" &&

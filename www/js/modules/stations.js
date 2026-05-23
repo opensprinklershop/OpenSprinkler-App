@@ -223,6 +223,24 @@ OSApp.Stations.parseModbusStationData = function( hex ) {
 	return result;
 };
 
+OSApp.Stations.parseZigbeeStationData = function( hex ) {
+	var result = {
+		ieee: "0000000000000000",
+		endpoint: "01",
+		useTuya: "0",
+		tuyaDp: "00"
+	};
+
+	if ( typeof hex === "string" && hex.length >= 21 ) {
+		result.ieee = hex.substring( 0, 16 );
+		result.endpoint = hex.substring( 16, 18 );
+		result.useTuya = hex.substring( 18, 19 );
+		result.tuyaDp = hex.substring( 19, 21 );
+	}
+
+	return result;
+};
+
 OSApp.Stations.verifyRemoteStation = function( data, callback ) {
 	callback = callback || function() {};
 	data = OSApp.Stations.parseRemoteStationData( data );

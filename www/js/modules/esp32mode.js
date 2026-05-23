@@ -1392,13 +1392,11 @@ OSApp.ESP32Mode.setupMatter = function() {
 		} );
 
 		popup.on( "click", ".matter-open-commissioning", function() {
-			popup.popup( "close" );
 			OSApp.ESP32Mode.matterOpenCommissioningWindow();
 			return false;
 		} );
 
 		popup.on( "click", ".matter-remove-commissioning", function() {
-			popup.popup( "close" );
 			OSApp.ESP32Mode.matterRemoveCommissioning();
 			return false;
 		} );
@@ -1422,7 +1420,6 @@ OSApp.ESP32Mode.setupMatter = function() {
 		} );
 
 		popup.on( "click", ".matter-write-kvs", function() {
-			popup.popup( "close" );
 			OSApp.ESP32Mode.matterWriteKVS();
 			return false;
 		} );
@@ -1459,26 +1456,32 @@ OSApp.ESP32Mode.matterOpenCommissioningWindow = function() {
  * Uses /md?pw=
  */
 OSApp.ESP32Mode.matterRemoveCommissioning = function() {
-	OSApp.UIDom.areYouSure(
-		OSApp.Language._( "Remove Matter pairing from this device? You will need to remove it from your Matter controller app as well." ),
-		"",
-		function() {
-			$.mobile.loading( "show" );
-
-			OSApp.Firmware.sendToOS( "/md?pw=", "json" ).done( function( data ) {
-				$.mobile.loading( "hide" );
-				if ( data && data.result === 1 ) {
-					OSApp.Errors.showError( OSApp.Language._( "Matter pairing removed. The device can be paired again." ) );
-				} else {
-					var err = ( data && data.error ) ? data.error : OSApp.Language._( "Failed to remove Matter pairing." );
-					OSApp.Errors.showError( err );
-				}
-			} ).fail( function() {
-				$.mobile.loading( "hide" );
-				OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
-			} );
-		}
+	var confirmed = confirm(
+		OSApp.Language._( "Remove Matter pairing from this device? You will need to remove it from your Matter controller app as well." )
 	);
+	if ( confirmed ) {
+		$.mobile.loading( "show" );
+
+		OSApp.Firmware.sendToOS( "/md?pw=", "json" ).done( function( data ) {
+			$.mobile.loading( "hide" );
+			if ( data && data.result === 1 ) {
+				OSApp.Errors.showError( OSApp.Language._( "Matter pairing removed. The device can be paired again." ) );
+				// Refresh the setup popup state to reflect the decimmisioned status
+				if ( $( "#matterSetupPopup" ).parent().hasClass( "ui-popup-active" ) ) {
+					$( "#matterSetupPopup" ).popup( "close" );
+					setTimeout( function() {
+						OSApp.ESP32Mode.setupMatter();
+					}, 350 );
+				}
+			} else {
+				var err = ( data && data.error ) ? data.error : OSApp.Language._( "Failed to remove Matter pairing." );
+				OSApp.Errors.showError( err );
+			}
+		} ).fail( function() {
+			$.mobile.loading( "hide" );
+			OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+		} );
+	}
 };
 
 /**
@@ -2957,7 +2960,7 @@ OSApp.ESP32Mode.directRestoreAfterOTA = function( data, currentDevicePass, onDon
 
 	var soptKeyMap = {
 		"1": "loc", "4": "wto", "5": "ifkey", "8": "mqtt",
-		"9": "otc", "10": "dname", "12": "email", "13": "fyta"
+		"9": "otc", "10": "dname", "12": "email", "13": "fyta", "14": "gardena"
 	};
 	var params = "";
 	$.each( data.sopts || {}, function( key, val ) {
@@ -3652,7 +3655,8 @@ OSApp.ESP32Mode.restoreFromAppBackup = function( data, onDone, onFail ) {
 		"9": "otc",     // SOPT_OTC_OPTS
 		"10": "dname",  // SOPT_DEVICE_NAME
 		"12": "email",  // SOPT_EMAIL_OPTS
-		"13": "fyta"    // SOPT_FYTA_OPTS
+		"13": "fyta",   // SOPT_FYTA_OPTS
+		"14": "gardena" // SOPT_GARDENA_OPTS
 	};
 
 	// Build /co command with named sopt keys

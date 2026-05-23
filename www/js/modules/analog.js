@@ -96,7 +96,9 @@ OSApp.Analog = {
 		SENSOR_OSPI_INTERNAL_TEMP       : 54, // Internal OSPI Temperature
 
 		SENSOR_FYTA_MOISTURE            : 60,  // FYTA moisture sensor
-	SENSOR_FYTA_TEMPERATURE         : 61,  // FYTA temperature sensor
+		SENSOR_FYTA_TEMPERATURE         : 61,  // FYTA temperature sensor
+		SENSOR_GARDENA_MOISTURE         : 62,  // Gardena moisture sensor
+		SENSOR_GARDENA_TEMPERATURE      : 63,  // Gardena temperature sensor
 
 	SENSOR_MQTT                     : 90, // subscribe to a MQTT server and query a value
 
@@ -1924,7 +1926,13 @@ OSApp.Analog.isIPSensor = function(sensorType) {
 OSApp.Analog.isIDNeeded = function(sensorType) {
 	return sensorType < OSApp.Analog.Constants.SENSOR_OSPI_INTERNAL_TEMP || sensorType == OSApp.Analog.Constants.SENSOR_REMOTE ||
 		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_MOISTURE ||
-		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE;
+		sensorType == OSApp.Analog.Constants.SENSOR_FYTA_TEMPERATURE ||
+		sensorType == OSApp.Analog.Constants.SENSOR_GARDENA_MOISTURE ||
+		sensorType == OSApp.Analog.Constants.SENSOR_GARDENA_TEMPERATURE;
+};
+
+OSApp.Analog.isGardenaSensor = function(sensorType) {
+	return sensorType == OSApp.Analog.Constants.SENSOR_GARDENA_MOISTURE || sensorType == OSApp.Analog.Constants.SENSOR_GARDENA_TEMPERATURE;
 };
 
 //show and hide sensor editor fields
@@ -1967,6 +1975,13 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 		popup.find("#fytasel").show();
 	} else {
 		popup.find("#fytasel").hide();
+	}
+
+	// Show Gardena selector only if firmware supports it (2.4.0 build 202+)
+	if (OSApp.Analog.isGardenaSensor(sensortype) && OSApp.Firmware.isGardenaAvailable()) {
+		popup.find("#gardenasel").show();
+	} else {
+		popup.find("#gardenasel").hide();
 	}
 
 	if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
@@ -2798,6 +2813,14 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) 
 			sensorFormat = 0;
 		}
 
+		// Filter out Gardena sensors if not supported by current firmware
+		if (!OSApp.Firmware.isGardenaAvailable()) {
+			supportedSensorTypes = supportedSensorTypes.filter(function(s) {
+				return s.type !== OSApp.Analog.Constants.SENSOR_GARDENA_MOISTURE &&
+					   s.type !== OSApp.Analog.Constants.SENSOR_GARDENA_TEMPERATURE;
+			});
+		}
+
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
 
 		var list = "<div data-role='popup' data-theme='a' id='sensorEditor'>" +
@@ -2837,6 +2860,7 @@ list += "</select></div>" +
 
 		//FYTA edit credentials button:
 		"<button data-mini='true' id='fytasel' style='margin:5px 0;'>" + OSApp.Language._("Select FYTA plant and sensor") + "</button>" +
+		"<button data-mini='true' id='gardenasel' style='display:none;margin:5px 0;'>" + OSApp.Language._("Select Gardena sensor") + "</button>" +
 
 		//ZigBee device scanner button:
 	"<button data-mini='true' id='zigbeesel' style='display:none;margin:5px 0;'>" + OSApp.Language._("Scan for ZigBee Devices") + "</button>" +
@@ -3932,6 +3956,36 @@ list += "</select></div>" +
 			});
 		});
 
+	// Gardena: Select Sensor
+	popup.find("#gardenasel").on("click", function () {
+		return OSApp.Firmware.sendToOS("/gl?pw=", "json").then(function (result) {
+			var sensors = result.sensors || [];
+			var sel = "<ul class='gardena-sensors' data-role='listview'>";
+			for (let i = 0; i < sensors.length; i++) {
+				let sensor = sensors[i];
+				sel += "<li value='" + sensor.id + "'><a href='#'>" +
+					"<h2>" + (sensor.name || (OSApp.Language._("Gardena sensor") + " " + sensor.id)) + "</h2>" +
+					"<p>" + (sensor.soilHumidity !== null && sensor.soilHumidity !== undefined ? OSApp.Language._("Soil Moisture") + ": " + sensor.soilHumidity : "") + "</p>" +
+					"</a></li>";
+			}
+			sel += "</ul>";
+			popup.find("#gardenasel").html(sel).enhanceWithin();
+			$("ul.gardena-sensors li").click(function() {
+				let sensor = sensors[this.value];
+				popup.find(".id").val(sensor.id);
+				var type = parseInt(popup.find("#type").val());
+				var str = sensor.name || (OSApp.Language._("Gardena sensor") + " " + sensor.id);
+				if (type === OSApp.Analog.Constants.SENSOR_GARDENA_MOISTURE) {
+					str += " " + OSApp.Language._("Soil Moisture");
+				} else if (type === OSApp.Analog.Constants.SENSOR_GARDENA_TEMPERATURE) {
+					str += " " + OSApp.Language._("Temperature");
+				}
+				popup.find(".name").val(str);
+				popup.find(".name").focus();
+			});
+		});
+	});
+
 
 
 
@@ -4514,6 +4568,12 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			return false;
 		});
 
+		list.find(".gardenasetup").on("click", function () {
+			OSApp.Analog.expandItem.add("gardenasetup");
+			OSApp.Analog.setupGardenaCredentials();
+			return false;
+		});
+
 		list.find(".backup-all").on("click", function () {
 			OSApp.Analog.expandItem.add("backup");
 			OSApp.Analog.getExportMethodSensors(1+2+4);
@@ -4721,6 +4781,69 @@ OSApp.Analog.setupFytaCredentials = function() {
 		resetFyta.fyta.email = "";
 		resetFyta.fyta.password = "";
 		OSApp.Analog.sendToOsObj("/co?pw=", resetFyta);
+	});
+};
+
+OSApp.Analog.setupGardenaCredentials = function() {
+	OSApp.Firmware.sendToOS("/ga?pw=", "json").then(function (data) {
+		$(".ui-popup-active").find("[data-role='popup']").popup("close");
+
+		var gardena = data.gardena || {};
+		var list =
+			"<div data-role='popup' data-theme='a' id='gardenaCred'>" +
+			"<div data-role='header' data-theme='b'>" +
+			"<a href='#' data-rel='back' data-role='button' data-theme='a' data-icon='delete' data-iconpos='notext' class='ui-btn-right'>" + OSApp.Language._("close") + "</a>" +
+			"<h1>" + OSApp.Language._("Setup Gardena credentials") + "</h1>" +
+			"</div>" +
+
+			"<div class='ui-content'>" +
+			"<form>" +
+			"<label>API Key</label>" +
+			"<input class='api_key' type='text' value='" + (gardena.api_key ? gardena.api_key : "") + "'>" +
+			"<label>Client ID</label>" +
+			"<input class='client_id' type='text' value='" + (gardena.client_id ? gardena.client_id : "") + "'>" +
+			"<label>Client Secret</label>" +
+			"<input class='client_secret' type='password' value='" + (gardena.client_secret ? gardena.client_secret : "") + "'>" +
+			"<label>Refresh Token</label>" +
+			"<input class='refresh_token' type='text' value='" + (gardena.refresh_token ? gardena.refresh_token : "") + "'>" +
+			"<label>Access Token</label>" +
+			"<input class='access_token' type='text' value='" + (gardena.access_token ? gardena.access_token : "") + "'>" +
+			"<label>Location ID</label>" +
+			"<input class='location_id' type='text' value='" + (gardena.location_id ? gardena.location_id : "") + "'>" +
+			"</div>" +
+			"<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
+			"</form>" +
+			"</div>";
+
+		let popup = $(list);
+
+		popup.find(".submit").on("click", function () {
+			var newData = {};
+			newData.gardena = {};
+			var apiKey = popup.find(".api_key").val();
+			var clientId = popup.find(".client_id").val();
+			var clientSecret = popup.find(".client_secret").val();
+			var refreshToken = popup.find(".refresh_token").val();
+			var accessToken = popup.find(".access_token").val();
+			var locationId = popup.find(".location_id").val();
+			if (apiKey.length > 0) newData.gardena.api_key = apiKey;
+			if (clientId.length > 0) newData.gardena.client_id = clientId;
+			if (clientSecret.length > 0) newData.gardena.client_secret = clientSecret;
+			if (refreshToken.length > 0) newData.gardena.refresh_token = refreshToken;
+			if (accessToken.length > 0) newData.gardena.access_token = accessToken;
+			if (locationId.length > 0) newData.gardena.location_id = locationId;
+			OSApp.Analog.sendToOsObj("/co?pw=", newData);
+			popup.popup("close");
+			return false;
+		});
+
+		$("#gardenaCred").remove();
+		popup.css("max-width", "580px");
+		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
+	}, function() {
+		var resetGardena = {};
+		resetGardena.gardena = {};
+		OSApp.Analog.sendToOsObj("/co?pw=", resetGardena);
 	});
 };
 
@@ -5341,6 +5464,14 @@ OSApp.Analog.buildSensorConfig = function() {
 		list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("fytasetup") ? " data-collapsed='false'" : "") + ">" +
 			"<legend>" + OSApp.Language._("FYTA Setup") + "</legend>";
 		list += "<a data-role='button' data-icon='grid' class='fytasetup' href='#' data-mini='true'>" + OSApp.Language._("Setup FYTA credentials") + "</a>" +
+			"</fieldset>";
+	}
+
+	// Gardena Setup:
+	if (OSApp.Firmware.isGardenaAvailable()) {
+		list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("gardenasetup") ? " data-collapsed='false'" : "") + ">" +
+			"<legend>" + OSApp.Language._("Gardena Setup") + "</legend>";
+		list += "<a data-role='button' data-icon='grid' class='gardenasetup' href='#' data-mini='true'>" + OSApp.Language._("Setup Gardena credentials") + "</a>" +
 			"</fieldset>";
 	}
 
