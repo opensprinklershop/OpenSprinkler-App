@@ -1032,7 +1032,11 @@ OSApp.Weather.getWeatherError = function( err ) {
 };
 
 OSApp.Weather.getWeatherStatus = function( status ) {
-	if ( status < 0 ) {
+	if ( status === -5 ) {
+		return "<font class='debugWUPending'>" + OSApp.Language._( "Pending" ) + "</font>";
+	} else if ( status === -6 ) {
+		return "<font class='debugWUStale'>" + OSApp.Language._( "Stale" ) + "</font>";
+	} else if ( status < 0 ) {
 		return "<font class='debugWUError'>" + OSApp.Language._( "Offline" ) + "</font>";
 	} else if ( status > 0 ) {
 		return "<font class='debugWUError'>" + OSApp.Language._( "Error" ) + "</font>";

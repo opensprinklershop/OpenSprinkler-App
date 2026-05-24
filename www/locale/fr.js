@@ -714,6 +714,8 @@
       "Offline": "Déconnecté",
       "Error": "Erreur",
       "Online": "Connecté",
+      "Pending": "En attente",
+      "Stale": "Obsolète",
       "California Restriction": "Restriction en Californie",
       "Rain delay has been successfully set": "Retard différé pour pluie enregistré",
       "Welcome to the OpenSprinkler application. This app only works with the OpenSprinkler controller which must be installed and setup on your home network.": "Bienvenue dans l'application OpenSprinkler. Elle ne fonctionne qu'avec le module OpenSprinkler qui doit être installé et paramétré sur votre réseau local.",

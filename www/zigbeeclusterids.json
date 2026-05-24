@@ -1,0 +1,72 @@
+[
+  {
+    "id": "aqara_temp_humidity",
+    "name": "Aqara Temperature Sensor",
+    "description": "Temperature measurement",
+    "endpoint": "1",
+    "cluster_id": "0x0402",
+    "attribute_id": "0x0000",
+    "poll_interval": "60000",
+    "unitid": "2",
+    "unit": "°C",
+    "factor": "100",
+    "divider": "1",
+    "offset": "0"
+  },
+  {
+    "id": "tuya_soil_moisture",
+    "name": "Tuya Soil Moisture Sensor",
+    "description": "Soil moisture measurement",
+    "endpoint": "1",
+    "cluster_id": "0x0408",
+    "attribute_id": "0x0000",
+    "poll_interval": "60000",
+    "unitid": "1",
+    "unit": "%",
+    "factor": "1",
+    "divider": "1",
+    "offset": "0"
+  },
+  {
+    "id": "standard_water_meter",
+    "name": "Standard Zigbee Water Meter (1L/pulse)",
+    "description": "Simple Metering cluster - Liters",
+    "endpoint": "1",
+    "cluster_id": "0x0702",
+    "attribute_id": "0x0000",
+    "poll_interval": "60000",
+    "unitid": "14",
+    "unit": "L",
+    "factor": "1",
+    "divider": "1",
+    "offset": "0"
+  },
+  {
+    "id": "loratap_water_meter",
+    "name": "Loratap/Bmeters Water Meter",
+    "description": "Loratap Zigbee Water Meter 0.1L resolution",
+    "endpoint": "1",
+    "cluster_id": "0x0702",
+    "attribute_id": "0x0000",
+    "poll_interval": "60000",
+    "unitid": "14",
+    "unit": "L",
+    "factor": "1",
+    "divider": "10",
+    "offset": "0"
+  },
+  {
+    "id": "giex_water_valve_consumed",
+    "name": "GiEX Water Valve Consumption",
+    "description": "Water volume consumed in Liters",
+    "endpoint": "1",
+    "cluster_id": "0xEF00",
+    "attribute_id": "0x0002",
+    "poll_interval": "60000",
+    "unitid": "16",
+    "unit": "L",
+    "factor": "1",
+    "divider": "1",
+    "offset": "0"
+  }
+]

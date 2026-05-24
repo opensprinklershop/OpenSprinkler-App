@@ -1199,7 +1199,21 @@ OSApp.Sites.updateController = function( callback, fail ) {
 			// Fix the station status array
 			OSApp.currentSession.controller.status = OSApp.currentSession.controller.status.sn;
 
-			finish();
+			var hasSpecial = false;
+			if ( data.stations && data.stations.stn_spe ) {
+				for ( var i = 0; i < data.stations.stn_spe.length; i++ ) {
+					if ( data.stations.stn_spe[ i ] > 0 ) {
+						hasSpecial = true;
+						break;
+					}
+				}
+			}
+
+			if ( hasSpecial && ( typeof OSApp.currentSession.controller.special !== "object" || $.isEmptyObject( OSApp.currentSession.controller.special ) ) ) {
+				OSApp.Sites.updateControllerStationSpecial().always( finish );
+			} else {
+				finish();
+			}
 		}, fail );
 	} else {
 		$.when(

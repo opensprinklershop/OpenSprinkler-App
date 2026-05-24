@@ -682,7 +682,7 @@ OSApp.UIDom.bindPanel = function() {
 
 	panel.find( ".open-irrigationdb-menu" ).on( "click", function() {
 		OSApp.UIDom.closePanel( function() {
-			window.open( "https://opensprinklershop.de/irrigationdb", OSApp.currentDevice.isOSXApp ? "_system" : "_blank" );
+			window.open( "https://ui.opensprinklershop.de/irrigationdb", OSApp.currentDevice.isOSXApp ? "_system" : "_blank" );
 		} );
 		return false;
 	} );

@@ -83,7 +83,20 @@ OSApp.Dashboard.displayPage = function() {
 			cards += "<span class='bno-border ui-btn ui-btn-icon-notext ui-corner-all card-icon station-status " +
 				( isRunning ? "on" : ( isScheduled ? "wait" : "off" ) ) + "'></span>";
 
-			cards += "<span class='btn-no-border ui-btn ui-btn-icon-notext ui-icon-wifi card-icon special-station " +
+			var specIconClass = "ui-icon-wifi";
+			if ( OSApp.Stations.isSpecial( sid ) ) {
+				var stObj = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
+				var specialType = stObj ? stObj.st : 0;
+				if ( specialType === 7 ) {
+					specIconClass = "ui-icon-rs485";
+				} else if ( specialType === 8 ) {
+					specIconClass = "ui-icon-gardena";
+				} else if ( specialType === 9 ) {
+					specIconClass = "ui-icon-zigbee";
+				}
+			}
+
+			cards += "<span class='btn-no-border ui-btn ui-btn-icon-notext " + specIconClass + " card-icon special-station " +
 				( OSApp.Stations.isSpecial( sid ) ? "" : "hidden" ) + "'></span>";
 
 			if ( OSApp.Supported.groups() ) {
@@ -235,7 +248,7 @@ OSApp.Dashboard.displayPage = function() {
 						$( ".validate-length" ).on( "input", validateLength );
 					} else if (value === 7) { //RS485 Modbus Station
 						if (OSApp.Firmware.checkOSVersion( 233 ) && OSApp.currentSession.controller.options.fwm >= 180) {
-							data = OSApp.Stations.parseModbusStationData( ( type === value ) ? data : "000000000000000006000100060000" );
+							data = OSApp.Stations.parseModbusStationData( ( type === value ) ? data : "00000000000000000600010006000000" );
 							if (OSApp.Firmware.getHWVersion() === "OSPi") {
 								opts.append(
 								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device Index" ) + ":</div>" +
@@ -1129,7 +1142,23 @@ OSApp.Dashboard.displayPage = function() {
 					}
 
 					card.find( "#station_" + sid ).text( OSApp.Stations.getName( sid) );
-					card.find( ".special-station" ).removeClass( "hidden" ).addClass( OSApp.Stations.isSpecial( sid ) ? "" : "hidden" );
+
+					var specIconClass = "ui-icon-wifi";
+					if ( OSApp.Stations.isSpecial( sid ) ) {
+						var stObj = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
+						var specialType = stObj ? stObj.st : 0;
+						if ( specialType === 7 ) {
+							specIconClass = "ui-icon-rs485";
+						} else if ( specialType === 8 ) {
+							specIconClass = "ui-icon-gardena";
+						} else if ( specialType === 9 ) {
+							specIconClass = "ui-icon-zigbee";
+						}
+					}
+					card.find( ".special-station" )
+						.removeClass( "hidden ui-icon-wifi ui-icon-rs485 ui-icon-gardena ui-icon-zigbee" )
+						.addClass( specIconClass + ( OSApp.Stations.isSpecial( sid ) ? "" : " hidden" ) );
+
 					card.find( ".station-status" ).removeClass( "on off wait" ).addClass( isRunning ? "on" : ( isScheduled ? "wait" : "off" ) );
 					if ( OSApp.Stations.isMaster( sid ) ) {
 						card.find( ".station-settings" ).removeClass( "ui-icon-gear" ).addClass( "ui-icon-master" );

@@ -3963,9 +3963,22 @@ list += "</select></div>" +
 			var sel = "<ul class='gardena-sensors' data-role='listview'>";
 			for (let i = 0; i < sensors.length; i++) {
 				let sensor = sensors[i];
+				var details = [];
+				if (sensor.soilHumidity !== null && sensor.soilHumidity !== undefined) {
+					details.push(OSApp.Language._("Soil Moisture") + ": " + sensor.soilHumidity + "%");
+				}
+				if (sensor.soilTemperature !== null && sensor.soilTemperature !== undefined) {
+					details.push(OSApp.Language._("Soil Temperature") + ": " + sensor.soilTemperature + "°C");
+				}
+				if (sensor.ambientTemperature !== null && sensor.ambientTemperature !== undefined) {
+					details.push(OSApp.Language._("Ambient Temperature") + ": " + sensor.ambientTemperature + "°C");
+				}
+				if (sensor.lightIntensity !== null && sensor.lightIntensity !== undefined) {
+					details.push(OSApp.Language._("Light Intensity") + ": " + sensor.lightIntensity + " lx");
+				}
 				sel += "<li value='" + sensor.id + "'><a href='#'>" +
 					"<h2>" + (sensor.name || (OSApp.Language._("Gardena sensor") + " " + sensor.id)) + "</h2>" +
-					"<p>" + (sensor.soilHumidity !== null && sensor.soilHumidity !== undefined ? OSApp.Language._("Soil Moisture") + ": " + sensor.soilHumidity : "") + "</p>" +
+					"<p>" + (details.length > 0 ? details.join(" | ") : "") + "</p>" +
 					"</a></li>";
 			}
 			sel += "</ul>";
@@ -4811,8 +4824,13 @@ OSApp.Analog.setupGardenaCredentials = function() {
 			"<label>Location ID</label>" +
 			"<input class='location_id' type='text' value='" + (gardena.location_id ? gardena.location_id : "") + "'>" +
 			"</div>" +
-			"<button class='submit' data-theme='b'>" + OSApp.Language._("Submit") + "</button>" +
+			"<button class='submit' data-theme='b'>" + OSApp.Language._("Done") + "</button>" +
 			"</form>" +
+			"<hr style='margin:15px 0; border:0; border-top:1px solid #ccc;'>" +
+			"<h3>" + OSApp.Language._("Discovered Valves & Sensors") + "</h3>" +
+			"<div class='gardena-discovered-list' style='font-size:12px; max-height:220px; overflow-y:auto; background:#f9f9f9; border:1px solid #ddd; padding:10px; border-radius:4px;'>" +
+			OSApp.Language._("Loading list components...") +
+			"</div>" +
 			"</div>";
 
 		let popup = $(list);
@@ -4840,6 +4858,57 @@ OSApp.Analog.setupGardenaCredentials = function() {
 		$("#gardenaCred").remove();
 		popup.css("max-width", "580px");
 		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
+
+		// Fetch discovered valves & sensors from /gl
+		OSApp.Firmware.sendToOS("/gl?pw=", "json").then(function (result) {
+			var listHtml = "";
+			var valves = result.valves || [];
+			var sensors = result.sensors || [];
+
+			if (valves.length === 0 && sensors.length === 0) {
+				listHtml = "<p style='color:#777; font-style:italic;'>" + OSApp.Language._("No valves or sensors found in your Gardena account.") + "</p>";
+			} else {
+				if (valves.length > 0) {
+					listHtml += "<b style='color:#333; text-transform:uppercase; font-size:11px;'>" + OSApp.Language._("Valves / Irrigation Controls (STN_TYPE_GARDENA / VALVE)") + ":</b>";
+					listHtml += "<table style='width:100%; border-collapse:collapse; margin-top:5px; margin-bottom:15px; text-align:left; font-size:12px;'>" +
+						"<thead><tr style='border-bottom:1px solid #bbb; background:#eaeaea;'><th style='padding:5px 8px;'>" + OSApp.Language._("Service Index") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Name") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("State") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Activity") + "</th></tr></thead><tbody>";
+					for (var i = 0; i < valves.length; i++) {
+						var v = valves[i];
+						var bg = i % 2 === 0 ? "#fdfdfd" : "#f4f4f4";
+						listHtml += "<tr style='border-bottom:1px solid #e0e0e0; background:" + bg + ";'>" +
+							"<td style='padding:5px 8px; font-weight:bold; color:#1565c0;'>" + v.id + "</td>" +
+							"<td style='padding:5px 8px; font-weight:500;'>" + (v.name || OSApp.Language._("Valve")) + "</td>" +
+							"<td style='padding:5px 8px;'>" + (v.state || "-") + "</td>" +
+							"<td style='padding:5px 8px; font-style:italic;'>" + (v.activity || "-") + "</td>" +
+							"</tr>";
+					}
+					listHtml += "</tbody></table>";
+				}
+				if (sensors.length > 0) {
+					listHtml += "<b style='color:#333; text-transform:uppercase; font-size:11px;'>" + OSApp.Language._("Sensors") + ":</b>";
+					listHtml += "<table style='width:100%; border-collapse:collapse; margin-top:5px; text-align:left; font-size:12px;'>" +
+						"<thead><tr style='border-bottom:1px solid #bbb; background:#eaeaea;'><th style='padding:5px 8px;'>" + OSApp.Language._("Sensor ID") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Name") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Details") + "</th></tr></thead><tbody>";
+					for (var j = 0; j < sensors.length; j++) {
+						var s = sensors[j];
+						var details = [];
+						if (s.soilHumidity !== null && s.soilHumidity !== undefined) details.push(OSApp.Language._("Moisture") + ": " + s.soilHumidity + "%");
+						if (s.soilTemperature !== null && s.soilTemperature !== undefined) details.push(OSApp.Language._("Soil Temp") + ": " + s.soilTemperature + "°C");
+						if (s.ambientTemperature !== null && s.ambientTemperature !== undefined) details.push(OSApp.Language._("Ambient Temp") + ": " + s.ambientTemperature + "°C");
+						if (s.lightIntensity !== null && s.lightIntensity !== undefined) details.push(OSApp.Language._("Light") + ": " + s.lightIntensity + " lx");
+						var sbg = j % 2 === 0 ? "#fdfdfd" : "#f4f4f4";
+						listHtml += "<tr style='border-bottom:1px solid #e0e0e0; background:" + sbg + ";'>" +
+							"<td style='padding:5px 8px; font-weight:bold; color:#1565c0;'>" + s.id + "</td>" +
+							"<td style='padding:5px 8px; font-weight:500;'>" + (s.name || OSApp.Language._("Sensor")) + "</td>" +
+							"<td style='padding:5px 8px;'>" + (details.length > 0 ? details.join(" | ") : "-") + "</td>" +
+							"</tr>";
+					}
+					listHtml += "</tbody></table>";
+				}
+			}
+			popup.find(".gardena-discovered-list").html(listHtml);
+		}).fail(function() {
+			popup.find(".gardena-discovered-list").html("<p style='color:#d9534f; font-weight:bold;'>" + OSApp.Language._("Failed to retrieve device list. Please verify your credentials and submit first.") + "</p>");
+		});
 	}, function() {
 		var resetGardena = {};
 		resetGardena.gardena = {};

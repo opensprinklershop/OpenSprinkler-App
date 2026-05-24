@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gardena OAuth2 Token Assistant</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7f6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 550px;
+            margin: 40px auto;
+            background: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 22px;
+            margin-top: 0;
+            color: #2c3e50;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 12px;
+        }
+        p {
+            font-size: 14px;
+            line-height: 1.5;
+            color: #555;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            font-size: 13px;
+            margin-bottom: 6px;
+            color: #2c3e50;
+        }
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+            background: #fafafa;
+        }
+        input[type="text"]:focus, input[type="password"]:focus {
+            border-color: #3498db;
+            outline: none;
+            background: #fff;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 100%;
+            text-align: center;
+            text-decoration: none;
+            box-sizing: border-box;
+            transition: background-color 0.2s;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn-success {
+            background-color: #2ecc71;
+        }
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        .result-box {
+            background-color: #eef9f1;
+            border: 1px solid #c2eec7;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            display: none;
+        }
+        .error-box {
+            background-color: #fdf2f2;
+            border: 1px solid #f8b4b4;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            color: #9b1c1c;
+            display: none;
+            font-size: 14px;
+        }
+        .step {
+            display: none;
+        }
+        .step.active {
+            display: block;
+        }
+        .copy-group {
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .copy-btn {
+            position: absolute;
+            right: 5px;
+            top: 5px;
+            background: #eee;
+            border: 1px solid #ccc;
+            padding: 4px 8px;
+            font-size: 11px;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .copy-btn:hover {
+            background: #ddd;
+        }
+        .back-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+        }
+        .back-link a {
+            color: #3498db;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1 id="title_text">Gardena Token Assistant / Assistent</h1>
+
+    <!-- STEP 1: Enter credentials -->
+    <div id="step-inputs" class="step active">
+        <p id="desc_step1">
+            To generate a new Gardena Refresh Token, enter your Application's <strong>Client ID</strong> and <strong>Client Secret</strong> from the <a href="https://developer.husqvarnagroup.cloud/" target="_blank" style="color: #3498db; text-decoration: none; font-weight: bold;">Husqvarna Developer Portal</a>.
+            <br><br>
+            <em>Um ein Gardena Refresh-Token zu generieren, tragen Sie hier Ihre Anwendungs-<strong>Client-ID</strong> und Ihr <strong>Client-Secret</strong> aus dem <a href="https://developer.husqvarnagroup.cloud/" target="_blank" style="color: #3498db; text-decoration: none; font-weight: bold;">Husqvarna Developer Portal</a> ein.</em>
+        </p>
+
+        <div class="form-group">
+            <label>API Key / Client ID (Application Key)</label>
+            <input type="text" id="client_id" placeholder="e.g. 1a2b3c4d-5e6f-...">
+        </div>
+
+        <div class="form-group">
+            <label>Client Secret</label>
+            <input type="password" id="client_secret" placeholder="e.g. xYz1234...">
+        </div>
+
+        <button class="btn" id="btn-next" onclick="startAuth()">Connect with Gardena / Mit Gardena verbinden</button>
+    </div>
+
+    <!-- STEP 2: Exchanging code -->
+    <div id="step-loading" class="step">
+        <p style="text-align: center; font-size: 16px; margin: 30px 0;" id="loading_text">
+            Exchanging Authorization Code for Token, please wait...
+            <br><br>
+            <em>Code wird gegen Token eingetauscht, bitte warten...</em>
+        </p>
+    </div>
+
+    <!-- RESULT BOXES -->
+    <div id="result-success" class="result-box">
+        <h3 style="margin-top: 0; color: #27ae60;" id="success_title">Success! / Erfolgreich!</h3>
+        <p id="success_desc">Here is your Refresh Token and Access Token. Copy these values back into your OpenSprinkler dashboard.</p>
+
+        <div id="auto-transfer-msg" style="display:none; background-color: #e6f4ea; border: 1px solid #137333; color: #137333; padding: 10px; border-radius: 4px; font-size: 13px; font-weight: bold; margin-bottom:15px; text-align: center;">
+            ✓ Credentials transferred back to OpenSprinkler automatically!<br>
+            ✓ Zugangsdaten wurden automatisch an OpenSprinkler übertragen!
+        </div>
+
+        <div class="form-group">
+            <label>Refresh Token</label>
+            <div class="copy-group">
+                <input type="text" id="res_refresh" readonly>
+                <button class="copy-btn" onclick="copyVal('res_refresh')">Copy</button>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Access Token</label>
+            <div class="copy-group">
+                <input type="text" id="res_access" readonly>
+                <button class="copy-btn" onclick="copyVal('res_access')">Copy</button>
+            </div>
+        </div>
+
+        <button class="btn btn-success" onclick="resetFlow()" id="btn_done">Done / Fertig</button>
+    </div>
+
+    <div id="error-box" class="error-box">
+        <strong id="error_title">Error / Fehler:</strong>
+        <p id="error_msg" style="margin: 5px 0 0 0;"></p>
+        <button class="btn" style="margin-top:15px; background: #e74c3c;" onclick="resetFlow()">Try Again / Erneut versuchen</button>
+    </div>
+
+    <div class="back-link">
+        <a href="https://ui.opensprinklershop.de">&larr; Back to OpenSprinkler UI / Zurück zur App</a>
+    </div>
+</div>
+
+<script>
+    let REDIRECT_URI = window.location.href.split('#')[0].split('?')[0];
+    if (REDIRECT_URI.endsWith('/index.html')) {
+        REDIRECT_URI = REDIRECT_URI.slice(0, REDIRECT_URI.lastIndexOf('/index.html') + 1);
+    }
+
+    // Read stored credentials or state on page run
+    window.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const error = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+
+        if (error) {
+            showError("Authentication error: " + (errorDescription || error));
+            return;
+        }
+
+        if (code) {
+            // We came back with an auth code!
+            document.getElementById('step-inputs').classList.remove('active');
+            document.getElementById('step-loading').classList.add('active');
+
+            const clientId = sessionStorage.getItem('gardena_tmp_client_id');
+            const clientSecret = sessionStorage.getItem('gardena_tmp_client_secret');
+
+            if (!clientId || !clientSecret) {
+                showError("Missing saved Client ID or Client Secret. Please start the flow again.\n(Fehlende Client-ID/Secret im Speicher. Bitte starten Sie den Vorgang von vorne.)");
+                return;
+            }
+
+            exchangeToken(code, clientId, clientSecret);
+        } else {
+            // Restore from input fields if user returned
+            const savedId = sessionStorage.getItem('gardena_tmp_client_id');
+            const savedSec = sessionStorage.getItem('gardena_tmp_client_secret');
+            if (savedId) document.getElementById('client_id').value = savedId;
+            if (savedSec) document.getElementById('client_secret').value = savedSec;
+        }
+    });
+
+    function startAuth() {
+        const clientId = document.getElementById('client_id').value.trim();
+        const clientSecret = document.getElementById('client_secret').value.trim();
+
+        if (!clientId || !clientSecret) {
+            alert("Please fill in both Client ID and Client Secret!\nBitte geben Sie sowohl Client ID als auch Client Secret ein!");
+            return;
+        }
+
+        // Store them securely for when we redirect back
+        sessionStorage.setItem('gardena_tmp_client_id', clientId);
+        sessionStorage.setItem('gardena_tmp_client_secret', clientSecret);
+
+        // Husqvarna Authorize Redirect Url
+        const authUrl = "https://api.authentication.husqvarnagroup.dev/v1/oauth2/authorize" +
+            "?client_id=" + encodeURIComponent(clientId) +
+            "&redirect_uri=" + encodeURIComponent(REDIRECT_URI) +
+            "&response_type=code";
+
+        window.location.href = authUrl;
+    }
+
+    function exchangeToken(code, clientId, clientSecret) {
+        const tokenUrl = "https://api.authentication.husqvarnagroup.dev/v1/oauth2/token";
+
+        const bodyParams = new URLSearchParams();
+        bodyParams.append('grant_type', 'authorization_code');
+        bodyParams.append('client_id', clientId);
+        bodyParams.append('client_secret', clientSecret);
+        bodyParams.append('code', code);
+        bodyParams.append('redirect_uri', REDIRECT_URI);
+
+        fetch(tokenUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'accept': 'application/json'
+            },
+            body: bodyParams
+        })
+        .then(response => {
+            if (!response.ok) {
+                return response.json().then(err => {
+                    throw new Error(err.message || err.error_description || "HTTP Error " + response.status);
+                }).catch(() => {
+                    throw new Error("HTTP Error " + response.status);
+                });
+            }
+            return response.json();
+        })
+        .then(data => {
+            document.getElementById('step-loading').classList.remove('active');
+            document.getElementById('result-success').style.display = 'block';
+
+            if (data.refresh_token) {
+                document.getElementById('res_refresh').value = data.refresh_token;
+            }
+            if (data.access_token) {
+                document.getElementById('res_access').value = data.access_token;
+            }
+
+            // Automatically post message back to the OpenSprinkler Window if opener is present
+            if (window.opener) {
+                try {
+                    window.opener.postMessage({
+                        type: 'gardena_tokens',
+                        refresh_token: data.refresh_token || '',
+                        access_token: data.access_token || '',
+                        client_id: clientId,
+                        client_secret: clientSecret
+                    }, '*');
+                    document.getElementById('auto-transfer-msg').style.display = 'block';
+                } catch (e) {
+                    console.error("Failed to automatically transfer tokens back to main window", e);
+                }
+            }
+        })
+        .catch(err => {
+            showError("Failed to trade authorization code: " + err.message);
+        });
+    }
+
+    function showError(msg) {
+        document.getElementById('step-inputs').classList.remove('active');
+        document.getElementById('step-loading').classList.remove('active');
+        document.getElementById('result-success').style.display = 'none';
+
+        const errBox = document.getElementById('error-box');
+        errBox.style.display = 'block';
+        document.getElementById('error_msg').innerText = msg;
+    }
+
+    function resetFlow() {
+        // Clear url params
+        window.history.replaceState({}, document.title, window.location.pathname);
+        document.getElementById('result-success').style.display = 'none';
+        document.getElementById('error-box').style.display = 'none';
+        document.getElementById('step-loading').classList.remove('active');
+        document.getElementById('step-inputs').classList.add('active');
+    }
+
+    function copyVal(id) {
+        const input = document.getElementById(id);
+        input.select();
+        input.setSelectionRange(0, 99999);
+        navigator.clipboard.writeText(input.value);
+
+        // Simple visual feedback
+        const btn = input.nextElementSibling;
+        const originalText = btn.innerText;
+        btn.innerText = "Copied / Kopiert!";
+        setTimeout(() => {
+            btn.innerText = originalText;
+        }, 1500);
+    }
+</script>
+</body>
+</html>

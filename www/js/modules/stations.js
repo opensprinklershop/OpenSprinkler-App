@@ -200,25 +200,45 @@ OSApp.Stations.parseRemoteStationData = function( hex ) {
 };
 
 OSApp.Stations.parseModbusStationData = function( hex ) {
-	var result = {};
+	var result = {
+		ip: "0.0.0.0",
+		port: 502,
+		device: 0,
+		address: 1,
+		regOn: "0000",
+		dataOn: "0000",
+		regOff: "0000",
+		dataOff: "0000"
+	};
 
-	hex = hex.split( "" );
+	if ( typeof hex !== "string" ) {
+		return result;
+	}
 
+	// Pad or truncate hex string to exactly 32 characters
+	while ( hex.length < 32 ) {
+		hex += "0";
+	}
+	if ( hex.length > 32 ) {
+		hex = hex.substring( 0, 32 );
+	}
+
+	var chars = hex.split( "" );
 	var ip = [], value;
 
 	for ( var i = 0; i < 8; i+=2 ) {
-		value = parseInt( hex[ i ] + hex[ i + 1 ], 16 ) || 0;
+		value = parseInt( chars[ i ] + chars[ i + 1 ], 16 ) || 0;
 		ip.push( value );
 	}
 
 	result.ip      = ip.join( "." );
-	result.port    = parseInt( hex[ 8 ] + hex[ 9 ] + hex[ 10 ] + hex[ 11 ], 16 );
-	result.device  = parseInt( hex[ 12 ] + hex[ 13 ], 16 );
-	result.address = parseInt( hex[ 14 ] + hex[ 15 ], 16 );
-	result.regOn   = hex[ 16 ] + hex[ 17 ] + hex[ 18 ] + hex[ 19 ];
-	result.dataOn  = hex[ 20 ] + hex[ 21 ] + hex[ 22 ] + hex[ 23 ];
-	result.regOff  = hex[ 24 ] + hex[ 25 ] + hex[ 26 ] + hex[ 27 ];
-	result.dataOff = hex[ 28 ] + hex[ 29 ] + hex[ 30 ] + hex[ 31 ];
+	result.port    = parseInt( chars[ 8 ] + chars[ 9 ] + chars[ 10 ] + chars[ 11 ], 16 ) || 0;
+	result.device  = parseInt( chars[ 12 ] + chars[ 13 ], 16 ) || 0;
+	result.address = parseInt( chars[ 14 ] + chars[ 15 ], 16 ) || 0;
+	result.regOn   = chars[ 16 ] + chars[ 17 ] + chars[ 18 ] + chars[ 19 ];
+	result.dataOn  = chars[ 20 ] + chars[ 21 ] + chars[ 22 ] + chars[ 23 ];
+	result.regOff  = chars[ 24 ] + chars[ 25 ] + chars[ 26 ] + chars[ 27 ];
+	result.dataOff = chars[ 28 ] + chars[ 29 ] + chars[ 30 ] + chars[ 31 ];
 
 	return result;
 };
