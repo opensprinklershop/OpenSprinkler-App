@@ -1209,9 +1209,10 @@ OSApp.Sites.updateController = function( callback, fail ) {
 				}
 			}
 
-			if ( hasSpecial && ( typeof OSApp.currentSession.controller.special !== "object" || $.isEmptyObject( OSApp.currentSession.controller.special ) ) ) {
+			if ( hasSpecial ) {
 				OSApp.Sites.updateControllerStationSpecial().always( finish );
 			} else {
+				OSApp.currentSession.controller.special = {};
 				finish();
 			}
 		}, fail );

@@ -4809,8 +4809,27 @@ OSApp.Analog.setupGardenaCredentials = function() {
 			"<h1>" + OSApp.Language._("Setup Gardena credentials") + "</h1>" +
 			"</div>" +
 
-			"<div class='ui-content'>" +
+			"<div class='ui-content' style='padding:15px;'>" +
+			"<p style='font-size:13px; line-height:1.4; color:#333; margin-top:0;'>" +
+			OSApp.Language._("Gardena API relies on OAuth2. Register your free account on Husqvarna Developer Portal: ") +
+			"<br><a href='https://developer.husqvarnagroup.cloud/' target='_blank' style='color:#1565c0; font-weight:bold; text-decoration:underline;'>developer.husqvarnagroup.cloud</a>" +
+			"</p>" +
+			"<p style='font-size:13px; line-height:1.4; color:#555;'>" +
+			OSApp.Language._("Create an Application, connect it to the 'Authentication API' and 'smart system API' to acquire your API Key (Client ID) and Client Secret, then generate your Refresh Token.") +
+			"</p>" +
+
+			"<div style='background:#f1f8e9; border:1px solid #c8e6c9; padding:12px; border-radius:4px; margin-bottom:15px; text-shadow:none;'>" +
+			"<p style='font-size:13px; font-weight:bold; color:#2e7d32; margin:0 0 10px 0;'>" +
+			OSApp.Language._("If you only have your Gardena email and password, click the button below to easily obtain your Refresh Token via secure assistant portal:") +
+			"</p>" +
+			"<button class='launch-assistant' data-theme='b' style='background:#2ecc71 !important; color:#fff !important; text-shadow:none !important; font-weight:bold; margin:0;'>" +
+			OSApp.Language._("Get Refresh Token via Login Assistant") +
+			"</button>" +
+			"</div>" +
+
 			"<form>" +
+			"<div data-role='collapsible' data-collapsed='true' data-mini='true' data-theme='a' data-content-theme='a' style='margin-bottom:15px;'>" +
+			"<h3>" + OSApp.Language._("Advanced Developer Settings") + "</h3>" +
 			"<label>API Key</label>" +
 			"<input class='api_key' type='text' value='" + (gardena.api_key ? gardena.api_key : "") + "'>" +
 			"<label>Client ID</label>" +
@@ -4831,9 +4850,41 @@ OSApp.Analog.setupGardenaCredentials = function() {
 			"<div class='gardena-discovered-list' style='font-size:12px; max-height:220px; overflow-y:auto; background:#f9f9f9; border:1px solid #ddd; padding:10px; border-radius:4px;'>" +
 			OSApp.Language._("Loading list components...") +
 			"</div>" +
-			"</div>";
+			"</div></div>";
 
 		let popup = $(list);
+
+		var tokenListener = function (event) {
+			if (event.data && event.data.type === 'gardena_tokens') {
+				var data = event.data;
+				popup.find(".client_id").val(data.client_id || "");
+				popup.find(".client_secret").val(data.client_secret || "");
+				popup.find(".refresh_token").val(data.refresh_token || "");
+				popup.find(".access_token").val(data.access_token || "");
+				popup.find(".api_key").val(data.client_id || "");
+
+				var importMsg = popup.find(".import-msg");
+				if (importMsg.length === 0) {
+					popup.find("form").prepend(
+						"<div class='import-msg' style='background:#e8f5e9; border:1px solid #c8e6c9; color:#2e7d32; padding:10px; border-radius:4px; margin-bottom:15px; font-weight:bold; font-size:12px; text-shadow:none;'>" +
+						OSApp.Language._("Credentials imported automatically! Please click Submit to save.") +
+						"</div>"
+					);
+				}
+			}
+		};
+
+		window.addEventListener("message", tokenListener);
+
+		popup.one("popupafterclose", function () {
+			window.removeEventListener("message", tokenListener);
+		});
+
+		popup.find(".launch-assistant").on("click", function (e) {
+			e.preventDefault();
+			window.open("gardena-oauth2/index.html", "gardena_assistant", "width=600,height=750,scrollbars=yes");
+			return false;
+		});
 
 		popup.find(".submit").on("click", function () {
 			var newData = {};

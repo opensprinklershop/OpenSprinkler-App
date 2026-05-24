@@ -313,72 +313,76 @@ OSApp.Firmware.checkOSVersion = function( check ) {
 	}
 };
 
-// Check if Gardena API is available (requires ESP32 and firmware 2.4.0 with minor build >= 202)
+// Check if Gardena API is available (requires firmware 2.4.0 or newer and either Zigbee or Matter feature)
 OSApp.Firmware.isGardenaAvailable = function() {
 	if ( $.isEmptyObject( OSApp.currentSession.controller ) ) {
 		return false;
 	}
-	if ( OSApp.Firmware.isOSPi() ) {
-		return false;
-	}
-
-	// Must be an ESP32 device
-	var isEsp32 = false;
-	if ( OSApp.Analog && typeof OSApp.Analog.isESP32 === "function" ) {
-		isEsp32 = OSApp.Analog.isESP32();
-	} else {
-		var controllerOptions = OSApp.currentSession.controller.options;
-		var features = controllerOptions && controllerOptions.feature;
-		isEsp32 = (typeof features === "string" || Array.isArray(features)) && features.includes("ESP32");
-	}
-	if ( !isEsp32 ) {
-		return false;
-	}
 
 	var fwv = OSApp.currentSession.controller.options.fwv;
-	var fwm = OSApp.currentSession.controller.options.fwm;
+	var parsedFwv = 0;
 
-	// Gardena available from firmware 2.4.0 (240) build 202 onwards
-	if ( fwv > 240 ) {
-		return true;
-	} else if ( fwv === 240 && fwm >= 202 ) {
-		return true;
+	if ( typeof fwv === "number" ) {
+		parsedFwv = fwv;
+	} else if ( typeof fwv === "string" ) {
+		if ( fwv.indexOf( "." ) !== -1 ) {
+			var parts = fwv.split( "." );
+			parsedFwv = ( parseInt( parts[ 0 ], 10 ) || 0 ) * 100 + ( parseInt( parts[ 1 ], 10 ) || 0 ) * 10 + ( parseInt( parts[ 2 ], 10 ) || 0 );
+		} else {
+			parsedFwv = parseInt( fwv, 10 ) || 0;
+		}
 	}
-	return false;
+
+	if ( parsedFwv < 240 ) {
+		return false;
+	}
+
+	var feature = OSApp.currentSession.controller.options.feature;
+	var hasZigbee = false;
+	var hasMatter = false;
+	if ( feature ) {
+		var featureStr = Array.isArray( feature ) ? feature.join( "," ) : String( feature );
+		featureStr = featureStr.toUpperCase();
+		hasZigbee = featureStr.indexOf( "ZIGBEE" ) !== -1;
+		hasMatter = featureStr.indexOf( "MATTER" ) !== -1;
+	}
+
+	return hasZigbee || hasMatter;
 };
 
-// Check if Zigbee Station/Zone Control is available (requires ESP32 and firmware 2.4.0 with minor build >= 202)
+// Check if Zigbee Station/Zone Control is available (requires firmware 2.4.0 or newer and Zigbee feature)
 OSApp.Firmware.isZigbeeAvailable = function() {
 	if ( $.isEmptyObject( OSApp.currentSession.controller ) ) {
 		return false;
 	}
-	if ( OSApp.Firmware.isOSPi() ) {
-		return false;
-	}
-
-	// Must be an ESP32 device
-	var isEsp32 = false;
-	if ( OSApp.Analog && typeof OSApp.Analog.isESP32 === "function" ) {
-		isEsp32 = OSApp.Analog.isESP32();
-	} else {
-		var controllerOptions = OSApp.currentSession.controller.options;
-		var features = controllerOptions && controllerOptions.feature;
-		isEsp32 = (typeof features === "string" || Array.isArray(features)) && features.includes("ESP32");
-	}
-	if ( !isEsp32 ) {
-		return false;
-	}
 
 	var fwv = OSApp.currentSession.controller.options.fwv;
-	var fwm = OSApp.currentSession.controller.options.fwm;
+	var parsedFwv = 0;
 
-	// Zigbee zone control/station available from firmware 2.4.0 (240) build 202 onwards
-	if ( fwv > 240 ) {
-		return true;
-	} else if ( fwv === 240 && fwm >= 202 ) {
-		return true;
+	if ( typeof fwv === "number" ) {
+		parsedFwv = fwv;
+	} else if ( typeof fwv === "string" ) {
+		if ( fwv.indexOf( "." ) !== -1 ) {
+			var parts = fwv.split( "." );
+			parsedFwv = ( parseInt( parts[ 0 ], 10 ) || 0 ) * 100 + ( parseInt( parts[ 1 ], 10 ) || 0 ) * 10 + ( parseInt( parts[ 2 ], 10 ) || 0 );
+		} else {
+			parsedFwv = parseInt( fwv, 10 ) || 0;
+		}
 	}
-	return false;
+
+	if ( parsedFwv < 240 ) {
+		return false;
+	}
+
+	var feature = OSApp.currentSession.controller.options.feature;
+	var hasZigbee = false;
+	if ( feature ) {
+		var featureStr = Array.isArray( feature ) ? feature.join( "," ) : String( feature );
+		featureStr = featureStr.toUpperCase();
+		hasZigbee = featureStr.indexOf( "ZIGBEE" ) !== -1;
+	}
+
+	return hasZigbee;
 };
 
 OSApp.Firmware.isOSPi = function() {
