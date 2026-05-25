@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "Atjaunināšana pabeigta! Tagad varat aizvērt šo dialoglodziņu.",
       "Overall progress": "Overall progress",
       "Free Storage": "Brīva krātuve",
       "Free Memory": "Brīvā atmiņa",

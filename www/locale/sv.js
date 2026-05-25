@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "Uppdatering klar! Du kan nu stänga den här dialogrutan.",
       "Overall progress": "Overall progress",
       "Free Storage": "Ledigt lagringsutrymme",
       "Free Memory": "Ledigt minne",

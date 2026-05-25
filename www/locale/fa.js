@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "به‌روزرسانی کامل شد! اکنون می‌توانید این کادر را ببندید.",
       "Overall progress": "Overall progress",
       "Free Storage": "فضای ذخیره‌سازی آزاد",
       "Free Memory": "حافظه آزاد",

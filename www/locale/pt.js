@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Atualizacao concluida. Configuracao restaurada.",
       "Update complete. Device is back online.": "Atualizacao concluida. O dispositivo voltou a estar online.",
       "Device is back online.": "O dispositivo voltou a estar online.",
+      "Update complete! You can now close this dialog.": "Atualização concluída! Agora você pode fechar esta janela.",
       "Overall progress": "Progresso total",
       "Free Storage": "Armazenamento livre",
       "Free Memory": "Memória livre",

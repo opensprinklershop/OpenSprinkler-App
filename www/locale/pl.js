@@ -903,6 +903,7 @@
       "Update complete. Configuration restored.": "Aktualizacja zakonczona. Konfiguracja przywrocona.",
       "Update complete. Device is back online.": "Aktualizacja zakonczona. Urzadzenie ponownie online.",
       "Device is back online.": "Urzadzenie ponownie online.",
+      "Update complete! You can now close this dialog.": "Aktualizacja zakończona! Możesz teraz zamknąć to okno.",
       "Overall progress": "Postep calkowity",
       "Free Storage": "Wolna pamięć masowa",
       "Free Memory": "Wolna pamięć RAM",

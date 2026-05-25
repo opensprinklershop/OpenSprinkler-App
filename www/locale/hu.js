@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "A frissítés befejeződött! Most bezárhatja ezt az ablakot.",
       "Overall progress": "Overall progress",
       "Free Storage": "Szabad tárhely",
       "Free Memory": "Szabad memória",

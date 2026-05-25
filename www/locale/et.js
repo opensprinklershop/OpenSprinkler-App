@@ -806,6 +806,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "Uuendus lõpetatud! Nüüd saate selle dialoogi sulgeda.",
       "Overall progress": "Overall progress",
       "Free Storage": "Vaba salvestusruum",
       "Free Memory": "Vaba mälu",

@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "ዝማኔ ተጠናቅቋል! አሁን ይህን መስኮት መዝጋት ይችላሉ።",
       "Overall progress": "Overall progress",
       "Free Storage": "ነፃ ማከማቻ",
       "Free Memory": "ነፃ ማህደረ ትውስታ",

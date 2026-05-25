@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "העדכון הושלם! כעת ניתן לסגור את תיבת הדו-שיח.",
       "Overall progress": "Overall progress",
       "Free Storage": "אחסון פנוי",
       "Free Memory": "זיכרון פנוי",

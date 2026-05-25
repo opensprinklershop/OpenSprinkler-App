@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "Uppfærslu lokið! Þú getur nú lokað þessum glugga.",
       "Overall progress": "Overall progress",
       "Free Storage": "Laus geymsluþjónusta",
       "Free Memory": "Laust minni",

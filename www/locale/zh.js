@@ -899,6 +899,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "更新完成！您现在可以关闭此对话框。",
       "Overall progress": "Overall progress",
       "Free Storage": "可用存储",
       "Free Memory": "可用内存",

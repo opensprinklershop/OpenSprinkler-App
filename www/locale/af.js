@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "Opdatering voltooi! U kan hierdie dialoog nou sluit.",
       "Overall progress": "Overall progress",
       "Free Storage": "Vrye stoorplek",
       "Free Memory": "Vrye geheue",

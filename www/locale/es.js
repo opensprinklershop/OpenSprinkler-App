@@ -908,6 +908,7 @@
       "Update complete. Configuration restored.": "Actualizacion completa. Configuracion restaurada.",
       "Update complete. Device is back online.": "Actualizacion completa. El dispositivo esta de nuevo en linea.",
       "Device is back online.": "El dispositivo esta de nuevo en linea.",
+      "Update complete! You can now close this dialog.": "¡Actualización completada! Ahora puede cerrar este diálogo.",
       "Overall progress": "Progreso total",
       "Free Storage": "Almacenamiento libre",
       "Free Memory": "Memoria libre",

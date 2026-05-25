@@ -899,6 +899,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "Обновление завершено! Теперь можно закрыть это окно.",
       "Overall progress": "Overall progress",
       "Free Storage": "Свободное хранилище",
       "Free Memory": "Свободная память",

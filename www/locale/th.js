@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "อัปเดตเสร็จสมบูรณ์! ตอนนี้คุณสามารถปิดหน้าต่างนี้ได้",
       "Overall progress": "Overall progress",
       "Free Storage": "พื้นที่เก็บข้อมูลว่าง",
       "Free Memory": "หน่วยความจำว่าง",

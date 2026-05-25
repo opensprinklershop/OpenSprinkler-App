@@ -905,6 +905,7 @@
       "Update complete. Configuration restored.": "Update voltooid. Configuratie hersteld.",
       "Update complete. Device is back online.": "Update voltooid. Apparaat is weer online.",
       "Device is back online.": "Apparaat is weer online.",
+      "Update complete! You can now close this dialog.": "Update voltooid! U kunt dit venster nu sluiten.",
       "Overall progress": "Totale voortgang",
       "Free Storage": "Vrije opslag",
       "Free Memory": "Vrij geheugen",

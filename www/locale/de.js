@@ -1136,6 +1136,7 @@
       "Update complete. Configuration restored.": "Update abgeschlossen. Konfiguration wiederhergestellt.",
       "Update complete. Device is back online.": "Update abgeschlossen. Gerät ist wieder online.",
       "Device is back online.": "Gerät ist wieder online.",
+      "Update complete! You can now close this dialog.": "Update abgeschlossen! Sie können diesen Dialog jetzt schließen.",
       "Overall progress": "Gesamtfortschritt",
       "Free Storage": "Freier Speicher",
       "Free Memory": "Freier Arbeitsspeicher",

@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "Posodobitev zaključena! Zdaj lahko zaprete to pogovorno okno.",
       "Overall progress": "Overall progress",
       "Free Storage": "Prosta shramba",
       "Free Memory": "Prosti pomnilnik",

@@ -807,6 +807,7 @@
       "Update complete. Configuration restored.": "Update complete. Configuration restored.",
       "Update complete. Device is back online.": "Update complete. Device is back online.",
       "Device is back online.": "Device is back online.",
+      "Update complete! You can now close this dialog.": "புதுப்பிப்பு முடிந்தது! இப்போது இந்த உரையாடலை மூடலாம்.",
       "Overall progress": "Overall progress",
       "Free Storage": "இலவச சேமிப்பகம்",
       "Free Memory": "இலவச நினைவகம்",
