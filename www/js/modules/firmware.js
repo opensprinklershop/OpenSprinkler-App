@@ -265,11 +265,15 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 				// Handle the connection timing out but only show error on setting change
 				if ( OSApp.currentSession.prefix === "https://" ) {
-					OSApp.SSL.showCertDialog( OSApp.currentSession.ip, function( ready ) {
-						if ( ready ) {
-							OSApp.Errors.showError( OSApp.Language._( "Certificate trusted. Please retry your action." ) );
-						}
-					} );
+					if ( OSApp.SSL && typeof OSApp.SSL.showCertDialog === "function" ) {
+						OSApp.SSL.showCertDialog( OSApp.currentSession.ip, function( ready ) {
+							if ( ready ) {
+								OSApp.Errors.showError( OSApp.Language._( "Certificate trusted. Please retry your action." ) );
+							}
+						} );
+					} else {
+						OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. Please try again." ) );
+					}
 				} else {
 					OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. Please try again." ) );
 				}

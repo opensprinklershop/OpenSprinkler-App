@@ -46,6 +46,75 @@ OSApp.Dashboard.displayPage = function() {
 		'</div>';
 
 	var page = $(content),
+		normalizeZigbeeIeeeForCard = function( value ) {
+			var ieee = String( value || "" ).toLowerCase();
+
+			if ( ieee.indexOf( "0x" ) === 0 ) {
+				ieee = ieee.substring( 2 );
+			}
+
+			ieee = ieee.replace( /[^0-9a-f]/g, "" );
+			while ( ieee.length < 16 ) { ieee += "0"; }
+
+			return ieee.substring( 0, 16 ).toUpperCase();
+		},
+		getZigbeeStationBatteryPercent = function( sid ) {
+			var specialEntry, specialType, stationData, stationIeee, sensors, i, sensor, sensorIeee, batteryPercent;
+
+			if ( !OSApp.Stations.isSpecial( sid ) || !OSApp.Analog || !OSApp.Analog.Constants || !OSApp.Analog.getBatteryPercent ) {
+				return null;
+			}
+
+			specialEntry = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
+			specialType = specialEntry ? parseInt( specialEntry.st, 10 ) : 0;
+			if ( specialType !== 9 ) {
+				return null;
+			}
+
+			stationData = OSApp.Stations.parseZigbeeStationData( specialEntry && specialEntry.sd ? specialEntry.sd : "" );
+			stationIeee = normalizeZigbeeIeeeForCard( stationData.ieee );
+			if ( stationIeee === "0000000000000000" ) {
+				return null;
+			}
+
+			sensors = OSApp.Analog.analogSensors;
+			if ( !( sensors instanceof Array ) ) {
+				return null;
+			}
+
+			for ( i = 0; i < sensors.length; i++ ) {
+				sensor = sensors[ i ] || {};
+				if ( parseInt( sensor.type, 10 ) !== OSApp.Analog.Constants.SENSOR_ZIGBEE ) {
+					continue;
+				}
+
+				sensorIeee = normalizeZigbeeIeeeForCard( sensor.device_ieee || sensor.ieee || sensor.ieee_addr );
+				if ( sensorIeee !== stationIeee ) {
+					continue;
+				}
+
+				batteryPercent = OSApp.Analog.getBatteryPercent( sensor.battery );
+				if ( batteryPercent !== null ) {
+					return batteryPercent;
+				}
+			}
+
+			return null;
+		},
+		getZigbeeIconStateClass = function( sid ) {
+			var zigbeeStatus = OSApp.currentSession.controller.zigbeeStationStatus || [];
+			var statusCode = parseInt( zigbeeStatus[ sid ], 10 );
+
+			if ( statusCode === 2 ) {
+				return "zigbee-error";
+			}
+
+			if ( statusCode === 3 || statusCode === 4 ) {
+				return "zigbee-on";
+			}
+
+			return "zigbee-off";
+		},
 		addTimer = function( station, rem ) {
 			OSApp.uiState.timers[ "station-" + station ] = {
 				val: rem,
@@ -64,7 +133,8 @@ OSApp.Dashboard.displayPage = function() {
 				pname = isScheduled ? OSApp.Programs.pidToName( OSApp.Stations.getPID( sid ) ) : "",
 				rem = OSApp.Stations.getRemainingRuntime( sid ),
 				qPause = OSApp.Supported.pausing() && OSApp.StationQueue.isPaused(),
-				hasImage = sites[ currentSite ].images[ sid ] ? true : false;
+				hasImage = sites[ currentSite ].images[ sid ] ? true : false,
+				zigbeeBatteryPercent = getZigbeeStationBatteryPercent( sid );
 
 			if ( OSApp.Stations.getStatus( sid ) && rem > 0 ) {
 				addTimer( sid, rem );
@@ -97,7 +167,10 @@ OSApp.Dashboard.displayPage = function() {
 			}
 
 			cards += "<span class='btn-no-border ui-btn ui-btn-icon-notext " + specIconClass + " card-icon special-station " +
-				( OSApp.Stations.isSpecial( sid ) ? "" : "hidden" ) + "'></span>";
+				( OSApp.Stations.isSpecial( sid ) ? ( specIconClass === "ui-icon-zigbee" ? getZigbeeIconStateClass( sid ) : "" ) : "hidden" ) + "'></span>";
+			cards += "<span class='zigbee-station-battery card-icon " + ( zigbeeBatteryPercent === null ? "hidden" : "" ) + "'>" +
+				( zigbeeBatteryPercent === null ? "" : OSApp.Analog.renderBatteryIcon( zigbeeBatteryPercent, false ) ) +
+				"</span>";
 
 			if ( OSApp.Supported.groups() ) {
 				cards += "<span class='btn-no-border ui-btn card-icon station-gid " + ( OSApp.Stations.isMaster( sid ) ? "hidden" : "" ) +
@@ -145,6 +218,34 @@ OSApp.Dashboard.displayPage = function() {
 			var button = $( this ),
 				sid = button.data( "station" ),
 				name = button.siblings( "[id='station_" + sid + "']" ),
+				refreshStationAttribLayout = function() {
+					// Recalculate popup position/size after dynamic content changes.
+					setTimeout( function() {
+						try {
+							select.popup( "reposition", { positionTo: "window" } );
+						} catch ( e ) { void e; }
+
+						try {
+							var popupContainer = select.closest( ".ui-popup-container" );
+							if ( popupContainer && popupContainer.length ) {
+								popupContainer.scrollTop( 0 );
+							}
+						} catch ( e2 ) { void e2; }
+					}, 0 );
+				},
+				normalizeZigbeeIeee = function( value ) {
+					var ieee = String( value || "" ).toLowerCase();
+
+					if ( ieee.indexOf( "0x" ) === 0 ) {
+						ieee = ieee.substring( 2 );
+					}
+
+					ieee = ieee.replace( /[^0-9a-f]/g, "" );
+
+					while ( ieee.length < 16 ) { ieee += "0"; }
+
+					return ieee.substring( 0, 16 ).toUpperCase();
+				},
 				showSpecialOptions = function( value ) {
 					var opts = select.find( "#specialOpts" ),
 						data = OSApp.currentSession.controller.special && Object.prototype.hasOwnProperty.call(OSApp.currentSession.controller.special,  sid ) ? OSApp.currentSession.controller.special[ sid ].sd : "",
@@ -287,11 +388,14 @@ OSApp.Dashboard.displayPage = function() {
 
 						opts.append(
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Paired Zigbee Device" ) + ":</div>" +
+							"<div style='margin-bottom: 5px;'>" +
 							"<select class='center' data-corners='false' data-wrapper-class='tight ui-btn' id='zigbee-device-select'>" +
 							"<option value=''>" + OSApp.Language._( "Loading paired devices..." ) + "</option>" +
 							"</select>" +
+							"</div>" +
+							"<button class='ui-btn ui-btn-b' id='zigbee-station-scan-btn' data-corners='false' style='margin: 8px 0;'>" + OSApp.Language._("Scan for Zigbee Valve") + "</button>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "IEEE Address" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-ieee' required='true' type='text' maxlength='16' placeholder='e.g., 00124b002aa11bb2' value='" + data.ieee + "'>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-ieee' required='true' type='text' maxlength='18' pattern='^(0x|0X)?[0-9A-Fa-f]{16}$' placeholder='e.g., 0x00124b002aa11bb2' value='" + data.ieee + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Endpoint" ) + ":</div>" +
 							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-endpoint' required='true' type='number' min='1' max='255' value='" + parseInt( data.endpoint, 16 ) + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Control Mode" ) + ":</div>" +
@@ -301,55 +405,179 @@ OSApp.Dashboard.displayPage = function() {
 							"</select>" +
 							"<div id='zigbee-tuya-options' style='" + ( data.useTuya === "1" ? "" : "display:none;" ) + "'>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Tuya DP ID" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-tuya-dp' type='number' min='1' max='255' value='" + parseInt( data.tuyaDp, 16 ) + "'>" +
-							"</div>"
-						).enhanceWithin();
+						"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-tuya-dp' type='number' min='1' max='255' value='" + ( parseInt( data.tuyaDp, 16 ) || 1 ) + "'" + ( data.useTuya === "1" ? "" : " disabled='disabled'" ) + ">" +
+						"</div>"
+					).enhanceWithin();
 
-						// Toggle Tuya DP option visibility on change
+					// Toggle Tuya DP option visibility on change
 						select.find( "#zigbee-use-tuya" ).on( "change", function() {
 							if ( $( this ).val() === "1" ) {
 								select.find( "#zigbee-tuya-options" ).show();
+								select.find( "#zigbee-tuya-dp" ).prop( "disabled", false );
 							} else {
 								select.find( "#zigbee-tuya-options" ).hide();
+								select.find( "#zigbee-tuya-dp" ).prop( "disabled", true );
 							}
 						} );
 
-						// Fetch Zigbee device list from REST API [/zg?pw=...]
-						OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( response ) {
+						var loadZigbeeDevices = function( chosenIeee ) {
 							var sel = select.find( "#zigbee-device-select" );
-							sel.empty();
-							sel.append( "<option value=''>" + OSApp.Language._( "-- Select or Enter Custom --" ) + "</option>" );
-							if ( response && response.result === 1 && response.devices && response.devices.length > 0 ) {
-								for ( var i = 0; i < response.devices.length; i++ ) {
-									var dev = response.devices[ i ];
-									var label = dev.model || dev.manufacturer || "Device";
-									var cachedLabel = ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) );
-									if ( cachedLabel ) { label = cachedLabel; }
-									var optionText = label + " (" + dev.ieee + ")";
-									var selectedStr = ( dev.ieee === data.ieee ) ? "selected='selected'" : "";
-									sel.append( "<option value='" + dev.ieee + "' data-endpoint='" + dev.endpoint + "' " + selectedStr + ">" + OSApp.Utils.htmlEscape( optionText ) + "</option>" );
+							var refreshZigbeeSelect = function() {
+								try { sel.selectmenu( "refresh", true ); } catch( e ) { void e; }
+							};
+							var updateZigbeeOptionLabel = function( ieee, data ) {
+								var label = "";
+
+								if ( data && data.vendor && data.description ) {
+									label = data.vendor + " - " + data.description;
+								} else if ( data ) {
+									label = data.vendor || data.description || data.model || "";
 								}
-							} else {
-								sel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "No paired devices found" ) + "</option>" );
-							}
-							sel.selectmenu( "refresh", true );
-						} ).fail( function() {
-							var sel = select.find( "#zigbee-device-select" );
+
+								if ( label && ieee ) {
+									sel.find( "option" ).filter( function() {
+										return normalizeZigbeeIeee( $( this ).val() ) === normalizeZigbeeIeee( ieee );
+									} ).text( label + " (" + normalizeZigbeeIeee( ieee ) + ")" );
+									refreshZigbeeSelect();
+								}
+							};
 							sel.empty();
-							sel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "Error loading devices" ) + "</option>" );
-							sel.selectmenu( "refresh", true );
-						} );
+							sel.append( "<option value=''>" + OSApp.Language._( "Loading paired devices..." ) + "</option>" );
+							refreshZigbeeSelect();
+
+							return OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( response ) {
+								sel.empty();
+								sel.append( "<option value=''>" + OSApp.Language._( "-- Select or Enter Custom --" ) + "</option>" );
+								if ( response && response.result === 1 && response.devices && response.devices.length > 0 ) {
+									for ( var i = 0; i < response.devices.length; i++ ) {
+										var dev = response.devices[ i ];
+										var label = dev.model || dev.manufacturer || "Device";
+										var cachedLabel = ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) );
+										if ( cachedLabel ) { label = cachedLabel; }
+										var optionText = label + " (" + dev.ieee + ")";
+										var selectedStr = ( normalizeZigbeeIeee( dev.ieee ) === normalizeZigbeeIeee( chosenIeee ) ) ? "selected='selected'" : "";
+										sel.append( "<option value='" + dev.ieee + "' data-endpoint='" + dev.endpoint + "' " + selectedStr + ">" + OSApp.Utils.htmlEscape( optionText ) + "</option>" );
+
+										if ( dev.ieee && dev.manufacturer && dev.model && OSApp.ESP32Mode.ZigbeeDeviceDB ) {
+											OSApp.ESP32Mode.ZigbeeDeviceDB.lookup( dev.manufacturer, dev.model ).done( (function( deviceIeee ) {
+												return function( dbData ) {
+													if ( dbData && ( dbData.vendor || dbData.description || dbData.model ) ) {
+														OSApp.ESP32Mode.ZigbeeDeviceDB.setCached( deviceIeee, dbData );
+														updateZigbeeOptionLabel( deviceIeee, dbData );
+													}
+												};
+											})( dev.ieee ) );
+										}
+									}
+								} else {
+									sel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "No paired devices found" ) + "</option>" );
+								}
+								refreshZigbeeSelect();
+							} ).fail( function() {
+								sel.empty();
+								sel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "Error loading devices" ) + "</option>" );
+								refreshZigbeeSelect();
+							} );
+						};
+
+						// Initial device list load
+						loadZigbeeDevices( data.ieee );
 
 						// Populate inputs on device dropdown change
 						select.find( "#zigbee-device-select" ).on( "change", function() {
 							var chosenIeee = $( this ).val();
 							if ( chosenIeee ) {
-								select.find( "#zigbee-ieee" ).val( chosenIeee );
+								select.find( "#zigbee-ieee" ).val( normalizeZigbeeIeee( chosenIeee ) );
 								var chosenEndpoint = $( this ).find( "option:selected" ).data( "endpoint" ) || 1;
 								select.find( "#zigbee-endpoint" ).val( chosenEndpoint );
 							}
 						} );
+
+						select.find( "#zigbee-ieee" ).on( "blur", function() {
+							$( this ).val( normalizeZigbeeIeee( $( this ).val() ) );
+						} );
+
+						// Hook up scan button click using Analog scanner component
+						select.find( "#zigbee-station-scan-btn" ).on( "click", function() {
+							var scanBtn = $( this );
+							var originalText = scanBtn.text();
+							scanBtn.prop( "disabled", true );
+							OSApp.Analog.showZigBeeDeviceScanner(
+								select,
+								function( selectedDevice ) {
+									scanBtn.prop( "disabled", false ).text( originalText );
+									if ( selectedDevice && selectedDevice.ieee ) {
+										select.find( "#zigbee-ieee" ).val( normalizeZigbeeIeee( selectedDevice.ieee ) );
+										// Small delay so firmware finishes registering the device in /zg
+										setTimeout( function() { loadZigbeeDevices( selectedDevice.ieee ); }, 600 );
+										// Auto-detect Control Mode and Tuya DP ID from template DB
+										if ( selectedDevice.manufacturer && selectedDevice.model &&
+											selectedDevice.manufacturer !== OSApp.Language._( "Unknown" ) &&
+											selectedDevice.model !== OSApp.Language._( "Unknown" ) ) {
+											var apiUrl = "https://opensprinklershop.de/zigbee/devices_api.php?manufacturer=" +
+												encodeURIComponent( selectedDevice.manufacturer ) + "&model=" +
+												encodeURIComponent( selectedDevice.model ) + "&_=" + Date.now();
+											$.ajax( { url: apiUrl, dataType: "json", timeout: 6000 } )
+												.done( function( dbData ) {
+													if ( dbData && dbData.is_tuya ) {
+														// Prefer actuator-like DPs (valve/switch/on_off/state) and
+														// reliably exclude battery/meta datapoints.
+														var valveDp = 1;
+														if ( dbData.sensors && dbData.sensors.length > 0 ) {
+															var firstValidDp = 0;
+															var preferredDp = 0;
+
+															for ( var si = 0; si < dbData.sensors.length; si++ ) {
+																var sensor = dbData.sensors[ si ] || {};
+																var dp = parseInt( sensor.dp, 10 ) || 0;
+																if ( dp <= 0 ) {
+																	continue;
+																}
+
+																var nameText = String( sensor.name || "" ).toLowerCase();
+																var descText = String( sensor.description || "" ).toLowerCase();
+																var text = nameText + " " + descText;
+
+																var isMeta = /battery|temperature_unit|unit|signal|lqi|rssi|voltage/.test( text );
+																if ( isMeta ) {
+																	continue;
+																}
+
+																if ( firstValidDp === 0 ) {
+																	firstValidDp = dp;
+																}
+
+																var isActuator = /valve|switch|on[_ -]?off|state|open|close|relay/.test( text );
+																if ( isActuator ) {
+																	preferredDp = dp;
+																	break;
+																}
+															}
+
+															valveDp = preferredDp || firstValidDp || 1;
+														}
+														select.find( "#zigbee-use-tuya" ).val( "1" ).trigger( "change" );
+														select.find( "#zigbee-tuya-dp" ).val( valveDp );
+														select.find( "#zigbee-tuya-options" ).show();
+													}
+												} );
+										}
+									} else {
+										loadZigbeeDevices( select.find( "#zigbee-ieee" ).val() );
+									}
+								},
+								function() {
+									scanBtn.prop( "disabled", false ).text( originalText );
+									loadZigbeeDevices( select.find( "#zigbee-ieee" ).val() );
+								},
+								scanBtn,
+								originalText
+							);
+							return false; // prevent form submit/default action
+						} );
 					}
+
+					refreshStationAttribLayout();
 				},
 				validateLength = function() {
 					var maxSDChars = 240,		// Maximum size of special data when uri encoded. Needs to be less than sizeof(SpecialStationData) i.e. 247 bytes
@@ -486,9 +714,7 @@ OSApp.Dashboard.displayPage = function() {
 					} else if ( hs === 8 ) {
 						button.data( "specialData", String( parseInt( select.find( "#gardena-service" ).val(), 10 ) || 0 ) );
 					} else if ( hs === 9 ) { // Zigbee Station
-						var ieee = select.find( "#zigbee-ieee" ).val() || "0000000000000000";
-						while ( ieee.length < 16 ) { ieee += "0"; }
-						ieee = ieee.substring( 0, 16 );
+						var ieee = normalizeZigbeeIeee( select.find( "#zigbee-ieee" ).val() );
 
 						var endpoint = parseInt( select.find( "#zigbee-endpoint" ).val(), 10 ) || 1;
 						var endpointHex = OSApp.Utils.pad( endpoint.toString( 16 ) );
@@ -646,7 +872,7 @@ OSApp.Dashboard.displayPage = function() {
 			if ( OSApp.Supported.special() ) {
 				select +=
 					"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Station Type" ) + ":</div>" +
-					"<select data-mini='true' id='hs'"  + ( OSApp.Stations.isSpecial( sid ) ? " class='ui-disabled'" : "" ) + ">" +
+					"<select data-mini='true' id='hs'>" +
 					"<option data-hs='0' value='0'" + ( OSApp.Stations.isSpecial( sid ) ? "" : "selected" ) + ">" + OSApp.Language._( "Standard" ) + "</option>" +
 					"<option data-hs='1' value='1'>" + OSApp.Language._( "RF" ) + "</option>" +
 					"<option data-hs='2' value='2'>" + OSApp.Language._( "Remote Station (IP)" ) + "</option>" +
@@ -728,17 +954,37 @@ OSApp.Dashboard.displayPage = function() {
 			} );
 
 			// Refresh station data from firmware and update the Advanced tab to reflect special station type
+			var stationTypeSelect = select.find( "#hs" );
+			var setStationTypeEditable = function( editable ) {
+				stationTypeSelect.prop( "disabled", !editable );
+				try {
+					stationTypeSelect.selectmenu( editable ? "enable" : "disable" );
+				} catch ( e ) {
+					void e;
+					// Fallback for non-enhanced cases
+					stationTypeSelect.toggleClass( "ui-disabled", !editable );
+				}
+			};
+
 			if ( OSApp.Stations.isSpecial( sid ) ) {
+				setStationTypeEditable( false );
 				OSApp.Sites.updateControllerStationSpecial( function() {
-					select.find( "#hs" )
-						.removeClass( "ui-disabled" )
-						.find( "option[data-hs='" + OSApp.currentSession.controller.special[ sid ].st + "']" ).prop( "selected", true );
-					select.find( "#hs" ).change();
+					var specialEntry = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
+					var specialType = specialEntry && typeof specialEntry.st !== "undefined" ? specialEntry.st : 0;
+					var opt = stationTypeSelect.find( "option[data-hs='" + specialType + "']" );
+					if ( !opt.length ) {
+						opt = stationTypeSelect.find( "option[data-hs='0']" );
+					}
+					opt.prop( "selected", true );
+					try { stationTypeSelect.selectmenu( "refresh", true ); } catch ( e ) { void e; }
+					setStationTypeEditable( true );
+					stationTypeSelect.change();
 				} );
 			} else {
-				select.find( "#hs" ).removeClass( "ui-disabled" );
-				select.find( "option[data-hs='0']" ).prop( "selected", true );
-				select.find( "#hs" ).change();
+				setStationTypeEditable( true );
+				stationTypeSelect.find( "option[data-hs='0']" ).prop( "selected", true );
+				try { stationTypeSelect.selectmenu( "refresh", true ); } catch ( e ) { void e; }
+				stationTypeSelect.change();
 			}
 
 			select.find( ".changeBackground" ).on( "click", function( e ) {
@@ -768,6 +1014,7 @@ OSApp.Dashboard.displayPage = function() {
 			}
 
 			select.popup( opts ).popup( "open" );
+			refreshStationAttribLayout();
 		},
 		submitStations = function( id ) {
 			var is208 = ( OSApp.Firmware.checkOSVersion( 208 ) === true ),
@@ -1156,8 +1403,21 @@ OSApp.Dashboard.displayPage = function() {
 						}
 					}
 					card.find( ".special-station" )
-						.removeClass( "hidden ui-icon-wifi ui-icon-rs485 ui-icon-gardena ui-icon-zigbee" )
-						.addClass( specIconClass + ( OSApp.Stations.isSpecial( sid ) ? "" : " hidden" ) );
+						.removeClass( "hidden ui-icon-wifi ui-icon-rs485 ui-icon-gardena ui-icon-zigbee zigbee-on zigbee-off zigbee-error" )
+						.addClass( specIconClass + ( OSApp.Stations.isSpecial( sid ) ? ( specIconClass === "ui-icon-zigbee" ? ( " " + getZigbeeIconStateClass( sid ) ) : "" ) : " hidden" ) );
+
+					var zigbeeBatteryPercent = getZigbeeStationBatteryPercent( sid );
+					var batteryBadge = card.find( ".zigbee-station-battery" );
+					if ( !batteryBadge.length ) {
+						batteryBadge = $( "<span class='zigbee-station-battery card-icon hidden'></span>" );
+						card.find( ".ui-body" ).append( batteryBadge );
+					}
+
+					if ( zigbeeBatteryPercent === null ) {
+						batteryBadge.empty().addClass( "hidden" );
+					} else {
+						batteryBadge.html( OSApp.Analog.renderBatteryIcon( zigbeeBatteryPercent, false ) ).removeClass( "hidden" );
+					}
 
 					card.find( ".station-status" ).removeClass( "on off wait" ).addClass( isRunning ? "on" : ( isScheduled ? "wait" : "off" ) );
 					if ( OSApp.Stations.isMaster( sid ) ) {

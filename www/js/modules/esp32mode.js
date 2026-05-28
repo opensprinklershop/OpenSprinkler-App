@@ -984,7 +984,7 @@ OSApp.ESP32Mode.setupZigBeeGateway = function() {
  * Caches results in localStorage by IEEE address.
  */
 OSApp.ESP32Mode.ZigbeeDeviceDB = {
-	API_URL: "https://ui.opensprinklershop.de/zigbee/devices_api.php",
+	API_URL: "https://opensprinklershop.de/zigbee/devices_api.php",
 	_mem: {},
 
 	getCached: function( ieee ) {

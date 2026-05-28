@@ -400,7 +400,11 @@ list.find( ".add-otc-connection" ).on( "click", function() {
 
 				list.find( ".ssl-cert-btn" ).on( "click", function() {
 					var ip = $( this ).data( "ip" );
-					OSApp.SSL.showCertDialog( ip );
+					if ( OSApp.SSL && typeof OSApp.SSL.showCertDialog === "function" ) {
+						OSApp.SSL.showCertDialog( ip );
+					} else {
+						OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. Please try again." ) );
+					}
 					return false;
 				} );
 
@@ -853,25 +857,29 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 				$.mobile.loading( "hide" );
 				if ( x.status === 0 ) {
 					// Status 0 with HTTPS typically means a certificate rejection
-					OSApp.SSL.showCertDialog( ip, function( ready ) {
-						if ( !ready ) { return; }
-						// Certificate trusted — retry via native HTTP (cordova-plugin-advanced-http)
-						$.mobile.loading( "show" );
-						OSApp.Firmware.nativeHttpRequest( {
-							url: prefix + ip + urlDest,
-							type: "GET",
-							dataType: "json",
-							timeout: 10000
-						} ).then( function( reply ) {
-							OSApp.Storage.get( "sites", function( storageData ) {
-								var sites = OSApp.Sites.parseSites( storageData.sites );
-								success( reply, sites );
+					if ( OSApp.SSL && typeof OSApp.SSL.showCertDialog === "function" ) {
+						OSApp.SSL.showCertDialog( ip, function( ready ) {
+							if ( !ready ) { return; }
+							// Certificate trusted — retry via native HTTP (cordova-plugin-advanced-http)
+							$.mobile.loading( "show" );
+							OSApp.Firmware.nativeHttpRequest( {
+								url: prefix + ip + urlDest,
+								type: "GET",
+								dataType: "json",
+								timeout: 10000
+							} ).then( function( reply ) {
+								OSApp.Storage.get( "sites", function( storageData ) {
+									var sites = OSApp.Sites.parseSites( storageData.sites );
+									success( reply, sites );
+								} );
+							}, function() {
+								$.mobile.loading( "hide" );
+								OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
 							} );
-						}, function() {
-							$.mobile.loading( "hide" );
-							OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
 						} );
-					} );
+					} else {
+						OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
+					}
 				} else {
 					OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
 				}
@@ -1197,6 +1205,7 @@ OSApp.Sites.updateController = function( callback, fail ) {
 			OSApp.currentSession.controller.special = special;
 
 			// Fix the station status array
+			OSApp.currentSession.controller.zigbeeStationStatus = OSApp.currentSession.controller.status.zst || [];
 			OSApp.currentSession.controller.status = OSApp.currentSession.controller.status.sn;
 
 			var hasSpecial = false;
@@ -1364,6 +1373,7 @@ OSApp.Sites.updateControllerStatus = function( callback ) {
 	} else {
 		return OSApp.Firmware.sendToOS( "/js?pw=", "json" ).then(
 			function( status ) {
+				OSApp.currentSession.controller.zigbeeStationStatus = status.zst || [];
 				OSApp.currentSession.controller.status = status.sn;
 				callback();
 			},
@@ -1545,11 +1555,14 @@ OSApp.Sites.updateControllerStationSpecial = function( callback ) {
 
 	return OSApp.Firmware.sendToOS( "/je?pw=", "json" ).then(
 		function( special ) {
-			OSApp.currentSession.controller.special = special;
+			OSApp.currentSession.controller.special = special || {};
 			callback();
 		},
 		function() {
+			// Always release the caller even on transport errors so UI elements
+			// (e.g. the Station-Type dropdown) don't stay disabled forever.
 			OSApp.currentSession.controller.special = {};
+			try { callback(); } catch ( e ) { void e; }
 		} );
 };
 
