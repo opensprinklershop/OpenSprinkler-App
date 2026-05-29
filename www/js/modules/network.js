@@ -919,7 +919,7 @@ OSApp.Network.networkFail = function() {
 
 	OSApp.Status.changeStatus( 0, "red", "<p class='running-text center'>" + OSApp.Language._( "Network Error" ) + "</p>",
 		function() {
-			OSApp.UIDom.showLoading( "#weather,#footer-running" );
+			OSApp.UIDom.showLoading( "#weather" );
 			OSApp.Status.refreshStatus();
 			OSApp.Weather.updateWeather();
 		}

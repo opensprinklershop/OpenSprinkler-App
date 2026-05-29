@@ -202,7 +202,7 @@ OSApp.UIDom.launchApp = function() {
 		OSApp.Network.cloudSync();
 
 		// Indicate the weather and device status are being updated
-		OSApp.UIDom.showLoading( "#weather,#footer-running" );
+		OSApp.UIDom.showLoading( "#weather" );
 
 		OSApp.Sites.updateController( OSApp.Weather.updateWeather, OSApp.Network.networkFail );
 	} )
