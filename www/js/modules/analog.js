@@ -2170,7 +2170,7 @@ OSApp.Analog.zigbeeStandardTemplates = [
 	{ id: "illum",   name: "Illuminance (0x0400)",        cluster_id: 0x0400, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 13, unit: "" },
 	{ id: "flow",    name: "Flow (0x0404)",               cluster_id: 0x0404, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 10,  offset: 0, unitid: 0,  unit: "" },
 	{ id: "water",   name: "Water Meter (0x0702)",        cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 14, unit: "" },
-	{ id: "giex_gx02_water_dp111", name: "GIEX/GX02 Water Consumption (DP111)", cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1, offset: 0, unitid: 14, unit: "", tuya_dp: 111, tuya_dp_batt: 108, stdlog: 1 },
+	{ id: "giex_gx02_water_dp2", name: "GIEX/GX02 Water Consumption (DP2)", cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1, offset: 0, unitid: 14, unit: "", tuya_dp: 2, tuya_dp_batt: 108, stdlog: 1 },
 	{ id: "tuya_water_dp15", name: "Tuya Valve Water Meter (DP15)", cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1, offset: 0, unitid: 14, unit: "", tuya_dp: 15, tuya_dp_batt: 0, stdlog: 1 },
 	{ id: "leaf",    name: "Leaf Wetness (0x0407)",       cluster_id: 0x0407, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 100, offset: 0, unitid: 10, unit: "" },
 	{ id: "occup",   name: "Occupancy (0x0406)",          cluster_id: 0x0406, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 0,  unit: "" },
