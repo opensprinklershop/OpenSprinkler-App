@@ -38,7 +38,7 @@ before(function() {
 			);
 		} else if (pathname === '/jo') {
 			request.respond(200, { "Content-Type": "application/json" },
-				'{"fwv":221,"tz":28,"hp0":144,"hp1":31,"hwv":255,"ext":0,"sdt":0,"mas":0,"mton":0,"mtof":0,"wl":100,"den":1,"ipas":0,"devid":0,"uwt":0,"ntp1":0,"ntp2":0,"ntp3":0,"ntp4":0,"lg":1,"mas2":0,"mton2":0,"mtof2":0,"fwm":0,"fpr0":100,"fpr1":0,"re":0,"sar":0,"ife":0,"sn1t":0,"sn1o":1,"sn2t":0,"sn2o":1,"sn1on":0,"sn1of":0,"sn2on":0,"sn2of":0,"resv1":0,"resv2":0,"resv3":0,"resv4":0,"resv5":0,"resv6":0,"resv7":0,"resv8":0,"wimod":169,"reset":0,"dexp":-1,"mexp":24,"hwt":255,"ms":[0,0,0,0,0,0]}'
+				'{"fwv":221,"tz":28,"hp0":144,"hp1":31,"hwv":255,"ext":0,"sdt":0,"mas":0,"mton":0,"mtof":0,"wl":100,"den":1,"ipas":0,"devid":0,"uwt":0,"ntp1":0,"ntp2":0,"ntp3":0,"ntp4":0,"lg":1,"mas2":0,"mton2":0,"mtof2":0,"fwm":0,"fpr0":100,"fpr1":0,"re":0,"sar":0,"ife":0,"sn1t":0,"sn1o":1,"sn2t":0,"sn2o":1,"sn1on":0,"sn1of":0,"sn2on":0,"sn2of":0,"resv1":0,"resv2":0,"resv3":0,"resv4":0,"resv5":0,"resv6":0,"resv7":0,"resv8":0,"wimod":169,"reset":0,"dexp":-1,"mexp":24,"hwt":255,"fpd0":1,"fpd1":0,"ms":[0,0,0,0,0,0]}'
 			);
 		} else if (pathname === '/js') {
 			request.respond(200, { "Content-Type": "application/json" },

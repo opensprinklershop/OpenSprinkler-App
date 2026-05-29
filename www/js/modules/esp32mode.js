@@ -1109,6 +1109,13 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 				content += "<p>" + OSApp.Language._( "Manufacturer" ) + ": " + dev.manufacturer + "</p>";
 			}
 			content += "<p class='ui-li-aside'>" + OSApp.Language._( "Endpoint" ) + ": " + dev.endpoint + "</p>";
+			// Add Force Rejoin and Remove buttons
+			if ( dev.ieee ) {
+				content += "<div style='margin-top:8px;'>";
+				content += "<button class='zigbee-device-rejoin ui-btn ui-btn-mini ui-corner-all' style='margin-right:4px;' data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'>" + OSApp.Language._( "Force Rejoin + Reset Seq" ) + "</button>";
+				content += "<button class='zigbee-device-remove ui-btn ui-btn-mini ui-btn-warning ui-corner-all' data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'>" + OSApp.Language._( "Remove" ) + "</button>";
+				content += "</div>";
+			}
 			content += "</li>";
 		}
 		content += "</ul>";
@@ -1131,6 +1138,51 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	popup.on( "click", ".zigbee-permit-join", function() {
 		popup.popup( "close" );
 		OSApp.ESP32Mode.zigBeePermitJoin();
+		return false;
+	} );
+
+	// Handle Force Rejoin button
+	popup.on( "click", ".zigbee-device-rejoin", function() {
+		var ieee = $( this ).data( "ieee" );
+		if ( ieee ) {
+			$.mobile.loading( "show" );
+			OSApp.Firmware.sendToOS( "/zg?pw=&action=rejoin_device&ieee=" + encodeURIComponent( ieee ), "json" ).done( function( data ) {
+				$.mobile.loading( "hide" );
+				if ( data && data.result === 1 ) {
+					OSApp.Errors.showMessage( OSApp.Language._( "Device rejoin initiated with sequence reset (60s window)" ) );
+				} else {
+					var msg = ( data && data.message ) ? data.message : OSApp.Language._( "Failed to initiate device rejoin" );
+					OSApp.Errors.showError( msg );
+				}
+			} ).fail( function() {
+				$.mobile.loading( "hide" );
+				OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+			} );
+		}
+		return false;
+	} );
+
+	// Handle Remove button (keep existing behavior if already implemented)
+	popup.on( "click", ".zigbee-device-remove", function() {
+		var ieee = $( this ).data( "ieee" );
+		if ( ieee ) {
+			var deviceName = $( this ).closest( "li" ).find( "h4" ).text() || OSApp.Language._( "Device" );
+			if ( confirm( OSApp.Language._( "Remove" ) + " " + deviceName + "?" ) ) {
+				$.mobile.loading( "show" );
+				OSApp.Firmware.sendToOS( "/zg?pw=&action=remove&ieee=" + encodeURIComponent( ieee ), "json" ).done( function( data ) {
+					$.mobile.loading( "hide" );
+					if ( data && data.result === 1 ) {
+						popup.popup( "close" );
+						OSApp.ESP32Mode.setupZigBeeGateway();
+					} else {
+						OSApp.Errors.showError( OSApp.Language._( "Failed to remove device" ) );
+					}
+				} ).fail( function() {
+					$.mobile.loading( "hide" );
+					OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+				} );
+			}
+		}
 		return false;
 	} );
 

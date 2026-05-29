@@ -312,12 +312,39 @@ OSApp.Options.showOptions = function( expandItem ) {
 						}
 						break;
 					case "o41":
-						if ( page.find( "#o41-units" ).val() === "gallon" ) {
-							data = data * 3.78541;
+						var pulseDivisorInput = parseInt( page.find( "#o80" ).val(), 10 );
+						var pulseRate100;
+
+						if ( pulseDivisorInput > 1 ) {
+							pulseRate100 = parseInt( data, 10 );
+							if ( isNaN( pulseRate100 ) || pulseRate100 < 1 ) {
+								pulseRate100 = 1;
+							}
+						} else {
+							if ( page.find( "#o41-units" ).val() === "gallon" ) {
+								data = data * 3.78541;
+							}
+
+							pulseRate100 = Math.round( data * 100 );
+							if ( isNaN( pulseRate100 ) || pulseRate100 < 1 ) {
+								pulseRate100 = 1;
+							}
 						}
 
-						opt.o41 = ( data * 100 ) & 0xff;
-						opt.o42 = ( ( data * 100 ) >> 8 ) & 0xff;
+						if ( pulseRate100 > 0xffff ) {
+							pulseRate100 = 0xffff;
+						}
+
+						opt.o41 = pulseRate100 & 0xff;
+						opt.o42 = ( pulseRate100 >> 8 ) & 0xff;
+						return true;
+					case "o80":
+						data = parseInt( data, 10 );
+						if ( isNaN( data ) || data < 1 ) {
+							data = 1;
+						}
+						opt.o80 = data & 0xff;
+						opt.o81 = ( data >> 8 ) & 0xff;
 						return true;
 					case "o2":
 					case "o3":
@@ -763,13 +790,22 @@ OSApp.Options.showOptions = function( expandItem ) {
 	}
 
 	if ( typeof OSApp.currentSession.controller.options.fpr0 !== "undefined" ) {
+		var supportsFlowPulseDiv = OSApp.Firmware.checkOSVersion( 203 );
+		var flowPulseDiv = supportsFlowPulseDiv && OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ?
+			( OSApp.currentSession.controller.options.fpd1 * 256 + OSApp.currentSession.controller.options.fpd0 ) : 1;
+		var flowPulseRate100 = ( OSApp.currentSession.controller.options.fpr1 * 256 + OSApp.currentSession.controller.options.fpr0 );
+		var flowPulseRateDisplay = flowPulseDiv > 1 ? flowPulseRate100 : ( flowPulseRate100 / 100 );
+		if ( !flowPulseDiv || flowPulseDiv < 1 ) {
+			flowPulseDiv = 1;
+		}
+
 		list += "<div class='ui-field-contain" + ( OSApp.currentSession.controller.options.urs === 2 || OSApp.currentSession.controller.options.sn1t === 2 ? "" : " hidden" ) + "'>" +
 			"<label for='o41'>" + OSApp.Language._( "Flow Pulse Rate" ) + "</label>" +
 			"<table>" +
 				"<tr style='width:100%;vertical-align: top;'>" +
 					"<td style='width:100%'>" +
 						"<div class='ui-input-text controlgroup-textinput ui-btn ui-body-inherit ui-corner-all ui-mini ui-shadow-inset ui-input-has-clear'>" +
-							"<input data-role='none' data-mini='true' type='number' pattern='^[-+]?[0-9]*.?[0-9]*$' id='o41' value='" + ( ( OSApp.currentSession.controller.options.fpr1 * 256 + OSApp.currentSession.controller.options.fpr0 ) / 100 ) + "'>" +
+							"<input data-role='none' data-mini='true' type='number' pattern='^[-+]?[0-9]*.?[0-9]*$' id='o41' value='" + flowPulseRateDisplay + "'>" +
 						"</div>" +
 					"</td>" +
 					"<td class='tight-select'>" +
@@ -780,6 +816,13 @@ OSApp.Options.showOptions = function( expandItem ) {
 					"</td>" +
 				"</tr>" +
 			"</table></div>";
+
+		if ( supportsFlowPulseDiv ) {
+			list += "<div class='ui-field-contain" + ( OSApp.currentSession.controller.options.urs === 2 || OSApp.currentSession.controller.options.sn1t === 2 ? "" : " hidden" ) + "'>" +
+				"<label for='o80'>" + OSApp.Language._( "Flow Pulse Divisor" ) + "</label>" +
+				"<input data-mini='true' type='number' pattern='[0-9]*' min='1' step='1' id='o80' value='" + flowPulseDiv + "'>" +
+			"</div>";
+		}
 	}
 
 	if ( typeof OSApp.currentSession.controller.options.sn1on !== "undefined" ) {
@@ -1549,8 +1592,10 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 		if ( currentValue === "2" ) {
 			page.find( "#o41" ).parents( ".ui-field-contain" ).removeClass( "hidden" );
+			page.find( "#o80" ).parents( ".ui-field-contain" ).removeClass( "hidden" );
 		} else if ( index === 21 || index === 50 ) {
 			page.find( "#o41" ).parents( ".ui-field-contain" ).addClass( "hidden" );
+			page.find( "#o80" ).parents( ".ui-field-contain" ).addClass( "hidden" );
 		}
 
 		if ( currentValue === "1" || currentValue === "3" || currentValue === "240" ) {

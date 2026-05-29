@@ -46,6 +46,7 @@ OSApp.Dashboard.displayPage = function() {
 		'</div>';
 
 	var page = $(content),
+		zigbeeBatteryRefreshPending = false,
 		normalizeZigbeeIeeeForCard = function( value ) {
 			var ieee = String( value || "" ).toLowerCase();
 
@@ -54,9 +55,41 @@ OSApp.Dashboard.displayPage = function() {
 			}
 
 			ieee = ieee.replace( /[^0-9a-f]/g, "" );
-			while ( ieee.length < 16 ) { ieee += "0"; }
+			while ( ieee.length < 16 ) { ieee = "0" + ieee; }
 
 			return ieee.substring( 0, 16 ).toUpperCase();
+		},
+		ieeeToBigInt = function( value ) {
+			if ( !value ) {
+				return null;
+			}
+			try {
+				return BigInt( "0x" + value );
+			} catch ( _err ) {
+				void _err;
+				return null;
+			}
+		},
+		isSameZigbeeIeee = function( a, b ) {
+			var na = normalizeZigbeeIeeeForCard( a );
+			var nb = normalizeZigbeeIeeeForCard( b );
+			var va, vb;
+
+			if ( !na || !nb ) {
+				return false;
+			}
+			if ( na === nb ) {
+				return true;
+			}
+
+			// Legacy compatibility: some older station entries can be shifted by one byte.
+			va = ieeeToBigInt( na );
+			vb = ieeeToBigInt( nb );
+			if ( va === null || vb === null ) {
+				return false;
+			}
+
+			return ( va >> 8n ) === vb || ( vb >> 8n ) === va;
 		},
 		getZigbeeStationBatteryPercent = function( sid ) {
 			var specialEntry, specialType, stationData, stationIeee, sensors, i, sensor, sensorIeee, batteryPercent;
@@ -78,7 +111,14 @@ OSApp.Dashboard.displayPage = function() {
 			}
 
 			sensors = OSApp.Analog.analogSensors;
-			if ( !( sensors instanceof Array ) ) {
+			if ( !( sensors instanceof Array ) || sensors.length === 0 ) {
+				if ( !zigbeeBatteryRefreshPending && OSApp.Analog && typeof OSApp.Analog.updateAnalogSensor === "function" ) {
+					zigbeeBatteryRefreshPending = true;
+					OSApp.Analog.updateAnalogSensor( function() {
+						zigbeeBatteryRefreshPending = false;
+						$( "html" ).trigger( "datarefresh" );
+					} );
+				}
 				return null;
 			}
 
@@ -89,7 +129,7 @@ OSApp.Dashboard.displayPage = function() {
 				}
 
 				sensorIeee = normalizeZigbeeIeeeForCard( sensor.device_ieee || sensor.ieee || sensor.ieee_addr );
-				if ( sensorIeee !== stationIeee ) {
+				if ( !isSameZigbeeIeee( sensorIeee, stationIeee ) ) {
 					continue;
 				}
 
@@ -104,6 +144,10 @@ OSApp.Dashboard.displayPage = function() {
 		getZigbeeIconStateClass = function( sid ) {
 			var zigbeeStatus = OSApp.currentSession.controller.zigbeeStationStatus || [];
 			var statusCode = parseInt( zigbeeStatus[ sid ], 10 );
+
+			if ( isNaN( statusCode ) ) {
+				return OSApp.Stations.getStatus( sid ) ? "zigbee-on" : "zigbee-off";
+			}
 
 			if ( statusCode === 2 ) {
 				return "zigbee-error";
@@ -156,7 +200,7 @@ OSApp.Dashboard.displayPage = function() {
 			var specIconClass = "ui-icon-wifi";
 			if ( OSApp.Stations.isSpecial( sid ) ) {
 				var stObj = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
-				var specialType = stObj ? stObj.st : 0;
+				var specialType = stObj ? parseInt( stObj.st, 10 ) : 0;
 				if ( specialType === 7 ) {
 					specIconClass = "ui-icon-rs485";
 				} else if ( specialType === 8 ) {
@@ -242,7 +286,7 @@ OSApp.Dashboard.displayPage = function() {
 
 					ieee = ieee.replace( /[^0-9a-f]/g, "" );
 
-					while ( ieee.length < 16 ) { ieee += "0"; }
+					while ( ieee.length < 16 ) { ieee = "0" + ieee; }
 
 					return ieee.substring( 0, 16 ).toUpperCase();
 				},
@@ -1393,7 +1437,7 @@ OSApp.Dashboard.displayPage = function() {
 					var specIconClass = "ui-icon-wifi";
 					if ( OSApp.Stations.isSpecial( sid ) ) {
 						var stObj = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
-						var specialType = stObj ? stObj.st : 0;
+						var specialType = stObj ? parseInt( stObj.st, 10 ) : 0;
 						if ( specialType === 7 ) {
 							specIconClass = "ui-icon-rs485";
 						} else if ( specialType === 8 ) {

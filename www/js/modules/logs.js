@@ -311,9 +311,14 @@ OSApp.Logs.displayPage = function() {
 				}
 
 				var pulseRate = result.pr || 0,
+					pulseDiv = result.pd || 1,
 					records = ( result.records || [] ).filter( function( r ) { return Math.floor( r.ym / 12 ) >= 2000; } ),
 					curr = result.curr || {},
 					html = "";
+
+				if ( pulseDiv < 1 ) {
+					pulseDiv = 1;
+				}
 
 				var ymToLabel = function( ym ) {
 					var y = Math.floor( ym / 12 ),
@@ -322,7 +327,7 @@ OSApp.Logs.displayPage = function() {
 				};
 
 				var flowToVolume = function( count ) {
-					return parseFloat( ( count * pulseRate / 100 ).toFixed( 2 ) );
+					return parseFloat( ( count * pulseRate / ( 100 * pulseDiv ) ).toFixed( 2 ) );
 				};
 
 				// Current month (skip if timestamp is invalid, e.g. Jan 1970 = epoch 0)

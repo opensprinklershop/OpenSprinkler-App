@@ -173,12 +173,18 @@ OSApp.Utils.isValidOTC = function( token ) {
 };
 
 OSApp.Utils.flowCountToVolume = function( count ) {
-        return parseFloat( ( count * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / 100 ).toFixed( 2 ) );
+	var divisor = ( OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ) ?
+		( ( OSApp.currentSession.controller.options.fpd1 << 8 ) + OSApp.currentSession.controller.options.fpd0 ) : 1;
+	if ( !divisor ) { divisor = 1; }
+	return parseFloat( ( count * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / ( 100 * divisor ) ).toFixed( 2 ) );
 };
 
 // Convert flow rate (sensor pulses per minute) to volume per minute
 OSApp.Utils.flowRateToVolume = function( rate ) {
-       return parseFloat( ( rate * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / 100 ).toFixed( 2 ) );
+	var divisor = ( OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ) ?
+		( ( OSApp.currentSession.controller.options.fpd1 << 8 ) + OSApp.currentSession.controller.options.fpd0 ) : 1;
+	if ( !divisor ) { divisor = 1; }
+	return parseFloat( ( rate * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / ( 100 * divisor ) ).toFixed( 2 ) );
 };
 
 /*
