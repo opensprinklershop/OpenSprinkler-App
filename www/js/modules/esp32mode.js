@@ -213,6 +213,26 @@ OSApp.ESP32Mode.isZigBeeClientActive = function() {
 };
 
 /**
+ * Check whether the connected firmware supports the in-app ZigBee gateway
+ * device editor / scanner / DB-driven device profiles. Available from
+ * firmware 2.4.0 build 203 and later, AND only if the editor UI is loaded.
+ */
+OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor = function() {
+	if ( typeof OSApp.ESP32Mode.showZigBeeDeviceEditor !== "function" ) {
+		return false;
+	}
+	if ( !OSApp.currentSession || !OSApp.currentSession.controller || !OSApp.currentSession.controller.options ) {
+		return false;
+	}
+	var opts = OSApp.currentSession.controller.options;
+	var fwv = parseInt( opts.fwv, 10 ) || 0;
+	var fwm = parseInt( opts.fwm, 10 ) || 0;
+	if ( fwv > 240 ) { return true; }
+	if ( fwv === 240 && fwm >= 203 ) { return true; }
+	return false;
+};
+
+/**
  * Setup ESP32 Mode dialog — allows user to switch between IEEE 802.15.4 modes.
  * First fetches the current mode from /ir, then shows the selection popup.
  */
@@ -1021,20 +1041,52 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 		return $.ajax( { url: url, dataType: "json", timeout: 6000 } );
 	},
 
-	/** Returns cluster_entries array for the sensor-editor combobox.
-	 *  Each entry has: label, cluster_id, attr_id, sensor_name, unit, unitid,
-	 *  factor, divider, is_tuya_dp, dp, endpoint, vendor, model_name, fingerprint.
+		/** Returns consolidated cluster_entries for the sensor-editor combobox.
+	 *  Secondary DPs (battery, unit, status, consumption) are folded into the
+	 *  primary entry as dp_battery / dp_unit / dp_status / dp_consumption fields.
 	 *  Resolves with [] on failure so callers don't need to handle errors. */
 	lookupForCombobox: function( manufacturer, model ) {
+		var self = this;
 		var url = this.API_URL +
 			"?manufacturer=" + encodeURIComponent( manufacturer ) +
 			"&model="        + encodeURIComponent( model ) +
 			"&for_combobox=1";
 		return $.ajax( { url: url, dataType: "json", timeout: 8000 } )
 			.then(
-				function( data ) { return data.cluster_entries || []; },
+				function( data ) { return self._consolidateEntries( data.cluster_entries || [] ); },
 				function()       { return []; }
 			);
+	},
+
+	/** Folds secondary DPs (battery, unit, status, consumption) into primary entries. */
+	_consolidateEntries: function( entries ) {
+		var secondaryPat = /^(battery|battery_level|linkquality|unit|unit_select|status|valve_status|power_on_behavior|consumption|water_consumed|current_summation)$/i;
+		var primary = [], secondary = [];
+		for ( var i = 0; i < entries.length; i++ ) {
+			var e = entries[ i ];
+			var name = ( e.sensor_name || "" ).toLowerCase();
+			if ( e.is_tuya_dp && secondaryPat.test( name ) ) {
+				secondary.push( e );
+			} else {
+				primary.push( e );
+			}
+		}
+		if ( primary.length === 0 ) { return entries; }
+		for ( var j = 0; j < secondary.length; j++ ) {
+			var s = secondary[ j ];
+			var sn = ( s.sensor_name || "" ).toLowerCase();
+			var target = primary[ 0 ];
+			if ( /battery/.test( sn ) && !target.dp_battery ) {
+				target.dp_battery = s.dp;
+			} else if ( /unit/.test( sn ) && !target.dp_unit ) {
+				target.dp_unit = s.dp;
+			} else if ( /status|valve/.test( sn ) && !target.dp_status ) {
+				target.dp_status = s.dp;
+			} else if ( /consumption|water|summation/.test( sn ) && !target.dp_consumption ) {
+				target.dp_consumption = s.dp;
+			}
+		}
+		return primary;
 	},
 
 	enrich: function( dev, $li ) {
@@ -1062,73 +1114,663 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 			: ( data.vendor || data.description || "" );
 		if ( label ) {
 			$li.find( ".zb-db-info" ).text( label ).show();
-			// Update main device title so it shows the proper product name
-			$li.find( "h4" ).text( label );
+			// Works for both old <h4> (listview) and new .zg-dev-title (table rows)
+			$li.find( "h4, .zg-dev-title" ).text( label );
 		}
 	}
 };
 
 /**
+ * Slim ZigBee device editor popup (separate from the full analog sensor editor).
+ * Shows only ZigBee-relevant fields: Name, IEEE, Endpoint, Model/Manufacturer,
+ * Cluster/Attribute IDs and Tuya DP mappings.
+ *
+ * @param {Object} device  ZigBee device descriptor or existing sensor object.
+ *                         Recognised: ieee/device_ieee, endpoint, model, manufacturer,
+ *                         cluster_id, attribute_id, tuya_dp[_value], tuya_dp_batt,
+ *                         tuya_dp_unit, tuya_dp_status, tuya_dp_consumption.
+ * @param {Function} done  Called after save/cancel.
+ */
+OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
+	done = done || function() {};
+	device = device || {};
+
+	if ( !OSApp.Analog || typeof OSApp.Analog.sendToOsObj !== "function" ) {
+		OSApp.Errors.showError( OSApp.Language._( "Sensor backend not available" ) );
+		return;
+	}
+
+	function firstDefined() {
+		for ( var i = 0; i < arguments.length; i++ ) {
+			if ( arguments[ i ] !== undefined && arguments[ i ] !== null && arguments[ i ] !== "" ) {
+				return arguments[ i ];
+			}
+		}
+		return "";
+	}
+
+	function toHex4( val, fallback ) {
+		if ( val === undefined || val === null || val === "" ) { return fallback; }
+		var n = ( typeof val === "string" )
+			? ( val.toLowerCase().indexOf( "0x" ) === 0 ? parseInt( val, 16 ) : parseInt( val, 10 ) )
+			: parseInt( val, 10 );
+		if ( isNaN( n ) ) { return fallback; }
+		var s = n.toString( 16 ).toUpperCase();
+		while ( s.length < 4 ) { s = "0" + s; }
+		return "0x" + s;
+	}
+
+	function parseHex( v ) {
+		if ( v === undefined || v === null || v === "" ) { return null; }
+		var s = String( v ).trim();
+		if ( s === "" ) { return null; }
+		var n = ( s.toLowerCase().indexOf( "0x" ) === 0 ) ? parseInt( s, 16 ) : parseInt( s, 10 );
+		return isNaN( n ) ? null : n;
+	}
+
+	function parseDpOrEmpty( v ) {
+		if ( v === undefined || v === null || v === "" ) { return ""; }
+		var s = String( v ).trim();
+		if ( s === "" ) { return ""; }
+		var n = parseInt( s, 10 );
+		return isNaN( n ) ? "" : n;
+	}
+
+	OSApp.Analog.updateAnalogSensor( function() {
+		var sensors = OSApp.Analog.analogSensors || [];
+		var ZIGBEE_TYPE = ( OSApp.Analog.Constants && OSApp.Analog.Constants.SENSOR_ZIGBEE ) || 95;
+		var ieee = firstDefined( device.device_ieee, device.ieee );
+		var i;
+
+		// Collect ALL existing sensor rows that share this IEEE — these are the derivatives.
+		var existingDerivs = [];
+		for ( i = 0; i < sensors.length; i++ ) {
+			var sCur = sensors[ i ];
+			if ( sCur && sCur.device_ieee && ieee &&
+				String( sCur.device_ieee ).toLowerCase() === String( ieee ).toLowerCase() ) {
+				existingDerivs.push( sCur );
+			}
+		}
+		var isNewDevice = existingDerivs.length === 0;
+		var existingNrs = existingDerivs.map( function( s ) { return s.nr; } );
+
+		var maxNr = 0;
+		for ( i = 0; i < sensors.length; i++ ) {
+			if ( sensors[ i ] && sensors[ i ].nr > maxNr ) { maxNr = sensors[ i ].nr; }
+		}
+		var nextNr = maxNr + 1;
+		function allocNr() { return nextNr++; }
+
+		// Device-wide metadata (taken from first existing derivative or scan/device hint).
+		var src0 = existingDerivs[ 0 ] || device;
+		var devName  = firstDefined(
+			isNewDevice ? "" : ( src0.device_name || extractDeviceName( src0.name ) ),
+			device.model && device.model !== "unknown" ? device.model : "",
+			OSApp.Language._( "New ZigBee Device" )
+		);
+		var devIeee  = firstDefined( src0.device_ieee, ieee );
+		var devManuf = firstDefined( src0.manufacturer, device.manufacturer, "" );
+		var devModel = firstDefined( src0.model,        device.model,        "" );
+
+		function extractDeviceName( fullName ) {
+			if ( !fullName ) { return ""; }
+			var sep = String( fullName ).indexOf( " - " );
+			return sep > 0 ? String( fullName ).slice( 0, sep ) : String( fullName );
+		}
+		function extractDerivName( fullName ) {
+			if ( !fullName ) { return ""; }
+			var sep = String( fullName ).indexOf( " - " );
+			return sep > 0 ? String( fullName ).slice( sep + 3 ) : "";
+		}
+
+		function derivFromSensor( s ) {
+			return {
+				origNr:  s.nr,
+				nr:      s.nr,
+				name:    extractDerivName( s.name ) || s.name || "",
+				endpoint: parseInt( firstDefined( s.endpoint, 1 ), 10 ) || 1,
+				cluster: toHex4( s.cluster_id,   "0x0408" ),
+				attr:    toHex4( s.attribute_id, "0x0000" ),
+				dpVal:   parseDpOrEmpty( firstDefined( s.tuya_dp,        s.tuya_dp_value,       s.dp_value ) ),
+				dpStat:  parseDpOrEmpty( firstDefined( s.tuya_dp_status, s.dp_status ) ),
+				dpCons:  parseDpOrEmpty( firstDefined( s.tuya_dp_consumption, s.dp_consumption ) ),
+				dpUnit:  parseDpOrEmpty( firstDefined( s.tuya_dp_unit,   s.dp_unit ) ),
+				dpBatt:  parseDpOrEmpty( firstDefined( s.tuya_dp_batt,   s.tuya_dp_battery,     s.dp_battery ) ),
+				ri:      parseInt( firstDefined( s.ri, 600 ), 10 ) || 600,
+				enable:  ( s.enable === undefined || s.enable === null ) ? 1 : ( s.enable ? 1 : 0 ),
+				log:     ( s.log    === undefined || s.log    === null ) ? 1 : ( s.log    ? 1 : 0 ),
+				group:   parseInt( firstDefined( s.group, 0 ), 10 ) || 0,
+				unitid:  parseInt( firstDefined( s.unitid, 0 ), 10 ) || 0,
+				srcSensor: s
+			};
+		}
+		function emptyDeriv() {
+			return {
+				origNr: 0, nr: allocNr(), name: "",
+				endpoint: parseInt( device.endpoint, 10 ) || 1,
+				cluster: "0x0408", attr: "0x0000",
+				dpVal: "", dpStat: "", dpCons: "", dpUnit: "", dpBatt: "",
+				ri: 600, enable: 1, log: 1, group: 0, unitid: 0, srcSensor: null
+			};
+		}
+
+		var derivs = existingDerivs.map( derivFromSensor );
+		if ( derivs.length === 0 ) { derivs.push( emptyDeriv() ); }
+
+		var dpFieldDefs = [
+			{ key: "dpVal",  cls: "d-dp-val",  label: "Value DP",       hint: OSApp.Language._( "on/off control" ) },
+			{ key: "dpStat", cls: "d-dp-stat", label: "Status DP",      hint: OSApp.Language._( "current state" ) },
+			{ key: "dpCons", cls: "d-dp-cons", label: "Consumption DP", hint: OSApp.Language._( "water meter (optional)" ) },
+			{ key: "dpUnit", cls: "d-dp-unit", label: "Unit DP",        hint: OSApp.Language._( "°C/°F or L/m³ (optional)" ) },
+			{ key: "dpBatt", cls: "d-dp-batt", label: "Battery DP",     hint: OSApp.Language._( "battery level (optional)" ) }
+		];
+
+		function renderDerivCard( d, idx ) {
+			var title = d.name || ( OSApp.Language._( "Derivative" ) + " " + ( idx + 1 ) );
+			var h = "";
+			h += "<fieldset data-role='collapsible' data-mini='true' data-collapsed='false' data-idx='" + idx + "' class='zbed-deriv'>";
+			h += "<legend>" + OSApp.Utils.htmlEscape( title ) + "</legend>";
+
+			h += "<label>" + OSApp.Language._( "Derivative Name" );
+			h += "<input type='text' class='d-name' data-mini='true' maxlength='40' value='" + OSApp.Utils.htmlEscape( d.name ) + "'></label>";
+
+			h += "<div style='display:flex;gap:8px;flex-wrap:wrap;'>";
+			h += "<div style='flex:1;min-width:80px;'><label>" + OSApp.Language._( "Endpoint" );
+			h += "<input type='number' class='d-ep' data-mini='true' min='1' max='255' value='" + d.endpoint + "' style='width:100%;'></label></div>";
+			h += "<div style='flex:2;min-width:130px;'><label>" + OSApp.Language._( "Cluster ID (hex)" );
+			h += "<input type='text' class='d-cluster' data-mini='true' value='" + OSApp.Utils.htmlEscape( d.cluster ) + "' style='width:100%;'></label></div>";
+			h += "<div style='flex:2;min-width:130px;'><label>" + OSApp.Language._( "Attribute ID (hex)" );
+			h += "<input type='text' class='d-attr' data-mini='true' value='" + OSApp.Utils.htmlEscape( d.attr ) + "' style='width:100%;'></label></div>";
+			h += "</div>";
+
+			h += "<div style='display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;'>";
+			dpFieldDefs.forEach( function( f ) {
+				h += "<div style='flex:1;min-width:130px;'><label>" + OSApp.Language._( f.label ) +
+					" <span style='color:#888;font-weight:normal;font-size:0.8em;'>(" + f.hint + ")</span>";
+				h += "<input type='number' class='" + f.cls + "' data-mini='true' min='0' max='255' style='width:100%;' value='" + d[ f.key ] + "'></label></div>";
+			} );
+			h += "</div>";
+
+			h += "<div style='margin-top:6px;text-align:right;'>";
+			h += "<button type='button' class='zbed-remove-deriv ui-btn ui-mini ui-corner-all ui-icon-delete ui-btn-icon-left' data-idx='" + idx + "'>" +
+				OSApp.Language._( "Remove derivative" ) + "</button>";
+			h += "</div>";
+
+			h += "</fieldset>";
+			return h;
+		}
+
+		function renderDerivs() {
+			var $list = popup.find( "#zbed-derivs" );
+			$list.empty();
+			for ( var k = 0; k < derivs.length; k++ ) {
+				$list.append( renderDerivCard( derivs[ k ], k ) );
+			}
+			$list.enhanceWithin();
+		}
+
+		function syncDerivsFromUI() {
+			popup.find( "#zbed-derivs > fieldset.zbed-deriv" ).each( function() {
+				var $f = $( this );
+				var idx = parseInt( $f.attr( "data-idx" ), 10 );
+				var d = derivs[ idx ];
+				if ( !d ) { return; }
+				d.name     = String( $f.find( ".d-name" ).val() || "" );
+				d.endpoint = parseInt( $f.find( ".d-ep" ).val(), 10 ) || 1;
+				d.cluster  = String( $f.find( ".d-cluster" ).val() || "" );
+				d.attr     = String( $f.find( ".d-attr"    ).val() || "" );
+				d.dpVal    = String( $f.find( ".d-dp-val"  ).val() || "" );
+				d.dpStat   = String( $f.find( ".d-dp-stat" ).val() || "" );
+				d.dpCons   = String( $f.find( ".d-dp-cons" ).val() || "" );
+				d.dpUnit   = String( $f.find( ".d-dp-unit" ).val() || "" );
+				d.dpBatt   = String( $f.find( ".d-dp-batt" ).val() || "" );
+			} );
+		}
+
+		var html = "";
+		html += "<div data-role='header' data-theme='b'>";
+		html += "<a href='#' data-rel='back' data-role='button' data-theme='a' data-icon='delete' data-iconpos='notext' class='ui-btn-right'>" + OSApp.Language._( "close" ) + "</a>";
+		html += "<h1>" + ( isNewDevice ? OSApp.Language._( "New ZigBee Device" ) : OSApp.Language._( "Edit ZigBee Device" ) ) + "</h1>";
+		html += "</div>";
+		html += "<div class='ui-content'>";
+
+		html += "<label for='zbed-name'>" + OSApp.Language._( "Device Name" ) + "</label>";
+		html += "<input type='text' id='zbed-name' data-mini='true' maxlength='40' value='" + OSApp.Utils.htmlEscape( devName ) + "'>";
+
+		html += "<label for='zbed-ieee'>" + OSApp.Language._( "IEEE Address" ) + "</label>";
+		html += "<input type='text' id='zbed-ieee' data-mini='true' value='" + OSApp.Utils.htmlEscape( devIeee ) + "'" + ( isNewDevice ? "" : " readonly" ) + ">";
+
+		html += "<div style='display:flex;gap:12px;flex-wrap:wrap;'>";
+		html += "<div style='flex:1;min-width:150px;'><label for='zbed-manuf'>" + OSApp.Language._( "Manufacturer" ) + "</label>";
+		html += "<input type='text' id='zbed-manuf' data-mini='true' maxlength='40' value='" + OSApp.Utils.htmlEscape( devManuf ) + "' style='width:100%;'></div>";
+		html += "<div style='flex:1;min-width:150px;'><label for='zbed-model'>" + OSApp.Language._( "Model" ) + "</label>";
+		html += "<input type='text' id='zbed-model' data-mini='true' maxlength='40' value='" + OSApp.Utils.htmlEscape( devModel ) + "' style='width:100%;'></div>";
+		html += "</div>";
+
+		html += "<div style='margin:8px 0;'>";
+		html += "<button type='button' class='zbed-db-lookup ui-btn ui-mini ui-corner-all ui-icon-search ui-btn-icon-left'>" +
+			OSApp.Language._( "Query Device Database" ) + "</button>";
+		html += "<div class='zbed-db-result' style='display:none;margin-top:6px;padding:8px;border-radius:4px;background:#f5f5f5;font-size:0.9em;'></div>";
+		html += "</div>";
+
+		html += "<h3 style='margin:10px 0 4px;'>" + OSApp.Language._( "Derivatives" ) + "</h3>";
+		html += "<p style='margin:0 0 6px;font-size:0.85em;color:#666;'>" +
+			OSApp.Language._( "Each derivative is one logical sensor/valve channel of this device (e.g. soil moisture, temperature, valve)." ) + "</p>";
+		html += "<div id='zbed-derivs'></div>";
+		html += "<div style='margin:6px 0;'>";
+		html += "<button type='button' class='zbed-add-deriv ui-btn ui-mini ui-corner-all ui-icon-plus ui-btn-icon-left'>" +
+			OSApp.Language._( "Add derivative" ) + "</button>";
+		html += "</div>";
+
+		html += "<div style='margin-top:10px;'>";
+		html += "<button type='button' class='zbed-save ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Save" ) + "</button>";
+		if ( !isNewDevice ) {
+			html += "<button type='button' class='zbed-delete ui-btn ui-corner-all'>" + OSApp.Language._( "Delete device" ) + "</button>";
+		}
+		html += "<button type='button' class='zbed-cancel ui-btn ui-corner-all'>" + OSApp.Language._( "Cancel" ) + "</button>";
+		html += "</div>";
+		html += "</div>";
+
+		$( "#zigbeeDeviceEditor" ).remove();
+		var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='zigbeeDeviceEditor' style='max-width:95vw;width:640px;max-height:90vh;overflow:auto;'>" + html + "</div>" );
+
+		popup.on( "click", ".zbed-cancel", function() {
+			popup.popup( "close" );
+			return false;
+		} );
+
+		popup.on( "click", ".zbed-add-deriv", function() {
+			syncDerivsFromUI();
+			derivs.push( emptyDeriv() );
+			renderDerivs();
+			return false;
+		} );
+
+		popup.on( "click", ".zbed-remove-deriv", function() {
+			var idx = parseInt( $( this ).attr( "data-idx" ), 10 );
+			if ( isNaN( idx ) || !derivs[ idx ] ) { return false; }
+			syncDerivsFromUI();
+			derivs.splice( idx, 1 );
+			if ( derivs.length === 0 ) { derivs.push( emptyDeriv() ); }
+			renderDerivs();
+			return false;
+		} );
+
+		popup.on( "click", ".zbed-db-lookup", function() {
+			var $result = popup.find( ".zbed-db-result" );
+			var manufQ = String( popup.find( "#zbed-manuf" ).val() || "" ).trim() || devManuf;
+			var modelQ = String( popup.find( "#zbed-model" ).val() || "" ).trim() || devModel;
+			if ( !manufQ || !modelQ ) {
+				$result.show().html( "<em style='color:#a00;'>" +
+					OSApp.Language._( "Manufacturer/Model unknown — cannot query database." ) + "</em>" );
+				return false;
+			}
+			if ( !OSApp.ESP32Mode.ZigbeeDeviceDB || typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookupForCombobox !== "function" ) {
+				$result.show().html( "<em style='color:#a00;'>" + OSApp.Language._( "Database not available" ) + "</em>" );
+				return false;
+			}
+			$result.show().html( "<em>" + OSApp.Language._( "Querying database..." ) + "</em>" );
+			OSApp.ESP32Mode.ZigbeeDeviceDB.lookupForCombobox( manufQ, modelQ ).done( function( entries ) {
+				if ( !entries || !entries.length ) {
+					$result.html( "<em>" + OSApp.Language._( "No database entry found." ) + "</em>" );
+					return;
+				}
+
+				var apply = function() {
+					var newDerivs = entries.map( function( e ) {
+						return {
+							origNr:   0,
+							nr:       allocNr(),
+							name:     String( firstDefined( e.sensor_name, e.name, e.description, "" ) ),
+							endpoint: parseInt( firstDefined( e.endpoint, 1 ), 10 ) || 1,
+							cluster:  toHex4( firstDefined( e.cluster_id, e.cluster ), "0x0000" ),
+							attr:     toHex4( firstDefined( e.attr_id, e.attribute_id, e.attribute ), "0x0000" ),
+							dpVal:    parseDpOrEmpty( firstDefined( e.dp, e.tuya_dp ) ),
+							dpStat:   parseDpOrEmpty( firstDefined( e.dp_status, e.tuya_dp_status ) ),
+							dpCons:   parseDpOrEmpty( firstDefined( e.dp_consumption, e.tuya_dp_consumption ) ),
+							dpUnit:   parseDpOrEmpty( firstDefined( e.dp_unit, e.tuya_dp_unit ) ),
+							dpBatt:   parseDpOrEmpty( firstDefined( e.dp_battery, e.tuya_dp_batt ) ),
+							ri: 600, enable: 1, log: 1, group: 0, unitid: 0, srcSensor: null
+						};
+					} );
+					// Preserve nr/origNr for existing derivatives where cluster+attr+endpoint match.
+					for ( var ni = 0; ni < newDerivs.length; ni++ ) {
+						for ( var oi = 0; oi < existingDerivs.length; oi++ ) {
+							var oe = derivFromSensor( existingDerivs[ oi ] );
+							if ( oe.cluster === newDerivs[ ni ].cluster &&
+								oe.attr === newDerivs[ ni ].attr &&
+								oe.endpoint === newDerivs[ ni ].endpoint ) {
+								newDerivs[ ni ].origNr = oe.origNr;
+								newDerivs[ ni ].nr     = oe.nr;
+								break;
+							}
+						}
+					}
+					derivs = newDerivs;
+					renderDerivs();
+				};
+
+				var info = "<div><strong>" + OSApp.Language._( "Found" ) + ":</strong> " + entries.length + " " +
+					OSApp.Language._( "derivative(s)" ) + "</div>";
+				$result.html( info );
+
+				if ( existingDerivs.length > 0 ) {
+					OSApp.UIDom.areYouSure(
+						OSApp.Language._( "Replace existing derivatives with database entries?" ),
+						"",
+						apply
+					);
+				} else {
+					apply();
+				}
+			} ).fail( function() {
+				$result.html( "<em style='color:#a00;'>" + OSApp.Language._( "Database query failed" ) + "</em>" );
+			} );
+			return false;
+		} );
+
+		popup.on( "click", ".zbed-save", function() {
+			syncDerivsFromUI();
+
+			var ieeeVal  = String( popup.find( "#zbed-ieee"  ).val() || "" ).trim();
+			var nameVal  = String( popup.find( "#zbed-name"  ).val() || "" ).trim();
+			var manufVal = String( popup.find( "#zbed-manuf" ).val() || "" ).trim();
+			var modelVal = String( popup.find( "#zbed-model" ).val() || "" ).trim();
+
+			if ( !ieeeVal ) {
+				OSApp.Errors.showError( OSApp.Language._( "IEEE Address is required" ) );
+				return false;
+			}
+			if ( !derivs.length ) {
+				OSApp.Errors.showError( OSApp.Language._( "At least one derivative is required" ) );
+				return false;
+			}
+
+			// Validate & build payloads
+			var payloads = [];
+			for ( var di = 0; di < derivs.length; di++ ) {
+				var d = derivs[ di ];
+				var clusterN = parseHex( d.cluster );
+				var attrN    = parseHex( d.attr );
+				if ( clusterN === null || attrN === null ) {
+					OSApp.Errors.showError( OSApp.Language._( "Invalid Cluster/Attribute ID in derivative " ) + ( di + 1 ) );
+					return false;
+				}
+				var derivLabel = d.name || ( OSApp.Language._( "Derivative" ) + " " + ( di + 1 ) );
+				var sensorName = ( nameVal && d.name ) ? ( nameVal + " - " + d.name )
+					: ( nameVal || derivLabel );
+				sensorName = sensorName.slice( 0, 40 );
+
+				var p = {
+					nr:        d.nr,
+					type:      ZIGBEE_TYPE,
+					name:      sensorName,
+					group:     d.group,
+					ri:        d.ri,
+					enable:    d.enable,
+					log:       d.log,
+					unitid:    d.unitid,
+					device_ieee:  ieeeVal,
+					manufacturer: manufVal.slice( 0, 40 ),
+					model:        modelVal.slice( 0, 40 ),
+					endpoint:     d.endpoint,
+					cluster_id:   clusterN,
+					attribute_id: attrN
+				};
+
+				function dpVal( v ) {
+					if ( v === "" || v === null || v === undefined ) { return -1; }
+					var n = parseInt( v, 10 );
+					return ( isNaN( n ) || n < 0 ) ? -1 : n;
+				}
+				var dpv = dpVal( d.dpVal );
+				var dps = dpVal( d.dpStat );
+				var dpc = dpVal( d.dpCons );
+				var dpu = dpVal( d.dpUnit );
+				var dpb = dpVal( d.dpBatt );
+				if ( dpv >= 0 ) { p.tuya_dp             = dpv; }
+				if ( dps >= 0 ) { p.tuya_dp_status      = dps; }
+				if ( dpc >= 0 ) { p.tuya_dp_consumption = dpc; }
+				if ( dpu >= 0 ) { p.tuya_dp_unit        = dpu; }
+				if ( dpb >= 0 ) { p.tuya_dp_batt        = dpb; }
+
+				if ( d.srcSensor ) {
+					p.nativedata = d.srcSensor.nativedata;
+					p.data       = d.srcSensor.data;
+					p.last       = d.srcSensor.last;
+				}
+				payloads.push( { payload: p, isNewDeriv: !d.origNr } );
+			}
+
+			// Derivatives to delete: existing nrs no longer present in derivs.
+			var keptOrig = derivs.filter( function( d ) { return d.origNr; } )
+				.map( function( d ) { return d.origNr; } );
+			var toDelete = existingNrs.filter( function( n ) { return keptOrig.indexOf( n ) === -1; } );
+
+			$.mobile.loading( "show" );
+
+			function runOps( ops, finishCb ) {
+				if ( !ops.length ) { finishCb( true ); return; }
+				var op = ops.shift();
+				var req;
+				if ( op.delNr ) {
+					req = OSApp.Firmware.sendToOS( "/sc?pw=&nr=" + op.delNr + "&type=0", "json" );
+				} else {
+					req = OSApp.Analog.sendToOsObj( "/sc?pw=", op.payload );
+				}
+				req.done( function( info ) {
+					var result = info && info.result;
+					if ( !result || result > 1 ) {
+						$.mobile.loading( "hide" );
+						OSApp.Errors.showError( OSApp.Language._( "Error calling rest service: " ) + " " + result );
+						finishCb( false );
+						return;
+					}
+					if ( !op.delNr && op.isNewDeriv && op.payload.enable ) {
+						OSApp.Firmware.sendToOS( "/sr?pw=&nr=" + op.payload.nr );
+					}
+					runOps( ops, finishCb );
+				} ).fail( function() {
+					$.mobile.loading( "hide" );
+					OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+					finishCb( false );
+				} );
+			}
+
+			var ops = [];
+			toDelete.forEach( function( n ) { ops.push( { delNr: n } ); } );
+			payloads.forEach( function( pp ) { ops.push( pp ); } );
+
+			runOps( ops, function( ok ) {
+				$.mobile.loading( "hide" );
+				if ( ok ) {
+					popup.popup( "close" );
+					OSApp.Analog.updateAnalogSensor( done );
+				}
+			} );
+			return false;
+		} );
+
+		popup.on( "click", ".zbed-delete", function() {
+			if ( isNewDevice ) { return false; }
+			OSApp.UIDom.areYouSure(
+				OSApp.Language._( "Delete this ZigBee device and all of its derivatives?" ),
+				"",
+				function() {
+					$.mobile.loading( "show" );
+					var nrs = existingNrs.slice();
+					( function deleteNext() {
+						if ( !nrs.length ) {
+							$.mobile.loading( "hide" );
+							popup.popup( "close" );
+							OSApp.Analog.updateAnalogSensor( done );
+							return;
+						}
+						var nr = nrs.shift();
+						OSApp.Firmware.sendToOS( "/sc?pw=&nr=" + nr + "&type=0", "json" )
+							.done( function( info ) {
+								var result = info && info.result;
+								if ( !result || result > 1 ) {
+									$.mobile.loading( "hide" );
+									OSApp.Errors.showError( OSApp.Language._( "Error calling rest service: " ) + " " + result );
+									return;
+								}
+								deleteNext();
+							} )
+							.fail( function() {
+								$.mobile.loading( "hide" );
+								OSApp.Errors.showError( OSApp.Language._( "Error connecting to device" ) );
+							} );
+					} )();
+				}
+			);
+			return false;
+		} );
+
+		popup.enhanceWithin();
+		// Render derivatives after popup is in the DOM so enhanceWithin works on them too.
+		renderDerivs();
+		OSApp.UIDom.openPopup( popup, { positionTo: "window" } );
+
+		// Auto-apply DB lookup when opening a freshly scanned device with known manufacturer/model.
+		if ( isNewDevice && devManuf && devModel &&
+			OSApp.ESP32Mode.ZigbeeDeviceDB &&
+			typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookupForCombobox === "function" ) {
+			var $autoResult = popup.find( ".zbed-db-result" );
+			$autoResult.show().html( "<em>" + OSApp.Language._( "Querying database..." ) + "</em>" );
+			OSApp.ESP32Mode.ZigbeeDeviceDB.lookupForCombobox( devManuf, devModel ).done( function( entries ) {
+				if ( !entries || !entries.length ) {
+					$autoResult.html( "<em>" + OSApp.Language._( "No database entry found." ) + "</em>" );
+					return;
+				}
+				var newDerivs = entries.map( function( e ) {
+					return {
+						origNr:   0,
+						nr:       allocNr(),
+						name:     String( firstDefined( e.sensor_name, e.name, e.description, "" ) ),
+						endpoint: parseInt( firstDefined( e.endpoint, 1 ), 10 ) || 1,
+						cluster:  toHex4( firstDefined( e.cluster_id, e.cluster ), "0x0000" ),
+						attr:     toHex4( firstDefined( e.attr_id, e.attribute_id, e.attribute ), "0x0000" ),
+						dpVal:    parseDpOrEmpty( firstDefined( e.dp, e.tuya_dp ) ),
+						dpStat:   parseDpOrEmpty( firstDefined( e.dp_status, e.tuya_dp_status ) ),
+						dpCons:   parseDpOrEmpty( firstDefined( e.dp_consumption, e.tuya_dp_consumption ) ),
+						dpUnit:   parseDpOrEmpty( firstDefined( e.dp_unit, e.tuya_dp_unit ) ),
+						dpBatt:   parseDpOrEmpty( firstDefined( e.dp_battery, e.tuya_dp_batt ) ),
+						ri: 600, enable: 1, log: 1, group: 0, unitid: 0, srcSensor: null
+					};
+				} );
+				derivs = newDerivs;
+				renderDerivs();
+				$autoResult.html( "<div><strong>" + OSApp.Language._( "Found" ) + ":</strong> " +
+					entries.length + " " + OSApp.Language._( "derivative(s)" ) +
+					" — " + OSApp.Language._( "applied from database" ) + "</div>" );
+			} ).fail( function() {
+				$autoResult.html( "<em style='color:#a00;'>" + OSApp.Language._( "Database query failed" ) + "</em>" );
+			} );
+		}
+	} );
+};
+
+/**
+ * Show a variant-selection popup after a successful scan.
+ *
+ * Minimal implementation: directly open the sensor editor for the selected
+ * device. (More advanced variants like Tuya DP profiles can be added later
+ * via the editor's existing controls.)
+ */
+OSApp.ESP32Mode.showZigBeeScanVariantPopup = function( selectedDevice, discoveredDevices, done ) {
+	void discoveredDevices;
+	if ( !selectedDevice ) {
+		if ( typeof done === "function" ) { done(); }
+		return;
+	}
+	OSApp.ESP32Mode.showZigBeeDeviceEditor( selectedDevice, done );
+};
+
+/**
  * Display the ZigBee Gateway management panel.
- * Shows the device list from /zg (action=list) response and a permit-join button.
+ * Compact table list, white background, icon-only action buttons, "New" entry button.
  * Response format: { result:1, action:"list", devices:[ {ieee, short_addr, model, manufacturer, endpoint, device_id, is_new, last_rx_s, online} ], count:N }
  */
 OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	var content = "";
+	var supportsEditor = OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor();
+	var supportsScan = supportsEditor &&
+		typeof OSApp.ESP32Mode.showZigBeeScanVariantPopup === "function" &&
+		OSApp.Analog && typeof OSApp.Analog.showZigBeeDeviceScanner === "function";
 
 	content += "<div class='ui-content' role='main'>";
-	content += "<h3>" + OSApp.Language._( "ZigBee Gateway" ) + "</h3>";
+	content += "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'>";
+	content += "<h3 style='margin:0;'>" + OSApp.Language._( "ZigBee Gateway" ) + "</h3>";
+	if ( supportsEditor ) {
+		content += "<a href='#' class='zigbee-device-new ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-plus ui-btn-icon-left' style='margin:0;'>" +
+			OSApp.Language._( "New" ) + "</a>";
+	}
+	content += "</div>";
 
-	// Show paired devices list
 	if ( data.devices && data.devices.length > 0 ) {
-		content += "<ul data-role='listview' data-inset='true'>";
+		// Compact list using jQuery Mobile native styling (no custom colours).
+		// Each row: device name + IEEE tail + status badge + icon-only actions.
+		content += "<ul data-role='listview' data-inset='true' style='margin:0;'>";
 		for ( var i = 0; i < data.devices.length; i++ ) {
 			var dev = data.devices[ i ];
 			var isOnline  = dev.online === 1 || dev.online === true;
 			var hasRxInfo = dev.last_rx_s !== undefined && dev.last_rx_s !== null;
-			var onlineBadge = isOnline
-				? "<span style='color:#4caf50'>&#9679; " + OSApp.Language._( "Online" ) + "</span>"
+			var statusIcon = isOnline
+				? "<span class='ui-icon ui-icon-check' style='display:inline-block;width:18px;height:18px;background-color:#4caf50;border-radius:50%;vertical-align:middle;' title='" + OSApp.Language._( "Online" ) + "'></span>"
 				: ( hasRxInfo
-					? "<span style='color:#9e9e9e'>&#9675; " + OSApp.Language._( "Offline" ) + "</span>"
+					? "<span style='display:inline-block;width:14px;height:14px;border:2px solid #999;border-radius:50%;vertical-align:middle;' title='" + OSApp.Language._( "Offline" ) + "'></span>"
 					: "" );
 			var ieeeAttr = dev.ieee ? " data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'" : "";
-
-			content += "<li" + ( dev.is_new ? " data-theme='b'" : "" ) + ieeeAttr + ">";
-			// Pre-populate from cached DB label (persisted by IEEE across page reloads)
 			var cachedDevLabel = ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) || null;
 			var deviceTitle = cachedDevLabel || ( ( dev.model && dev.model !== "unknown" ) ? dev.model : OSApp.Language._( "Unknown Device" ) );
-			content += "<h4>" + OSApp.Utils.htmlEscape( deviceTitle ) + "</h4>";
-			if ( onlineBadge ) {
-				content += "<p>" + onlineBadge + "</p>";
+			var ieeeShort = dev.ieee ? "\u2026" + dev.ieee.slice( -8 ) : "";
+			var liTheme = dev.is_new ? " data-theme='e'" : "";
+
+			content += "<li" + ieeeAttr + liTheme + " style='padding:6px 8px;'>";
+			content += "<div style='display:flex;align-items:center;gap:6px;'>";
+			// Status badge
+			content += "<div style='flex:0 0 auto;'>" + statusIcon + "</div>";
+			// Title + IEEE
+			content += "<div style='flex:1 1 auto;min-width:0;'>";
+			content += "<div class='zg-dev-title' style='font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>" +
+				OSApp.Utils.htmlEscape( deviceTitle ) + "</div>";
+			content += "<div class='zb-db-info' style='display:none;font-size:0.8em;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'></div>";
+			if ( ieeeShort ) {
+				content += "<div style='font-family:monospace;font-size:0.75em;color:#888;'>" + ieeeShort + "</div>";
 			}
-			content += "<p class='zb-db-info' style='display:none;color:#888;font-size:0.85em;margin:2px 0;'></p>";
+			content += "</div>";
+			// Action buttons (compact icon-only)
 			if ( dev.ieee ) {
-				content += "<p>" + OSApp.Language._( "IEEE" ) + ": " + dev.ieee + "</p>";
-			}
-			if ( dev.manufacturer && dev.manufacturer !== "unknown" ) {
-				content += "<p>" + OSApp.Language._( "Manufacturer" ) + ": " + dev.manufacturer + "</p>";
-			}
-			content += "<p class='ui-li-aside'>" + OSApp.Language._( "Endpoint" ) + ": " + dev.endpoint + "</p>";
-			// Add Force Rejoin and Remove buttons
-			if ( dev.ieee ) {
-				content += "<div style='margin-top:8px;'>";
-				content += "<button class='zigbee-device-rejoin ui-btn ui-btn-mini ui-corner-all' style='margin-right:4px;' data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'>" + OSApp.Language._( "Force Rejoin + Reset Seq" ) + "</button>";
-				content += "<button class='zigbee-device-remove ui-btn ui-btn-mini ui-btn-warning ui-corner-all' data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'>" + OSApp.Language._( "Remove" ) + "</button>";
+				var ieee4btn = dev.ieee.replace( /'/g, "" );
+				content += "<div style='flex:0 0 auto;white-space:nowrap;'>";
+				if ( supportsEditor ) {
+					content += "<a href='#' class='zigbee-device-edit ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-edit ui-btn-icon-notext' " +
+						"title='" + OSApp.Language._( "Edit" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
+				}
+				content += "<a href='#' class='zigbee-device-rejoin ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-refresh ui-btn-icon-notext' " +
+					"title='" + OSApp.Language._( "Force Rejoin" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
+				content += "<a href='#' class='zigbee-device-remove ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-delete ui-btn-icon-notext' " +
+					"title='" + OSApp.Language._( "Remove" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
 				content += "</div>";
 			}
+			content += "</div>";
 			content += "</li>";
 		}
 		content += "</ul>";
 	} else {
-		content += "<p>" + OSApp.Language._( "No ZigBee devices paired" ) + "</p>";
+		content += "<p style='text-align:center;'>" + OSApp.Language._( "No ZigBee devices paired" ) + "</p>";
 	}
 
-	// Permit join button
+	content += "<div style='margin-top:10px;'>";
+	if ( supportsScan ) {
+		content += "<button class='zigbee-scan-valve ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Scan for Zigbee Valve" ) + "</button>";
+	}
 	content += "<button class='zigbee-permit-join ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Allow ZigBee Pairing" ) + "</button>";
 	content += "<button class='cancel-zigbee-gw ui-btn ui-corner-all'>" + OSApp.Language._( "Cancel" ) + "</button>";
-	content += "</div>";
+	content += "</div></div>";
 
-	var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='zigbeeGatewayPopup'>" + content + "</div>" );
+	var popup = $( "<div data-role='popup' data-theme='a' data-overlay-theme='b' id='zigbeeGatewayPopup' style='max-width:90vw;'>" + content + "</div>" );
 
 	popup.on( "click", ".cancel-zigbee-gw", function() {
 		popup.popup( "close" );
@@ -1141,17 +1783,69 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 		return false;
 	} );
 
-	// Handle Force Rejoin button
+	popup.on( "click", ".zigbee-scan-valve", function() {
+		var scanBtn = $( this );
+		var origText = scanBtn.text();
+		scanBtn.prop( "disabled", true );
+		OSApp.Analog.showZigBeeDeviceScanner(
+			popup,
+			function( selectedDevice, discoveredDevices ) {
+				scanBtn.prop( "disabled", false ).text( origText );
+				OSApp.ESP32Mode.showZigBeeScanVariantPopup( selectedDevice, discoveredDevices, function() {
+					OSApp.ESP32Mode.setupZigBeeGateway();
+				} );
+			},
+			function() {
+				scanBtn.prop( "disabled", false ).text( origText );
+				OSApp.ESP32Mode.setupZigBeeGateway();
+			},
+			scanBtn,
+			origText
+		);
+		return false;
+	} );
+
+	popup.on( "click", ".zigbee-device-new", function() {
+		popup.one( "popupafterclose", function() {
+			OSApp.ESP32Mode.showZigBeeDeviceEditor(
+				{ ieee: "", endpoint: 1, model: "", manufacturer: "", is_tuya: false },
+				function() { OSApp.ESP32Mode.setupZigBeeGateway(); }
+			);
+		} );
+		popup.popup( "close" );
+		return false;
+	} );
+
+	popup.on( "click", ".zigbee-device-edit", function() {
+		var ieee = $( this ).data( "ieee" );
+		if ( !ieee ) { return false; }
+		var selectedDevice = null;
+		for ( var ei = 0; ei < data.devices.length; ei++ ) {
+			if ( String( data.devices[ ei ].ieee || "" ).toLowerCase() === String( ieee ).toLowerCase() ) {
+				selectedDevice = data.devices[ ei ];
+				break;
+			}
+		}
+		if ( !selectedDevice ) { return false; }
+		popup.one( "popupafterclose", function() {
+			OSApp.ESP32Mode.showZigBeeDeviceEditor( selectedDevice, function() {
+				OSApp.ESP32Mode.setupZigBeeGateway();
+			} );
+		} );
+		popup.popup( "close" );
+		return false;
+	} );
+
 	popup.on( "click", ".zigbee-device-rejoin", function() {
 		var ieee = $( this ).data( "ieee" );
 		if ( ieee ) {
 			$.mobile.loading( "show" );
-			OSApp.Firmware.sendToOS( "/zg?pw=&action=rejoin_device&ieee=" + encodeURIComponent( ieee ), "json" ).done( function( data ) {
+			OSApp.Firmware.sendToOS( "/zg?pw=&action=rejoin_device&ieee=" + encodeURIComponent( ieee ), "json" ).done( function( resp ) {
 				$.mobile.loading( "hide" );
-				if ( data && data.result === 1 ) {
+				if ( resp && resp.result === 1 ) {
 					OSApp.Errors.showMessage( OSApp.Language._( "Device rejoin initiated with sequence reset (60s window)" ) );
 				} else {
-					var msg = ( data && data.message ) ? data.message : OSApp.Language._( "Failed to initiate device rejoin" );
+					var msg = ( resp && resp.message ) ? resp.message : OSApp.Language._( "Failed to initiate device rejoin" );
 					OSApp.Errors.showError( msg );
 				}
 			} ).fail( function() {
@@ -1162,16 +1856,15 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 		return false;
 	} );
 
-	// Handle Remove button (keep existing behavior if already implemented)
 	popup.on( "click", ".zigbee-device-remove", function() {
 		var ieee = $( this ).data( "ieee" );
 		if ( ieee ) {
-			var deviceName = $( this ).closest( "li" ).find( "h4" ).text() || OSApp.Language._( "Device" );
+			var deviceName = $( this ).closest( "tr" ).find( ".zg-dev-title" ).text() || OSApp.Language._( "Device" );
 			if ( confirm( OSApp.Language._( "Remove" ) + " " + deviceName + "?" ) ) {
 				$.mobile.loading( "show" );
-				OSApp.Firmware.sendToOS( "/zg?pw=&action=remove&ieee=" + encodeURIComponent( ieee ), "json" ).done( function( data ) {
+				OSApp.Firmware.sendToOS( "/zg?pw=&action=remove&ieee=" + encodeURIComponent( ieee ), "json" ).done( function( resp ) {
 					$.mobile.loading( "hide" );
-					if ( data && data.result === 1 ) {
+					if ( resp && resp.result === 1 ) {
 						popup.popup( "close" );
 						OSApp.ESP32Mode.setupZigBeeGateway();
 					} else {
@@ -1188,13 +1881,14 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 
 	OSApp.UIDom.openPopup( popup );
 
-	// Async: enrich each device with vendor / description from the Zigbee Device DB
 	if ( data.devices ) {
 		for ( var j = 0; j < data.devices.length; j++ ) {
 			var d = data.devices[ j ];
 			if ( d.ieee ) {
-				var $li = popup.find( "li[data-ieee='" + d.ieee.replace( /'/g, "" ) + "']" );
-				OSApp.ESP32Mode.ZigbeeDeviceDB.enrich( d, $li );
+				( function( dev ) {
+					var $row = popup.find( "tr[data-ieee='" + dev.ieee.replace( /'/g, "" ) + "']" );
+					OSApp.ESP32Mode.ZigbeeDeviceDB.enrich( dev, $row );
+				}( d ) );
 			}
 		}
 	}

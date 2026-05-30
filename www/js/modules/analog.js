@@ -1937,6 +1937,7 @@ OSApp.Analog.isGardenaSensor = function(sensorType) {
 
 //show and hide sensor editor fields
 OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
+	var zigbeeEditorMode = popup.data("zigbeeEditorMode") || "zone";
 	// First hide IP/Port/ID related fields
 	popup.find(".ip_port_container").hide();
 	popup.find(".id_label").hide();
@@ -1985,7 +1986,7 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	}
 
 	if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
-		popup.find("#zigbeesel").show();
+		popup.find("#zigbeesel").toggle( zigbeeEditorMode === "gateway" );
 	} else {
 		popup.find("#zigbeesel").hide();
 	}
@@ -2028,12 +2029,14 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 		popup.find(".filter_container").show();
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
 		popup.find(".zigbee_device_ieee_container").show();
-		popup.find(".zigbee_template_status_container").show();
-		popup.find(".zigbee_cluster_template_container").show();
-		popup.find(".zigbee_endpoint_cluster_attribute_container").show();
-		popup.find(".zigbee_tuya_dp_container").show();
-		popup.find(".fac_div_offset_container").show();
 		popup.find(".zigbee_scan_select_container").show();
+		if (zigbeeEditorMode === "gateway") {
+			popup.find(".zigbee_template_status_container").show();
+			popup.find(".zigbee_cluster_template_container").show();
+			popup.find(".zigbee_endpoint_cluster_attribute_container").show();
+			popup.find(".zigbee_tuya_dp_container").show();
+			popup.find(".fac_div_offset_container").show();
+		}
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
 		popup.find(".bluetooth_char_uuid_container").show();
 		popup.find(".bluetooth_format_container").show();
@@ -2239,6 +2242,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			"<label for='zigbeeDeviceSelectScanner'>" + OSApp.Language._("Discovered devices") + "</label>" +
 			"<select data-mini='true' id='zigbeeDeviceSelectScanner'></select>" +
 			"</div>" +
+			"<button class='apply-scanner-selection ui-btn ui-btn-b' disabled='disabled'>" + OSApp.Language._("Use selected device") + "</button>" +
 			"<button class='close-scanner' data-theme='a'>" + OSApp.Language._("Cancel") + "</button>" +
 			"</div>" +
 			"</div>");
@@ -2253,6 +2257,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 		var requestInFlight = false;
 		var didCleanup = false;
 		var lastDeviceCount = 0;
+		var scanCompleted = false;
 
 		function normalizeZigBeeDevices(data) {
 			if (Array.isArray(data)) {
@@ -2298,6 +2303,34 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			if (scanButton && originalButtonText) {
 				scanButton.text(OSApp.Language._("Scanning...") + " " + remaining + "s (" + lastDeviceCount + ")");
 			}
+		}
+
+		function updateScannerActions() {
+			var hasSelection = !!selectedDevice;
+			scanDialog.find(".apply-scanner-selection").prop("disabled", !(scanCompleted && hasSelection));
+		}
+
+		function setSelectedDeviceByIndex(idx) {
+			var devices = scanDialog.data("zigbeeDevices") || [];
+			if (!devices || idx < 0 || idx >= devices.length) {
+				selectedDevice = null;
+				updateScannerActions();
+				return;
+			}
+			var dev = devices[idx] || null;
+			if (!dev) {
+				selectedDevice = null;
+				updateScannerActions();
+				return;
+			}
+			selectedDevice = {
+				ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
+				short_addr: dev.short_addr || "0x0000",
+				model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
+				manufacturer: dev.manufacturer || OSApp.Language._("Unknown"),
+				endpoint: dev.endpoint || 1
+			};
+			updateScannerActions();
 		}
 
 		function updateDeviceList() {
@@ -2372,48 +2405,30 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			});
 		}
 
-		// Immediately apply selected device on combobox change
+		// Keep selected device in combobox; final apply is explicit after scan ends.
 		scanDialog.find("#zigbeeDeviceSelectScanner").off("change").on("change", function () {
 			var idxStr = scanDialog.find("#zigbeeDeviceSelectScanner").val();
 			var idx = parseInt(idxStr, 10);
 			if (idxStr === "" || isNaN(idx)) {
+				selectedDevice = null;
+				updateScannerActions();
 				return;
 			}
-			var devices = scanDialog.data("zigbeeDevices") || [];
-			if (!devices || idx < 0 || idx >= devices.length) {
-				return;
-			}
-			var dev = devices[idx] || null;
-			if (!dev) {
-				return;
-			}
-			selectedDevice = {
-				ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
-				short_addr: dev.short_addr || "0x0000",
-				model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
-				manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
-			};
+			setSelectedDeviceByIndex(idx);
+		});
 
-			if (scanInterval) {
-				clearInterval(scanInterval);
-				scanInterval = null;
+		scanDialog.find(".apply-scanner-selection").on("click", function() {
+			if (!scanCompleted || !selectedDevice) {
+				return false;
 			}
-			if (uiInterval) {
-				clearInterval(uiInterval);
-				uiInterval = null;
-			}
-			if (scanTimeout) {
-				clearTimeout(scanTimeout);
-				scanTimeout = null;
-			}
-
 			OSApp.Firmware.sendToOS("/zc?pw=", "json").always(function () {
 				scanDialog.popup("close");
 				$("#zigbeeScanner").remove();
 				if (callback) {
-					callback(selectedDevice);
+					callback(selectedDevice, scanDialog.data("zigbeeDevices") || []);
 				}
 			});
+			return false;
 		});
 
 		function cleanupScanner() {
@@ -2498,54 +2513,75 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			} catch (e) { void e; }
 
 			var postScanPolls = 0;
+			var requeriedIeees = {};
 			var postScanInterval = setInterval(function() {
 				postScanPolls++;
 				updateDeviceList();
 
 				// Check if all devices have real info (not "Unknown")
 				var devs = scanDialog.data("zigbeeDevices") || [];
-				var allIdentified = devs.length > 0 && devs.every(function(d) {
-					var m = d.model || d.model_id || "";
-					return m !== "" && m !== OSApp.Language._("Unknown");
-				});
+				var unknownLabel = OSApp.Language._("Unknown");
+				var isUnknown = function(d) {
+					var m = String(d.model || d.model_id || "").trim().toLowerCase();
+					var mf = String(d.manufacturer || "").trim().toLowerCase();
+					return m === "" || m === "unknown" || m === unknownLabel.toLowerCase() ||
+						mf === "" || mf === "unknown" || mf === unknownLabel.toLowerCase();
+				};
+				var allIdentified = devs.length > 0 && devs.every(function(d) { return !isUnknown(d); });
 
-				// Wait up to 12 seconds for async Basic Cluster reads (5s delay + 10s timeout in firmware)
-				if (allIdentified || postScanPolls >= 12) {
+				// After a few polls, actively re-trigger the firmware Basic Cluster query
+				// for any device still missing manufacturer/model (Tuya devices like GIEX GX02
+				// often need a second read attempt before they answer).
+				if (postScanPolls >= 3 && postScanPolls <= 18 && (postScanPolls % 5) === 3) {
+					devs.forEach(function(d) {
+						if (!d || !d.ieee || !isUnknown(d)) { return; }
+						var key = String(d.ieee).toLowerCase();
+						var n = requeriedIeees[key] || 0;
+						if (n >= 3) { return; }
+						requeriedIeees[key] = n + 1;
+						var ep = parseInt(d.endpoint, 10) || 1;
+						OSApp.Firmware.sendToOS(
+							"/zg?pw=&action=query_basic&ieee=" + encodeURIComponent(d.ieee) +
+							"&endpoint=" + ep, "json");
+					});
+				}
+
+				// Wait up to 24 seconds for async Basic Cluster reads (Tuya devices can be slow).
+				if (allIdentified || postScanPolls >= 24) {
 					clearInterval(postScanInterval);
-
+					scanCompleted = true;
 					var devices = scanDialog.data("zigbeeDevices") || [];
 					if (devices && devices.length > 0) {
-						var chosenDev = null;
+						var chosenIdx = 0;
 						for (var i = 0; i < devices.length; i++) {
-							if (devices[i].is_new) {
-								chosenDev = devices[i];
+							if (devices[i] && (devices[i].is_new === true || devices[i].is_new === 1 || devices[i].is_new === "1")) {
+								chosenIdx = i;
 								break;
 							}
 						}
-						if (!chosenDev) {
-							chosenDev = devices[0];
-						}
-						selectedDevice = {
-							ieee: chosenDev.ieee || chosenDev.ieee_addr || "0x0000000000000000",
-							short_addr: chosenDev.short_addr || "0x0000",
-							model: chosenDev.model || chosenDev.model_id || OSApp.Language._("Unknown"),
-							manufacturer: chosenDev.manufacturer || chosenDev.manufacturer_id || OSApp.Language._("Unknown")
-						};
-					}
-
-					OSApp.Firmware.sendToOS("/zc?pw=", "json").always(function () {
-						scanDialog.popup("close");
-						$("#zigbeeScanner").remove();
-						if (selectedDevice) {
+						scanDialog.find("#zigbeeDeviceSelectScanner").val(String(chosenIdx));
+						try {
+							scanDialog.find("#zigbeeDeviceSelectScanner").selectmenu("refresh", true);
+						} catch (e) { void e; }
+						setSelectedDeviceByIndex(chosenIdx);
+						OSApp.Firmware.sendToOS("/zc?pw=", "json").always(function () {
+							scanDialog.popup("close");
+							$("#zigbeeScanner").remove();
 							if (callback) {
-								callback(selectedDevice);
+								callback(selectedDevice, devices);
 							}
-						} else {
+						});
+					} else {
+						selectedDevice = null;
+						updateScannerActions();
+						OSApp.Firmware.sendToOS("/zc?pw=", "json").always(function () {
+							scanDialog.popup("close");
+							$("#zigbeeScanner").remove();
 							if (errorCallback) {
 								errorCallback();
 							}
-						}
-					});
+						});
+					}
 				}
 			}, 1000);
 		});
@@ -2883,10 +2919,12 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 
 
 // Analog sensor editor
-OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel) {
+OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel, options) {
 
 	OSApp.Analog.getSupportedSensorTypes().then(function (supportedSensorTypes) {
 		var i;
+		options = options || {};
+		var zigbeeEditorMode = options.zigbeeEditorMode || "zone";
 		function firstDefined() {
 			for (var j = 0; j < arguments.length; j++) {
 				if (arguments[j] !== undefined && arguments[j] !== null && arguments[j] !== "") {
@@ -3142,6 +3180,7 @@ list += "</select></div>" +
 			"</div>";
 
 		var popup = $(list),
+			popupMode = zigbeeEditorMode,
 
 			changeValue = function (pos, dir) {
 				var input = popup.find(".inputs input").eq(pos),
@@ -3423,7 +3462,23 @@ list += "</select></div>" +
 				nameField.val(selectedTemplate ? selectedTemplate.sensor.name : sel.model).trigger("change");
 				try { nameField.textinput("refresh"); } catch (e) { void e; }
 			}
-			if (selectedTemplate) {
+			if (popupMode === "gateway") {
+				if (selectedTemplate) {
+					applyZigBeeTemplate(selectedTemplate.sensor, selectedTemplate.label);
+				} else {
+					if (sel.model.toLowerCase().indexOf("temp") !== -1) {
+						popup.find("#cluster_id").val("0x0402");
+						popup.find("#attribute_id").val("0x0000");
+					} else if (sel.model.toLowerCase().indexOf("humid") !== -1) {
+						popup.find("#cluster_id").val("0x0405");
+						popup.find("#attribute_id").val("0x0000");
+					} else if (sel.model.toLowerCase().indexOf("soil") !== -1 || sel.model.toLowerCase().indexOf("moist") !== -1) {
+						popup.find("#cluster_id").val("0x0408");
+						popup.find("#attribute_id").val("0x0000");
+					}
+					loadZigBeeTemplateForDevice(sel.manufacturer, sel.model, true);
+				}
+			} else if (selectedTemplate) {
 				applyZigBeeTemplate(selectedTemplate.sensor, selectedTemplate.label);
 			} else {
 				if (sel.model.toLowerCase().indexOf("temp") !== -1) {
@@ -3585,6 +3640,7 @@ list += "</select></div>" +
 			var sensortype = parseInt($(this).val());
 			OSApp.Analog.updateSensorVisibility(popup, sensortype);
 			if (sensortype === OSApp.Analog.Constants.SENSOR_ZIGBEE) {
+				popup.data("zigbeeEditorMode", zigbeeEditorMode);
 				preloadZigBeeDevices();
 			} else if (sensortype === OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
 				preloadBluetoothDevices();
@@ -4483,6 +4539,7 @@ list += "</select></div>" +
 	popup.css("max-width", "576px");
 
 		// Initial visibility update based on sensor type
+		popup.data("zigbeeEditorMode", zigbeeEditorMode);
 		OSApp.Analog.updateSensorVisibility(popup, sensor.type);
 		if (sensor.type === OSApp.Analog.Constants.SENSOR_ZIGBEE) {
 			preloadZigBeeDevices();

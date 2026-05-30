@@ -429,6 +429,7 @@ OSApp.Dashboard.displayPage = function() {
 						).enhanceWithin();
 					} else if (value === 9) { // Zigbee Station
 						data = OSApp.Stations.parseZigbeeStationData( ( type === value ) ? data : "000000000000000001000000000000000000" );
+						var useZigbeeDeviceProfile = OSApp.ESP32Mode && OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor && OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor();
 
 						opts.append(
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Paired Zigbee Device" ) + ":</div>" +
@@ -437,23 +438,24 @@ OSApp.Dashboard.displayPage = function() {
 							"<option value=''>" + OSApp.Language._( "Loading paired devices..." ) + "</option>" +
 							"</select>" +
 							"</div>" +
-							"<button class='ui-btn ui-btn-b' id='zigbee-station-scan-btn' data-corners='false' style='margin: 8px 0;'>" + OSApp.Language._("Scan for Zigbee Valve") + "</button>" +
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "IEEE Address" ) + ":</div>" +
 							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-ieee' required='true' type='text' maxlength='18' pattern='^(0x|0X)?[0-9A-Fa-f]{16}$' placeholder='e.g., 0x00124b002aa11bb2' value='" + data.ieee + "'>" +
-							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Endpoint" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-endpoint' required='true' type='number' min='1' max='255' value='" + parseInt( data.endpoint, 16 ) + "'>" +
-							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Control Mode" ) + ":</div>" +
-							"<select class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-use-tuya'>" +
-							"<option value='0' " + ( data.useTuya === "1" ? "" : "selected='selected'" ) + ">" + OSApp.Language._( "Standard ZCL On/Off" ) + "</option>" +
-							"<option value='1' " + ( data.useTuya === "1" ? "selected='selected'" : "" ) + ">" + OSApp.Language._( "Tuya Custom DP" ) + "</option>" +
-							"</select>" +
-							"<div id='zigbee-tuya-options' style='" + ( data.useTuya === "1" ? "" : "display:none;" ) + "'>" +
-							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Tuya DP ID" ) + ":</div>" +
-						"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-tuya-dp' type='number' min='1' max='255' value='" + ( parseInt( data.tuyaDp, 16 ) || 1 ) + "'" + ( data.useTuya === "1" ? "" : " disabled='disabled'" ) + ">" +
-						"</div>"
+							( useZigbeeDeviceProfile ?
+								"<div class='center smaller' style='margin-top:8px;color:#777;'>" + OSApp.Language._( "Endpoint, control mode and DPs are configured in the ZigBee device editor." ) + "</div>" :
+								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Endpoint" ) + ":</div>" +
+								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-endpoint' required='true' type='number' min='1' max='255' value='" + parseInt( data.endpoint, 16 ) + "'>" +
+								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Control Mode" ) + ":</div>" +
+								"<select class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-use-tuya'>" +
+								"<option value='0' " + ( data.useTuya === "1" ? "" : "selected='selected'" ) + ">" + OSApp.Language._( "Standard ZCL On/Off" ) + "</option>" +
+								"<option value='1' " + ( data.useTuya === "1" ? "selected='selected'" : "" ) + ">" + OSApp.Language._( "Tuya Custom DP" ) + "</option>" +
+								"</select>" +
+								"<div id='zigbee-tuya-options' style='" + ( data.useTuya === "1" ? "" : "display:none;" ) + "'>" +
+								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Tuya DP ID" ) + ":</div>" +
+								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-tuya-dp' type='number' min='1' max='255' value='" + ( parseInt( data.tuyaDp, 16 ) || 1 ) + "'" + ( data.useTuya === "1" ? "" : " disabled='disabled'" ) + ">" +
+								"</div>" )
 					).enhanceWithin();
 
-					// Toggle Tuya DP option visibility on change
+					if ( !useZigbeeDeviceProfile ) {
 						select.find( "#zigbee-use-tuya" ).on( "change", function() {
 							if ( $( this ).val() === "1" ) {
 								select.find( "#zigbee-tuya-options" ).show();
@@ -463,6 +465,7 @@ OSApp.Dashboard.displayPage = function() {
 								select.find( "#zigbee-tuya-dp" ).prop( "disabled", true );
 							}
 						} );
+					}
 
 						var loadZigbeeDevices = function( chosenIeee ) {
 							var sel = select.find( "#zigbee-device-select" );
@@ -500,7 +503,7 @@ OSApp.Dashboard.displayPage = function() {
 										if ( cachedLabel ) { label = cachedLabel; }
 										var optionText = label + " (" + dev.ieee + ")";
 										var selectedStr = ( normalizeZigbeeIeee( dev.ieee ) === normalizeZigbeeIeee( chosenIeee ) ) ? "selected='selected'" : "";
-										sel.append( "<option value='" + dev.ieee + "' data-endpoint='" + dev.endpoint + "' " + selectedStr + ">" + OSApp.Utils.htmlEscape( optionText ) + "</option>" );
+										sel.append( "<option value='" + dev.ieee + "' data-endpoint='" + dev.endpoint + "' data-manufacturer='" + OSApp.Utils.htmlEscape( dev.manufacturer || "" ) + "' data-model='" + OSApp.Utils.htmlEscape( dev.model || "" ) + "' " + selectedStr + ">" + OSApp.Utils.htmlEscape( optionText ) + "</option>" );
 
 										if ( dev.ieee && dev.manufacturer && dev.model && OSApp.ESP32Mode.ZigbeeDeviceDB ) {
 											OSApp.ESP32Mode.ZigbeeDeviceDB.lookup( dev.manufacturer, dev.model ).done( (function( deviceIeee ) {
@@ -527,13 +530,75 @@ OSApp.Dashboard.displayPage = function() {
 						// Initial device list load
 						loadZigbeeDevices( data.ieee );
 
+						var autoDetectAndPopulateTuyaSpecs = function( manufacturer, model, select ) {
+							if ( manufacturer && model &&
+								manufacturer !== OSApp.Language._( "Unknown" ) &&
+								model !== OSApp.Language._( "Unknown" ) ) {
+								var apiUrl = "https://opensprinklershop.de/zigbee/devices_api.php?manufacturer=" +
+									encodeURIComponent( manufacturer ) + "&model=" +
+									encodeURIComponent( model ) + "&_=" + Date.now();
+								$.ajax( { url: apiUrl, dataType: "json", timeout: 6000 } )
+									.done( function( dbData ) {
+										if ( dbData && dbData.is_tuya ) {
+											// Prefer actuator DPs (valve, switch, lamp, bulb, light, etc.)
+											var valveDp = 1;
+											if ( dbData.sensors && dbData.sensors.length > 0 ) {
+												var firstValidDp = 0;
+												var preferredDp = 0;
+
+												for ( var si = 0; si < dbData.sensors.length; si++ ) {
+													var sensor = dbData.sensors[ si ] || {};
+													var dp = parseInt( sensor.dp, 10 ) || 0;
+													if ( dp <= 0 ) {
+														continue;
+													}
+
+													var nameText = String( sensor.name || "" ).toLowerCase();
+													var descText = String( sensor.description || "" ).toLowerCase();
+													var text = nameText + " " + descText;
+
+													var isMeta = /battery|temperature_unit|unit|signal|lqi|rssi|voltage/.test( text );
+													if ( isMeta ) {
+														continue;
+													}
+
+													if ( firstValidDp === 0 ) {
+														firstValidDp = dp;
+													}
+
+													var isActuator = /valve|switch|on[_ -]?off|state|open|close|relay|lamp|bulb|light/.test( text );
+													if ( isActuator ) {
+														preferredDp = dp;
+														break;
+													}
+												}
+
+												valveDp = preferredDp || firstValidDp || 1;
+											}
+											select.find( "#zigbee-use-tuya" ).val( "1" ).trigger( "change" );
+											select.find( "#zigbee-tuya-dp" ).val( valveDp );
+											select.find( "#zigbee-tuya-options" ).show();
+										} else {
+											select.find( "#zigbee-use-tuya" ).val( "0" ).trigger( "change" );
+											select.find( "#zigbee-tuya-options" ).hide();
+										}
+									} );
+							}
+						};
+
 						// Populate inputs on device dropdown change
 						select.find( "#zigbee-device-select" ).on( "change", function() {
 							var chosenIeee = $( this ).val();
 							if ( chosenIeee ) {
 								select.find( "#zigbee-ieee" ).val( normalizeZigbeeIeee( chosenIeee ) );
-								var chosenEndpoint = $( this ).find( "option:selected" ).data( "endpoint" ) || 1;
-								select.find( "#zigbee-endpoint" ).val( chosenEndpoint );
+								if ( !useZigbeeDeviceProfile ) {
+									var chosenEndpoint = $( this ).find( "option:selected" ).data( "endpoint" ) || 1;
+									select.find( "#zigbee-endpoint" ).val( chosenEndpoint );
+
+									var manufacturer = $( this ).find( "option:selected" ).data( "manufacturer" );
+									var model = $( this ).find( "option:selected" ).data( "model" );
+									autoDetectAndPopulateTuyaSpecs( manufacturer, model, select );
+								}
 							}
 						} );
 
@@ -541,84 +606,6 @@ OSApp.Dashboard.displayPage = function() {
 							$( this ).val( normalizeZigbeeIeee( $( this ).val() ) );
 						} );
 
-						// Hook up scan button click using Analog scanner component
-						select.find( "#zigbee-station-scan-btn" ).on( "click", function() {
-							var scanBtn = $( this );
-							var originalText = scanBtn.text();
-							scanBtn.prop( "disabled", true );
-							OSApp.Analog.showZigBeeDeviceScanner(
-								select,
-								function( selectedDevice ) {
-									scanBtn.prop( "disabled", false ).text( originalText );
-									if ( selectedDevice && selectedDevice.ieee ) {
-										select.find( "#zigbee-ieee" ).val( normalizeZigbeeIeee( selectedDevice.ieee ) );
-										// Small delay so firmware finishes registering the device in /zg
-										setTimeout( function() { loadZigbeeDevices( selectedDevice.ieee ); }, 600 );
-										// Auto-detect Control Mode and Tuya DP ID from template DB
-										if ( selectedDevice.manufacturer && selectedDevice.model &&
-											selectedDevice.manufacturer !== OSApp.Language._( "Unknown" ) &&
-											selectedDevice.model !== OSApp.Language._( "Unknown" ) ) {
-											var apiUrl = "https://opensprinklershop.de/zigbee/devices_api.php?manufacturer=" +
-												encodeURIComponent( selectedDevice.manufacturer ) + "&model=" +
-												encodeURIComponent( selectedDevice.model ) + "&_=" + Date.now();
-											$.ajax( { url: apiUrl, dataType: "json", timeout: 6000 } )
-												.done( function( dbData ) {
-													if ( dbData && dbData.is_tuya ) {
-														// Prefer actuator-like DPs (valve/switch/on_off/state) and
-														// reliably exclude battery/meta datapoints.
-														var valveDp = 1;
-														if ( dbData.sensors && dbData.sensors.length > 0 ) {
-															var firstValidDp = 0;
-															var preferredDp = 0;
-
-															for ( var si = 0; si < dbData.sensors.length; si++ ) {
-																var sensor = dbData.sensors[ si ] || {};
-																var dp = parseInt( sensor.dp, 10 ) || 0;
-																if ( dp <= 0 ) {
-																	continue;
-																}
-
-																var nameText = String( sensor.name || "" ).toLowerCase();
-																var descText = String( sensor.description || "" ).toLowerCase();
-																var text = nameText + " " + descText;
-
-																var isMeta = /battery|temperature_unit|unit|signal|lqi|rssi|voltage/.test( text );
-																if ( isMeta ) {
-																	continue;
-																}
-
-																if ( firstValidDp === 0 ) {
-																	firstValidDp = dp;
-																}
-
-																var isActuator = /valve|switch|on[_ -]?off|state|open|close|relay/.test( text );
-																if ( isActuator ) {
-																	preferredDp = dp;
-																	break;
-																}
-															}
-
-															valveDp = preferredDp || firstValidDp || 1;
-														}
-														select.find( "#zigbee-use-tuya" ).val( "1" ).trigger( "change" );
-														select.find( "#zigbee-tuya-dp" ).val( valveDp );
-														select.find( "#zigbee-tuya-options" ).show();
-													}
-												} );
-										}
-									} else {
-										loadZigbeeDevices( select.find( "#zigbee-ieee" ).val() );
-									}
-								},
-								function() {
-									scanBtn.prop( "disabled", false ).text( originalText );
-									loadZigbeeDevices( select.find( "#zigbee-ieee" ).val() );
-								},
-								scanBtn,
-								originalText
-							);
-							return false; // prevent form submit/default action
-						} );
 					}
 
 					refreshStationAttribLayout();
@@ -759,14 +746,16 @@ OSApp.Dashboard.displayPage = function() {
 						button.data( "specialData", String( parseInt( select.find( "#gardena-service" ).val(), 10 ) || 0 ) );
 					} else if ( hs === 9 ) { // Zigbee Station
 						var ieee = normalizeZigbeeIeee( select.find( "#zigbee-ieee" ).val() );
-
-						var endpoint = parseInt( select.find( "#zigbee-endpoint" ).val(), 10 ) || 1;
-						var endpointHex = OSApp.Utils.pad( endpoint.toString( 16 ) );
-
-						var useTuya = select.find( "#zigbee-use-tuya" ).val() || "0";
-
-						var tuyaDp = parseInt( select.find( "#zigbee-tuya-dp" ).val(), 10 ) || 1;
-						var tuyaDpHex = OSApp.Utils.pad( tuyaDp.toString( 16 ) );
+						var endpointHex = "01";
+						var useTuya = "0";
+						var tuyaDpHex = "00";
+						if ( !( OSApp.ESP32Mode && OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor && OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor() ) ) {
+							var endpoint = parseInt( select.find( "#zigbee-endpoint" ).val(), 10 ) || 1;
+							endpointHex = OSApp.Utils.pad( endpoint.toString( 16 ) );
+							useTuya = select.find( "#zigbee-use-tuya" ).val() || "0";
+							var tuyaDp = parseInt( select.find( "#zigbee-tuya-dp" ).val(), 10 ) || 1;
+							tuyaDpHex = OSApp.Utils.pad( tuyaDp.toString( 16 ) );
+						}
 
 						var reserved = "000000000000000";
 
