@@ -2110,6 +2110,27 @@ OSApp.ESP32Mode.showZigBeeDeviceDBSearch = function( initialQuery, onPick ) {
 		$ov.find( ".zbsearch-status" ).text( OSApp.Language._( "Searching..." ) );
 		$ov.find( ".zbsearch-results" ).empty();
 		OSApp.ESP32Mode.ZigbeeDeviceDB.search( q ).done( function( results ) {
+			// Filter results: ALL search terms must be present (AND logic, not OR)
+			var terms = q.split( /\s+/ ).filter( function( t ) { return t.length > 0; } );
+			var filtered = results.filter( function( r ) {
+				if ( !r ) { return false; }
+				var searchText = (
+					( r.vendor || "" ) + " " +
+					( r.description || "" ) + " " +
+					( r.model || "" ) + " " +
+					( r.model_id || "" ) + " " +
+					( r.manufacturer || "" ) + " " +
+					( r.sensor_name || "" )
+				).toLowerCase();
+				// Check if ALL terms are present in the search text
+				for ( var ti = 0; ti < terms.length; ti++ ) {
+					if ( searchText.indexOf( terms[ ti ].toLowerCase() ) === -1 ) {
+						return false;
+					}
+				}
+				return true;
+			} );
+			results = filtered;
 			$ov.find( ".zbsearch-status" ).text(
 				( results.length ) + " " + OSApp.Language._( "match(es)" ) );
 			renderResults( results );
@@ -2363,7 +2384,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			OSApp.Firmware.sendToOS( "/zg?pw=&action=rejoin_device&ieee=" + encodeURIComponent( ieee ), "json" ).done( function( resp ) {
 				$.mobile.loading( "hide" );
 				if ( resp && resp.result === 1 ) {
-					OSApp.Errors.showMessage( OSApp.Language._( "Device rejoin initiated with sequence reset (60s window)" ) );
+					OSApp.Errors.showError( OSApp.Language._( "Device rejoin initiated with sequence reset (60s window)" ) );
 					// Refresh the gateway list to show updated device names
 					setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 200 );
 				} else {
