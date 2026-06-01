@@ -2317,8 +2317,20 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	} );
 
 	popup.on( "click", ".zigbee-gw-reload", function() {
-		popup.popup( "close" );
-		setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 100 );
+		// Close the editor popup if it's open, then reload the gateway
+		var editorPopup = $( "#zigbeeDeviceEditor" );
+		if ( editorPopup.length && editorPopup.data( "mobile-popup" ) ) {
+			var onEditorClose = function() {
+				editorPopup.off( "popupafterclose", onEditorClose );
+				popup.popup( "close" );
+				setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 100 );
+			};
+			editorPopup.on( "popupafterclose", onEditorClose );
+			editorPopup.popup( "close" );
+		} else {
+			popup.popup( "close" );
+			setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 100 );
+		}
 		return false;
 	} );
 
@@ -2352,6 +2364,8 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 				$.mobile.loading( "hide" );
 				if ( resp && resp.result === 1 ) {
 					OSApp.Errors.showMessage( OSApp.Language._( "Device rejoin initiated with sequence reset (60s window)" ) );
+					// Refresh the gateway list to show updated device names
+					setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 200 );
 				} else {
 					var msg = ( resp && resp.message ) ? resp.message : OSApp.Language._( "Failed to initiate device rejoin" );
 					OSApp.Errors.showError( msg );
