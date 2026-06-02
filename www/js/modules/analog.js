@@ -3102,7 +3102,7 @@ list += "</select></div>" +
 	"<input type='text' id='filter' data-mini='true' maxlength='100' value='" + (sensor.filter ? sensor.filter : "") + "'></div>" +
 
 "<div class='zigbee_device_ieee_container' style='display:none;'><label for='device_ieee'>" + OSApp.Language._("ZigBee Device IEEE Address") + "</label>" +
-		"<input type='text' id='device_ieee' data-mini='true' value='" + (sensor.device_ieee ? sensor.device_ieee : "") + "' readonly></div>" +
+		"<input type='text' id='device_ieee' data-mini='true' value='" + (sensor.device_ieee ? sensor.device_ieee : (sensor.zb_ieee_ref ? sensor.zb_ieee_ref : "")) + "' readonly></div>" +
 
 "<div class='zigbee_template_status_container' style='display:none; margin:10px 0;'>" +
 		"<div class='zigbee_template_status ui-body ui-body-a' style='padding:8px;border-radius:5px;'>" +
@@ -3843,7 +3843,7 @@ list += "</select></div>" +
 				resetZigBeeLogicalSelect(OSApp.Language._("Select a device first"));
 				if (devices.length > 0) {
 					deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
-					var configuredIeee = String(sensor.device_ieee || "").toLowerCase();
+					var configuredIeee = String(sensor.device_ieee || sensor.zb_ieee_ref || "").toLowerCase();
 					var selectedIdx = -1;
 					for (var i = 0; i < devices.length; i++) {
 						var device = devices[i] || {};

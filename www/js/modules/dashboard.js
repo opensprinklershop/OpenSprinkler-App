@@ -128,7 +128,7 @@ OSApp.Dashboard.displayPage = function() {
 					continue;
 				}
 
-				sensorIeee = normalizeZigbeeIeeeForCard( sensor.device_ieee || sensor.ieee || sensor.ieee_addr );
+				sensorIeee = normalizeZigbeeIeeeForCard( sensor.device_ieee || sensor.zb_ieee_ref || sensor.ieee || sensor.ieee_addr );
 				if ( !isSameZigbeeIeee( sensorIeee, stationIeee ) ) {
 					continue;
 				}
