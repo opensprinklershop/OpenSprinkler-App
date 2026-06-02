@@ -172,11 +172,30 @@ OSApp.Utils.isValidOTC = function( token ) {
 	return /^OT[a-f0-9]{30}$/i.test( token );
 };
 
+OSApp.Utils.getFlowPrecision = function() {
+	if ( !OSApp.currentSession || !OSApp.currentSession.controller || !OSApp.currentSession.controller.options ) {
+		return 2;
+	}
+	var divisor = ( OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ) ?
+		( ( OSApp.currentSession.controller.options.fpd1 << 8 ) + OSApp.currentSession.controller.options.fpd0 ) : 1;
+	if ( !divisor ) { divisor = 1; }
+	var vol_per_pulse = ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / ( 100 * divisor );
+	if ( vol_per_pulse < 0.001 ) {
+		return 5;
+	} else if ( vol_per_pulse < 0.01 ) {
+		return 4;
+	} else if ( vol_per_pulse < 0.1 ) {
+		return 3;
+	}
+	return 2;
+};
+
 OSApp.Utils.flowCountToVolume = function( count ) {
 	var divisor = ( OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ) ?
 		( ( OSApp.currentSession.controller.options.fpd1 << 8 ) + OSApp.currentSession.controller.options.fpd0 ) : 1;
 	if ( !divisor ) { divisor = 1; }
-	return parseFloat( ( count * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / ( 100 * divisor ) ).toFixed( 2 ) );
+	var vol = count * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / ( 100 * divisor );
+	return parseFloat( vol.toFixed( OSApp.Utils.getFlowPrecision() ) );
 };
 
 // Convert flow rate (sensor pulses per minute) to volume per minute
@@ -184,7 +203,8 @@ OSApp.Utils.flowRateToVolume = function( rate ) {
 	var divisor = ( OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ) ?
 		( ( OSApp.currentSession.controller.options.fpd1 << 8 ) + OSApp.currentSession.controller.options.fpd0 ) : 1;
 	if ( !divisor ) { divisor = 1; }
-	return parseFloat( ( rate * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / ( 100 * divisor ) ).toFixed( 2 ) );
+	var vol = rate * ( ( OSApp.currentSession.controller.options.fpr1 << 8 ) + OSApp.currentSession.controller.options.fpr0 ) / ( 100 * divisor );
+	return parseFloat( vol.toFixed( OSApp.Utils.getFlowPrecision() ) );
 };
 
 /*

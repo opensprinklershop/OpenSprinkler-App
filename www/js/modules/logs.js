@@ -204,13 +204,15 @@ OSApp.Logs.displayPage = function() {
 				return totals;
 			};
 			var formatVolume = function( volume ) {
-				return parseFloat( volume.value.toFixed( 2 ) ) + " " + volume.unit;
+				var precision = ( volume.unit === "L" ) ? OSApp.Utils.getFlowPrecision() : 2;
+				return parseFloat( volume.value.toFixed( precision ) ) + " " + volume.unit;
 			};
 			var formatTotals = function( totals ) {
 				var parts = [];
 				Object.keys( totals || {} ).forEach( function( unit ) {
 					if ( totals[ unit ] > 0 ) {
-						parts.push( parseFloat( totals[ unit ].toFixed( 2 ) ) + " " + unit );
+						var precision = ( unit === "L" ) ? OSApp.Utils.getFlowPrecision() : 2;
+						parts.push( parseFloat( totals[ unit ].toFixed( precision ) ) + " " + unit );
 					}
 				} );
 				return parts.join( " / " );
@@ -326,8 +328,16 @@ OSApp.Logs.displayPage = function() {
 					return y + "/" + OSApp.Utils.pad( m );
 				};
 
+				var getLocalFlowPrecision = function() {
+					var rate = pulseRate / ( 100 * pulseDiv );
+					if ( rate < 0.001 ) return 5;
+					if ( rate < 0.01 ) return 4;
+					if ( rate < 0.1 ) return 3;
+					return 2;
+				};
+
 				var flowToVolume = function( count ) {
-					return parseFloat( ( count * pulseRate / ( 100 * pulseDiv ) ).toFixed( 2 ) );
+					return parseFloat( ( count * pulseRate / ( 100 * pulseDiv ) ).toFixed( getLocalFlowPrecision() ) );
 				};
 
 				// Current month (skip if timestamp is invalid, e.g. Jan 1970 = epoch 0)
@@ -537,7 +547,8 @@ OSApp.Logs.displayPage = function() {
 					if ( flSorted[ group ] ) {
 						groupArray[ i ] += "<span style='border:none' class='ui-body ui-body-a'>" +
 							OSApp.Language._( "Total Water Used" ) + ": " + Object.keys( flSorted[ group ] ).map( function( unit ) {
-								return parseFloat( flSorted[ group ][ unit ].toFixed( 2 ) ) + " " + unit;
+								var precision = ( unit === "L" ) ? OSApp.Utils.getFlowPrecision() : 2;
+								return parseFloat( flSorted[ group ][ unit ].toFixed( precision ) ) + " " + unit;
 							} ).join( " / " ) +
 							"</span>";
 					}
@@ -551,7 +562,8 @@ OSApp.Logs.displayPage = function() {
 						var startTime = formatTime( sortedData[ group ][ k ][ 0 ], grouping ) ;
 						var endTime = formatTime( sortedData[ group ][ k ][ 3 ], grouping );
 						var fRate = sortedData[ group ][ k ][ 4 ];
-						var flowDisplay = ( typeof fRate === "number" ) ? fRate.toFixed( 2 ) + " L/min" : "";
+						var precision = OSApp.Utils.getFlowPrecision();
+						var flowDisplay = ( typeof fRate === "number" ) ? fRate.toFixed( precision ) + " L/min" : "";
 
 						groupArray[ i ] += "<tr>" +
 							"<td>" + stationName + "</td>" + // Station name
@@ -618,7 +630,7 @@ OSApp.Logs.displayPage = function() {
 						"'>" + stats.avgWaterLevel + "%</span></div>" : ""
 				) +
 				( stats.totalVolumeText ? "<div><span class='bold'>" + OSApp.Language._( "Total Water Used" ) + "</span>: " + stats.totalVolumeText +
-					( hasWater && stats.avgWaterLevel < 100 && stats.totalVolume && stats.totalVolume.L ? " (<span class='green-text'>" + ( stats.totalVolume.L - ( stats.totalVolume.L * ( stats.avgWaterLevel / 100 ) ) ).toFixed( 2 ) + "L saved</span>)" : "" ) +
+					( hasWater && stats.avgWaterLevel < 100 && stats.totalVolume && stats.totalVolume.L ? " (<span class='green-text'>" + ( stats.totalVolume.L - ( stats.totalVolume.L * ( stats.avgWaterLevel / 100 ) ) ).toFixed( OSApp.Utils.getFlowPrecision() ) + "L saved</span>)" : "" ) +
 					"</div>" : "" ) +
 				"</div>";
 		},

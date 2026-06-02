@@ -125,13 +125,13 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 					"</fieldset>" +
 					"<div class='ui-grid-b inputs'>" +
 						"<div class='ui-block-a'>" +
-							"<input data-wrapper-class='pad_buttons' class='t' type='number' min='0' max='100' value='" + options.t + "'>" +
+							"<input data-wrapper-class='pad_buttons' class='t' type='number' min='0' max='250' value='" + options.t + "'>" +
 						"</div>" +
 						"<div class='ui-block-b'>" +
-							"<input data-wrapper-class='pad_buttons' class='r' type='number'  min='0' max='100' value='" + options.r + "'>" +
+							"<input data-wrapper-class='pad_buttons' class='r' type='number'  min='0' max='250' value='" + options.r + "'>" +
 						"</div>" +
 						"<div class='ui-block-c'>" +
-							"<input data-wrapper-class='pad_buttons' class='h' type='number'  min='0' max='100' value='" + options.h + "'>" +
+							"<input data-wrapper-class='pad_buttons' class='h' type='number'  min='0' max='250' value='" + options.h + "'>" +
 						"</div>" +
 					"</div>" +
 					"<fieldset class='ui-grid-b decr'>" +
@@ -153,7 +153,7 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 			var input = popup.find( ".inputs input" ).eq( pos ),
 				val = parseInt( input.val() );
 
-			if ( ( dir === -1 && val === 0 ) || ( dir === 1 && val === 100 ) ) {
+			if ( ( dir === -1 && val === 0 ) || ( dir === 1 && val === 250 ) ) {
 				return;
 			}
 

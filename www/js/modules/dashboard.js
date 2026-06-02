@@ -153,11 +153,14 @@ OSApp.Dashboard.displayPage = function() {
 				return "zigbee-error";
 			}
 
-			if ( statusCode === 3 || statusCode === 4 ) {
-				return "zigbee-on";
+			var sollIsOn = !!OSApp.Stations.getStatus( sid );
+			var istIsOn = ( statusCode === 3 || statusCode === 4 );
+
+			if ( sollIsOn !== istIsOn ) {
+				return "zigbee-error";
 			}
 
-			return "zigbee-off";
+			return sollIsOn ? "zigbee-on" : "zigbee-off";
 		},
 		addTimer = function( station, rem ) {
 			OSApp.uiState.timers[ "station-" + station ] = {

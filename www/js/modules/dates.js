@@ -108,11 +108,8 @@ OSApp.Dates.decodeDate = function( dateValue ) {
 };
 
 OSApp.Dates.getTimezoneOffsetOS = function() {
-	var tz = OSApp.currentSession.controller.options.tz - 48,
-		sign = tz >= 0 ? 1 : -1;
-
-	tz = ( ( Math.abs( tz ) / 4 >> 0 ) * 60 ) + ( ( Math.abs( tz ) % 4 ) * 15 / 10 >> 0 ) + ( ( Math.abs( tz ) % 4 ) * 15 % 10 );
-	return tz * sign;
+	var tz = OSApp.currentSession.controller.options.tz - 48;
+	return tz * 15;
 };
 
 // Credit Stacktrace

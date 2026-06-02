@@ -1464,10 +1464,10 @@ OSApp.Analog.addToObjectChk = function(popup, fieldId, obj) {
 	}
 };
 
-OSApp.Analog.addToObjectInt = function(popup, fieldId, obj) {
+OSApp.Analog.addToObjectInt = function(popup, fieldId, obj, propName) {
 	let field = popup.find(fieldId);
-	if (field) {
-		let property = fieldId.substring(1);
+	if (field && field.length) {
+		let property = propName || fieldId.substring(1);
 		obj[property] = parseInt(field.val());
 		OSApp.Analog.requiredCheck(field, obj, property);
 	}
@@ -1545,11 +1545,11 @@ OSApp.Analog.getMonitor = function(popup) {
 	//Sensor12 (can be in type_sensor12 or type_set_sensor12)
 	if (result.type === OSApp.Analog.Constants.MONITOR_SENSOR12) {
 		let subPopup = popup.find("#type_sensor12");
-		OSApp.Analog.addToObjectInt(subPopup, "#sensor12", result);
+		OSApp.Analog.addToObjectInt(subPopup, "#sensor12_1", result, "sensor12");
 		OSApp.Analog.addToObjectChk(subPopup, "#invers", result);
 	} else if (result.type === OSApp.Analog.Constants.MONITOR_SET_SENSOR12) {
 		let subPopup = popup.find("#type_set_sensor12");
-		OSApp.Analog.addToObjectInt(subPopup, "#sensor12", result);
+		OSApp.Analog.addToObjectInt(subPopup, "#sensor12_2", result, "sensor12");
 	}
 	//AND+OR+XOR
 	OSApp.Analog.addToObjectInt(popup, "#monitor1", result);
@@ -1563,10 +1563,10 @@ OSApp.Analog.getMonitor = function(popup) {
 	//NOT & SET_SENSOR12 (both use #monitor but are in different scopes)
 	if (result.type === OSApp.Analog.Constants.MONITOR_SET_SENSOR12) {
 		let subPopup = popup.find("#type_set_sensor12");
-		OSApp.Analog.addToObjectInt(subPopup, "#monitor", result);
+		OSApp.Analog.addToObjectInt(subPopup, "#set_monitor", result, "monitor");
 	} else if (result.type === OSApp.Analog.Constants.MONITOR_NOT) {
 		let subPopup = popup.find("#type_not");
-		OSApp.Analog.addToObjectInt(subPopup, "#monitor", result);
+		OSApp.Analog.addToObjectInt(subPopup, "#not_monitor", result, "monitor");
 	}
 	//TIME
 	OSApp.Analog.addToObjectTime(popup, "#from", result);
@@ -1720,10 +1720,10 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 
 		//typ = SENSOR12
 			"<div id='type_sensor12'>"+
-			"<label for='sensor12'>" +
+			"<label for='sensor12_1'>" +
 			OSApp.Language._("Digital Sensor Port") +
 			"</label>" +
-			"<select data-mini='true' id='sensor12'>" +
+			"<select data-mini='true' id='sensor12_1'>" +
 			"<option " + (monitor.sensor12 <= 1? "selected" : "") + " value='1'>" + OSApp.Language._("Sensor 1") + "</option>" +
 			"<option " + (monitor.sensor12 >= 2? "selected" : "") + " value='2'>" + OSApp.Language._("Sensor 2") + "</option>" +
 			"</select>"+
@@ -1733,14 +1733,14 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 
 		//typ = SET_SENSOR12
 			"<div id='type_set_sensor12'>"+
-			"<label for='sensor12'>" +
+			"<label for='sensor12_2'>" +
 			OSApp.Language._("Set Digital Sensor Port") +
 			"</label>" +
-			"<select data-mini='true' id='sensor12'>" +
+			"<select data-mini='true' id='sensor12_2'>" +
 			"<option " + (monitor.sensor12 <= 1? "selected" : "") + " value='1'>" + OSApp.Language._("Sensor 1") + "</option>" +
 			"<option " + (monitor.sensor12 >= 2? "selected" : "") + " value='2'>" + OSApp.Language._("Sensor 2") + "</option>" +
 			"</select>"+
-			"<label for='monitor'>"+OSApp.Language._("Monitor")+"</label>"+OSApp.Analog.monitorSelection("monitor", monitor.monitor, monitor.nr)+
+			"<label for='set_monitor'>"+OSApp.Language._("Monitor")+"</label>"+OSApp.Analog.monitorSelection("set_monitor", monitor.monitor, monitor.nr)+
 			"</label></div>" +
 
 		//typ == ANDORXOR
@@ -1757,7 +1757,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 
 		//typ == NOT
 			"<div id='type_not'>"+
-			"<label for='monitor'>"+OSApp.Language._("Monitor")+"</label>"+OSApp.Analog.monitorSelection("monitor", monitor.monitor, monitor.nr)+
+			"<label for='not_monitor'>"+OSApp.Language._("Monitor")+"</label>"+OSApp.Analog.monitorSelection("not_monitor", monitor.monitor, monitor.nr)+
 			"</div>"+
 
 		//typ == TIME
