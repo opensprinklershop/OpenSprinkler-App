@@ -1542,9 +1542,15 @@ OSApp.Analog.getMonitor = function(popup) {
 	//Min+Max
 	OSApp.Analog.addToObjectFlt(popup, "#value1", result);
 	OSApp.Analog.addToObjectFlt(popup, "#value2", result);
-	//Sensor12
-	OSApp.Analog.addToObjectInt(popup, "#sensor12", result);
-	OSApp.Analog.addToObjectChk(popup, "#invers", result);
+	//Sensor12 (can be in type_sensor12 or type_set_sensor12)
+	if (result.type === OSApp.Analog.Constants.MONITOR_SENSOR12) {
+		let subPopup = popup.find("#type_sensor12");
+		OSApp.Analog.addToObjectInt(subPopup, "#sensor12", result);
+		OSApp.Analog.addToObjectChk(subPopup, "#invers", result);
+	} else if (result.type === OSApp.Analog.Constants.MONITOR_SET_SENSOR12) {
+		let subPopup = popup.find("#type_set_sensor12");
+		OSApp.Analog.addToObjectInt(subPopup, "#sensor12", result);
+	}
 	//AND+OR+XOR
 	OSApp.Analog.addToObjectInt(popup, "#monitor1", result);
 	OSApp.Analog.addToObjectInt(popup, "#monitor2", result);
@@ -1554,8 +1560,14 @@ OSApp.Analog.getMonitor = function(popup) {
 	OSApp.Analog.addToObjectChk(popup, "#invers2", result);
 	OSApp.Analog.addToObjectChk(popup, "#invers3", result);
 	OSApp.Analog.addToObjectChk(popup, "#invers4", result);
-	//NOT
-	OSApp.Analog.addToObjectInt(popup, "#monitor", result);
+	//NOT & SET_SENSOR12 (both use #monitor but are in different scopes)
+	if (result.type === OSApp.Analog.Constants.MONITOR_SET_SENSOR12) {
+		let subPopup = popup.find("#type_set_sensor12");
+		OSApp.Analog.addToObjectInt(subPopup, "#monitor", result);
+	} else if (result.type === OSApp.Analog.Constants.MONITOR_NOT) {
+		let subPopup = popup.find("#type_not");
+		OSApp.Analog.addToObjectInt(subPopup, "#monitor", result);
+	}
 	//TIME
 	OSApp.Analog.addToObjectTime(popup, "#from", result);
 	OSApp.Analog.addToObjectTime(popup, "#to", result);
@@ -2030,12 +2042,12 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
 		popup.find(".zigbee_device_ieee_container").show();
 		popup.find(".zigbee_scan_select_container").show();
+		popup.find(".fac_div_offset_container").show();
 		if (zigbeeEditorMode === "gateway") {
 			popup.find(".zigbee_template_status_container").show();
 			popup.find(".zigbee_cluster_template_container").show();
 			popup.find(".zigbee_endpoint_cluster_attribute_container").show();
 			popup.find(".zigbee_tuya_dp_container").show();
-			popup.find(".fac_div_offset_container").show();
 		}
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_BLUETOOTH) {
 		popup.find(".bluetooth_char_uuid_container").show();
@@ -2173,7 +2185,7 @@ OSApp.Analog.zigbeeStandardTemplates = [
 	{ id: "illum",   name: "Illuminance (0x0400)",        cluster_id: 0x0400, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 13, unit: "" },
 	{ id: "flow",    name: "Flow (0x0404)",               cluster_id: 0x0404, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 10,  offset: 0, unitid: 0,  unit: "" },
 	{ id: "water",   name: "Water Meter (0x0702)",        cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 14, unit: "" },
-	{ id: "giex_gx02_water_dp2", name: "GIEX/GX02 Water Consumption (DP2)", cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1, offset: 0, unitid: 14, unit: "", tuya_dp: 2, tuya_dp_batt: 108, stdlog: 1 },
+	{ id: "giex_gx02_water_dp111", name: "GIEX/GX02 Water Consumption (DP111)", cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1, offset: 0, unitid: 14, unit: "", tuya_dp: 111, tuya_dp_batt: 108, stdlog: 1 },
 	{ id: "tuya_water_dp15", name: "Tuya Valve Water Meter (DP15)", cluster_id: 0x0702, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1, offset: 0, unitid: 14, unit: "", tuya_dp: 15, tuya_dp_batt: 0, stdlog: 1 },
 	{ id: "leaf",    name: "Leaf Wetness (0x0407)",       cluster_id: 0x0407, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 100, offset: 0, unitid: 10, unit: "" },
 	{ id: "occup",   name: "Occupancy (0x0406)",          cluster_id: 0x0406, attribute_id: 0x0000, endpoint: 1, factor: 1, divider: 1,   offset: 0, unitid: 0,  unit: "" },
@@ -2243,7 +2255,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			"<select data-mini='true' id='zigbeeDeviceSelectScanner'></select>" +
 			"</div>" +
 			"<button class='apply-scanner-selection ui-btn ui-btn-b' disabled='disabled'>" + OSApp.Language._("Use selected device") + "</button>" +
-			"<button class='close-scanner' data-theme='a'>" + OSApp.Language._("Cancel") + "</button>" +
+			"<button class='close-scanner' data-theme='a'>" + OSApp.Language._("Stop scanning") + "</button>" +
 			"</div>" +
 			"</div>");
 
@@ -2513,10 +2525,19 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			} catch (e) { void e; }
 
 			var postScanPolls = 0;
+			var postScanMax = 24;
 			var requeriedIeees = {};
 			var postScanInterval = setInterval(function() {
 				postScanPolls++;
 				updateDeviceList();
+				// Keep stop button label informative during the post-scan wait.
+				var $stop = scanDialog.find(".close-scanner");
+				if ($stop.length) {
+					$stop.text(OSApp.Language._("Stop scanning") +
+						" (" + OSApp.Language._("resolving") + " " +
+						postScanPolls + "/" + postScanMax + " / " +
+						lastDeviceCount + ")");
+				}
 
 				// Check if all devices have real info (not "Unknown")
 				var devs = scanDialog.data("zigbeeDevices") || [];
@@ -2547,7 +2568,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 				}
 
 				// Wait up to 24 seconds for async Basic Cluster reads (Tuya devices can be slow).
-				if (allIdentified || postScanPolls >= 24) {
+				if (allIdentified || postScanPolls >= postScanMax) {
 					clearInterval(postScanInterval);
 					scanCompleted = true;
 					var devices = scanDialog.data("zigbeeDevices") || [];
@@ -2994,6 +3015,10 @@ list += "</select></div>" +
 	"<label for='zigbeeDeviceSelect'>" + OSApp.Language._("Discovered devices") + "</label>" +
 	"<select data-mini='true' id='zigbeeDeviceSelect'></select>" +
 	"</div>" +
+	"<div class='zigbee-logical-device-select-container' style='margin-top:8px;'>" +
+	"<label for='zigbeeLogicalDeviceSelect'>" + OSApp.Language._("Logical devices") + "</label>" +
+	"<select data-mini='true' id='zigbeeLogicalDeviceSelect'></select>" +
+	"</div>" +
 	"</div>" +
 	"<div id='zigbeeScanArea' class='ui-body ui-body-a' style='display:none; margin: 10px 0; padding: 10px; border-radius: 5px;'>" +
 	"<div id='zigbeeScanTimer' class='center' style='font-size: 16px; font-weight: bold; margin: 5px 0; color: #2196F3;'></div>" +
@@ -3180,7 +3205,6 @@ list += "</select></div>" +
 			"</div>";
 
 		var popup = $(list),
-			popupMode = zigbeeEditorMode,
 
 			changeValue = function (pos, dir) {
 				var input = popup.find(".inputs input").eq(pos),
@@ -3408,92 +3432,319 @@ list += "</select></div>" +
 			try { sel.selectmenu("refresh", true); } catch (e) { void e; }
 		};
 
-		var appendZigBeeDbVariantsToSelect = function(deviceSelect, devices) {
-			var optionMap = popup.data("zigbeeDeviceTemplateOptions") || {};
-			popup.data("zigbeeDeviceTemplateOptions", optionMap);
+		var isUnknownMeta = function(value) {
+			var s = String(value || "").trim().toLowerCase();
+			var unknownLabel = String(OSApp.Language._("Unknown") || "").trim().toLowerCase();
+			return !s || s === "unknown" || (unknownLabel && s === unknownLabel);
+		};
 
-			(devices || []).forEach(function(device, deviceIndex) {
-				var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
-				var model = device.model || device.model_id || OSApp.Language._("Unknown");
-				if (!manufacturer || !model || manufacturer === OSApp.Language._("Unknown") || model === OSApp.Language._("Unknown")) {
-					return;
+		var cleanMeta = function(value) {
+			return isUnknownMeta(value) ? "" : String(value || "").trim();
+		};
+
+		var resolveZigBeeDeviceLabel = function(device, i) {
+			var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
+			var cachedLabel = (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel === "function") ?
+				OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel(ieeeAddr) : null;
+
+			if (cachedLabel) {
+				return cachedLabel;
+			}
+
+			var manufacturer = cleanMeta(device.manufacturer);
+			var model = cleanMeta(device.model || device.model_id);
+
+			// If not cached, trigger background lookup to cache it
+			if (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookup === "function") {
+				if (manufacturer && model) {
+					OSApp.ESP32Mode.ZigbeeDeviceDB.lookup(manufacturer, model).done((function(addr, idx) {
+						return function(dbData) {
+							if (dbData) {
+								OSApp.ESP32Mode.ZigbeeDeviceDB.setCached(addr, dbData);
+								var updatedLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel(addr);
+								if (updatedLabel) {
+									var option = popup.find("#zigbeeDeviceSelect option[value='" + idx + "']");
+									if (option.length) {
+										var text = updatedLabel + " | IEEE: " + addr;
+										option.text(text);
+										try { popup.find("#zigbeeDeviceSelect").selectmenu("refresh"); } catch (ignore) { void ignore; }
+									}
+								}
+							}
+						};
+					})(ieeeAddr, i));
 				}
-				loadZigBeeTemplateData(manufacturer, model).done(function(dbData) {
-					var deviceLabel = dbData.vendor || manufacturer || model || "";
-					var mapped = mapZigBeeDbSensors(deviceLabel, normalizeZigBeeDbSensors(dbData));
-					mapped.forEach(function(sensorDef, sensorIndex) {
-						var value = "tpl:" + deviceIndex + ":" + sensorIndex;
-						if (optionMap[value]) { return; }
+			}
+
+			var modelId = model || cleanMeta(device.vendor);
+			var manu = manufacturer || cleanMeta(device.vendor);
+			var isTechnical = /^TS\d+$/i.test(modelId);
+			var title = modelId;
+			if (isTechnical) {
+				if (manu && manu.indexOf("_TZE") === 0) {
+					title = "Tuya Smart Device (" + modelId + ")";
+				}
+			}
+			return manu ? (title + " (" + manu + ")") : (title || ("IEEE " + ieeeAddr));
+		};
+
+		var isFallbackLogicalName = function(name) {
+			var n = String(name || "").trim().toLowerCase();
+			return !n || n.indexOf("fallback_") === 0;
+		};
+
+		var hasUsableLogicals = function(device) {
+			var logicals = Array.isArray(device && device.logical_devices) ? device.logical_devices : [];
+			for (var i = 0; i < logicals.length; i++) {
+				var nm = logicals[i] && (logicals[i].name || logicals[i].kind);
+				if (!isFallbackLogicalName(nm)) {
+					return true;
+				}
+			}
+			return false;
+		};
+
+		var resetZigBeeLogicalSelect = function(message) {
+			var logicalSelect = popup.find("#zigbeeLogicalDeviceSelect");
+			logicalSelect.empty().append(
+				$("<option>").val("").text(message || OSApp.Language._("Select a logical device..."))
+			);
+			popup.data("zigbeeDeviceTemplateOptions", {});
+			refreshSelectMenu(logicalSelect);
+		};
+
+		var populateZigBeeLogicalSelectForDevice = function(deviceIndex, includeDbFallback) {
+			var devices = popup.data("zigbeeDevices") || [];
+			var idx = parseInt(deviceIndex, 10);
+			if (isNaN(idx) || idx < 0 || idx >= devices.length) {
+				resetZigBeeLogicalSelect(OSApp.Language._("No logical devices found"));
+				return;
+			}
+			var device = devices[idx] || {};
+			var logicalSelect = popup.find("#zigbeeLogicalDeviceSelect");
+			var optionMap = {};
+
+			var logicals = Array.isArray(device.logical_devices) ? device.logical_devices : [];
+			var vendor = cleanMeta(device.vendor) || cleanMeta(device.model) || cleanMeta(device.model_id) || cleanMeta(device.manufacturer) || "";
+			var manufacturer = cleanMeta(device.manufacturer);
+			var model = cleanMeta(device.model || device.model_id);
+
+			var buildOptions = function(dbData) {
+				logicalSelect.empty().append($("<option>").val("").text(OSApp.Language._("Select a logical device...")));
+				var count = 0;
+
+				var dbSensors = [];
+				if (dbData) {
+					dbSensors = mapZigBeeDbSensors(dbData.vendor || manufacturer || model || "", normalizeZigBeeDbSensors(dbData));
+				}
+
+				var hasNonFallbackLogical = logicals.some(function(ld) {
+					var nm = ld && (ld.name || ld.kind);
+					return !isFallbackLogicalName(nm);
+				});
+
+				logicals.forEach(function(ld, ldIndex) {
+					var rawLdName = ld.name || ld.kind || "";
+					var isFallback = isFallbackLogicalName(rawLdName);
+					if (isFallback && hasNonFallbackLogical) { return; }
+					var ldName = isFallback ?
+						(OSApp.Language._("Logical Device") + " " + (count + 1)) : rawLdName;
+					var detail = "";
+					if (parseInt(ld.control_mode, 10) === 1) {
+						var mainDp = (ld.value_dp !== undefined && ld.value_dp !== null && ld.value_dp >= 0) ? ld.value_dp
+							: (ld.status_dp !== undefined && ld.status_dp !== null && ld.status_dp >= 0) ? ld.status_dp : "?";
+						detail = "Tuya DP " + mainDp;
+					} else {
+						detail = formatZigBeeId(ld.cluster_id) + ":" + formatZigBeeId(ld.attribute_id);
+					}
+
+					var clonedLd = $.extend({}, ld);
+
+					if (dbSensors && dbSensors.length) {
+						var ldCluster = parseZigBeeId(clonedLd.cluster_id);
+						var ldAttr = parseZigBeeId(clonedLd.attribute_id);
+						var ldDp = (clonedLd.value_dp !== undefined && clonedLd.value_dp !== null && clonedLd.value_dp >= 0) ? clonedLd.value_dp : null;
+
+						for (var i = 0; i < dbSensors.length; i++) {
+							var s = dbSensors[i];
+							var sCluster = parseZigBeeId(s.cluster_id);
+							var sAttr = parseZigBeeId(s.attribute_id);
+							var sDp = (s.tuya_dp !== undefined && s.tuya_dp !== null && s.tuya_dp !== "") ? parseInt(s.tuya_dp, 10) : null;
+
+							var match = false;
+							if (ldCluster === 0xEF00 && sCluster === 0xEF00) {
+								if (ldDp !== null && sDp !== null && ldDp === sDp) {
+									match = true;
+								}
+							} else if (ldCluster !== null && sCluster !== null && ldCluster === sCluster) {
+								if (ldAttr !== null && sAttr !== null && ldAttr === sAttr) {
+									match = true;
+								}
+							}
+
+							if (match) {
+								clonedLd.factor = s.factor !== undefined ? s.factor : clonedLd.factor;
+								clonedLd.divider = s.divider !== undefined ? s.divider : clonedLd.divider;
+								clonedLd.offset = s.offset !== undefined ? s.offset : clonedLd.offset;
+								break;
+							}
+						}
+					}
+
+					if (!clonedLd.factor) { clonedLd.factor = 1; }
+					if (!clonedLd.divider) { clonedLd.divider = 1; }
+
+					var key = "ld:" + idx + ":" + ldIndex;
+					optionMap[key] = { device: device, logicalDevice: clonedLd };
+					logicalSelect.append($("<option>").val(key).text((vendor ? (vendor + " – ") : "") + ldName + " (" + detail + ")"));
+					count++;
+				});
+
+				if (!count && includeDbFallback && dbSensors.length) {
+					dbSensors.forEach(function(sensorDef, sensorIndex) {
+						var key = "tpl:" + idx + ":" + sensorIndex;
+						optionMap[key] = { device: device, sensor: sensorDef, label: (dbData.vendor || model || "") + ": " + sensorDef.description };
 						var detail = String(sensorDef.cluster_id || "0x0000") + ":" + String(sensorDef.attribute_id || "0x0000");
 						if (sensorDef.tuya_dp !== undefined && sensorDef.tuya_dp !== null && sensorDef.tuya_dp !== "") {
 							detail += " | DP " + sensorDef.tuya_dp;
 						}
-						optionMap[value] = {
-							device: device,
-							sensor: sensorDef,
-							label: deviceLabel + ": " + sensorDef.description
-						};
-						deviceSelect.append($("<option>").val(value).text(model + " - " + sensorDef.description + " (" + detail + ", " + manufacturer + ")"));
+						logicalSelect.append($("<option>").val(key).text((sensorDef.description || sensorDef.name || OSApp.Language._("Logical Device")) + " (" + detail + ")"));
 					});
-					refreshSelectMenu(deviceSelect);
+				}
+
+				popup.data("zigbeeDeviceTemplateOptions", optionMap);
+
+				// Match and auto-select active logical device / template
+				var curEndpoint = parseInt(sensor.endpoint, 10) || 1;
+				var curCluster = parseZigBeeId(sensor.cluster_id);
+				var curAttr = parseZigBeeId(sensor.attribute_id);
+				var curDp = parseZigBeeId(firstDefined(sensor.tuya_dp, sensor.tuya_dp_value, sensor.dp_value, sensor.dp));
+
+				var bestMatchKey = "";
+				for (var oKey in optionMap) {
+					if (Object.prototype.hasOwnProperty.call(optionMap, oKey)) {
+						var item = optionMap[oKey];
+						var isMatch = false;
+
+						if (oKey.indexOf("ld:") === 0) {
+							var ld = item.logicalDevice;
+							var ldCluster = parseZigBeeId(ld.cluster_id);
+							var ldAttr = parseZigBeeId(ld.attribute_id);
+							var ldEndpoint = parseInt(ld.endpoint, 10) || 1;
+							var ldDp = (ld.value_dp !== undefined && ld.value_dp !== null && ld.value_dp >= 0) ? ld.value_dp : null;
+
+							if (ldCluster === 0xEF00 && curCluster === 0xEF00) {
+								if (ldDp !== null && curDp !== null && ldDp === curDp) {
+									isMatch = true;
+								}
+							} else if (ldCluster !== null && curCluster !== null && ldCluster === curCluster) {
+								if (ldAttr !== null && curAttr !== null && ldAttr === curAttr && ldEndpoint === curEndpoint) {
+									isMatch = true;
+								}
+							}
+						} else if (oKey.indexOf("tpl:") === 0) {
+							var s = item.sensor;
+							var sCluster = parseZigBeeId(s.cluster_id);
+							var sAttr = parseZigBeeId(s.attribute_id);
+							var sEndpoint = parseInt(s.endpoint, 10) || 1;
+							var sDp = (s.tuya_dp !== undefined && s.tuya_dp !== null && s.tuya_dp !== "") ? parseInt(s.tuya_dp, 10) : null;
+
+							if (sCluster === 0xEF00 && curCluster === 0xEF00) {
+								if (sDp !== null && curDp !== null && sDp === curDp) {
+									isMatch = true;
+								}
+							} else if (sCluster !== null && curCluster !== null && sCluster === curCluster) {
+								if (sAttr !== null && curAttr !== null && sAttr === curAttr && sEndpoint === curEndpoint) {
+									isMatch = true;
+								}
+							}
+						}
+
+						if (isMatch) {
+							bestMatchKey = oKey;
+							break;
+						}
+					}
+				}
+
+				if (bestMatchKey) {
+					logicalSelect.val(bestMatchKey);
+				}
+
+				refreshSelectMenu(logicalSelect);
+			};
+
+			if (manufacturer && model) {
+				loadZigBeeTemplateData(manufacturer, model).done(function(dbData) {
+					buildOptions(dbData);
+				}).fail(function() {
+					buildOptions(null);
 				});
-			});
+			} else {
+				buildOptions(null);
+			}
 		};
 
 		var applyZigBeeDeviceSelection = function(value) {
-			var optionMap = popup.data("zigbeeDeviceTemplateOptions") || {};
-			var selectedTemplate = optionMap[value];
 			var idx = parseInt(value, 10);
 			var devices = popup.data("zigbeeDevices") || [];
-			var dev = selectedTemplate ? selectedTemplate.device : devices[idx];
+			var dev = devices[idx];
 			if (!dev) { return null; }
 
 			var sel = {
 				ieee: dev.ieee || dev.ieee_addr || "0x0000000000000000",
-				model: dev.model || dev.model_id || OSApp.Language._("Unknown"),
-				manufacturer: dev.manufacturer || OSApp.Language._("Unknown")
+				model: cleanMeta(dev.model || dev.model_id),
+				manufacturer: cleanMeta(dev.manufacturer)
 			};
 			popup.data("zigbee_manufacturer", sel.manufacturer);
 			popup.data("zigbee_model", sel.model);
 			popup.find("#device_ieee").val(sel.ieee).trigger("change");
+			resetZigBeeLogicalSelect(OSApp.Language._("Select a logical device..."));
+			populateZigBeeLogicalSelectForDevice(idx, true);
 			var currentName = popup.find(".name").val();
 			if (!currentName || currentName.trim() === "") {
 				var nameField = popup.find(".name");
-				nameField.val(selectedTemplate ? selectedTemplate.sensor.name : sel.model).trigger("change");
+				var friendlyLabel = resolveZigBeeDeviceLabel(dev, idx);
+				var cleanName = friendlyLabel.split("|")[0].split("(")[0].trim();
+				if (!cleanName || cleanName === "Unknown") {
+					cleanName = sel.model;
+				}
+				nameField.val(cleanName).trigger("change");
 				try { nameField.textinput("refresh"); } catch (e) { void e; }
 			}
-			if (popupMode === "gateway") {
-				if (selectedTemplate) {
-					applyZigBeeTemplate(selectedTemplate.sensor, selectedTemplate.label);
-				} else {
-					if (sel.model.toLowerCase().indexOf("temp") !== -1) {
-						popup.find("#cluster_id").val("0x0402");
-						popup.find("#attribute_id").val("0x0000");
-					} else if (sel.model.toLowerCase().indexOf("humid") !== -1) {
-						popup.find("#cluster_id").val("0x0405");
-						popup.find("#attribute_id").val("0x0000");
-					} else if (sel.model.toLowerCase().indexOf("soil") !== -1 || sel.model.toLowerCase().indexOf("moist") !== -1) {
-						popup.find("#cluster_id").val("0x0408");
-						popup.find("#attribute_id").val("0x0000");
-					}
-					loadZigBeeTemplateForDevice(sel.manufacturer, sel.model, true);
-				}
-			} else if (selectedTemplate) {
-				applyZigBeeTemplate(selectedTemplate.sensor, selectedTemplate.label);
-			} else {
-				if (sel.model.toLowerCase().indexOf("temp") !== -1) {
-					popup.find("#cluster_id").val("0x0402");
-					popup.find("#attribute_id").val("0x0000");
-				} else if (sel.model.toLowerCase().indexOf("humid") !== -1) {
-					popup.find("#cluster_id").val("0x0405");
-					popup.find("#attribute_id").val("0x0000");
-				} else if (sel.model.toLowerCase().indexOf("soil") !== -1 || sel.model.toLowerCase().indexOf("moist") !== -1) {
-					popup.find("#cluster_id").val("0x0408");
-					popup.find("#attribute_id").val("0x0000");
-				}
-				loadZigBeeTemplateForDevice(sel.manufacturer, sel.model, true);
-			}
 			return sel;
+		};
+
+		var applyZigBeeLogicalSelection = function(value) {
+			var optionMap = popup.data("zigbeeDeviceTemplateOptions") || {};
+			if (!value || !optionMap[value]) { return null; }
+			var selected = optionMap[value];
+			if (String(value).indexOf("ld:") === 0) {
+				var ld = selected.logicalDevice;
+				var ldDev = selected.device;
+				var rawName = String(ld.name || ld.kind || "").trim();
+				var cleanName = isFallbackLogicalName(rawName) ? "" : rawName;
+				applyZigBeeTemplate({
+					endpoint:     ld.endpoint || 1,
+					cluster_id:   ld.cluster_id,
+					attribute_id: ld.attribute_id,
+					tuya_dp:      (ld.value_dp  !== undefined && ld.value_dp  !== null && ld.value_dp  >= 0) ? ld.value_dp  : "",
+					tuya_dp_batt: (ld.battery_dp !== undefined && ld.battery_dp !== null && ld.battery_dp >= 0) ? ld.battery_dp : "",
+					tuya_dp_unit: (ld.unit_dp   !== undefined && ld.unit_dp   !== null && ld.unit_dp   >= 0) ? ld.unit_dp   : "",
+					unitid:       ld.unitid !== undefined ? ld.unitid : (parseInt(ld.unit, 10) || 0),
+					unit:         (typeof ld.unit === "string") ? ld.unit : "",
+					factor:       ld.factor,
+					divider:      ld.divider,
+					offset:       ld.offset,
+					name:         cleanName
+				}, (ldDev.vendor || ldDev.model || "") + " – " + (cleanName || OSApp.Language._("Logical Device")));
+				return selected;
+			}
+			if (String(value).indexOf("tpl:") === 0 && selected.sensor) {
+				applyZigBeeTemplate(selected.sensor, selected.label);
+				return selected;
+			}
+			return null;
 		};
 
 		// Fetch current Bluetooth devices and populate the Discovered Devices dropdown
@@ -3573,37 +3824,46 @@ list += "</select></div>" +
 			}
 		});
 
-		// Fetch current ZigBee devices from coordinator and populate the Discovered Devices dropdown
+		// Fetch registered ZigBee gateway devices (with logical_devices) and populate the dropdown
 		var preloadZigBeeDevices = function () {
-			OSApp.Firmware.sendToOS("/zd?pw=", "json").then(function (data) {
-				var devices;
-				if (Array.isArray(data)) {
-					devices = data;
-				} else if (data && Array.isArray(data.devices)) {
-					devices = data.devices;
-				} else if (data && data.devices && typeof data.devices === "object") {
-					devices = Object.values(data.devices);
-				} else {
-					devices = [];
+			OSApp.Firmware.sendToOS("/zg?pw=", "json").then(function (data) {
+				var devicesRaw = (data && Array.isArray(data.devices)) ? data.devices : [];
+				var devices = devicesRaw.filter(function(device) {
+					var model = cleanMeta(device && (device.model || device.model_id));
+					var manufacturer = cleanMeta(device && device.manufacturer);
+					return (model && manufacturer) || hasUsableLogicals(device);
+				});
+				// Keep all devices visible when metadata is still pending, otherwise the list appears empty.
+				if (!devices.length && devicesRaw.length) {
+					devices = devicesRaw.slice();
 				}
 				popup.data("zigbeeDevices", devices);
 				var deviceSelect = popup.find("#zigbeeDeviceSelect");
 				deviceSelect.empty();
+				resetZigBeeLogicalSelect(OSApp.Language._("Select a device first"));
 				if (devices.length > 0) {
 					deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
+					var configuredIeee = String(sensor.device_ieee || "").toLowerCase();
+					var selectedIdx = -1;
 					for (var i = 0; i < devices.length; i++) {
 						var device = devices[i] || {};
 						var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
-						var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
-						var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
-						deviceSelect.append($("<option>").val(String(i)).text(modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr));
+						var label = resolveZigBeeDeviceLabel(device, i) + " | IEEE: " + ieeeAddr;
+						deviceSelect.append($("<option>").val(String(i)).text(label));
+						if (configuredIeee && String(ieeeAddr).toLowerCase() === configuredIeee) {
+							selectedIdx = i;
+						}
+					}
+					if (selectedIdx >= 0) {
+						deviceSelect.val(String(selectedIdx));
 					}
 				} else {
 					deviceSelect.append($("<option>").val("").text(OSApp.Language._("No devices found")));
 				}
-				popup.data("zigbeeDeviceTemplateOptions", {});
-				appendZigBeeDbVariantsToSelect(deviceSelect, devices);
 				refreshSelectMenu(deviceSelect);
+				if (devices.length > 0 && deviceSelect.val() !== "") {
+					deviceSelect.trigger("change");
+				}
 			});
 		};
 
@@ -3611,9 +3871,17 @@ list += "</select></div>" +
 		popup.find("#zigbeeDeviceSelect").on("change", function () {
 			var idxStr = $(this).val();
 			var idx = parseInt(idxStr, 10);
-			var optionMap = popup.data("zigbeeDeviceTemplateOptions") || {};
-			if (idxStr === "" || (isNaN(idx) && !optionMap[idxStr])) { return; }
+			if (idxStr === "" || isNaN(idx)) {
+				resetZigBeeLogicalSelect(OSApp.Language._("Select a device first"));
+				return;
+			}
 			applyZigBeeDeviceSelection(idxStr);
+		});
+
+		popup.find("#zigbeeLogicalDeviceSelect").on("change", function () {
+			var value = $(this).val();
+			if (!value) { return; }
+			applyZigBeeLogicalSelection(value);
 		});
 
 		// ZigBee standard cluster template dropdown
@@ -3756,20 +4024,17 @@ list += "</select></div>" +
 						if (devices && devices.length > 0) {
 							deviceSelect.empty();
 							deviceSelect.append($("<option>").val("").text(OSApp.Language._("Select a device...")));
+							resetZigBeeLogicalSelect(OSApp.Language._("Select a device first"));
 							for (var i = 0; i < devices.length; i++) {
 								var device = devices[i] || {};
 								var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
-								var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
-								var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
-
-								var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr;
+								var label = resolveZigBeeDeviceLabel(device, i) + " | IEEE: " + ieeeAddr;
 								deviceSelect.append($("<option>").val(String(i)).text(label));
 							}
-							popup.data("zigbeeDeviceTemplateOptions", {});
-							appendZigBeeDbVariantsToSelect(deviceSelect, devices);
 							refreshSelectMenu(deviceSelect);
 						} else {
 							deviceSelect.empty().append($("<option>").val("").text(OSApp.Language._("No devices found yet. Please pair your device.")));
+							resetZigBeeLogicalSelect(OSApp.Language._("No logical devices found"));
 							try {
 								deviceSelect.selectmenu("refresh", true);
 							} catch (e) {
@@ -3794,8 +4059,8 @@ list += "</select></div>" +
 				popup.find("#zigbeeDeviceSelect").off("change").on("change", function () {
 					var idxStr = popup.find("#zigbeeDeviceSelect").val();
 					var idx = parseInt(idxStr, 10);
-					var optionMap = popup.data("zigbeeDeviceTemplateOptions") || {};
-					if (idxStr === "" || (isNaN(idx) && !optionMap[idxStr])) {
+					if (idxStr === "" || isNaN(idx)) {
+						resetZigBeeLogicalSelect(OSApp.Language._("Select a device first"));
 						return;
 					}
 					var selectedDevice = applyZigBeeDeviceSelection(idxStr);
@@ -3855,21 +4120,13 @@ list += "</select></div>" +
 					btn.text(originalText).prop("disabled", false);
 					scanTimeout = null;
 
-					// Post-scan enrichment: keep refreshing device list for up to 6 s so
-					// that devices whose model/manufacturer arrive via the async Basic
-					// cluster read (firmware reads after join) get their real label.
+					// Post-scan enrichment: keep refreshing device list for a short grace
+					// period so late joiners still appear, but do not wait for metadata.
 					var postScanPolls = 0;
 					var postScanInterval = setInterval(function() {
 						postScanPolls++;
 						updateDeviceList();
-						// Stop once we have at least one device with real model info,
-						// or after 6 polls (≈ 6 s).
-						var devs = popup.data("zigbeeDevices") || [];
-						var allIdentified = devs.length > 0 && devs.every(function(d) {
-							var m = d.model || d.model_id || "";
-							return m !== "" && m !== OSApp.Language._("Unknown");
-						});
-						if (allIdentified || postScanPolls >= 6) {
+						if (postScanPolls >= 6) {
 							clearInterval(postScanInterval);
 						}
 					}, 1000);
@@ -6165,8 +6422,7 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 		if (logdata.length < (isWaterMeter ? 1 : 2)) continue;
 
 		//add current value as forecast data:
-		let date = new Date();
-		date.setMinutes(date.getMinutes() - date.getTimezoneOffset() - tzo / 60);
+		let date = Date.now();
 
 		let value = logdata.slice(-1)[0].y;
 		var fkdp = 0;

@@ -430,6 +430,64 @@ OSApp.Dashboard.displayPage = function() {
 					} else if (value === 9) { // Zigbee Station
 						data = OSApp.Stations.parseZigbeeStationData( ( type === value ) ? data : "000000000000000001000000000000000000" );
 						var useZigbeeDeviceProfile = OSApp.ESP32Mode && OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor && OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor();
+						var loadedDevices = [];
+
+						var updateLogicalDevices = function( currentIeee, devicesList ) {
+							var lSel = select.find( "#zigbee-logical-select" );
+							if ( !lSel.length ) return;
+
+							lSel.empty();
+
+							var targetDev = null;
+							if ( devicesList && devicesList.length ) {
+								for ( var i = 0; i < devicesList.length; i++ ) {
+									if ( normalizeZigbeeIeee( devicesList[ i ].ieee ) === normalizeZigbeeIeee( currentIeee ) ) {
+										targetDev = devicesList[ i ];
+										break;
+									}
+								}
+							}
+
+							if ( targetDev && targetDev.logical_devices && targetDev.logical_devices.length ) {
+								var matchingFound = false;
+								var epTarget = parseInt( select.find( "#zigbee-endpoint" ).val(), 10 ) || 1;
+								var isTuyaTarget = parseInt( select.find( "#zigbee-use-tuya" ).val(), 10 ) || 0;
+								var dpTarget = parseInt( select.find( "#zigbee-tuya-dp" ).val(), 10 ) || 0;
+
+								for ( var li = 0; li < targetDev.logical_devices.length; li++ ) {
+									var ld = targetDev.logical_devices[ li ];
+									var ep = parseInt( ld.endpoint, 10 ) || 1;
+									var isTuya = ld.control_mode === 1 ? 1 : 0;
+									var dp = ( ld.status_dp !== undefined && ld.status_dp >= 0 ) ? ld.status_dp : ( ld.value_dp !== undefined && ld.value_dp >= 0 ? ld.value_dp : 0 );
+									if ( dp < 0 ) dp = 0;
+
+									var isSelected = ( ep === epTarget && isTuya === isTuyaTarget && dp === dpTarget );
+									if ( isSelected ) matchingFound = true;
+
+									var optionLabel = ld.name || ( "Logical " + ( li + 1 ) );
+									var selAttr = isSelected ? " selected='selected'" : "";
+									lSel.append( "<option value='" + ep + ":" + isTuya + ":" + dp + "' data-endpoint='" + ep + "' data-usetuya='" + isTuya + "' data-tuyadp='" + dp + "'" + selAttr + ">" + OSApp.Utils.htmlEscape( optionLabel ) + " (EP: " + ep + ( isTuya ? ( ", DP: " + dp ) : "" ) + ")</option>" );
+								}
+
+								// If no exact match was pre-selected, select the first option and update hidden inputs
+								if ( !matchingFound ) {
+									var firstOpt = lSel.find( "option" ).eq( 0 );
+									if ( firstOpt.length ) {
+										firstOpt.prop( "selected", true );
+										var ep0 = firstOpt.data( "endpoint" ) || 1;
+										var useTuya0 = firstOpt.data( "usetuya" ) || 0;
+										var dp0 = firstOpt.data( "tuyadp" ) || 0;
+										select.find( "#zigbee-endpoint" ).val( ep0 );
+										select.find( "#zigbee-use-tuya" ).val( useTuya0 );
+										select.find( "#zigbee-tuya-dp" ).val( dp0 );
+									}
+								}
+							} else {
+								lSel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "No logical devices" ) + "</option>" );
+							}
+
+							try { lSel.selectmenu( "refresh", true ); } catch( e ) { void e; }
+						};
 
 						opts.append(
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Paired Zigbee Device" ) + ":</div>" +
@@ -441,7 +499,16 @@ OSApp.Dashboard.displayPage = function() {
 							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "IEEE Address" ) + ":</div>" +
 							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-ieee' required='true' type='text' maxlength='18' pattern='^(0x|0X)?[0-9A-Fa-f]{16}$' placeholder='e.g., 0x00124b002aa11bb2' value='" + data.ieee + "'>" +
 							( useZigbeeDeviceProfile ?
-								"<div class='center smaller' style='margin-top:8px;color:#777;'>" + OSApp.Language._( "Endpoint, control mode and DPs are configured in the ZigBee device editor." ) + "</div>" :
+								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Logical Device" ) + ":</div>" +
+								"<div style='margin-bottom: 5px;'>" +
+								"<select class='center' data-corners='false' data-wrapper-class='tight ui-btn' id='zigbee-logical-select'>" +
+								"<option value=''>" + OSApp.Language._( "Loading logical devices..." ) + "</option>" +
+								"</select>" +
+								"</div>" +
+								"<input type='hidden' id='zigbee-endpoint' value='" + parseInt( data.endpoint, 16 ) + "'>" +
+								"<input type='hidden' id='zigbee-use-tuya' value='" + data.useTuya + "'>" +
+								"<input type='hidden' id='zigbee-tuya-dp' value='" + ( parseInt( data.tuyaDp, 16 ) || 1 ) + "'>" +
+								"<div class='center smaller' style='margin-top:4px;color:#777;'>" + OSApp.Language._( "Mapped attributes are defined in the ZigBee device editor." ) + "</div>" :
 								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Endpoint" ) + ":</div>" +
 								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='zigbee-endpoint' required='true' type='number' min='1' max='255' value='" + parseInt( data.endpoint, 16 ) + "'>" +
 								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Control Mode" ) + ":</div>" +
@@ -496,6 +563,7 @@ OSApp.Dashboard.displayPage = function() {
 								sel.empty();
 								sel.append( "<option value=''>" + OSApp.Language._( "-- Select or Enter Custom --" ) + "</option>" );
 								if ( response && response.result === 1 && response.devices && response.devices.length > 0 ) {
+									loadedDevices = response.devices || [];
 									for ( var i = 0; i < response.devices.length; i++ ) {
 										var dev = response.devices[ i ];
 										var label = dev.model || dev.manufacturer || "Device";
@@ -520,6 +588,9 @@ OSApp.Dashboard.displayPage = function() {
 									sel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "No paired devices found" ) + "</option>" );
 								}
 								refreshZigbeeSelect();
+								if ( useZigbeeDeviceProfile ) {
+									updateLogicalDevices( chosenIeee, loadedDevices );
+								}
 							} ).fail( function() {
 								sel.empty();
 								sel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "Error loading devices" ) + "</option>" );
@@ -591,7 +662,9 @@ OSApp.Dashboard.displayPage = function() {
 							var chosenIeee = $( this ).val();
 							if ( chosenIeee ) {
 								select.find( "#zigbee-ieee" ).val( normalizeZigbeeIeee( chosenIeee ) );
-								if ( !useZigbeeDeviceProfile ) {
+								if ( useZigbeeDeviceProfile ) {
+									updateLogicalDevices( chosenIeee, loadedDevices );
+								} else {
 									var chosenEndpoint = $( this ).find( "option:selected" ).data( "endpoint" ) || 1;
 									select.find( "#zigbee-endpoint" ).val( chosenEndpoint );
 
@@ -601,6 +674,18 @@ OSApp.Dashboard.displayPage = function() {
 								}
 							}
 						} );
+
+						if ( useZigbeeDeviceProfile ) {
+							select.on( "change", "#zigbee-logical-select", function() {
+								var selectedOpt = $( this ).find( "option:selected" );
+								var ep = selectedOpt.data( "endpoint" ) || 1;
+								var useTuya = selectedOpt.data( "usetuya" ) || 0;
+								var dp = selectedOpt.data( "tuyadp" ) || 0;
+								select.find( "#zigbee-endpoint" ).val( ep );
+								select.find( "#zigbee-use-tuya" ).val( useTuya );
+								select.find( "#zigbee-tuya-dp" ).val( dp );
+							} );
+						}
 
 						select.find( "#zigbee-ieee" ).on( "blur", function() {
 							$( this ).val( normalizeZigbeeIeee( $( this ).val() ) );
@@ -746,16 +831,11 @@ OSApp.Dashboard.displayPage = function() {
 						button.data( "specialData", String( parseInt( select.find( "#gardena-service" ).val(), 10 ) || 0 ) );
 					} else if ( hs === 9 ) { // Zigbee Station
 						var ieee = normalizeZigbeeIeee( select.find( "#zigbee-ieee" ).val() );
-						var endpointHex = "01";
-						var useTuya = "0";
-						var tuyaDpHex = "00";
-						if ( !( OSApp.ESP32Mode && OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor && OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor() ) ) {
-							var endpoint = parseInt( select.find( "#zigbee-endpoint" ).val(), 10 ) || 1;
-							endpointHex = OSApp.Utils.pad( endpoint.toString( 16 ) );
-							useTuya = select.find( "#zigbee-use-tuya" ).val() || "0";
-							var tuyaDp = parseInt( select.find( "#zigbee-tuya-dp" ).val(), 10 ) || 1;
-							tuyaDpHex = OSApp.Utils.pad( tuyaDp.toString( 16 ) );
-						}
+						var endpoint = parseInt( select.find( "#zigbee-endpoint" ).val(), 10 ) || 1;
+						var endpointHex = OSApp.Utils.pad( endpoint.toString( 16 ) );
+						var useTuya = select.find( "#zigbee-use-tuya" ).val() || "0";
+						var tuyaDp = parseInt( select.find( "#zigbee-tuya-dp" ).val(), 10 ) || 1;
+						var tuyaDpHex = OSApp.Utils.pad( tuyaDp.toString( 16 ) );
 
 						var reserved = "000000000000000";
 
