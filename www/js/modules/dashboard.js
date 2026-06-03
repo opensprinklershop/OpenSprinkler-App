@@ -145,11 +145,7 @@ OSApp.Dashboard.displayPage = function() {
 			var zigbeeStatus = OSApp.currentSession.controller.zigbeeStationStatus || [];
 			var statusCode = parseInt( zigbeeStatus[ sid ], 10 );
 
-			if ( isNaN( statusCode ) ) {
-				return OSApp.Stations.getStatus( sid ) ? "zigbee-on" : "zigbee-off";
-			}
-
-			if ( statusCode === 2 ) {
+			if ( isNaN( statusCode ) || statusCode === 2 ) {
 				return "zigbee-error";
 			}
 
