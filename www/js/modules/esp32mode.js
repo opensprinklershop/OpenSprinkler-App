@@ -1019,12 +1019,72 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 		return null;
 	},
 
+	cleanDescription: function( desc, vendor, model ) {
+		if ( !desc ) { return ""; }
+		// Replace all tabs/newlines/multiple spaces with a single space
+		desc = String( desc ).replace( /\s+/g, " " ).trim();
+
+		var v = String( vendor || "" ).trim();
+		var m = String( model || "" ).trim();
+
+		var changed = true;
+		while ( changed ) {
+			changed = false;
+			if ( v ) {
+				var vEscaped = v.replace( /[-/\\^$*+?.()|[\]{}]/g, "\\$&" );
+				var reV = new RegExp( "^" + vEscaped + "\\b", "i" );
+				if ( reV.test( desc ) ) {
+					desc = desc.replace( reV, "" ).trim();
+					changed = true;
+				}
+			}
+			if ( m ) {
+				var mEscaped = m.replace( /[-/\\^$*+?.()|[\]{}]/g, "\\$&" );
+				var reM = new RegExp( "^" + mEscaped + "\\b", "i" );
+				if ( reM.test( desc ) ) {
+					desc = desc.replace( reM, "" ).trim();
+					changed = true;
+				}
+			}
+			var prevDesc = desc;
+			desc = desc.replace( /^[\s\-_,;:///]+/, "" ).trim();
+			if ( desc !== prevDesc ) {
+				changed = true;
+			}
+		}
+		return desc;
+	},
+
+	buildFriendlyName: function( vendor, model, description ) {
+		var local = this.getLocalFriendlyName( vendor, model );
+		if ( local ) {
+			return local;
+		}
+
+		var v = String( vendor || "" ).replace( /\s+/g, " " ).trim();
+		var m = String( model || "" ).replace( /\s+/g, " " ).trim();
+		var d = String( description || "" ).replace( /\s+/g, " " ).trim();
+
+		d = this.cleanDescription( d, v, m );
+
+		var parts = [];
+		if ( v ) {
+			parts.push( v );
+		}
+		if ( m ) {
+			parts.push( m );
+		}
+		if ( d ) {
+			parts.push( d );
+		}
+
+		return parts.join( " " );
+	},
+
 	setCached: function( ieee, data ) {
 		this._mem[ ieee ] = data;
 		try { localStorage.setItem( "zb_dev_" + ieee, JSON.stringify( data ) ); } catch ( e ) { void e; }
-		var label = ( data.vendor && data.description )
-			? data.vendor + " - " + data.description
-			: ( data.vendor || data.description || "" );
+		var label = this.buildFriendlyName( data.vendor, data.model_id || data.model || "", data.description );
 		if ( label ) {
 			try { localStorage.setItem( "zb_name_" + ieee, label ); } catch ( e ) { void e; }
 		}
@@ -1034,6 +1094,42 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	/** Returns the cached display label for a device by IEEE address, or null. */
 	getCachedLabel: function( ieee ) {
 		try { return localStorage.getItem( "zb_name_" + ieee ) || null; } catch ( e ) { void e; return null; }
+	},
+
+	getLocalFriendlyName: function( manufacturer, model ) {
+		var mfr = String( manufacturer || "" ).trim();
+		var mdl = String( model || "" ).trim();
+
+		if ( !mfr && !mdl ) { return null; }
+
+		var mfrLower = mfr.toLowerCase();
+		var mdlLower = mdl.toLowerCase();
+
+		// GIEX GX04 Soil Sensor (Tuya TS0601 family with _TZE284_)
+		if (
+			mdlLower === "ts0601_soil_3" ||
+			mfrLower.indexOf( "_tze284_" ) === 0 ||
+			( mdlLower === "ts0601" && mfrLower.indexOf( "_tze284_" ) !== -1 )
+		) {
+			return "GIEX GX04 Soil Sensor";
+		}
+
+		// GIEX GX02 Water irrigation valve (Tuya QT06 / TS0601 with _TZE200_sh1btabb)
+		if (
+			mdlLower === "qt06_2" ||
+			mdlLower === "qt06_1" ||
+			mfrLower.indexOf( "_tze200_sh1btabb" ) !== -1 ||
+			( mdlLower === "ts0601" && mfrLower.indexOf( "_tze200_sh1btabb" ) !== -1 )
+		) {
+			return "GIEX GX02 Water Valve";
+		}
+
+		// Tuya fallback placeholder to avoid displaying raw technical name
+		if ( mdlLower === "ts0601" || mdlLower === "ts0001" ) {
+			return "Tuya Smart Device (" + mdl.toUpperCase() + ")";
+		}
+
+		return null;
 	},
 
 	setCachedLabel: function( ieee, label ) {
@@ -1307,7 +1403,7 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	 *  Works for both Tuya (dp-based) and ZCL (cluster/attr-based) entries. */
 	_buildFunctionEntries: function( entries ) {
 		var self = this;
-		var secondaryPat = /^(battery|battery_level|linkquality|unit|unit_select|status|valve_status|power_on_behavior|consumption|water_consumed|current_summation)$/i;
+		var secondaryPat = /^(battery|battery_level|linkquality|unit|unit_select|status|state|state_\d+|valve_status|power_on_behavior|consumption|water_consumed|current_summation)$/i;
 		var primary = [], secondary = [];
 
 		for ( var i = 0; i < entries.length; i++ ) {
@@ -1335,17 +1431,34 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 			var sn = ( s.sensor_name || "" ).toLowerCase();
 			var dp = s.dp !== undefined ? s.dp : s.tuya_dp;
 
-			var target = primary[ 0 ];
-			if ( /valve|switch/.test( sn ) ) {
-				for ( var vi = 0; vi < primary.length; vi++ ) {
-					if ( /valve|switch/.test( ( primary[ vi ].sensor_name || "" ).toLowerCase() ) ) {
-						target = primary[ vi ]; break;
+			// Suffix matching: extract trailing digits from secondary name sn
+			var numMatch = sn.match(/\d+$/);
+			var target = null;
+			if ( numMatch ) {
+				var suffixNum = numMatch[ 0 ];
+				for ( var pi = 0; pi < primary.length; pi++ ) {
+					var pn = ( primary[ pi ].sensor_name || "" ).toLowerCase();
+					var pNumMatch = pn.match(/\d+$/);
+					if ( pNumMatch && pNumMatch[0] === suffixNum ) {
+						target = primary[ pi ];
+						break;
 					}
 				}
-			} else if ( /water|flow|consumption|summation/.test( sn ) ) {
-				for ( var wi = 0; wi < primary.length; wi++ ) {
-					if ( /water|flow/.test( ( primary[ wi ].sensor_name || "" ).toLowerCase() ) ) {
-						target = primary[ wi ]; break;
+			}
+
+			if ( !target ) {
+				target = primary[ 0 ];
+				if ( /valve|switch|state/.test( sn ) ) {
+					for ( var vi = 0; vi < primary.length; vi++ ) {
+						if ( /valve|switch/.test( ( primary[ vi ].sensor_name || "" ).toLowerCase() ) ) {
+							target = primary[ vi ]; break;
+						}
+					}
+				} else if ( /water|flow|consumption|summation/.test( sn ) ) {
+					for ( var wi = 0; wi < primary.length; wi++ ) {
+						if ( /water|flow/.test( ( primary[ wi ].sensor_name || "" ).toLowerCase() ) ) {
+							target = primary[ wi ]; break;
+						}
 					}
 				}
 			}
@@ -1354,7 +1467,7 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 				target.dp_battery = dp;
 			} else if ( /unit/.test( sn ) && target.dp_unit === undefined ) {
 				target.dp_unit = dp;
-			} else if ( /status|valve/.test( sn ) && target.dp_status === undefined ) {
+			} else if ( /status|valve|state/.test( sn ) && target.dp_status === undefined ) {
 				target.dp_status = dp;
 			} else if ( /consumption|water|summation/.test( sn ) && target.dp_consumption === undefined ) {
 				target.dp_consumption = dp;
@@ -1366,7 +1479,7 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 
 	/** Folds secondary DPs (battery, unit, status, consumption) into primary entries. */
 	_consolidateEntries: function( entries ) {
-		var secondaryPat = /^(battery|battery_level|linkquality|unit|unit_select|status|valve_status|power_on_behavior|consumption|water_consumed|current_summation)$/i;
+		var secondaryPat = /^(battery|battery_level|linkquality|unit|unit_select|status|state|state_\d+|valve_status|power_on_behavior|consumption|water_consumed|current_summation)$/i;
 		var primary = [], secondary = [];
 		for ( var i = 0; i < entries.length; i++ ) {
 			var e = entries[ i ];
@@ -1385,7 +1498,26 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 		for ( var j = 0; j < secondary.length; j++ ) {
 			var s = secondary[ j ];
 			var sn = ( s.sensor_name || "" ).toLowerCase();
-			var target = primary[ 0 ];
+
+			// Suffix matching: extract trailing digits from secondary name sn
+			var numMatch = sn.match(/\d+$/);
+			var target = null;
+			if ( numMatch ) {
+				var suffixNum = numMatch[ 0 ];
+				for ( var pi = 0; pi < primary.length; pi++ ) {
+					var pn = ( primary[ pi ].sensor_name || "" ).toLowerCase();
+					var pNumMatch = pn.match(/\d+$/);
+					if ( pNumMatch && pNumMatch[0] === suffixNum ) {
+						target = primary[ pi ];
+						break;
+					}
+				}
+			}
+
+			if ( !target ) {
+				target = primary[ 0 ];
+			}
+
 			if ( target.zb_type === undefined || target.zb_type === null || target.zb_type === "" ) {
 				var sType = this._normalizeProtocolType( s && ( s.zb_type !== undefined ? s.zb_type : ( s.protocol_type !== undefined ? s.protocol_type : ( s.type !== undefined ? s.type : s.is_tuya ) ) ) );
 				if ( sType !== null ) {
@@ -1396,7 +1528,7 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 				target.dp_battery = s.dp;
 			} else if ( /unit/.test( sn ) && !target.dp_unit ) {
 				target.dp_unit = s.dp;
-			} else if ( /status|valve/.test( sn ) && !target.dp_status ) {
+			} else if ( /status|valve|state/.test( sn ) && !target.dp_status ) {
 				target.dp_status = s.dp;
 			} else if ( /consumption|water|summation/.test( sn ) && !target.dp_consumption ) {
 				target.dp_consumption = s.dp;
@@ -1427,13 +1559,19 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	},
 
 	_apply: function( $li, data ) {
-		var label = ( data.vendor && data.description )
-			? data.vendor + " — " + data.description
-			: ( data.vendor || data.description || "" );
+		var label = this.buildFriendlyName( data.vendor, data.model_id || data.model || "", data.description );
 		if ( label ) {
 			$li.find( ".zb-db-info" ).text( label ).show();
 			// Works for both old <h4> (listview) and new .zg-dev-title (table rows)
-			$li.find( "h4, .zg-dev-title" ).text( label );
+			var $title = $li.find( "h4, .zg-dev-title" );
+			if ( $title.length ) {
+				var $span = $title.find( "span" );
+				if ( $span.length ) {
+					$title.text( label ).prepend( $span );
+				} else {
+					$title.text( label );
+				}
+			}
 		}
 	}
 };
@@ -1494,6 +1632,9 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 	var devVendor = cleanMeta( device.vendor || "" );
 
 	var cachedLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( devIeee ) || "";
+	if ( !cachedLabel ) {
+		cachedLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( devManuf, devModel ) || "";
+	}
 	var devName = cleanMeta( cachedLabel || devVendor || devModel || devManuf || "" );
 
 	// pendingLogicals: null = not changed (keep registry); array = new entries to save
@@ -1504,6 +1645,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		return {
 			nr:        ld.nr || 0,
 			name:      ld.name || "",
+			desc:      ld.desc || ld.description || "",
 			kind:      ld.kind || "",
 			endpoint:  parseInt( ld.endpoint, 10 ) || 1,
 			cluster:   toHex4( ld.cluster_id,   "0x0000" ),
@@ -1534,6 +1676,8 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		}
 		var logicalName = String( entry.name || "logical_" + idx ).trim();
 		params[ prefix + "name" ] = logicalName.slice( 0, 29 );
+		var logicalDesc = String( entry.desc || entry.description || "" ).trim();
+		params[ prefix + "desc" ] = logicalDesc.slice( 0, 29 );
 		params[ prefix + "ep" ] = parseIntAuto( entry.endpoint, 1 ) || 1;
 		var cluster = parseIntAuto( entry.cluster, 0 );
 		params[ prefix + "cluster" ] = cluster;
@@ -1580,6 +1724,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			return {
 				nr:       idx,
 				name:     logicalName,
+				desc:     String( e.sensor_description || e.description || "" ).trim(),
 				kind:     logicalName,
 				endpoint: parseInt( e.endpoint, 10 ) || 1,
 				cluster:  toHex4( cluster, "0x0000" ),
@@ -1626,8 +1771,10 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 	];
 
 	function renderLogicalCard( d, idx ) {
-		var title = d.name || d.kind || ( OSApp.Language._( "Logical Device" ) + " " + ( idx + 1 ) );
-		var h = "<fieldset data-role='collapsible' data-mini='true' data-collapsed='false' class='zbed-logical' data-idx='" + idx + "'>";
+		var name = d.name || d.kind || ( OSApp.Language._( "Logical Device" ) + " " + ( idx + 1 ) );
+		var desc = d.desc || d.description || "";
+		var title = name + ( desc ? " - " + desc : "" );
+		var h = "<fieldset data-role='collapsible' data-mini='true' data-collapsed='true' class='zbed-logical' data-idx='" + idx + "'>";
 		h += "<legend>" + OSApp.Utils.htmlEscape( title );
 		if ( d.kind && d.kind !== d.name ) {
 			h += " <small style='color:#888;'>(" + OSApp.Utils.htmlEscape( d.kind ) + ")</small>";
@@ -1645,6 +1792,12 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		h += "      <label style='font-size:0.8em;margin:0 0 2px;'>" + OSApp.Language._( "EP" ) + "</label>";
 		h += "      <input type='number' class='zbed-ld-field' data-idx='" + idx + "' data-field='endpoint' value='" + d.endpoint + "' data-mini='true' min='1' max='254'>";
 		h += "    </div>";
+		h += "  </div>";
+
+		// Row 1b: Description
+		h += "  <div style='margin-top:6px;'>";
+		h += "    <label style='font-size:0.8em;margin:0 0 2px;'>" + OSApp.Language._( "Description" ) + "</label>";
+		h += "    <input type='text' class='zbed-ld-field' data-idx='" + idx + "' data-field='desc' value='" + OSApp.Utils.htmlEscape( desc ) + "' data-mini='true' maxlength='29'>";
 		h += "  </div>";
 
 		// Row 2: Cluster & Attribute
@@ -1841,7 +1994,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		} else {
 			var existingLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( devIeee ) || "";
 			if ( !existingLabel ) {
-				var fb = devVendor || devModel || devManuf || "";
+				var fb = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( devManuf, devModel ) || devVendor || devModel || devManuf || "";
 				if ( fb ) { OSApp.ESP32Mode.ZigbeeDeviceDB.setCachedLabel( devIeee, fb ); }
 			}
 		}
@@ -1874,6 +2027,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 						return {
 							nr:             li,
 							name:           pl.name,
+							desc:           pl.desc || pl.description || "",
 							kind:           pl.kind || pl.name,
 							endpoint:       parseInt( pl.endpoint, 10 ) || 1,
 							cluster_id:     cluster,
@@ -2795,6 +2949,9 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 					: "<span style='display:inline-block;width:10px;height:10px;margin-right:6px;'></span>" );
 			var ieeeAttr = dev.ieee ? " data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'" : "";
 			var cachedDevLabel = ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) || null;
+			if ( !cachedDevLabel ) {
+				cachedDevLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( dev.manufacturer, dev.model );
+			}
 			var hasModel = dev.model && dev.model !== "unknown";
 			var hasMfr   = dev.manufacturer && dev.manufacturer !== "unknown";
 			var ldVendor = ( dev.logical_devices && dev.logical_devices.length ) ? ( dev.logical_devices[ 0 ].vendor || "" ) : "";
@@ -3048,12 +3205,13 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 				$.mobile.loading( "hide" );
 				if ( resp && resp.result === 1 ) {
 					OSApp.Errors.showError( OSApp.Language._( "Device rejoin initiated with sequence reset (60s window)" ) );
-					// Clear the throttle entry so the next panel render
-					// re-issues query_basic for this device, then reload
-					// after enough time for it to re-announce + answer.
+					// Clear BOTH the throttle cache and user cached label so the next panel render
+					// re-issues query_basic for this device and builds the pristine friendly name.
 					if ( OSApp.ESP32Mode._zbAutoQueryCache ) {
 						delete OSApp.ESP32Mode._zbAutoQueryCache[ String( ieee ).toLowerCase() ];
 					}
+					OSApp.ESP32Mode.ZigbeeDeviceDB.setCachedLabel( ieee, null );
+					try { localStorage.removeItem( "zb_dev_" + ieee ); } catch ( e ) { void e; }
 					setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 4000 );
 				} else {
 					var msg = ( resp && resp.message ) ? resp.message : OSApp.Language._( "Failed to initiate device rejoin" );
@@ -3287,9 +3445,13 @@ OSApp.ESP32Mode.zigBeePermitJoin = function() {
 	}
 
 	function deviceLabel( dev ) {
+		var cached = OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee );
+		if ( cached ) { return cached; }
+		var local = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( dev.manufacturer, dev.model );
+		if ( local ) { return local; }
 		var parts = [];
-		if ( dev.manufacturer ) { parts.push( dev.manufacturer ); }
-		if ( dev.model )        { parts.push( dev.model ); }
+		if ( dev.manufacturer && dev.manufacturer !== "unknown" ) { parts.push( dev.manufacturer ); }
+		if ( dev.model && dev.model !== "unknown" )        { parts.push( dev.model ); }
 		var label = parts.join( " " );
 		if ( !label ) { label = dev.ieee || OSApp.Language._( "unknown device" ); }
 		return label;

@@ -2986,7 +2986,7 @@ OSApp.Analog.showSensorEditor = function(sensor, row, callback, callbackCancel, 
 	"<div style='flex: 1; min-width: 100px;'><label for='sensor_nr'>" + OSApp.Language._("Sensor Nr.") + "</label>" +
 	"<input class='nr' id='sensor_nr' data-mini='true' type='number' inputmode='decimal' min='1' max='99999' required style='width: 100%;' value='" + sensor.nr + (sensor.nr > 0 ? "' disabled='disabled'></div>" : "'></div>") +
 	"<div style='flex: 2; min-width: 150px;'><label for='sensor_name'>" + OSApp.Language._("Name") + "</label>" +
-	"<input class='name' id='sensor_name' data-mini='true' type='text' maxlength='40' style='width: 100%;' value='" + (sensor.name ? sensor.name : "") + "'></div>" +
+	"<input class='name' id='sensor_name' data-mini='true' type='text' maxlength='40' style='width: 100%;' value='" + OSApp.Utils.htmlEscape(sensor.name ? sensor.name : "") + "'></div>" +
 	"<div style='flex: 1; min-width: 100px;'><label for='sensor_group'>" + OSApp.Language._("Group") + "</label>" +
 	"<input class='group' id='sensor_group' data-mini='true' type='number' inputmode='decimal' min='0' max='255' style='width: 100%;' value='" + (sensor.group ? sensor.group : "0") + "'></div>" +
 	"</div>" +
@@ -3045,7 +3045,7 @@ list += "</select></div>" +
 	"<input class='id' id='sensor_id' data-mini='true' type='number' inputmode='decimal' min='-2147483647' max='2147483647' value='" + sensor.id + "'></div>" +
 
 "<div class='mac_label'><label for='sensor_mac'>" + OSApp.Language._("MAC Address") + "</label>" +
-	"<input class='mac' id='sensor_mac' data-mini='true' type='text' value='" + (sensor.mac ? sensor.mac : "") + "'></div>" +
+	"<input class='mac' id='sensor_mac' data-mini='true' type='text' value='" + OSApp.Utils.htmlEscape(sensor.mac ? sensor.mac : "") + "'></div>" +
 
 			"<div class='rs485_help ui-body ui-body-a' style='display:none; margin: 10px 0; padding: 10px; border-radius: 5px;'>" +
 			"<p style='margin: 0; font-size: 0.9em;'>" + OSApp.Language._("RS485 Configuration Help:") + "<br>" +
@@ -3093,13 +3093,13 @@ list += "</select></div>" +
 			"<option value='99'>" + OSApp.Language._("Custom Unit") + "</option>" +
 		"</select></div>" +
 "<div class='unit_container' style='display:none;'><label for='unit'>" + OSApp.Language._("Unit") + "</label>" +
-	"<input type='text' id='unit' data-mini='true' maxlength='10' value='" + (sensor.unit ? sensor.unit : "") + "'></div>" +
+	"<input type='text' id='unit' data-mini='true' maxlength='10' value='" + OSApp.Utils.htmlEscape(sensor.unit ? sensor.unit : "") + "'></div>" +
 
 "<div class='topic_container' style='display:none;'><label for='topic'>" + OSApp.Language._("MQTT Topic") + "</label>" +
-	"<input type='text' id='topic' data-mini='true' maxlength='100' value='" + (sensor.topic ? sensor.topic : "") + "'></div>" +
+	"<input type='text' id='topic' data-mini='true' maxlength='100' value='" + OSApp.Utils.htmlEscape(sensor.topic ? sensor.topic : "") + "'></div>" +
 
 "<div class='filter_container' style='display:none;'><label for='filter'>" + OSApp.Language._("MQTT Filter") + "</label>" +
-	"<input type='text' id='filter' data-mini='true' maxlength='100' value='" + (sensor.filter ? sensor.filter : "") + "'></div>" +
+	"<input type='text' id='filter' data-mini='true' maxlength='100' value='" + OSApp.Utils.htmlEscape(sensor.filter ? sensor.filter : "") + "'></div>" +
 
 "<div class='zigbee_device_ieee_container' style='display:none;'><label for='device_ieee'>" + OSApp.Language._("ZigBee Device IEEE Address") + "</label>" +
 		"<input type='text' id='device_ieee' data-mini='true' value='" + (sensor.device_ieee ? sensor.device_ieee : (sensor.zb_ieee_ref ? sensor.zb_ieee_ref : "")) + "' readonly></div>" +
@@ -3454,6 +3454,13 @@ list += "</select></div>" +
 			var manufacturer = cleanMeta(device.manufacturer);
 			var model = cleanMeta(device.model || device.model_id);
 
+			var localLabel = (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName === "function") ?
+				OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName(manufacturer, model) : null;
+
+			if (localLabel) {
+				return localLabel;
+			}
+
 			// If not cached, trigger background lookup to cache it
 			if (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookup === "function") {
 				if (manufacturer && model) {
@@ -3596,7 +3603,10 @@ list += "</select></div>" +
 
 					var key = "ld:" + idx + ":" + ldIndex;
 					optionMap[key] = { device: device, logicalDevice: clonedLd };
-					logicalSelect.append($("<option>").val(key).text((vendor ? (vendor + " – ") : "") + ldName + " (" + detail + ")"));
+					var ldDesc = ld.desc || ld.description || "";
+					var ldDisplayName = ldName + (ldDesc ? " - " + ldDesc : "");
+					var optionText = (vendor ? (vendor + " – ") : "") + ldDisplayName + " (" + detail + ")";
+					logicalSelect.append($("<option>").val(key).text(optionText));
 					count++;
 				});
 

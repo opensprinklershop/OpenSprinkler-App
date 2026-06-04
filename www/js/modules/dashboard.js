@@ -111,6 +111,58 @@ OSApp.Dashboard.displayPage = function() {
 			}
 
 			sensors = OSApp.Analog.analogSensors;
+			if ( sensors instanceof Array && sensors.length > 0 ) {
+				for ( i = 0; i < sensors.length; i++ ) {
+					sensor = sensors[ i ] || {};
+					if ( parseInt( sensor.type, 10 ) !== OSApp.Analog.Constants.SENSOR_ZIGBEE ) {
+						continue;
+					}
+
+					sensorIeee = normalizeZigbeeIeeeForCard( sensor.device_ieee || sensor.zb_ieee_ref || sensor.ieee || sensor.ieee_addr );
+					if ( isSameZigbeeIeee( sensorIeee, stationIeee ) ) {
+						batteryPercent = OSApp.Analog.getBatteryPercent( sensor.battery );
+						if ( batteryPercent !== null ) {
+							return batteryPercent;
+						}
+					}
+				}
+			}
+
+			if ( typeof OSApp.ESP32Mode === "undefined" ) {
+				OSApp.ESP32Mode = {};
+			}
+
+			if ( !OSApp.ESP32Mode.cachedDevices && !OSApp.ESP32Mode.fetchingDevices ) {
+				OSApp.ESP32Mode.fetchingDevices = true;
+				OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( data ) {
+					OSApp.ESP32Mode.fetchingDevices = false;
+					if ( data && data.result === 1 && data.devices ) {
+						OSApp.ESP32Mode.cachedDevices = data.devices;
+						$( "html" ).trigger( "datarefresh" );
+					}
+				} ).fail( function() {
+					OSApp.ESP32Mode.fetchingDevices = false;
+				} );
+			}
+
+			if ( OSApp.ESP32Mode.cachedDevices && OSApp.ESP32Mode.cachedDevices.length > 0 ) {
+				for ( i = 0; i < OSApp.ESP32Mode.cachedDevices.length; i++ ) {
+					var dev = OSApp.ESP32Mode.cachedDevices[ i ];
+					if ( !dev || !dev.ieee ) {
+						continue;
+					}
+					var devIeee = normalizeZigbeeIeeeForCard( dev.ieee );
+					if ( isSameZigbeeIeee( devIeee, stationIeee ) ) {
+						if ( dev.battery !== undefined && dev.battery !== 255 ) {
+							batteryPercent = OSApp.Analog.getBatteryPercent( dev.battery );
+							if ( batteryPercent !== null ) {
+								return batteryPercent;
+							}
+						}
+					}
+				}
+			}
+
 			if ( !( sensors instanceof Array ) || sensors.length === 0 ) {
 				if ( !zigbeeBatteryRefreshPending && OSApp.Analog && typeof OSApp.Analog.updateAnalogSensor === "function" ) {
 					zigbeeBatteryRefreshPending = true;
@@ -118,24 +170,6 @@ OSApp.Dashboard.displayPage = function() {
 						zigbeeBatteryRefreshPending = false;
 						$( "html" ).trigger( "datarefresh" );
 					} );
-				}
-				return null;
-			}
-
-			for ( i = 0; i < sensors.length; i++ ) {
-				sensor = sensors[ i ] || {};
-				if ( parseInt( sensor.type, 10 ) !== OSApp.Analog.Constants.SENSOR_ZIGBEE ) {
-					continue;
-				}
-
-				sensorIeee = normalizeZigbeeIeeeForCard( sensor.device_ieee || sensor.zb_ieee_ref || sensor.ieee || sensor.ieee_addr );
-				if ( !isSameZigbeeIeee( sensorIeee, stationIeee ) ) {
-					continue;
-				}
-
-				batteryPercent = OSApp.Analog.getBatteryPercent( sensor.battery );
-				if ( batteryPercent !== null ) {
-					return batteryPercent;
 				}
 			}
 
@@ -145,18 +179,19 @@ OSApp.Dashboard.displayPage = function() {
 			var zigbeeStatus = OSApp.currentSession.controller.zigbeeStationStatus || [];
 			var statusCode = parseInt( zigbeeStatus[ sid ], 10 );
 
-			if ( isNaN( statusCode ) || statusCode === 2 ) {
+			if ( isNaN( statusCode ) ) {
+				return "zigbee-off";
+			}
+
+			if ( statusCode === 2 ) {
 				return "zigbee-error";
 			}
 
-			var sollIsOn = !!OSApp.Stations.getStatus( sid );
-			var istIsOn = ( statusCode === 3 || statusCode === 4 );
-
-			if ( sollIsOn !== istIsOn ) {
-				return "zigbee-error";
+			if ( statusCode === 3 || statusCode === 4 ) {
+				return "zigbee-on";
 			}
 
-			return sollIsOn ? "zigbee-on" : "zigbee-off";
+			return "zigbee-off";
 		},
 		addTimer = function( station, rem ) {
 			OSApp.uiState.timers[ "station-" + station ] = {
