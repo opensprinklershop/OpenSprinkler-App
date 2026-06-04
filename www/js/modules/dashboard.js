@@ -208,13 +208,30 @@ OSApp.Dashboard.displayPage = function() {
 		addCard = function( sid ) {
 			var isScheduled = OSApp.Stations.getPID( sid ) > 0,
 				isRunning = OSApp.Stations.isRunning( sid ),
-				pname = isScheduled ? OSApp.Programs.pidToName( OSApp.Stations.getPID( sid ) ) : "",
+				zigbeeIsOn = false;
+
+			if ( OSApp.Stations.isSpecial( sid ) ) {
+				var stObj = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
+				if ( stObj && parseInt( stObj.st, 10 ) === 9 ) {
+					// Zigbee Station: check if physically on via status code
+					var zigbeeClass = getZigbeeIconStateClass( sid );
+					if ( zigbeeClass === "zigbee-on" ) {
+						zigbeeIsOn = true;
+					}
+				}
+			}
+
+			if ( isRunning || zigbeeIsOn ) {
+				isRunning = true;
+			}
+
+			var pname = isScheduled ? OSApp.Programs.pidToName( OSApp.Stations.getPID( sid ) ) : "",
 				rem = OSApp.Stations.getRemainingRuntime( sid ),
 				qPause = OSApp.Supported.pausing() && OSApp.StationQueue.isPaused(),
 				hasImage = sites[ currentSite ].images[ sid ] ? true : false,
 				zigbeeBatteryPercent = getZigbeeStationBatteryPercent( sid );
 
-			if ( OSApp.Stations.getStatus( sid ) && rem > 0 ) {
+			if ( isRunning && rem > 0 ) {
 				addTimer( sid, rem );
 			}
 
@@ -1538,6 +1555,7 @@ OSApp.Dashboard.displayPage = function() {
 					card.find( "#station_" + sid ).text( OSApp.Stations.getName( sid) );
 
 					var specIconClass = "ui-icon-wifi";
+					var isZigbee = false;
 					if ( OSApp.Stations.isSpecial( sid ) ) {
 						var stObj = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
 						var specialType = stObj ? parseInt( stObj.st, 10 ) : 0;
@@ -1547,11 +1565,13 @@ OSApp.Dashboard.displayPage = function() {
 							specIconClass = "ui-icon-gardena";
 						} else if ( specialType === 9 ) {
 							specIconClass = "ui-icon-zigbee";
+							isZigbee = true;
 						}
 					}
+					var zigbeeClass = getZigbeeIconStateClass( sid );
 					card.find( ".special-station" )
 						.removeClass( "hidden ui-icon-wifi ui-icon-rs485 ui-icon-gardena ui-icon-zigbee zigbee-on zigbee-off zigbee-error" )
-						.addClass( specIconClass + ( OSApp.Stations.isSpecial( sid ) ? ( specIconClass === "ui-icon-zigbee" ? ( " " + getZigbeeIconStateClass( sid ) ) : "" ) : " hidden" ) );
+						.addClass( specIconClass + ( OSApp.Stations.isSpecial( sid ) ? ( specIconClass === "ui-icon-zigbee" ? ( " " + zigbeeClass ) : "" ) : " hidden" ) );
 
 					var zigbeeBatteryPercent = getZigbeeStationBatteryPercent( sid );
 					var batteryBadge = card.find( ".zigbee-station-battery" );
@@ -1566,7 +1586,11 @@ OSApp.Dashboard.displayPage = function() {
 						batteryBadge.html( OSApp.Analog.renderBatteryIcon( zigbeeBatteryPercent, false ) ).removeClass( "hidden" );
 					}
 
-					card.find( ".station-status" ).removeClass( "on off wait" ).addClass( isRunning ? "on" : ( isScheduled ? "wait" : "off" ) );
+					var displayRunning = isRunning;
+					if ( isZigbee && zigbeeClass === "zigbee-on" ) {
+						displayRunning = true;
+					}
+					card.find( ".station-status" ).removeClass( "on off wait" ).addClass( displayRunning ? "on" : ( isScheduled ? "wait" : "off" ) );
 					if ( OSApp.Stations.isMaster( sid ) ) {
 						card.find( ".station-settings" ).removeClass( "ui-icon-gear" ).addClass( "ui-icon-master" );
 					} else {
