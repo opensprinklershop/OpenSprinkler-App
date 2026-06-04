@@ -1655,6 +1655,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			dpCons:    parseDp( ld.consumption_dp ),
 			dpUnit:    parseDp( ld.unit_dp ),
 			dpBatt:    parseDp( ld.battery_dp ),
+			statusOn:  ld.status_on || "",
 			isTuya:    ( ld.control_mode === 1 ),
 			factor:    parseInt( ld.factor, 10 ) || 0,
 			divider:   parseInt( ld.divider, 10 ) || 0,
@@ -1693,6 +1694,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		params[ prefix + "dp_unit" ] = dpOrNeg( entry.dpUnit );
 		params[ prefix + "dp_stat" ] = dpOrNeg( entry.dpStat );
 		params[ prefix + "dp_cons" ] = dpOrNeg( entry.dpCons );
+		params[ prefix + "status_on" ] = String( entry.statusOn || "" ).trim().slice( 0, 15 );
 		params[ prefix + "factor"  ] = parseInt( entry.factor, 10 ) || 0;
 		params[ prefix + "div"     ] = parseInt( entry.divider, 10 ) || 0;
 		params[ prefix + "offset"  ] = parseInt( entry.offset, 10 ) || 0;
@@ -1734,6 +1736,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 				dpCons:   parseDp( e.dp_consumption ),
 				dpUnit:   parseDp( e.dp_unit ),
 				dpBatt:   parseDp( e.dp_battery ),
+				statusOn: e.tuya_status_on || e.status_on || "",
 				isTuya:   isTuya,
 				factor:   parseInt( e.factor, 10 ) || 0,
 				divider:  parseInt( e.divider, 10 ) || 0,
@@ -1765,6 +1768,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 	var dpLabels = [
 		{ key: "dpVal",  lbl: "Value DP"       },
 		{ key: "dpStat", lbl: "Status DP"      },
+		{ key: "statusOn", lbl: "Status ON"   },
 		{ key: "dpCons", lbl: "Consumption DP" },
 		{ key: "dpUnit", lbl: "Unit DP"        },
 		{ key: "dpBatt", lbl: "Battery DP"     }
@@ -1868,7 +1872,11 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			var val = d[ f.key ] !== undefined && d[ f.key ] !== null ? d[ f.key ] : "";
 			h += "    <div style='flex:1;min-width:60px;'>";
 			h += "      <label style='font-size:0.75em;margin:0 0 2px;'>" + OSApp.Language._( f.lbl ) + "</label>";
-			h += "      <input type='number' class='zbed-ld-field' data-idx='" + idx + "' data-field='" + f.key + "' value='" + val + "' data-mini='true'>";
+			if ( f.key === "statusOn" ) {
+				h += "      <input type='text' class='zbed-ld-field' data-idx='" + idx + "' data-field='" + f.key + "' value='" + val + "' data-mini='true' placeholder='e.g., 1,2'>";
+			} else {
+				h += "      <input type='number' class='zbed-ld-field' data-idx='" + idx + "' data-field='" + f.key + "' value='" + val + "' data-mini='true'>";
+			}
 			h += "    </div>";
 		} );
 		h += "  </div>";
@@ -2035,6 +2043,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 							value_dp:       intOrNeg( pl.dpVal ),
 							status_dp:      intOrNeg( pl.dpStat ),
 							consumption_dp: intOrNeg( pl.dpCons ),
+							status_on:      pl.statusOn || "",
 							unit_dp:        intOrNeg( pl.dpUnit ),
 							battery_dp:     intOrNeg( pl.dpBatt ),
 							control_mode:   pl.isTuya ? 1 : 0,
@@ -2072,6 +2081,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			dpCons:    "",
 			dpUnit:    "",
 			dpBatt:    "",
+			statusOn:  "",
 			isTuya:    false,
 			factor:    0,
 			divider:   0,

@@ -492,7 +492,7 @@ OSApp.Dashboard.displayPage = function() {
 									var ld = targetDev.logical_devices[ li ];
 									var ep = parseInt( ld.endpoint, 10 ) || 1;
 									var isTuya = ld.control_mode === 1 ? 1 : 0;
-									var dp = ( ld.status_dp !== undefined && ld.status_dp >= 0 ) ? ld.status_dp : ( ld.value_dp !== undefined && ld.value_dp >= 0 ? ld.value_dp : 0 );
+									var dp = ( ld.value_dp !== undefined && ld.value_dp >= 0 ) ? ld.value_dp : ( ld.status_dp !== undefined && ld.status_dp >= 0 ? ld.status_dp : 0 );
 									if ( dp < 0 ) dp = 0;
 
 									var isSelected = ( ep === epTarget && isTuya === isTuyaTarget && dp === dpTarget );
