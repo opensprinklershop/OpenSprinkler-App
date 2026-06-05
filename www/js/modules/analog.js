@@ -2371,6 +2371,75 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			updateScannerActions();
 		}
 
+		var isUnknownMeta = function(value) {
+			var s = String(value || "").trim().toLowerCase();
+			var unknownLabel = String(OSApp.Language._("Unknown") || "").trim().toLowerCase();
+			return !s || s === "unknown" || (unknownLabel && s === unknownLabel);
+		};
+
+		var cleanMeta = function(value) {
+			return isUnknownMeta(value) ? "" : String(value || "").trim();
+		};
+
+		var resolveScannerDeviceLabel = function(device, idx, shortAddr) {
+			var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
+			var cachedLabel = (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel === "function") ?
+				OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel(ieeeAddr) : null;
+
+			if (cachedLabel) {
+				return cachedLabel;
+			}
+
+			var manufacturer = cleanMeta(device.manufacturer);
+			var model = cleanMeta(device.model || device.model_id);
+
+			var localLabel = (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName === "function") ?
+				OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName(manufacturer, model) : null;
+
+			if (localLabel) {
+				return localLabel;
+			}
+
+			// If not cached, trigger background lookup to cache it
+			if (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookup === "function") {
+				if (manufacturer && model) {
+					OSApp.ESP32Mode.ZigbeeDeviceDB.lookup(manufacturer, model).done(function(dbData) {
+						if (dbData) {
+							OSApp.ESP32Mode.ZigbeeDeviceDB.setCached(ieeeAddr, dbData);
+							var updatedLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel(ieeeAddr);
+							if (updatedLabel) {
+								var option = scanDialog.find("#zigbeeDeviceSelectScanner option[value='" + idx + "']");
+								if (option.length) {
+									var text = updatedLabel + " | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
+									option.text(text);
+									try { scanDialog.find("#zigbeeDeviceSelectScanner").selectmenu("refresh"); } catch (ignore) { void ignore; }
+								}
+								// Also update lastDevice label if it matches
+								if (lastFoundDevice && lastFoundDevice.ieee === ieeeAddr) {
+									scanDialog.find("#lastDevice").html(
+										"<strong style='color: green;'>" + OSApp.Language._("Last found") + ":</strong> " +
+										OSApp.Utils.htmlEscape(updatedLabel) + "<br>" +
+										"<small>IEEE: " + OSApp.Utils.htmlEscape(ieeeAddr) + "</small>"
+									).show();
+								}
+							}
+						}
+					});
+				}
+			}
+
+			var modelId = model || cleanMeta(device.vendor);
+			var manu = manufacturer || cleanMeta(device.vendor);
+			var isTechnical = /^TS\d+$/i.test(model);
+			var title = model;
+			if (isTechnical) {
+				if (manu && manu.indexOf("_TZE") === 0) {
+					title = "Tuya Smart Device (" + model + ")";
+				}
+			}
+			return manu ? (title + " (" + manu + ")") : (title || ("IEEE " + ieeeAddr));
+		};
+
 		function updateDeviceList() {
 			if (requestInFlight) {
 				return;
@@ -2394,23 +2463,22 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 						var device = devices[i] || {};
 						var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
 						var shortAddr = device.short_addr || "0x0000";
-						var modelId = device.model || device.model_id || OSApp.Language._("Unknown");
-						var manufacturer = device.manufacturer || OSApp.Language._("Unknown");
 
-						var label = modelId + " (" + manufacturer + ") | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
+						var friendlyLabel = resolveScannerDeviceLabel(device, i, shortAddr);
+						var label = friendlyLabel + " | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
 						sel.append($("<option>").val(String(i)).text(label));
 
 						// Track last found device
 						var isNew = (device.is_new === true || device.is_new === 1 || device.is_new === "1");
 						if (isNew && !lastFoundDevice) {
 							lastFoundDevice = {
-								model: modelId,
+								model: device.model || device.model_id,
 								ieee: ieeeAddr,
-								manufacturer: manufacturer
+								manufacturer: device.manufacturer
 							};
 							scanDialog.find("#lastDevice").html(
 								"<strong style='color: green;'>" + OSApp.Language._("Last found") + ":</strong> " +
-								OSApp.Utils.htmlEscape(modelId) + " (" + OSApp.Utils.htmlEscape(manufacturer) + ")<br>" +
+								OSApp.Utils.htmlEscape(friendlyLabel) + "<br>" +
 								"<small>IEEE: " + OSApp.Utils.htmlEscape(ieeeAddr) + "</small>"
 							).show();
 						}
