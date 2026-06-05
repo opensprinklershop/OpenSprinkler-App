@@ -207,23 +207,7 @@ OSApp.Dashboard.displayPage = function() {
 		},
 		addCard = function( sid ) {
 			var isScheduled = OSApp.Stations.getPID( sid ) > 0,
-				isRunning = OSApp.Stations.isRunning( sid ),
-				zigbeeIsOn = false;
-
-			if ( OSApp.Stations.isSpecial( sid ) ) {
-				var stObj = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
-				if ( stObj && parseInt( stObj.st, 10 ) === 9 ) {
-					// Zigbee Station: check if physically on via status code
-					var zigbeeClass = getZigbeeIconStateClass( sid );
-					if ( zigbeeClass === "zigbee-on" ) {
-						zigbeeIsOn = true;
-					}
-				}
-			}
-
-			if ( isRunning || zigbeeIsOn ) {
-				isRunning = true;
-			}
+				isRunning = OSApp.Stations.isRunning( sid );
 
 			var pname = isScheduled ? OSApp.Programs.pidToName( OSApp.Stations.getPID( sid ) ) : "",
 				rem = OSApp.Stations.getRemainingRuntime( sid ),
@@ -610,6 +594,8 @@ OSApp.Dashboard.displayPage = function() {
 							sel.append( "<option value=''>" + OSApp.Language._( "Loading paired devices..." ) + "</option>" );
 							refreshZigbeeSelect();
 
+							$.mobile.loading( "show" );
+
 							return OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( response ) {
 								sel.empty();
 								sel.append( "<option value=''>" + OSApp.Language._( "-- Select or Enter Custom --" ) + "</option>" );
@@ -646,6 +632,8 @@ OSApp.Dashboard.displayPage = function() {
 								sel.empty();
 								sel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "Error loading devices" ) + "</option>" );
 								refreshZigbeeSelect();
+							} ).always( function() {
+								$.mobile.loading( "hide" );
 							} );
 						};
 
@@ -1587,9 +1575,6 @@ OSApp.Dashboard.displayPage = function() {
 					}
 
 					var displayRunning = isRunning;
-					if ( isZigbee && zigbeeClass === "zigbee-on" ) {
-						displayRunning = true;
-					}
 					card.find( ".station-status" ).removeClass( "on off wait" ).addClass( displayRunning ? "on" : ( isScheduled ? "wait" : "off" ) );
 					if ( OSApp.Stations.isMaster( sid ) ) {
 						card.find( ".station-settings" ).removeClass( "ui-icon-gear" ).addClass( "ui-icon-master" );

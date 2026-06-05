@@ -1571,7 +1571,14 @@ OSApp.Analog.getMonitor = function(popup) {
 	//TIME
 	OSApp.Analog.addToObjectTime(popup, "#from", result);
 	OSApp.Analog.addToObjectTime(popup, "#to", result);
-	OSApp.Analog.addToObjectInt(popup, "#wdays", result); //todo: weekdays as checkboxes
+	// Read weekdays from checkboxes
+	let wdaysVal = 0;
+	for (let d = 0; d < 7; d++) {
+		if (popup.find("#wd_" + d).is(":checked")) {
+			wdaysVal |= (1 << d);
+		}
+	}
+	result.wdays = wdaysVal;
 	//REMOTE
 	OSApp.Analog.addToObjectIPs(popup, "#ip", result);
 	OSApp.Analog.addToObjectInt(popup, "#port", result);
@@ -1603,6 +1610,28 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 		var i;
 
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
+
+		var activeFrom = (typeof monitor.from === "number" && !isNaN(monitor.from)) ? monitor.from : 0;
+		var activeTo = (typeof monitor.to === "number" && !isNaN(monitor.to)) ? monitor.to : 0;
+
+		var wdaysHtml = "<fieldset data-role='controlgroup' data-type='horizontal' class='center-controlgroup' style='text-align: center; margin-top: 15px;'>" +
+			"<legend style='font-weight: bold; margin-bottom: 5px;'>" + OSApp.Language._("Weekdays") + "</legend>";
+		var weekShort = [
+			OSApp.Language._("Mon"),
+			OSApp.Language._("Tue"),
+			OSApp.Language._("Wed"),
+			OSApp.Language._("Thu"),
+			OSApp.Language._("Fri"),
+			OSApp.Language._("Sat"),
+			OSApp.Language._("Sun")
+		];
+		var activeWdays = (typeof monitor.wdays === "number" && !isNaN(monitor.wdays)) ? monitor.wdays : 0xFF;
+		for (var d = 0; d < 7; d++) {
+			var checked = (activeWdays & (1 << d)) ? "checked='checked'" : "";
+			wdaysHtml += "<input type='checkbox' name='wd_" + d + "' id='wd_" + d + "' " + checked + " data-mini='true'>" +
+				"<label for='wd_" + d + "'>" + weekShort[d] + "</label>";
+		}
+		wdaysHtml += "</fieldset>";
 
 		var list =
 			"<div data-role='popup' data-theme='a' id='monitorEditor' style='max-width:580px;'>" +
@@ -1763,11 +1792,10 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 		//typ == TIME
 			"<div id='type_time'>"+
 			"<label for='from'>"+OSApp.Language._("From")+"</label>"+
-			"<input id='from' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.round(monitor.from / 100)) + ":" + OSApp.Utils.pad(monitor.from % 100) + "'>" +
+			"<input id='from' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.round(activeFrom / 100)) + ":" + OSApp.Utils.pad(activeFrom % 100) + "'>" +
 			"<label for='to'>"+OSApp.Language._("To")+"</label>"+
-			"<input id='to' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.round(monitor.to / 100)) + ":" + OSApp.Utils.pad(monitor.to % 100) + "'>" +
-			"<label for='wdays'>"+OSApp.Language._("Weekdays")+"</label>"+ //Todo: days as checkboxes
-			"<input id='wdays' type='number' inputmode='decimal' min='0' max ='255' value='" + monitor.wdays + "'>" +
+			"<input id='to' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.round(activeTo / 100)) + ":" + OSApp.Utils.pad(activeTo % 100) + "'>" +
+			wdaysHtml +
 			"</div>"+
 
 		//typ == REMOTE
@@ -6042,6 +6070,21 @@ OSApp.Analog.buildSensorConfig = function() {
 					source = OSApp.Analog.getMonitorLogical(item.type)+" "+OSApp.Analog.getMonitorName(item.monitor);
 					break;
 				}
+				case OSApp.Analog.Constants.MONITOR_TIME: {
+					source = OSApp.Analog.getMonitorLogical(item.type);
+					break;
+				}
+			}
+			var val1Text = "";
+			var val2Text = "";
+			if (item.type === OSApp.Analog.Constants.MONITOR_TIME) {
+				var activeFrom = (typeof item.from === "number" && !isNaN(item.from)) ? item.from : 0;
+				var activeTo = (typeof item.to === "number" && !isNaN(item.to)) ? item.to : 0;
+				val1Text = OSApp.Utils.pad(Math.round(activeFrom / 100)) + ":" + OSApp.Utils.pad(activeFrom % 100);
+				val2Text = OSApp.Utils.pad(Math.round(activeTo / 100)) + ":" + OSApp.Utils.pad(activeTo % 100);
+			} else {
+				val1Text = OSApp.Analog.formatValUnit(item.value1, unit);
+				val2Text = OSApp.Analog.formatValUnit(item.value2, unit);
 			}
 			var $tr = $("<tr>").append(
 				$("<td>").text(item.nr),
@@ -6052,8 +6095,8 @@ OSApp.Analog.buildSensorConfig = function() {
 				item.name + "</a></td>",
 				$("<td class=\"hidecol2\">").text(progName),
 				$("<td class=\"hidecol2\">").text(zoneName),
-				$("<td class=\"hidecol2\">").text(OSApp.Analog.formatValUnit(item.value1, unit)),
-				$("<td class=\"hidecol2\">").text(OSApp.Analog.formatValUnit(item.value2, unit)),
+				$("<td class=\"hidecol2\">").text(val1Text),
+				$("<td class=\"hidecol2\">").text(val2Text),
 				$("<td>"+(item.active ? checkpng : ""))
 			);
 			list += $tr.wrap("<p>").html() + "</tr>";

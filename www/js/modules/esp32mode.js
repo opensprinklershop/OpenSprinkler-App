@@ -1124,6 +1124,15 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 			return "GIEX GX02 Water Valve";
 		}
 
+		// GIEX GX03 2-zone watering timer (Tuya TS0601 with _TZE284_8zizsafo)
+		if (
+			mdlLower === "gx03" ||
+			mfrLower.indexOf( "_tze284_8zizsafo" ) !== -1 ||
+			( mdlLower === "ts0601" && mfrLower.indexOf( "_tze284_8zizsafo" ) !== -1 )
+		) {
+			return "GIEX GX03 2-zone watering timer";
+		}
+
 		// Tuya fallback placeholder to avoid displaying raw technical name
 		if ( mdlLower === "ts0601" || mdlLower === "ts0001" ) {
 			return "Tuya Smart Device (" + mdl.toUpperCase() + ")";
@@ -1954,8 +1963,15 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			var pickedModel = String( picked && ( picked.model_id || picked.model || "" ) ).trim();
 			if ( pickedManuf ) { popup.find( "#zbed-manuf" ).val( pickedManuf ); }
 			if ( pickedModel ) { popup.find( "#zbed-model" ).val( pickedModel ); }
-			if ( picked && picked.description ) {
-				popup.find( "#zbed-name" ).val( String( picked.description ).slice( 0, 40 ) );
+			if ( picked ) {
+				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( pickedManuf, pickedModel );
+				if ( !devName ) {
+					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, pickedModel, picked.description );
+				}
+				if ( !devName ) {
+					devName = picked.description || "";
+				}
+				popup.find( "#zbed-name" ).val( String( devName ).slice( 0, 40 ) );
 			}
 			return { mfr: pickedManuf || manuf, mdl: pickedModel || model };
 		}
@@ -2561,9 +2577,15 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 					popup.find( "#zbed-model" ).val( mdl );
 					devModel = mdl;
 				}
-				if ( picked.description ) {
-					popup.find( "#zbed-name" ).val( String( picked.description ).slice( 0, 40 ) );
+				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( mfr, mdl );
+				if ( !devName ) {
+					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, mdl, picked.description );
 				}
+				if ( !devName ) {
+					devName = picked.description || "";
+				}
+				popup.find( "#zbed-name" ).val( String( devName ).slice( 0, 40 ) );
+
 				logicalState = "loading";
 				renderLogicals();
 				// Trigger the existing DB lookup to pull cluster_entries / logical devices.
