@@ -1562,11 +1562,9 @@ OSApp.Analog.getMonitor = function(popup) {
 	OSApp.Analog.addToObjectChk(popup, "#invers4", result);
 	//NOT & SET_SENSOR12 (both use #monitor but are in different scopes)
 	if (result.type === OSApp.Analog.Constants.MONITOR_SET_SENSOR12) {
-		let subPopup = popup.find("#type_set_sensor12");
-		OSApp.Analog.addToObjectInt(subPopup, "#set_monitor", result, "monitor");
+		OSApp.Analog.addToObjectInt(popup, "#set_monitor", result, "monitor");
 	} else if (result.type === OSApp.Analog.Constants.MONITOR_NOT) {
-		let subPopup = popup.find("#type_not");
-		OSApp.Analog.addToObjectInt(subPopup, "#not_monitor", result, "monitor");
+		OSApp.Analog.addToObjectInt(popup, "#not_monitor", result, "monitor");
 	}
 	//TIME
 	OSApp.Analog.addToObjectTime(popup, "#from", result);
