@@ -2428,7 +2428,6 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 				}
 			}
 
-			var modelId = model || cleanMeta(device.vendor);
 			var manu = manufacturer || cleanMeta(device.vendor);
 			var isTechnical = /^TS\d+$/i.test(model);
 			var title = model;
@@ -6412,6 +6411,7 @@ OSApp.Analog.buildSensorTable = function(csv, sensorNr) {
 	var rows = [];
 	var nr = sensorId;
 	var pad = function(n) { return n < 10 ? "0" + n : "" + n; };
+	var tzo = OSApp.Dates.getTimezoneOffsetOS() * 60;
 
 	for (var i = 0; i < lines.length; i++) {
 		var parts = lines[i].split(";");
@@ -6420,7 +6420,7 @@ OSApp.Analog.buildSensorTable = function(csv, sensorNr) {
 		var ts  = parseInt(parts[1], 10);
 		var val = parseFloat(parts[2]);
 		if (isNaN(ts)) { continue; }
-		var d = new Date(ts * 1000);
+		var d = new Date((ts + tzo) * 1000);
 		var timeStr = pad(d.getUTCDate()) + "." + pad(d.getUTCMonth() + 1) + "." + String(d.getUTCFullYear()).slice(-2) +
 			" " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes());
 		rows.push({ ts: ts, timeStr: timeStr, val: isNaN(val) ? null : val });

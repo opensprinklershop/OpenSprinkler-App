@@ -316,7 +316,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 						var pulseRate100;
 
 						if ( pulseDivisorInput > 1 ) {
-							pulseRate100 = parseInt( data, 10 );
+							pulseRate100 = Math.round( parseFloat( data ) * 100 );
 							if ( isNaN( pulseRate100 ) || pulseRate100 < 1 ) {
 								pulseRate100 = 1;
 							}
@@ -325,7 +325,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								data = data * 3.78541;
 							}
 
-							pulseRate100 = Math.round( data * 100 );
+							pulseRate100 = Math.round( parseFloat( data ) * 100 );
 							if ( isNaN( pulseRate100 ) || pulseRate100 < 1 ) {
 								pulseRate100 = 1;
 							}
@@ -794,7 +794,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 		var flowPulseDiv = supportsFlowPulseDiv && OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ?
 			( OSApp.currentSession.controller.options.fpd1 * 256 + OSApp.currentSession.controller.options.fpd0 ) : 1;
 		var flowPulseRate100 = ( OSApp.currentSession.controller.options.fpr1 * 256 + OSApp.currentSession.controller.options.fpr0 );
-		var flowPulseRateDisplay = flowPulseDiv > 1 ? flowPulseRate100 : ( flowPulseRate100 / 100 );
+		var flowPulseRateDisplay = ( flowPulseRate100 / 100 );
 		if ( !flowPulseDiv || flowPulseDiv < 1 ) {
 			flowPulseDiv = 1;
 		}

@@ -1543,7 +1543,6 @@ OSApp.Dashboard.displayPage = function() {
 					card.find( "#station_" + sid ).text( OSApp.Stations.getName( sid) );
 
 					var specIconClass = "ui-icon-wifi";
-					var isZigbee = false;
 					if ( OSApp.Stations.isSpecial( sid ) ) {
 						var stObj = OSApp.currentSession.controller.special && OSApp.currentSession.controller.special[ sid ];
 						var specialType = stObj ? parseInt( stObj.st, 10 ) : 0;
@@ -1553,7 +1552,6 @@ OSApp.Dashboard.displayPage = function() {
 							specIconClass = "ui-icon-gardena";
 						} else if ( specialType === 9 ) {
 							specIconClass = "ui-icon-zigbee";
-							isZigbee = true;
 						}
 					}
 					var zigbeeClass = getZigbeeIconStateClass( sid );
