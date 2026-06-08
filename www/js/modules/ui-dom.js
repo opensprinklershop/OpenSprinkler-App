@@ -159,6 +159,8 @@ OSApp.UIDom.launchApp = function() {
 			OSApp.Programs.displayPageManual();
 		} else if ( hash === "#about" ) {
 			OSApp.About.displayPage();
+		} else if ( hash === "#liveDebug" ) {
+			OSApp.LiveDebug.displayPage();
 		} else if ( hash === "#runonce" ) {
 			OSApp.Programs.displayPageRunOnce();
 		} else if ( hash === "#os-options" ) {
@@ -638,6 +640,11 @@ OSApp.UIDom.bindPanel = function() {
 		return false;
 	} );
 
+	panel.find( "a[href='#liveDebug']" ).on( "click", function() {
+		OSApp.UIDom.changePage( "#liveDebug" );
+		return false;
+	} );
+
 	panel.find( ".setup-matter" ).on( "click", function() {
 		OSApp.UIDom.closePanel( function() {
 			OSApp.ESP32Mode.setupMatter();
@@ -780,6 +787,25 @@ OSApp.UIDom.bindPanel = function() {
 					onlineUpdateSupported = OSApp.Firmware.isDirectFirmwareUploadSupported() || OSApp.Firmware.isOSPi();
 
 				panel.find( ".toggleOperation span:first" ).html( operation ).attr( "data-translate", operation );
+
+				// Show Live Debug menu only if fwv >= 210 AND dbg mode is active in options/settings or "DEBUG" is a compiled feature
+				var isVersionSupported = OSApp.Firmware.checkOSVersion( 210 );
+				var isDebugEnabled = false;
+				if ( OSApp.currentSession.controller && OSApp.currentSession.controller.options && typeof OSApp.currentSession.controller.options.feature === "string" ) {
+					isDebugEnabled = OSApp.currentSession.controller.options.feature.indexOf( "DEBUG" ) !== -1;
+				}
+
+				if ( !isDebugEnabled && OSApp.currentSession.controller && OSApp.currentSession.controller.settings && typeof OSApp.currentSession.controller.settings.debug_build !== "undefined" ) {
+					isDebugEnabled = OSApp.currentSession.controller.settings.debug_build === 1;
+				} else if ( !isDebugEnabled && OSApp.currentSession.controller && OSApp.currentSession.controller.options && typeof OSApp.currentSession.controller.options.dbg !== "undefined" ) {
+					isDebugEnabled = OSApp.currentSession.controller.options.dbg === 1;
+				}
+
+				if ( isVersionSupported && isDebugEnabled ) {
+					panel.find( ".live-debug-menu" ).removeClass( "hidden" ).css( "display", "" );
+				} else {
+					panel.find( ".live-debug-menu" ).addClass( "hidden" );
+				}
 
 				// Update ESP32 Mode and sub-menu visibility
 				if ( OSApp.ESP32Mode && OSApp.ESP32Mode.isESP32Supported() ) {
@@ -973,6 +999,7 @@ OSApp.UIDom.goHome = function( firstLoad ) {
 			"#forecast": true,
 			"#preview": true,
 			"#about": true,
+			"#liveDebug": true,
 			"#statistics": true,
 			"#analogsensorconfig": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail(),
 			"#analogsensorchart": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail()

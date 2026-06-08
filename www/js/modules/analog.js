@@ -584,7 +584,8 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 	}
 
 	// Always update values in-place
-	var nowSec = Math.floor(Date.now() / 1000);
+	var tzo = OSApp.Dates.getTimezoneOffsetOS() * 60;
+	var nowSec = Math.floor(Date.now() / 1000) + tzo;
 
 	// Sensor rows
 	for (i = 0; i < orderedSensors.length; i++) {
@@ -5927,7 +5928,8 @@ OSApp.Analog.buildSensorConfig = function() {
 	var checkpng = "<img src=\"" + OSApp.UIDom.getAppURLPath() + "img/check-blue.png\">";
 
 	var row = 0;
-	var nowSec = Math.floor( Date.now() / 1000 );
+	var tzo = OSApp.Dates.getTimezoneOffsetOS() * 60;
+	var nowSec = Math.floor( Date.now() / 1000 ) + tzo;
 	$.each(OSApp.Analog.analogSensors, function (_i, item) {
 
 		var batteryPercent = OSApp.Analog.getBatteryPercent(item.battery);
@@ -5966,8 +5968,8 @@ OSApp.Analog.buildSensorConfig = function() {
 		var lastText = "";
 		if ( Number.isFinite( lastTs ) && dataOk ) {
 			var _ld = new Date( lastTs * 1000 ), _p = function(n) { return n < 10 ? "0"+n : ""+n; };
-			lastText = _p(_ld.getDate()) + "." + _p(_ld.getMonth()+1) + "." + String(_ld.getFullYear()).slice(-2) +
-				" " + _p(_ld.getHours()) + ":" + _p(_ld.getMinutes());
+			lastText = _p(_ld.getUTCDate()) + "." + _p(_ld.getUTCMonth()+1) + "." + String(_ld.getUTCFullYear()).slice(-2) +
+				" " + _p(_ld.getUTCHours()) + ":" + _p(_ld.getUTCMinutes());
 		}
 
 		var $tr = $("<tr>").addClass( rowClass ).append(
@@ -6411,7 +6413,6 @@ OSApp.Analog.buildSensorTable = function(csv, sensorNr) {
 	var rows = [];
 	var nr = sensorId;
 	var pad = function(n) { return n < 10 ? "0" + n : "" + n; };
-	var tzo = OSApp.Dates.getTimezoneOffsetOS() * 60;
 
 	for (var i = 0; i < lines.length; i++) {
 		var parts = lines[i].split(";");
@@ -6420,7 +6421,7 @@ OSApp.Analog.buildSensorTable = function(csv, sensorNr) {
 		var ts  = parseInt(parts[1], 10);
 		var val = parseFloat(parts[2]);
 		if (isNaN(ts)) { continue; }
-		var d = new Date((ts + tzo) * 1000);
+		var d = new Date(ts * 1000);
 		var timeStr = pad(d.getUTCDate()) + "." + pad(d.getUTCMonth() + 1) + "." + String(d.getUTCFullYear()).slice(-2) +
 			" " + pad(d.getUTCHours()) + ":" + pad(d.getUTCMinutes());
 		rows.push({ ts: ts, timeStr: timeStr, val: isNaN(val) ? null : val });

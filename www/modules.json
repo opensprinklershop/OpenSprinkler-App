@@ -30,6 +30,7 @@
   "storage.js",
   "supported.js",
   "system-diagnostics.js",
+  "live-debug.js",
   "ui-dom.js",
   "utils.js",
   "weather.js",
