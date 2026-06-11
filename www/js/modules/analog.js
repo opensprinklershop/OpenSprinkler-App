@@ -5099,11 +5099,14 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 					return OSApp.Analog.sendToOsObj("/mc?pw=", monitorOut).done(function (info) {
 						var result = info.result;
-						if (!result || result > 1)
+						if (!result || result > 1) {
 							OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
-						else
+						} else {
 							OSApp.Analog.monitors[row] = monitorOut;
-							OSApp.Analog.updateProgramAdjustments(updateSensorContent);
+							OSApp.Analog.updateMonitors(function() {
+								OSApp.Analog.updateProgramAdjustments(updateSensorContent);
+							});
+						}
 					});
 				}, updateSensorContent);
 			});
@@ -5130,11 +5133,14 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 				OSApp.Analog.showMonitorEditor(monitor, -1, function (monitorOut) {
 					return OSApp.Analog.sendToOsObj("/mc?pw=", monitorOut).done(function (info) {
 						var result = info.result;
-						if (!result || result > 1)
+						if (!result || result > 1) {
 							OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
-						else
+						} else {
 							OSApp.Analog.monitors.push(monitorOut);
-						OSApp.Analog.updateMonitors(updateSensorContent);
+							OSApp.Analog.updateMonitors(function() {
+								OSApp.Analog.updateProgramAdjustments(updateSensorContent);
+							});
+						}
 					});
 				}, updateSensorContent);
 			});
