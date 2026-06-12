@@ -5104,7 +5104,9 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 						} else {
 							OSApp.Analog.monitors[row] = monitorOut;
 							OSApp.Analog.updateMonitors(function() {
-								OSApp.Analog.updateProgramAdjustments(updateSensorContent);
+								OSApp.Analog.updateAnalogSensor(function() {
+									OSApp.Analog.updateProgramAdjustments(updateSensorContent);
+								});
 							});
 						}
 					});
@@ -5138,7 +5140,9 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 						} else {
 							OSApp.Analog.monitors.push(monitorOut);
 							OSApp.Analog.updateMonitors(function() {
-								OSApp.Analog.updateProgramAdjustments(updateSensorContent);
+								OSApp.Analog.updateAnalogSensor(function() {
+									OSApp.Analog.updateProgramAdjustments(updateSensorContent);
+								});
 							});
 						}
 					});
