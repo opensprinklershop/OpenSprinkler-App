@@ -4137,7 +4137,9 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 		var curVer = OSApp.ESP32Mode.formatFwVersion( data.cur_version ) + "." + data.cur_minor;
 		var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
 		var content = "<div class='ui-content'>";
-		content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+		content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel +
+			"<a href='https://opensprinklershop.de/upgrade' target='_blank' class='ui-btn ui-btn-inline ui-mini ui-corner-all ui-shadow' style='float:right; margin:-6px 0 0 0; font-size:0.65em; font-weight:normal; text-shadow:none;'>" + OSApp.Language._( "Details..." ) + "</a>" +
+			"</h3>";
 		content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer;
 		if ( data.available === 1 ) {
 			var newVer = OSApp.ESP32Mode.formatFwVersion( data.fw_version ) + "." + data.fw_minor;
@@ -4389,7 +4391,9 @@ OSApp.ESP32Mode.openClassicUpdatePopup = function( data, selectedEntry ) {
 	var latestEntry = OSApp.ESP32Mode.getClassicDefaultEntry( data );
 	var currentEntry = data && data.current_entry ? data.current_entry : null;
 	var content = "<div class='ui-content'>";
-	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel +
+		"<a href='https://opensprinklershop.de/upgrade' target='_blank' class='ui-btn ui-btn-inline ui-mini ui-corner-all ui-shadow' style='float:right; margin:-6px 0 0 0; font-size:0.65em; font-weight:normal; text-shadow:none;'>" + OSApp.Language._( "Details..." ) + "</a>" +
+		"</h3>";
 	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
 
 	if ( targetEntry ) {
@@ -5092,7 +5096,9 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
 		var curVer = OSApp.ESP32Mode.formatFwVersion( data.cur_version ) + "." + data.cur_minor;
 		var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
 		var content = "<div class='ui-content'>";
-		content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+		content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel +
+			"<a href='https://opensprinklershop.de/upgrade' target='_blank' class='ui-btn ui-btn-inline ui-mini ui-corner-all ui-shadow' style='float:right; margin:-6px 0 0 0; font-size:0.65em; font-weight:normal; text-shadow:none;'>" + OSApp.Language._( "Details..." ) + "</a>" +
+			"</h3>";
 		content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
 
 		if ( selectedEntry ) {
@@ -5375,7 +5381,9 @@ OSApp.ESP32Mode.setupOSPiOnlineUpdate = function() {
 	var curVer = OSApp.Firmware.getOSVersion();
 	var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
 	var content = "<div class='ui-content'>";
-	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel + "</h3>";
+	content += "<h3>" + OSApp.Language._( "Online Firmware Update" ) + " - " + variantLabel +
+		"<a href='https://opensprinklershop.de/upgrade' target='_blank' class='ui-btn ui-btn-inline ui-mini ui-corner-all ui-shadow' style='float:right; margin:-6px 0 0 0; font-size:0.65em; font-weight:normal; text-shadow:none;'>" + OSApp.Language._( "Details..." ) + "</a>" +
+		"</h3>";
 	content += "<p><b>" + OSApp.Language._( "Current version" ) + ":</b> " + curVer + "</p>";
 	content += "<p style='color:green;font-weight:bold;'>" + OSApp.Language._( "Firmware is up to date" ) + "</p>";
 	content += "<p style='font-size:0.9em;color:#666;'>" +
@@ -5794,7 +5802,9 @@ OSApp.ESP32Mode.startOTAwithURLs = function( zigbeeUrl, matterUrl, verLabel, zig
 	if ( matterSha256  && matterSha256.length  === 64 ) { urlParams += "&ms=" + encodeURIComponent( matterSha256  ); }
 
 	var content = "<div class='ui-content'>";
-	content += "<h3>" + OSApp.Language._( "Install Firmware" ) + " v" + verLabel + "</h3>";
+	content += "<h3>" + OSApp.Language._( "Install Firmware" ) + " v" + verLabel +
+		"<a href='https://opensprinklershop.de/upgrade' target='_blank' class='ui-btn ui-btn-inline ui-mini ui-corner-all ui-shadow' style='float:right; margin:-6px 0 0 0; font-size:0.65em; font-weight:normal; text-shadow:none;'>" + OSApp.Language._( "Details..." ) + "</a>" +
+		"</h3>";
 
 	content += "<div id='ota-steps' style='margin:12px 0;padding:8px;background:#f0f0f0;border-radius:4px;font-size:0.9em;'>";
 	content += "<p style='margin:2px 0;'><b>" + OSApp.Language._( "Update Process" ) + ":</b></p>";
