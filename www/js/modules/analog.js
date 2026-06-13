@@ -6249,8 +6249,8 @@ OSApp.Analog.buildSensorConfig = function() {
 		if (OSApp.Firmware.checkOSVersion(233)) {
 			list += "<a data-role='button' data-icon='arrow-d-r' class='backup-monitors'  href='#' data-mini='true'>" + OSApp.Language._("Backup Monitors") + "</a>" +
 				"<a data-role='button' data-icon='back'      class='restore-monitors' href='#' data-mini='true'>" + OSApp.Language._("Restore Monitors") + "</a>";
-			list += "</div></fieldset>";
 		}
+		list += "</fieldset>";
 	}
 	return list;
 };
