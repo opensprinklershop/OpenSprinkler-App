@@ -341,6 +341,10 @@ OSApp.Firmware.isGardenaAvailable = function() {
 		return false;
 	}
 
+	if ( OSApp.Firmware.isOSPi() ) {
+		return true;
+	}
+
 	var feature = OSApp.currentSession.controller.options.feature;
 	var hasZigbee = false;
 	var hasMatter = false;
