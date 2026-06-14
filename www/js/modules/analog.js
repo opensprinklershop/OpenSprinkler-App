@@ -101,6 +101,7 @@ OSApp.Analog = {
 		SENSOR_GARDENA_TEMPERATURE      : 63,  // Gardena temperature sensor
 
 	SENSOR_MQTT                     : 90, // subscribe to a MQTT server and query a value
+	SENSOR_REMOTE_JSON              : 92, // query a remote JSON URL and filter value
 
 	SENSOR_ZIGBEE                   : 95, // ZigBee sensor
 	SENSOR_BLUETOOTH                : 96, // Bluetooth sensor
@@ -706,6 +707,7 @@ OSApp.Analog.shortenSensorTypeName = function(name) {
 		.replace(/-analog\s+/, " ")
 		.replace(/\s+mode/g, "")
 		.replace(/\s+sensor$/i, "")
+		.replace(/^Remote JSON Data$/i, "Remote JSON")
 		.replace(/^MQTT subscription$/i, "MQTT");
 };
 
@@ -2042,6 +2044,7 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	// Hide all optional containers
 	popup.find(".fac_div_offset_container").hide();
 	popup.find(".unit_container").hide();
+	popup.find(".url_container").hide();
 	popup.find(".topic_container").hide();
 	popup.find(".filter_container").hide();
 	popup.find(".zigbee_scan_select_container").hide();
@@ -2066,6 +2069,12 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 		popup.find(".unit_container").show();
 		popup.find(".topic_container").show();
 		popup.find(".filter_container").show();
+		popup.find(".filter_container label").text(OSApp.Language._("MQTT Filter"));
+	} else if (sensortype == OSApp.Analog.Constants.SENSOR_REMOTE_JSON) {
+		popup.find(".unit_container").show();
+		popup.find(".url_container").show();
+		popup.find(".filter_container").show();
+		popup.find(".filter_container label").text(OSApp.Language._("JSON Filter"));
 	} else if (sensortype == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
 		popup.find(".zigbee_device_ieee_container").show();
 		popup.find(".zigbee_scan_select_container").show();
@@ -2082,7 +2091,7 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	}
 
 	// Show unit container for custom unit selection (independent of sensor type)
-	if (unitid == OSApp.Analog.Constants.USERDEF_UNIT && sensortype != OSApp.Analog.Constants.SENSOR_USERDEF && sensortype != OSApp.Analog.Constants.SENSOR_MQTT) {
+	if (unitid == OSApp.Analog.Constants.USERDEF_UNIT && sensortype != OSApp.Analog.Constants.SENSOR_USERDEF && sensortype != OSApp.Analog.Constants.SENSOR_MQTT && sensortype != OSApp.Analog.Constants.SENSOR_REMOTE_JSON) {
 		popup.find(".unit_container").show();
 	}
 
@@ -2137,6 +2146,7 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	OSApp.Analog.addToObjectChk(popup, "#show", sensorOut);
 	OSApp.Analog.addToObjectStr(popup, "#topic", sensorOut);
 	OSApp.Analog.addToObjectStr(popup, "#filter", sensorOut);
+	OSApp.Analog.addToObjectStr(popup, "#url", sensorOut);
 
 	// ZigBee-specific fields
 	if (parseInt(popup.find("#type").val()) == OSApp.Analog.Constants.SENSOR_ZIGBEE) {
@@ -3188,6 +3198,9 @@ list += "</select></div>" +
 		"</select></div>" +
 "<div class='unit_container' style='display:none;'><label for='unit'>" + OSApp.Language._("Unit") + "</label>" +
 	"<input type='text' id='unit' data-mini='true' maxlength='10' value='" + OSApp.Utils.htmlEscape(sensor.unit ? sensor.unit : "") + "'></div>" +
+
+"<div class='url_container' style='display:none;'><label for='url'>" + OSApp.Language._("URL (HTTP or HTTPS)") + "</label>" +
+	"<input type='text' id='url' data-mini='true' maxlength='200' value='" + OSApp.Utils.htmlEscape(sensor.url ? sensor.url : "") + "'></div>" +
 
 "<div class='topic_container' style='display:none;'><label for='topic'>" + OSApp.Language._("MQTT Topic") + "</label>" +
 	"<input type='text' id='topic' data-mini='true' maxlength='100' value='" + OSApp.Utils.htmlEscape(sensor.topic ? sensor.topic : "") + "'></div>" +
