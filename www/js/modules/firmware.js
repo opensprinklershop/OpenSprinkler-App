@@ -341,7 +341,7 @@ OSApp.Firmware.isGardenaAvailable = function() {
 		return false;
 	}
 
-	if ( OSApp.Firmware.isOSPi() ) {
+	if ( OSApp.Firmware.isOSPi() || OSApp.currentSession.controller.options.hwv === 64 || OSApp.currentSession.controller.options.hwv === 192 ) {
 		return true;
 	}
 
