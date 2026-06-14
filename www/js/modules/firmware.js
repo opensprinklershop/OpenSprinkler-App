@@ -449,7 +449,11 @@ OSApp.Firmware.checkOSPiVersion = function( check ) {
 	var ver;
 
 	if ( OSApp.Firmware.isOSPi() ) {
-		ver = OSApp.currentSession.controller.options.fwv.split( "-" )[ 0 ];
+		var fwv = OSApp.currentSession.controller.options.fwv;
+		if ( typeof fwv !== "string" ) {
+			fwv = OSApp.Firmware.getOSVersion( fwv );
+		}
+		ver = fwv.split( "-" )[ 0 ];
 		if ( ver !== check ) {
 			ver = ver.split( "." );
 			check = check.split( "." );

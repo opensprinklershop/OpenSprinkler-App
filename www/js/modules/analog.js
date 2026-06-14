@@ -341,14 +341,17 @@ OSApp.Analog.updateMonitors = function(callback) {
 
 	OSApp.Analog.checkBackgroundMode();
 
-	if (OSApp.Firmware.checkOSVersion(233)) {
+	if (OSApp.Firmware.checkOSVersion(233) || OSApp.Firmware.isOSPi()) {
 		return OSApp.Firmware.sendToOS("/ml?pw=", "json").then(function (data) {
 
 			OSApp.Analog.monitors = data.monitors;
 			OSApp.Analog.checkMonitorAlerts();
 			callback();
 		});
-	} else callback();
+	} else {
+		callback();
+		return $.Deferred().resolve();
+	}
 };
 
 OSApp.Analog.updateAnalogSensor = function( callback ) {
