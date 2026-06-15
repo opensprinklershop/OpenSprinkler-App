@@ -942,7 +942,17 @@ OSApp.UIDom.closePanel = function( callback ) {
 };
 
 OSApp.UIDom.getAppURLPath = function() {
-	return OSApp.currentSession.local ? $.mobile.path.parseUrl( $( "head" ).find( "script[src$='main.js']" ).attr( "src" ) ).hrefNoHash.slice( 0, -10 ) : "";
+	var script = $( "script[src*='main.js']" );
+	if ( script.length > 0 ) {
+		var src = script.attr( "src" );
+		var parsed = $.mobile.path.parseUrl( src );
+		var href = parsed.hrefNoHash;
+		// Strip query string if any exists
+		var qIdx = href.indexOf( "?" );
+		if ( qIdx !== -1 ) href = href.substring( 0, qIdx );
+		return href.slice( 0, -10 );
+	}
+	return "";
 };
 
 // Accessory functions
