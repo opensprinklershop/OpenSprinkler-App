@@ -5523,7 +5523,7 @@ OSApp.Analog.setupGardenaCredentials = function() {
 
 		popup.find(".launch-assistant").on("click", function (e) {
 			e.preventDefault();
-			window.open("gardena-oauth2/index.html", "gardena_assistant", "width=600,height=750,scrollbars=yes");
+			window.open(OSApp.UIDom.getAppURLPath() + "gardena-oauth2/index.html", "gardena_assistant", "width=600,height=750,scrollbars=yes");
 			return false;
 		});
 
