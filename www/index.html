@@ -15,6 +15,128 @@
 <html>
 	<head>
 		<title>OpenSprinkler</title>
+		<script>
+			(function() {
+				var path = window.location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "");
+				if (path === "" || path === "/") {
+					var sitesStr = localStorage.getItem("sites");
+					var currentSite = localStorage.getItem("current_site");
+					var showSites = localStorage.getItem("show_sites") === "1";
+
+					if (sitesStr && currentSite && !showSites) {
+						try {
+							var sites = JSON.parse(sitesStr);
+							var siteData = sites[currentSite];
+							if (siteData) {
+								// Inject lightweight dark styling immediately without modifying innerHTML to prevent contentscript/DOM parser crashes
+								document.write('<style id="fast-path-hide">html { background-color: #1a1a1a !important; } body { display: none !important; }</style>');
+
+								// Inject loading indicator after DOMContentLoaded or inline if DOM is already parsed
+								var showLoader = function() {
+									var container = document.createElement("div");
+									container.id = "fast-path-loader";
+									container.setAttribute("style", "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #1c1c1c; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999999; font-size: 1.2em;");
+									container.innerHTML = '<div style="border: 4px solid #333; border-top: 4px solid #f39c12; border-radius: 50%; width: 35px; height: 35px; animation: fastspin 1s linear infinite; margin-bottom: 20px;"></div><div>Connecting to ' + currentSite + '...</div><style>@keyframes fastspin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>';
+									document.documentElement.appendChild(container);
+								};
+
+								if (document.body) {
+									showLoader();
+								} else {
+									document.addEventListener("DOMContentLoaded", showLoader);
+								}
+
+								var urlDest = "/jo?pw=" + encodeURIComponent(siteData.os_pw);
+								var url = siteData.os_token ? "https://cloud.openthings.io/forward/v1/" + siteData.os_token + urlDest : (siteData.ssl === "1" ? "https://" : "http://") + siteData.os_ip + urlDest;
+
+								var xhr = new XMLHttpRequest();
+								xhr.open("GET", url, true);
+								if (!siteData.os_token && siteData.auth_user && siteData.auth_pw) {
+									xhr.setRequestHeader("Authorization", "Basic " + btoa(siteData.auth_user + ":" + siteData.auth_pw));
+								}
+								xhr.timeout = 3000;
+
+								var handleRedirect = function(fwv, fwm) {
+									var versionsXhr = new XMLHttpRequest();
+									versionsXhr.open("GET", "versions.json", true);
+									versionsXhr.timeout = 2000;
+									versionsXhr.onload = function() {
+										var targetVersion = "2.4.0.213";
+										try {
+											var vData = JSON.parse(versionsXhr.responseText);
+											var versions = vData.versions || [];
+
+											if (!fwv || fwv <= 221) {
+												targetVersion = "2.2.1";
+											} else {
+												// Determine matching version
+												var major = Math.floor(fwv / 100);
+												var minor = Math.floor((fwv % 100) / 10);
+												var patch = fwv % 10;
+												var fwvStr = major + "." + minor + "." + patch;
+
+												// Setup target version string
+												var fullFwvStr = fwvStr;
+												if (typeof fwm === "number" || (typeof fwm === "string" && fwm !== "")) {
+													fullFwvStr = fwvStr + "." + fwm;
+												}
+
+												// Match the longest/most-precise match first (e.g., "2.4.0.212" first, then "2.4.0")
+												var matching = versions.filter(function(v) {
+													return v.indexOf(fullFwvStr) === 0;
+												});
+
+												if (matching.length > 0) {
+													targetVersion = matching[0];
+												} else {
+													// Fallback to match standard prefix (e.g. "2.4.0" or matching prefix)
+													var baseMatching = versions.filter(function(v) {
+														return v.indexOf(fwvStr) === 0;
+													});
+													if (baseMatching.length > 0) {
+														targetVersion = baseMatching[0];
+													} else {
+														targetVersion = "2.4.0.213";
+													}
+												}
+											}
+										} catch (e) {}
+										localStorage.removeItem("show_sites");
+
+										var baseHref = window.location.href.split("#")[0].split("?")[0];
+										baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
+										baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+
+										window.location.href = baseHref + "/" + targetVersion + "/index.html";
+									};
+									versionsXhr.onerror = versionsXhr.ontimeout = function() {
+										localStorage.removeItem("show_sites");
+										var baseHref = window.location.href.split("#")[0].split("?")[0];
+										baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
+										baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+										window.location.href = baseHref + "/2.4.0.213/index.html";
+								};
+
+								xhr.onload = function() {
+									var fwv = null;
+									var fwm = null;
+									try {
+										var resp = JSON.parse(xhr.responseText);
+										fwv = resp.fwv;
+										fwm = resp.fwm;
+									} catch(e) {}
+									handleRedirect(fwv, fwm);
+								};
+								xhr.onerror = xhr.ontimeout = function() {
+									handleRedirect(null, null);
+								};
+								xhr.send();
+							}
+						} catch (e) {}
+					}
+				}
+			})();
+		</script>
 		<meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<meta content="yes" name="apple-mobile-web-app-capable">
 		<meta name="mobile-web-app-capable" content="yes">

@@ -67,6 +67,35 @@ trap restore_app_version EXIT
 scripts/appGMK.sh
 grunt makeFW
 
+# === Dynamically package UI versions inside mobile app ===
+echo "=== Syncing UI Versions for Mobile App Bundle ==="
+VERSIONS_SRC="/srv/www/htdocs/ui-live/www/versions.json"
+if [ -f "$VERSIONS_SRC" ]; then
+	cp "$VERSIONS_SRC" www/versions.json
+else
+	curl -s -o www/versions.json "https://ui.opensprinklershop.de/versions.json"
+fi
+
+VERSIONS=$(node -e '
+	try {
+		const data = JSON.parse(require("fs").readFileSync("www/versions.json", "utf8"));
+		console.log(data.versions.filter(v => v !== "dev").join(" "));
+	} catch(e) {
+		console.log("2.4.0.213 2.4.0.212 2.3.0 2.2.1");
+	}
+')
+
+for v in $VERSIONS; do
+	echo "   Syncing version $v ... "
+	mkdir -p "www/$v"
+	VER_SRC_DIR="/srv/www/htdocs/ui-live/www/$v"
+	if [ -d "$VER_SRC_DIR" ]; then
+		rsync -a --delete "$VER_SRC_DIR/" "www/$v/"
+	else
+		echo "   [WARN] Local path $VER_SRC_DIR not found. Skipping local copy."
+	fi
+done
+
 # Remove stale res/ symlinks in platform dirs to prevent EINVAL during cordova prepare.
 # platforms/ios/www/res and www/res both point to the same physical directory;
 # cordova would try to cp a file onto itself → EINVAL.
@@ -78,4 +107,8 @@ for PLAT_RES in platforms/ios/www/res platforms/browser/www/res; do
 done
 
 cordova build ios --device --release --buildConfig build.json
+
+# Clean up dynamically packaged UI versions from git-tracked workspace
+rm -rf www/versions.json www/[0-9]*
+
 scripts/appGMK2.sh

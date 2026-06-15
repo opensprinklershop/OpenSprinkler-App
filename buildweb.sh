@@ -6,6 +6,11 @@ rm ./www/locale/*~ 2>/dev/null
 rm ./www/*~ 2>/dev/null
 
 ./scripts/appGMK.sh
+
+# Temporary replacement of App Version from config.xml
+APP_VERSION=$(node -p "require('fs').readFileSync('config.xml', 'utf8').match(/version=\"([^\"]+)\"/)[1]")
+sed -i "s/appVersion: '0.0.0'/appVersion: '$APP_VERSION'/g" www/js/main.js
+
 grunt makeFW
 
 # Stamp sw.js with build timestamp to bust Service Worker cache
@@ -25,6 +30,9 @@ chown stefan:www platforms/* -R
 # Restore sw.js build timestamp placeholder for source control
 sed -i "s/OpenSprinkler-v$BUILD_TS/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.js
 
+# Restore main.js appVersion placeholder for source control
+sed -i "s/appVersion: '$APP_VERSION'/appVersion: '0.0.0'/g" www/js/main.js
+
 rm ./platforms/browser/platform_www/plugins/* -R 2>/dev/null
 rm ./platforms/browser/www/cordova.js ./platforms/browser/www/cordova_plugins.js 2>/dev/null
 #systemctl restart squid
@@ -41,6 +49,12 @@ fi
 
 echo "=== Deploying UI to betaui.opensprinklershop.de ($BETAUI_TARGET) ==="
 mkdir -p "$BETAUI_TARGET"
-rsync -a --delete "$SRC_DIR" "$BETAUI_TARGET/"
+# 1. Sync to root (for Standortverwaltung) - exclude versioned folders and dev folder
+rsync -a --delete --exclude="/dev/" --exclude="/[0-9]*/" "$SRC_DIR" "$BETAUI_TARGET/"
+
+# 2. Sync to dev folder (as the developer version)
+mkdir -p "$BETAUI_TARGET/dev"
+rsync -a --delete "$SRC_DIR" "$BETAUI_TARGET/dev/"
+
 chown -R stefan:www "$BETAUI_TARGET" 2>/dev/null || true
 echo "=== betaui deploy done ==="

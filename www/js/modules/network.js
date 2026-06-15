@@ -37,6 +37,11 @@ OSApp.Network.updateDeviceIP = function( finishCheck ) {
 		} );
 		//eslint-disable-next-line no-unused-vars
 	} catch ( err ) {
+		// Prevent slow mixed content blocking on secure web page loads of the site list
+		if ( window.location.protocol === "https:" ) {
+			finish( undefined );
+			return;
+		}
 		OSApp.Network.findRouter( function( status, data ) {
 			finish( !status ? undefined : data );
 		} );

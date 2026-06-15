@@ -12,6 +12,35 @@ grunt makeFW
 BUILD_TS=$(date +%Y%m%d%H%M%S)
 sed -i "s/__BUILD_TIMESTAMP__/$BUILD_TS/g" www/sw.js
 
+# === Dynamically package UI versions inside mobile app ===
+echo "=== Syncing UI Versions for Mobile App Bundle ==="
+VERSIONS_SRC="/srv/www/htdocs/ui-live/www/versions.json"
+if [ -f "$VERSIONS_SRC" ]; then
+	cp "$VERSIONS_SRC" www/versions.json
+else
+	curl -s -o www/versions.json "https://ui.opensprinklershop.de/versions.json"
+fi
+
+VERSIONS=$(node -e '
+	try {
+		const data = JSON.parse(require("fs").readFileSync("www/versions.json", "utf8"));
+		console.log(data.versions.filter(v => v !== "dev").join(" "));
+	} catch(e) {
+		console.log("2.4.0.213 2.4.0.212 2.3.0 2.2.1");
+	}
+')
+
+for v in $VERSIONS; do
+	echo "   Syncing version $v ... "
+	mkdir -p "www/$v"
+	VER_SRC_DIR="/srv/www/htdocs/ui-live/www/$v"
+	if [ -d "$VER_SRC_DIR" ]; then
+		rsync -a --delete "$VER_SRC_DIR/" "www/$v/"
+	else
+		echo "   [WARN] Local path $VER_SRC_DIR not found. Skipping local copy."
+	fi
+done
+
 # Copy modules.json to www/ and platforms BEFORE building
 cp build/modules.json www/
 cp build/modules.json platforms/browser/www/
@@ -45,6 +74,9 @@ chown stefan:www platforms/* -R
 
 # Restore sw.js build timestamp placeholder for source control
 sed -i "s/OpenSprinkler-v$BUILD_TS/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.js
+
+# Clean up dynamically packaged UI versions from git-tracked workspace
+rm -rf www/versions.json www/[0-9]*
 
 rm ./platforms/browser/platform_www/plugins/* -R 2>/dev/null
 rm ./platforms/browser/www/*.js 2>/dev/null

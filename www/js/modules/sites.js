@@ -17,6 +17,132 @@
 var OSApp = OSApp || {};
 OSApp.Sites = OSApp.Sites || {};
 
+OSApp.Sites.isRootPath = function() {
+	var path = window.location.pathname;
+	path = path.replace(/\/index\.html$/, "").replace(/\/$/, "");
+	return path === "" || path === "/";
+};
+
+OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
+	if (!fwv) {
+		return "2.4.0.213";
+	}
+
+	// 2.2.1 and below (fwv <= 221) should use 2.2.1 legacy
+	if (fwv <= 221) {
+		return "2.2.1";
+	}
+
+	var major = Math.floor(fwv / 100);
+	var minor = Math.floor((fwv % 100) / 10);
+	var patch = fwv % 10;
+	var fwvStr = major + "." + minor + "." + patch;
+
+	// Construct full target version string with minor/fwm if available
+	var fullFwvStr = fwvStr;
+	if (typeof fwm === "number" || (typeof fwm === "string" && fwm !== "")) {
+		fullFwvStr = fwvStr + "." + fwm;
+	}
+
+	// Match the longest/most-precise match first (e.g., "2.4.0.212" first, then "2.4.0")
+	var matching = versions.filter(function(v) {
+		return v.indexOf(fullFwvStr) === 0;
+	});
+
+	if (matching.length > 0) {
+		return matching[0];
+	} else {
+		// Fallback to match standard prefix (e.g. "2.4.0")
+		var baseMatching = versions.filter(function(v) {
+			return v.indexOf(fwvStr) === 0;
+		});
+		if (baseMatching.length > 0) {
+			return baseMatching[0];
+		}
+	}
+
+	return "2.4.0.213";
+};
+
+OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
+	$.mobile.loading( "show", {
+		html: "<h1>" + OSApp.Language._( "Connecting..." ) + "</h1>",
+		textVisible: true,
+		theme: "b"
+	} );
+
+	if (forceDefault || !siteData) {
+		$.mobile.loading( "hide" );
+		localStorage.removeItem("show_sites");
+
+		var baseHref = window.location.href.split("#")[0].split("?")[0];
+		baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
+		baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+
+		window.location.href = baseHref + "/2.4.0.213/index.html";
+		return;
+	}
+
+	var urlDest = "/jo?pw=" + encodeURIComponent( siteData.os_pw ),
+		url = siteData.os_token ? "https://cloud.openthings.io/forward/v1/" + siteData.os_token + urlDest : ( siteData.ssl === "1" ? "https://" : "http://" ) + siteData.os_ip + urlDest;
+
+	$.ajax( {
+		url: url,
+		type: "GET",
+		dataType: "json",
+		timeout: 5000,
+		beforeSend: function( xhr ) {
+			if ( !siteData.os_token && typeof siteData.auth_user !== "undefined" && typeof siteData.auth_pw !== "undefined" ) {
+				xhr.setRequestHeader( "Authorization", "Basic " + btoa( siteData.auth_user + ":" + siteData.auth_pw ) );
+			}
+		}
+	} ).then(
+		function(options) {
+			var fwv = options.fwv;
+			var fwm = options.fwm;
+			$.ajax({
+				url: "versions.json",
+				type: "GET",
+				dataType: "json",
+				timeout: 3000
+			}).then(
+				function(vData) {
+					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion(fwv, vData.versions || [], fwm);
+					$.mobile.loading( "hide" );
+					localStorage.removeItem("show_sites");
+
+					var baseHref = window.location.href.split("#")[0].split("?")[0];
+					baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
+					baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+
+					window.location.href = baseHref + "/" + targetVersion + "/index.html";
+				},
+				function() {
+					$.mobile.loading( "hide" );
+					localStorage.removeItem("show_sites");
+
+					var baseHref = window.location.href.split("#")[0].split("?")[0];
+					baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
+					baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+
+					window.location.href = baseHref + "/2.4.0.213/index.html";
+				}
+			);
+		},
+		function(err) {
+			console.log("Could not ping controller directly. Routing to default UI version 2.4.0.213.");
+			$.mobile.loading( "hide" );
+			localStorage.removeItem("show_sites");
+
+			var baseHref = window.location.href.split("#")[0].split("?")[0];
+			baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
+			baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+
+			window.location.href = baseHref + "/2.4.0.213/index.html";
+		}
+	);
+};
+
 OSApp.Sites.displayPage = function() {
 	var page = $( "<div data-role='page' id='site-control'>" +
 			"<div class='ui-content'>" +
@@ -182,10 +308,22 @@ OSApp.Sites.displayPage = function() {
 						"</form>" +
 						"</fieldset>";
 
-					OSApp.Sites.testSite( b, i, function( id, result ) {
-						page.find( "#site-" + id + " .connectnow" )
-							.removeClass( "yellow" )
-							.addClass( result ? "green" : "red" );
+					OSApp.Sites.testSite( b, i, function( id, result, data ) {
+						var connectBtn = page.find( "#site-" + id + " .connectnow" );
+						connectBtn.removeClass( "yellow" ).addClass( result ? "green" : "red" );
+						if ( result && data && typeof data.fwv === "number" ) {
+							var major = Math.floor(data.fwv / 100);
+							var minor = Math.floor((data.fwv % 100) / 10);
+							var patch = data.fwv % 10;
+							var bld = data.fwm ? "(" + data.fwm + ")" : "";
+							var vText = major + "." + minor + "." + patch + bld;
+
+							// If header is collapsed or expanded, we can display it next to the title or inside
+							var collHeader = page.find( "#site-" + id + " h3 .ui-collapsible-heading-toggle" );
+							if ( collHeader.length && collHeader.find(".fw-ver-badge").length === 0 ) {
+								collHeader.append("<span class='fw-ver-badge' style='float:right; font-size: 0.75em; color: gray; margin-right: 10px; font-weight: normal; line-height: 25px;'>FW: " + vText + "</span>");
+							}
+						}
 					} );
 
 					i++;
@@ -206,10 +344,22 @@ OSApp.Sites.displayPage = function() {
 								// Re-check all sites
 								var index = 0;
 								$.each( sites, function( name, siteData ) {
-									OSApp.Sites.testSite( siteData, index, function( id, result ) {
-										page.find( "#site-" + id + " .connectnow" )
-											.removeClass( "yellow green red" )
-											.addClass( result ? "green" : "red" );
+									OSApp.Sites.testSite( siteData, index, function( id, result, data ) {
+										var connectBtn = page.find( "#site-" + id + " .connectnow" );
+										connectBtn.removeClass( "yellow green red" ).addClass( result ? "green" : "red" );
+										if ( result && data && typeof data.fwv === "number" ) {
+											var major = Math.floor(data.fwv / 100);
+											var minor = Math.floor((data.fwv % 100) / 10);
+											var patch = data.fwv % 10;
+											var bld = data.fwm ? "(" + data.fwm + ")" : "";
+											var vText = major + "." + minor + "." + patch + bld;
+
+											var collHeader = page.find( "#site-" + id + " h3 .ui-collapsible-heading-toggle" );
+											if ( collHeader.length ) {
+												collHeader.find(".fw-ver-badge").remove();
+												collHeader.append("<span class='fw-ver-badge' style='float:right; font-size: 0.75em; color: gray; margin-right: 10px; font-weight: normal; line-height: 25px;'>FW: " + vText + "</span>");
+											}
+										}
 									} );
 									index++;
 								} );
@@ -489,7 +639,7 @@ OSApp.Sites.testSite = function( site, id, callback ) {
 			dataType: "json",
 			headers: headers
 		} ).then(
-			function() { callback( id, true ); },
+			function(data) { callback( id, true, data ); },
 			function() { callback( id, false ); }
 		);
 	} else {
@@ -503,7 +653,7 @@ OSApp.Sites.testSite = function( site, id, callback ) {
 				}
 			}
 		} ).then(
-			function() { callback( id, true ); },
+			function(data) { callback( id, true, data ); },
 			function() { callback( id, false ); }
 		);
 	}
@@ -550,6 +700,31 @@ OSApp.Sites.checkConfigured = function( firstLoad ) {
 		sites = OSApp.Sites.parseSites( sites );
 
 		names = Object.keys( sites );
+
+		if ( OSApp.Sites.isRootPath() ) {
+			if ( !names.length ) {
+				$.mobile.loading( "hide" );
+				if ( data.cloudToken === undefined || data.cloudToken === null ) {
+					OSApp.UIDom.changePage( "#start", { transition: "none" } );
+				} else {
+					OSApp.UIDom.changePage( "#site-control", { transition: "none" } );
+				}
+				return;
+			}
+
+			var showSites = localStorage.getItem("show_sites") === "1";
+			if ( !showSites && current !== null && ( current in sites ) ) {
+				OSApp.Sites.routeToVersion( current, sites[ current ] );
+				return;
+			}
+
+			// If we are showing the site list, clear the show_sites flag so next load auto-connects
+			localStorage.removeItem("show_sites");
+
+			$.mobile.loading( "hide" );
+			OSApp.UIDom.changePage( "#site-control", { transition: firstLoad ? "none" : undefined } );
+			return;
+		}
 
 		if ( !names.length ) {
 			if ( firstLoad ) {
@@ -842,7 +1017,11 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 					}
 					OSApp.Network.cloudSaveSites();
 					OSApp.Sites.updateSiteList( Object.keys( sites ), name );
-					OSApp.Sites.newLoad();
+					if ( OSApp.Sites.isRootPath() ) {
+						OSApp.Sites.routeToVersion( name, sites[ name ] );
+					} else {
+						OSApp.Sites.newLoad();
+					}
 				} );
 			} else {
 				OSApp.Errors.showError( OSApp.Language._( "Check IP/URL/Port and try again." ) );
@@ -1572,7 +1751,19 @@ OSApp.Sites.updateSite = function( newsite ) {
 		var sites = OSApp.Sites.parseSites( data.sites );
 		if ( newsite in sites ) {
 			OSApp.UIDom.closePanel( function() {
-				OSApp.Storage.set( { "current_site":newsite }, () => OSApp.Sites.checkConfigured() );
+				OSApp.Storage.set( { "current_site":newsite }, function() {
+					if ( OSApp.Sites.isRootPath() ) {
+						OSApp.Sites.routeToVersion( newsite, sites[ newsite ] );
+					} else {
+						localStorage.removeItem("show_sites");
+
+						var baseHref = window.location.href.split("#")[0].split("?")[0];
+						baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
+						baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+
+						window.location.href = baseHref + "/index.html";
+					}
+				} );
 			} );
 		}
 	} );

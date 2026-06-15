@@ -896,6 +896,17 @@ OSApp.UIDom.changePage = function( toPage, opts ) {
 		toPage = "#" + toPage;
 	}
 
+	if ( ( toPage === "#site-control" || toPage === "#start" ) && OSApp.Sites && !OSApp.Sites.isRootPath() ) {
+		localStorage.setItem("show_sites", "1");
+
+		var baseHref = window.location.href.split("#")[0].split("?")[0];
+		baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
+		baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+
+		window.location.href = baseHref + "/index.html";
+		return;
+	}
+
 	// Close the panel before page transition to avoid bug in jQM 1.4+
 	OSApp.UIDom.closePanel( function() {
 		$.mobile.pageContainer.pagecontainer( "change", toPage, opts );

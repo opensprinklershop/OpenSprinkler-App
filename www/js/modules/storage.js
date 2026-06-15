@@ -25,13 +25,21 @@ OSApp.Storage.prefix = ( function() {
        return path ? path + ":" : "";
 } )();
 
+// Check if a key should be shared globally across all UI versions
+OSApp.Storage.isGlobalKey = function( key ) {
+       return key === "sites" || key === "current_site" || key === "cloudToken" || key === "lang" || key === "show_sites";
+};
+
 OSApp.Storage._key = function( key ) {
+       if ( OSApp.Storage.isGlobalKey( key ) ) {
+               return key;
+       }
        return OSApp.Storage.prefix + key;
 };
 
 OSApp.Storage.getItemSync = function( key ) {
        var value = localStorage.getItem( OSApp.Storage._key( key ) );
-       if ( value === null && OSApp.Storage.prefix ) {
+       if ( value === null && OSApp.Storage.prefix && !OSApp.Storage.isGlobalKey( key ) ) {
                value = localStorage.getItem( key );
        }
        return value;
@@ -39,14 +47,14 @@ OSApp.Storage.getItemSync = function( key ) {
 
 OSApp.Storage.setItemSync = function( key, value ) {
        localStorage.setItem( OSApp.Storage._key( key ), value );
-       if ( OSApp.Storage.prefix ) {
+       if ( OSApp.Storage.prefix && !OSApp.Storage.isGlobalKey( key ) ) {
                localStorage.removeItem( key );
        }
 };
 
 OSApp.Storage.removeItemSync = function( key ) {
        localStorage.removeItem( OSApp.Storage._key( key ) );
-       if ( OSApp.Storage.prefix ) {
+       if ( OSApp.Storage.prefix && !OSApp.Storage.isGlobalKey( key ) ) {
                localStorage.removeItem( key );
        }
 };
