@@ -115,6 +115,8 @@
 										baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
 										baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
 										window.location.href = baseHref + "/2.4.0.213/index.html";
+									};
+									versionsXhr.send();
 								};
 
 								xhr.onload = function() {
