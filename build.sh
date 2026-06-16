@@ -75,8 +75,9 @@ chown stefan:www platforms/* -R
 # Restore sw.js build timestamp placeholder for source control
 sed -i "s/OpenSprinkler-v$BUILD_TS/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.js
 
-# Clean up dynamically packaged UI versions from git-tracked workspace
-rm -rf www/versions.json www/[0-9]*
+# Clean up dynamically packaged UI versions from git-tracked workspace (keep versions.json if original exists)
+rm -rf www/[0-9]*
+git checkout www/versions.json 2>/dev/null || true
 
 rm ./platforms/browser/platform_www/plugins/* -R 2>/dev/null
 rm ./platforms/browser/www/*.js 2>/dev/null

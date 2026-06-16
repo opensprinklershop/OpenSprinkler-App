@@ -5504,14 +5504,11 @@ OSApp.Analog.setupGardenaCredentials = function() {
 				popup.find(".access_token").val(data.access_token || "");
 				popup.find(".api_key").val(data.client_id || "");
 
-				var importMsg = popup.find(".import-msg");
-				if (importMsg.length === 0) {
-					popup.find("form").prepend(
-						"<div class='import-msg' style='background:#e8f5e9; border:1px solid #c8e6c9; color:#2e7d32; padding:10px; border-radius:4px; margin-bottom:15px; font-weight:bold; font-size:12px; text-shadow:none;'>" +
-						OSApp.Language._("Credentials imported automatically! Please click Submit to save.") +
-						"</div>"
-					);
-				}
+				// Automatically trigger form submit to save the credentials on OpenSprinkler
+				// and close the parent popup without manual user action.
+				setTimeout(function() {
+					popup.find("form").submit();
+				}, 800);
 			}
 		};
 
@@ -5523,7 +5520,9 @@ OSApp.Analog.setupGardenaCredentials = function() {
 
 		popup.find(".launch-assistant").on("click", function (e) {
 			e.preventDefault();
-			window.open(OSApp.UIDom.getAppURLPath() + "gardena-oauth2/index.html", "gardena_assistant", "width=600,height=750,scrollbars=yes");
+			// Root origin path to keep Gardena Assistant centralized and independent of versions
+			var rootUrl = window.location.origin + "/";
+			window.open(rootUrl + "gardena-oauth2/index.html", "gardena_assistant", "width=600,height=750,scrollbars=yes");
 			return false;
 		});
 

@@ -147,6 +147,17 @@
             <em>Um ein Gardena Refresh-Token zu generieren, tragen Sie hier Ihre Anwendungs-<strong>Client-ID</strong> und Ihr <strong>Client-Secret</strong> aus dem <a href="https://developer.husqvarnagroup.cloud/" target="_blank" style="color: #3498db; text-decoration: none; font-weight: bold;">Husqvarna Developer Portal</a> ein.</em>
         </p>
 
+          <div style="background-color: #fcf8e3; border: 1px solid #faebcc; color: #8a6d3b; padding: 15px; border-radius: 4px; font-size: 13px; margin-bottom: 20px;">
+              <strong style="display: block; margin-bottom: 5px;">⚠️ Required Redirect URI / Erforderliche Redirect-URL:</strong>
+              <span id="desc_redirect">Please register the exact Redirect URI below in your Husqvarna Application settings:</span>
+              <br>
+              <em style="color: #66512c;" id="desc_redirect_de">Bitte tragen Sie exakt folgende URL als Redirect-URL im Husqvarna-Entwicklerportal ein:</em>
+              <div class="copy-group" style="margin-top: 10px;">
+                  <input type="text" id="ipt_redirect" readonly style="font-family: monospace; font-size: 11px; background: #fff;">
+                  <button class="copy-btn" onclick="copyVal('ipt_redirect')">Copy / Kopieren</button>
+              </div>
+          </div>
+
         <div class="form-group">
             <label>API Key / Client ID (Application Key)</label>
             <input type="text" id="client_id" placeholder="e.g. 1a2b3c4d-5e6f-...">
@@ -210,13 +221,18 @@
 </div>
 
 <script>
-    let REDIRECT_URI = window.location.href.split('#')[0].split('?')[0];
-    if (REDIRECT_URI.endsWith('/index.html')) {
-        REDIRECT_URI = REDIRECT_URI.slice(0, REDIRECT_URI.lastIndexOf('/index.html') + 1);
-    }
+    // Always use the root-level gardena-oauth2 directory as the REDIRECT_URI
+    // regardless of whether this popup was launched from a versioned subfolder.
+    // Husqvarna OAuth2 only allows exact matched registered Redirect URIs.
+    let REDIRECT_URI = window.location.origin + "/gardena-oauth2/";
 
     // Read stored credentials or state on page run
     window.addEventListener('DOMContentLoaded', () => {
+        // Automatically populate redirect URI input field for easy copying
+        const iptRed = document.getElementById('ipt_redirect');
+        if (iptRed) {
+            iptRed.value = REDIRECT_URI;
+        }
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
@@ -322,6 +338,7 @@
                         client_secret: clientSecret
                     }, '*');
                     document.getElementById('auto-transfer-msg').style.display = 'block';
+                      setTimeout(function() { window.close(); }, 1500);
                 } catch (e) {
                     console.error("Failed to automatically transfer tokens back to main window", e);
                 }

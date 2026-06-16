@@ -108,7 +108,8 @@ done
 
 cordova build ios --device --release --buildConfig build.json
 
-# Clean up dynamically packaged UI versions from git-tracked workspace
-rm -rf www/versions.json www/[0-9]*
+# Clean up dynamically packaged UI versions from git-tracked workspace (keep versions.json if original exists)
+rm -rf www/[0-9]*
+git checkout www/versions.json 2>/dev/null || true
 
 scripts/appGMK2.sh
