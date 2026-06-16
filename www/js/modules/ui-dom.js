@@ -899,11 +899,18 @@ OSApp.UIDom.changePage = function( toPage, opts ) {
 	if ( ( toPage === "#site-control" || toPage === "#start" ) && OSApp.Sites && !OSApp.Sites.isRootPath() ) {
 		localStorage.setItem("show_sites", "1");
 
-		var baseHref = window.location.href.split("#")[0].split("?")[0];
-		baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
-		baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
+		var origin = window.location.origin;
+		var path = window.location.pathname;
+		if (path.endsWith("/index.html")) {
+			path = path.substring(0, path.length - 10);
+		}
+		if (path.length > 1 && path.endsWith("/")) {
+			path = path.slice(0, -1);
+		}
+		path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
+		var baseHref = origin + path;
 
-		window.location.href = baseHref + "/index.html";
+		window.location.href = (baseHref.endsWith("/") ? baseHref : baseHref + "/") + "index.html";
 		return;
 	}
 

@@ -69,7 +69,7 @@ cacheFiles = cacheFiles.concat([
 
 // Vendor Javascript
 cacheFiles = cacheFiles.concat([
-	"/vendor-js/js/apexcharts.min.js",
+	"/vendor-js/apexcharts.min.js",
 	"/vendor-js/jquery.js",
 	"/vendor-js/jqm.js",
 	"/vendor-js/dataTables-2.1.8.min.js",
@@ -256,19 +256,63 @@ self.addEventListener("fetch", function (e) {
         return;
     }
 
+    var requestUrl = new URL(e.request.url);
+
+    // Speed up loading of static resources by using a Cache-First strategy
+    // for all precached files (styles, scripts, images, locales) except the index page itself.
+    if (requestUrl.origin === self.location.origin) {
+        var pathname = requestUrl.pathname;
+        
+        // Match both exact listed files in cacheFiles or general static directories
+        var isStaticAsset = (cacheFiles.includes(pathname) && pathname !== "/index.html") ||
+                            pathname.startsWith("/vendor-js/") ||
+                            pathname.startsWith("/js/") ||
+                            pathname.startsWith("/css/") ||
+                            pathname.startsWith("/img/") ||
+                            pathname.startsWith("/locale/");
+
+        if (isStaticAsset) {
+            e.respondWith(
+                caches.match(e.request).then(function (cachedResponse) {
+                    if (cachedResponse) {
+                        return cachedResponse;
+                    }
+
+                    // Fallback to network and cache it for future use
+                    return fetch(e.request).then(function (response) {
+                        if (!response || response.status !== 200 || response.type !== "basic") {
+                            return response;
+                        }
+                        return caches.open(cacheName).then(function (cache) {
+                            cache.put(e.request, response.clone());
+                            return response;
+                        });
+                    }).catch(function () {
+                        // Offline or network error
+                        return new Response("Static asset offline and not cached", {
+                            status: 503,
+                            statusText: "Service Unavailable",
+                            headers: { "Content-Type": "text/plain; charset=utf-8" }
+                        });
+                    });
+                })
+            );
+            return;
+        }
+    }
+
     e.respondWith(
         fetch(e.request).then(function (response) {
             // Network-first: always try to get fresh content
             return caches.open(cacheName).then(function (cache) {
-                console.log("[Service Worker] Updating cache: " + e.request.url);
-                return cache.put(e.request, response.clone()).then(function () {
-                    return response;
-                }).catch(function (err) {
-                    console.warn("[Service Worker] Cache update failed: " + e.request.url, err);
-                    return response;
-                });
+                // Do not cache API query requests with passwords (e.g. ?pw=...) to avoid filling cache with dynamic endpoints
+                if (requestUrl.pathname === "/index.html" || !requestUrl.search) {
+                    console.log("[Service Worker] Updating cache: " + e.request.url);
+                    cache.put(e.request, response.clone());
+                }
+                return response;
             }).catch(function (err) {
-                console.warn("[Service Worker] Cache open failed: " + e.request.url, err);
+                console.warn("[Service Worker] Cache update failed: " + e.request.url, err);
                 return response;
             });
         }).catch(function () {

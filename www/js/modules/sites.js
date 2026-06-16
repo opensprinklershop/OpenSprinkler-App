@@ -20,6 +20,20 @@ OSApp.Sites = OSApp.Sites || {};
 OSApp.Sites.isRootPath = function() {
 	var path = window.location.pathname;
 	path = path.replace(/\/index\.html$/, "").replace(/\/$/, "");
+
+	// Only treat as root path if we are on a platform that supports multiple UI versions!
+	var isVersionsSupported = (
+		window.location.hostname.indexOf("opensprinklershop.de") !== -1 ||
+		window.location.hostname === "localhost" ||
+		window.location.hostname === "127.0.0.1" ||
+		window.location.protocol === "file:" ||
+		window.location.protocol.indexOf("app") === 0 ||
+		window.cordova
+	);
+	if (!isVersionsSupported) {
+		return false;
+	}
+
 	return path === "" || path === "/";
 };
 
@@ -71,15 +85,21 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 		theme: "b"
 	} );
 
+	var origin = window.location.origin;
+	var path = window.location.pathname;
+	if (path.endsWith("/index.html")) {
+		path = path.substring(0, path.length - 10);
+	}
+	if (path.length > 1 && path.endsWith("/")) {
+		path = path.slice(0, -1);
+	}
+	path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
+	var baseHref = origin + (path.endsWith("/") ? path : path + "/");
+
 	if (forceDefault || !siteData) {
 		$.mobile.loading( "hide" );
 		localStorage.removeItem("show_sites");
-
-		var baseHref = window.location.href.split("#")[0].split("?")[0];
-		baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
-		baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
-
-		window.location.href = baseHref + "/2.4.0.213/index.html";
+		window.location.href = baseHref + "2.4.0.213/index.html";
 		return;
 	}
 
@@ -110,22 +130,12 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion(fwv, vData.versions || [], fwm);
 					$.mobile.loading( "hide" );
 					localStorage.removeItem("show_sites");
-
-					var baseHref = window.location.href.split("#")[0].split("?")[0];
-					baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
-					baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
-
-					window.location.href = baseHref + "/" + targetVersion + "/index.html";
+					window.location.href = baseHref + targetVersion + "/index.html";
 				},
 				function() {
 					$.mobile.loading( "hide" );
 					localStorage.removeItem("show_sites");
-
-					var baseHref = window.location.href.split("#")[0].split("?")[0];
-					baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
-					baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
-
-					window.location.href = baseHref + "/2.4.0.213/index.html";
+					window.location.href = baseHref + "2.4.0.213/index.html";
 				}
 			);
 		},
@@ -133,12 +143,7 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 			console.log("Could not ping controller directly. Routing to default UI version 2.4.0.213.");
 			$.mobile.loading( "hide" );
 			localStorage.removeItem("show_sites");
-
-			var baseHref = window.location.href.split("#")[0].split("?")[0];
-			baseHref = baseHref.substring(0, baseHref.lastIndexOf("/"));
-			baseHref = baseHref.replace(/\/[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?$/, "").replace(/\/dev$/, "");
-
-			window.location.href = baseHref + "/2.4.0.213/index.html";
+			window.location.href = baseHref + "2.4.0.213/index.html";
 		}
 	);
 };
