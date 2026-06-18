@@ -27,8 +27,7 @@ OSApp.Sites.isRootPath = function() {
 		window.location.hostname === "localhost" ||
 		window.location.hostname === "127.0.0.1" ||
 		window.location.protocol === "file:" ||
-		window.location.protocol.indexOf("app") === 0 ||
-		window.cordova
+		window.location.protocol.indexOf("app") === 0
 	);
 	if (!isVersionsSupported) {
 		return false;
@@ -95,11 +94,46 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 	}
 	path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
 	var baseHref = origin + (path.endsWith("/") ? path : path + "/");
-
-	if (forceDefault || !siteData) {
+	var connectInCurrentBundle = function() {
 		$.mobile.loading( "hide" );
 		localStorage.removeItem("show_sites");
-		window.location.href = baseHref + "2.4.0.213/index.html";
+
+		if ( typeof OSApp.Sites.updateSite === "function" ) {
+			OSApp.Sites.updateSite( newsite, { goSprinklers: true } );
+		} else {
+			window.location.href = baseHref + "index.html";
+		}
+	};
+	var navigateToVersion = function( targetVersion ) {
+		var targetHref = baseHref + targetVersion + "/index.html";
+
+		// On opensprinklershop.de we know the versioned folders are present.
+		// For all other hosts (localhost, 127.0.0.1, WKWebView, cordova, file:, etc.),
+		// probe first and fallback to connecting in the current bundle if the folders are absent.
+		if ( window.location.hostname.indexOf("opensprinklershop.de") === -1 ) {
+			$.ajax( {
+				url: targetVersion + "/index.html",
+				type: "GET",
+				dataType: "text",
+				timeout: 2000,
+				cache: false
+			} ).then( function() {
+				$.mobile.loading( "hide" );
+				localStorage.removeItem("show_sites");
+				window.location.href = targetHref;
+			}, function() {
+				connectInCurrentBundle();
+			} );
+			return;
+		}
+
+		$.mobile.loading( "hide" );
+		localStorage.removeItem("show_sites");
+		window.location.href = targetHref;
+	};
+
+	if (forceDefault || !siteData) {
+		navigateToVersion( "2.4.0.213" );
 		return;
 	}
 
@@ -128,22 +162,16 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 			}).then(
 				function(vData) {
 					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion(fwv, vData.versions || [], fwm);
-					$.mobile.loading( "hide" );
-					localStorage.removeItem("show_sites");
-					window.location.href = baseHref + targetVersion + "/index.html";
+					navigateToVersion( targetVersion );
 				},
 				function() {
-					$.mobile.loading( "hide" );
-					localStorage.removeItem("show_sites");
-					window.location.href = baseHref + "2.4.0.213/index.html";
+					navigateToVersion( "2.4.0.213" );
 				}
 			);
 		},
 		function(err) {
 			console.log("Could not ping controller directly. Routing to default UI version 2.4.0.213.");
-			$.mobile.loading( "hide" );
-			localStorage.removeItem("show_sites");
-			window.location.href = baseHref + "2.4.0.213/index.html";
+			navigateToVersion( "2.4.0.213" );
 		}
 	);
 };
@@ -1241,8 +1269,34 @@ OSApp.Sites.newLoad = function() {
 	//Clear the current queued AJAX requests (used for previous OSApp.currentSession.controller connection)
 	$.ajaxq.abort( "default" );
 
+	var didFinishConnect = false,
+		connectWatchdog = setTimeout( function() {
+			if ( didFinishConnect ) {
+				return;
+			}
+
+			didFinishConnect = true;
+			$.ajaxq.abort( "default" );
+			OSApp.currentSession.controller = {};
+			$.mobile.loading( "hide" );
+
+			if ( $( ".ui-page-active" ).attr( "id" ) !== "site-control" ) {
+				OSApp.UIDom.changePage( "#site-control", {
+					transition: "none"
+				} );
+			}
+
+			OSApp.Errors.showError( OSApp.Language._( "Connection timed-out. Please try again." ) );
+		}, 15000 );
+
 	OSApp.Sites.updateController(
 		function() {
+			if ( didFinishConnect ) {
+				return;
+			}
+			didFinishConnect = true;
+			clearTimeout( connectWatchdog );
+
 			var weatherAdjust = $( ".weatherAdjust" ),
 				changePassword = $( ".changePassword" );
 
@@ -1318,6 +1372,12 @@ OSApp.Sites.newLoad = function() {
 			}
 		},
 		function( error ) {
+			if ( didFinishConnect ) {
+				return;
+			}
+			didFinishConnect = true;
+			clearTimeout( connectWatchdog );
+
 			$.ajaxq.abort( "default" );
 			OSApp.currentSession.controller = {};
 
@@ -1751,12 +1811,51 @@ OSApp.Sites.updateControllerStationSpecial = function( callback ) {
 };
 
 // Change the current site (needs to be defined AFTER OSApp.Sites.checkConfigured!)
-OSApp.Sites.updateSite = function( newsite ) {
+OSApp.Sites.updateSite = function( newsite, opts ) {
+	opts = opts || {};
+
 	OSApp.Storage.get( "sites", function( data ) {
 		var sites = OSApp.Sites.parseSites( data.sites );
 		if ( newsite in sites ) {
 			OSApp.UIDom.closePanel( function() {
 				OSApp.Storage.set( { "current_site":newsite }, function() {
+					if ( opts.goSprinklers === true ) {
+						OSApp.currentSession.currentSite = newsite;
+						OSApp.currentSession.token = sites[ newsite ].os_token;
+
+						OSApp.currentSession.ip = sites[ newsite ].os_ip;
+						OSApp.currentSession.pass = sites[ newsite ].os_pw;
+
+						if ( typeof sites[ newsite ].ssl !== "undefined" && sites[ newsite ].ssl === "1" ) {
+							OSApp.currentSession.prefix = "https://";
+						} else {
+							OSApp.currentSession.prefix = "http://";
+						}
+
+						if ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) {
+							OSApp.currentSession.ip = OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix );
+						}
+
+						if ( typeof sites[ newsite ].auth_user !== "undefined" &&
+							typeof sites[ newsite ].auth_pw !== "undefined" ) {
+
+							OSApp.currentSession.auth = true;
+							OSApp.currentSession.authUser = sites[ newsite ].auth_user;
+							OSApp.currentSession.authPass = sites[ newsite ].auth_pw;
+						} else {
+							OSApp.currentSession.auth = false;
+						}
+
+						if ( sites[ newsite ].is183 ) {
+							OSApp.currentSession.fw183 = true;
+						} else {
+							OSApp.currentSession.fw183 = false;
+						}
+
+						OSApp.Sites.newLoad();
+						return;
+					}
+
 					if ( OSApp.Sites.isRootPath() ) {
 						OSApp.Sites.routeToVersion( newsite, sites[ newsite ] );
 					} else {

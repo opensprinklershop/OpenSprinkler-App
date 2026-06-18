@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "OpenSprinkler UI (Simulator)",
+      "type": "pwa-chrome",
+      "request": "launch",
+      "url": "http://localhost:18080",
+      "webRoot": "${workspaceFolder}/www",
+      "preLaunchTask": "UI Dev-Server starten"
+    },
+    {
+      "name": "iPhone Simulator starten",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "echo 'iPhone Simulator wird gestartet...'",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Startkonfiguration: iPhone Simulator"
+    },
+    {
+      "name": "OpenSprinkler App (iPhone Simulator)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "echo 'OpenSprinkler App wird gestartet...'",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Startkonfiguration: iPhone Simulator + App"
+    },
+    {
+      "name": "iPhone Simulator stoppen",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "echo 'iPhone Simulator wird gestoppt...'",
+      "cwd": "${workspaceFolder}",
+      "preLaunchTask": "Stopkonfiguration: iPhone Simulator + App"
+    }
+  ]
+}

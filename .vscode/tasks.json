@@ -1,0 +1,85 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "UI Dev-Server starten",
+      "type": "shell",
+      "command": "npx http-server --port 18080 --cors '*' -c-1 ./www",
+      "isBackground": true,
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": {
+        "owner": "custom",
+        "pattern": [
+          {
+            "regexp": ".",
+            "file": 1,
+            "location": 2,
+            "message": 3
+          }
+        ],
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": ".*",
+          "endsPattern": "Starting up http-server, serving .* through http://127.0.0.1:18080"
+        }
+      },
+      "runOptions": {
+        "reevaluateOnRerun": true
+      }
+    },
+    {
+      "label": "iPhone Simulator starten",
+      "type": "shell",
+      "command": "UDID=$(xcrun simctl list devices available | grep \"iPhone 17 Pro (\" | tail -n 1 | sed -E 's/.*\\(([A-F0-9-]+)\\).*/\\1/'); if [ -z \"$UDID\" ]; then UDID=$(xcrun simctl list devices available | grep -E \"iPhone .*\\([A-F0-9-]+\\) \\((Shutdown|Booted)\\)\" | tail -n 1 | sed -E 's/.*\\(([A-F0-9-]+)\\).*/\\1/'); fi; if [ -z \"$UDID\" ]; then echo \"Kein iPhone-Simulator gefunden.\"; exit 1; fi; xcrun simctl boot \"$UDID\" >/dev/null 2>&1 || true; open -a Simulator --args -CurrentDeviceUDID \"$UDID\"; xcrun simctl bootstatus \"$UDID\" -b; echo \"iPhone Simulator gestartet: $UDID\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "OpenSprinkler App starten (iPhone)",
+      "type": "shell",
+      "command": "UDID=$(xcrun simctl list devices | sed -n -E 's/^[[:space:]]*iPhone[^()]* \\(([A-F0-9-]+)\\) \\(Booted\\).*/\\1/p' | head -n 1); if [ -z \"$UDID\" ]; then echo \"Kein gebooteter iPhone-Simulator gefunden.\"; exit 1; fi; npx cordova prepare ios && xcodebuild -workspace platforms/ios/App.xcworkspace -scheme App -configuration Debug -sdk iphonesimulator -destination \"id=$UDID\" build \"EMBEDDED_CONTENT_CONTAINS_SWIFT = YES\" ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=NO \"LD_RUNPATH_SEARCH_PATHS = \\\"@executable_path/Frameworks\\\"\" && xcrun simctl uninstall \"$UDID\" de.opensprinklershop.sprinklers >/dev/null 2>&1 || true && xcrun simctl install \"$UDID\" platforms/ios/build/Debug-iphonesimulator/OpenSprinklerASB.app && xcrun simctl launch \"$UDID\" de.opensprinklershop.sprinklers",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "iPhone Simulator stoppen",
+      "type": "shell",
+      "command": "BOOTED_IPHONES=$(xcrun simctl list devices | sed -n -E 's/^[[:space:]]*iPhone[^()]* \\(([A-F0-9-]+)\\) \\(Booted\\).*/\\1/p'); if [ -n \"$BOOTED_IPHONES\" ]; then for UDID in $BOOTED_IPHONES; do xcrun simctl terminate \"$UDID\" de.opensprinklershop.sprinklers >/dev/null 2>&1 || true; xcrun simctl shutdown \"$UDID\" >/dev/null 2>&1 || true; done; fi; pkill -x Simulator >/dev/null 2>&1 || true; echo \"iPhone Simulator gestoppt.\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Startkonfiguration: iPhone Simulator",
+      "dependsOn": [
+        "iPhone Simulator starten"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Startkonfiguration: iPhone Simulator + App",
+      "dependsOn": [
+        "iPhone Simulator starten",
+        "OpenSprinkler App starten (iPhone)"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    },
+    {
+      "label": "Stopkonfiguration: iPhone Simulator + App",
+      "dependsOn": [
+        "iPhone Simulator stoppen"
+      ],
+      "dependsOrder": "sequence",
+      "problemMatcher": []
+    }
+  ]
+}

@@ -10,7 +10,7 @@
 	},
     "ios": {
         "debug": {
-            "codeSignIdentity": "iPhone Developer",
+            "codeSignIdentity": "Apple Development",
             "developmentTeam": "4PRJY2T89D",
             "packageType": "development",
             "automaticProvisioning": true,
@@ -21,7 +21,7 @@
             ]
         },
         "release": {
-            "codeSignIdentity": "iPhone Developer",
+            "codeSignIdentity": "Apple Development",
             "developmentTeam": "4PRJY2T89D",
             "packageType": "app-store",
             "automaticProvisioning": true,

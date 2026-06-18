@@ -17,31 +17,38 @@ if [ -z "$XCODE_MAJOR" ] || [ "$XCODE_MAJOR" -lt 26 ]; then
 	exit 1
 fi
 
-read -r -p "Versionsnummer in config.xml erhöhen? [y/N]: " BUMP_VERSION
+# Check if we are running in an interactive terminal or if BUMP_VERSION is pre-set
+if [ -t 0 ] || [ -n "$BUMP_VERSION" ]; then
+	if [ -z "$BUMP_VERSION" ]; then
+		read -r -p "Versionsnummer in config.xml erhöhen? [y/N]: " BUMP_VERSION
+	fi
+else
+	BUMP_VERSION="n"
+fi
 BUMP_VERSION=${BUMP_VERSION:-n}
 
 if [[ "$BUMP_VERSION" =~ ^[Yy]$ ]]; then
-	CURRENT_VERSION=$(sed -n 's/.*<widget[^>]* version="\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p' "$SCRIPT_DIR/config.xml" | head -n 1)
-	CURRENT_VERSION_CODE=$(sed -n 's/.* versionCode="\([0-9][0-9]*\)".*/\1/p' "$SCRIPT_DIR/config.xml" | head -n 1)
+        CURRENT_VERSION=$(sed -n 's/.*<widget[^>]* version="\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)".*/\1/p' "$SCRIPT_DIR/config.xml" | head -n 1)
+        CURRENT_VERSION_CODE=$(sed -n 's/.* versionCode="\([0-9][0-9]*\)".*/\1/p' "$SCRIPT_DIR/config.xml" | head -n 1)
 
-	if [ -z "$CURRENT_VERSION" ] || [ -z "$CURRENT_VERSION_CODE" ]; then
-		echo "Fehler: Versionsinformationen in config.xml konnten nicht gelesen werden."
-		exit 1
-	fi
+        if [ -z "$CURRENT_VERSION" ] || [ -z "$CURRENT_VERSION_CODE" ]; then
+                echo "Fehler: Versionsinformationen in config.xml konnten nicht gelesen werden."
+                exit 1
+        fi
 
-	IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-	NEXT_PATCH=$((PATCH + 1))
-	NEXT_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
-	NEXT_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
+        IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+        NEXT_PATCH=$((PATCH + 1))
+        NEXT_VERSION="$MAJOR.$MINOR.$NEXT_PATCH"
+        NEXT_VERSION_CODE=$((CURRENT_VERSION_CODE + 1))
 
-	sed -i '' -E "0,/version=\"[0-9]+\.[0-9]+\.[0-9]+\"/{s/version=\"[0-9]+\.[0-9]+\.[0-9]+\"/version=\"$NEXT_VERSION\"/}" "$SCRIPT_DIR/config.xml"
-	sed -i '' -E "0,/android-versionCode=\"[0-9]+\"/{s/android-versionCode=\"[0-9]+\"/android-versionCode=\"$NEXT_VERSION_CODE\"/}" "$SCRIPT_DIR/config.xml"
-	sed -i '' -E "0,/ versionCode=\"[0-9]+\"/{s/ versionCode=\"[0-9]+\"/ versionCode=\"$NEXT_VERSION_CODE\"/}" "$SCRIPT_DIR/config.xml"
+        sed -i '' -E "0,/version=\"[0-9]+\.[0-9]+\.[0-9]+\"/{s/version=\"[0-9]+\.[0-9]+\.[0-9]+\"/version=\"$NEXT_VERSION\"/}" "$SCRIPT_DIR/config.xml"
+        sed -i '' -E "0,/android-versionCode=\"[0-9]+\"/{s/android-versionCode=\"[0-9]+\"/android-versionCode=\"$NEXT_VERSION_CODE\"/}" "$SCRIPT_DIR/config.xml"
+        sed -i '' -E "0,/ versionCode=\"[0-9]+\"/{s/ versionCode=\"[0-9]+\"/ versionCode=\"$NEXT_VERSION_CODE\"/}" "$SCRIPT_DIR/config.xml"
 
-	echo "Version erhöht: $CURRENT_VERSION -> $NEXT_VERSION"
-	echo "VersionCode erhöht: $CURRENT_VERSION_CODE -> $NEXT_VERSION_CODE"
+        echo "Version erhöht: $CURRENT_VERSION -> $NEXT_VERSION"
+        echo "VersionCode erhöht: $CURRENT_VERSION_CODE -> $NEXT_VERSION_CODE"
 else
-	echo "Version bleibt unverändert."
+        echo "Version bleibt unverändert ($BUMP_VERSION)."
 fi
 
 # --- CFBundleShortVersionString für App Store ---

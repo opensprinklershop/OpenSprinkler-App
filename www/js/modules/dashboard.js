@@ -1496,6 +1496,14 @@ OSApp.Dashboard.displayPage = function() {
 			OSApp.Dashboard.updateWaterLevel();
 			OSApp.Analog.updateSensorShowArea( page );
 
+			if ( !sites || !currentSite || !sites[ currentSite ] ) {
+				return;
+			}
+
+			if ( typeof sites[ currentSite ].images !== "object" ) {
+				sites[ currentSite ].images = {};
+			}
+
 			page.find( ".sitename" ).text( OSApp.currentSession.local ? OSApp.currentSession.controller.settings?.dname || "" : siteSelect.val() );
 			page.find( ".sitename" ).toggleClass( "hidden", OSApp.currentSession.local ? ( OSApp.currentSession.controller.settings?.dname ? false : true ) : false );
 
@@ -1627,12 +1635,19 @@ OSApp.Dashboard.displayPage = function() {
 		updateSites = function( callback ) {
 			callback = callback || function() {};
 
-			currentSite = siteSelect.val();
+			currentSite = siteSelect.val() || currentSite || "default";
 			OSApp.Storage.get( "sites", function( data ) {
-				sites = OSApp.Sites.parseSites( data.sites );
-				// Prevent errors during test: page navigation checks
-				if ( !sites || $.isEmptyObject(sites) || !currentSite ) {
-					return;
+				sites = OSApp.Sites.parseSites( data.sites ) || {};
+				if ( typeof sites !== "object" ) {
+					sites = {};
+				}
+
+				if ( !sites[ currentSite ] || typeof sites[ currentSite ] !== "object" ) {
+					sites[ currentSite ] = {
+						images: {},
+						notes: {},
+						lastRunTime: {}
+					};
 				}
 
 				if ( typeof sites[ currentSite ]?.images !== "object" || $.isEmptyObject( sites[ currentSite ].images ) ) {

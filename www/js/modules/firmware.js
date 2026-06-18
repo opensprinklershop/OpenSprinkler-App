@@ -734,20 +734,30 @@ OSApp.Firmware.OTA_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
 // Cached update check result
 OSApp.Firmware._otaCache = null;
 
+OSApp.Firmware.getControllerOptions = function() {
+	if ( OSApp.currentSession && OSApp.currentSession.controller && typeof OSApp.currentSession.controller.options === "object" ) {
+		return OSApp.currentSession.controller.options;
+	}
+
+	return {};
+};
+
 OSApp.Firmware.getOTACurrentVersion = function() {
+	var options = OSApp.Firmware.getControllerOptions();
+
 	return {
-		fwv: OSApp.currentSession.controller.options.fwv || 0,
-		fwm: OSApp.currentSession.controller.options.fwm || 0
+		fwv: options.fwv || 0,
+		fwm: options.fwm || 0
 	};
 };
 
 OSApp.Firmware.isESP8266Controller = function() {
-	var hwv = OSApp.currentSession.controller.options.hwv || 0;
+	var hwv = OSApp.Firmware.getControllerOptions().hwv || 0;
 	return hwv > 0 && hwv < 40;
 };
 
 OSApp.Firmware.isDirectFirmwareUploadSupported = function() {
-	var hwv = OSApp.currentSession.controller.options.hwv || 0;
+	var hwv = OSApp.Firmware.getControllerOptions().hwv || 0;
 	return hwv > 0 && hwv < 64;
 };
 
