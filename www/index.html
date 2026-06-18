@@ -165,6 +165,11 @@
 				}
 			})();
 		</script>
+
+		<!-- Boot diagnostics & startup watchdog: must load before vendor/app scripts
+		     so it can capture early errors and recover from a frozen/black screen. -->
+		<script src="js/boot-diagnostics.js"></script>
+
 		<meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<meta content="yes" name="apple-mobile-web-app-capable">
 		<meta name="mobile-web-app-capable" content="yes">
@@ -244,6 +249,7 @@
 		<script src="js/modules/supported.js"></script>
 		<script src="js/modules/system-diagnostics.js"></script>
 		<script src="js/modules/live-debug.js"></script>
+		<script src="js/modules/diagnostics-console.js"></script>
 		<script src="js/modules/ui-dom.js"></script>
 		<script src="js/modules/utils.js"></script>
 		<script src="js/modules/welcome.js"></script>
@@ -292,6 +298,7 @@
 				<li data-icon="alert" class="localSite hidden"><a id="downgradeui" href="#" data-translate="Downgrade UI">Downgrade UI</a></li>
 				<li data-icon="info" class="weatherAdjust"><a href="#debugWU" class="squeeze" data-translate="System Diagnostics">System Diagnostics</a></li>
 				<li data-icon="bullets" class="live-debug-menu hidden"><a href="#liveDebug" data-translate="Live Debug">Live Debug</a></li>
+				<li data-icon="alert"><a href="#jsConsole" data-translate="JavaScript Console">JavaScript Console</a></li>
 				<li data-icon="gear"><a href="#" class="theme-toggle" data-translate="Theme">Theme</a></li>
 			</ul>
 		</div>

@@ -161,6 +161,8 @@ OSApp.UIDom.launchApp = function() {
 			OSApp.About.displayPage();
 		} else if ( hash === "#liveDebug" ) {
 			OSApp.LiveDebug.displayPage();
+		} else if ( hash === "#jsConsole" ) {
+			OSApp.ErrorConsole.displayPage();
 		} else if ( hash === "#runonce" ) {
 			OSApp.Programs.displayPageRunOnce();
 		} else if ( hash === "#os-options" ) {
@@ -591,6 +593,11 @@ OSApp.UIDom.initAppData = function() {
 	setTimeout( function() {
 		OSApp.Sites.checkConfigured( true );
 	}, 200 );
+
+	// If the startup watchdog recovered the app, surface a one-time notice
+	if ( OSApp.ErrorConsole && typeof OSApp.ErrorConsole.checkWatchdogNotice === "function" ) {
+		OSApp.ErrorConsole.checkWatchdogNotice();
+	}
 };
 
 OSApp.UIDom.focusInput = function() {
@@ -642,6 +649,11 @@ OSApp.UIDom.bindPanel = function() {
 
 	panel.find( "a[href='#liveDebug']" ).on( "click", function() {
 		OSApp.UIDom.changePage( "#liveDebug" );
+		return false;
+	} );
+
+	panel.find( "a[href='#jsConsole']" ).on( "click", function() {
+		OSApp.UIDom.changePage( "#jsConsole" );
 		return false;
 	} );
 

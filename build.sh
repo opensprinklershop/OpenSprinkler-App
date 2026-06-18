@@ -41,6 +41,25 @@ for v in $VERSIONS; do
 	fi
 done
 
+# === Inject boot diagnostics & startup watchdog into each bundled UI version ===
+# The bundled versioned UIs are pinned older builds that do not contain the
+# startup watchdog / JavaScript error console. Inject the self-contained
+# boot-diagnostics.js into each one so a frozen/black screen can recover to the
+# main menu and the captured JS errors stay viewable. This is idempotent and
+# only touches the (untracked) bundled copies under www/$v.
+echo "=== Injecting boot watchdog into bundled UI versions ==="
+for v in $VERSIONS; do
+	VER_DIR="www/$v"
+	[ -d "$VER_DIR" ] || continue
+	[ -f "$VER_DIR/index.html" ] || continue
+	mkdir -p "$VER_DIR/js"
+	cp www/js/boot-diagnostics.js "$VER_DIR/js/boot-diagnostics.js"
+	if ! grep -q "js/boot-diagnostics.js" "$VER_DIR/index.html"; then
+		perl -0777 -pi -e 's{<head>}{<head>\n\t\t<script src="js/boot-diagnostics.js"></script>}' "$VER_DIR/index.html"
+		echo "   Injected watchdog into $VER_DIR/index.html"
+	fi
+done
+
 # Copy modules.json to www/ and platforms BEFORE building
 cp build/modules.json www/
 cp build/modules.json platforms/browser/www/
