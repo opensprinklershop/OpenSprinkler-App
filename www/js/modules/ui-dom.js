@@ -972,15 +972,26 @@ OSApp.UIDom.closePanel = function( callback ) {
 };
 
 OSApp.UIDom.getAppURLPath = function() {
-	var script = $( "script[src*='main.js']" );
-	if ( script.length > 0 ) {
-		var src = script.attr( "src" );
-		var parsed = $.mobile.path.parseUrl( src );
-		var href = parsed.hrefNoHash;
-		// Strip query string if any exists
-		var qIdx = href.indexOf( "?" );
-		if ( qIdx !== -1 ) href = href.substring( 0, qIdx );
-		return href.slice( 0, -10 );
+	var scripts = document.getElementsByTagName( "script" );
+	for ( var i = 0; i < scripts.length; i++ ) {
+		var src = scripts[ i ].src;
+		if ( src && ( src.indexOf( "main.js" ) !== -1 || src.indexOf( "home.js" ) !== -1 ) ) {
+			// Strip query parameters
+			var qIdx = src.indexOf( "?" );
+			if ( qIdx !== -1 ) src = src.substring( 0, qIdx );
+			// Check if it ends with js/main.js or js/home.js
+			if ( src.endsWith && ( src.endsWith( "js/main.js" ) || src.endsWith( "js/home.js" ) ) ) {
+				return src.slice( 0, -10 );
+			} else if ( src.endsWith && ( src.endsWith( "main.js" ) || src.endsWith( "home.js" ) ) ) {
+				return src.slice( 0, -7 );
+			} else {
+				// Fallback string matching if endsWith is absent or doesn't match
+				var match = src.match( /^(.*\/)(?:js\/)?(?:main|home)\.js$/ );
+				if ( match ) {
+					return match[ 1 ];
+				}
+			}
+		}
 	}
 	return "";
 };

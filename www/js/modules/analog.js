@@ -5520,9 +5520,14 @@ OSApp.Analog.setupGardenaCredentials = function() {
 
 		popup.find(".launch-assistant").on("click", function (e) {
 			e.preventDefault();
-			// Root origin path to keep Gardena Assistant centralized and independent of versions
-			var rootUrl = window.location.origin + "/";
-			window.open(rootUrl + "gardena-oauth2/index.html", "gardena_assistant", "width=600,height=750,scrollbars=yes");
+			var appPath = OSApp.UIDom.getAppURLPath();
+			// Since Husqvarna OAuth2 redirect URIs must be publicly registered HTTPS domains,
+			// any local controller IP (192.168.x.x, 10.x.x.x, etc.) or file:/// path cannot run the assistant locally.
+			// We fallback to the official public production domain if we are not running on an official opensprinklershop server.
+			if (!appPath || appPath.indexOf("opensprinklershop.de") === -1) {
+				appPath = "https://ui.opensprinklershop.de/";
+			}
+			window.open(appPath + "gardena-oauth2/index.html", "gardena_assistant", "width=600,height=750,scrollbars=yes");
 			return false;
 		});
 
