@@ -15,6 +15,8 @@
 <html>
 	<head>
 		<title>OpenSprinkler</title>
+		<!-- Boot diagnostics must run first so startup failures are visible immediately. -->
+		<script src="js/boot-diagnostics.js"></script>
 		<script>
 			(function() {
 				var path = window.location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "");
@@ -116,6 +118,9 @@
 										localStorage.removeItem("show_sites");
 
 										var origin = window.location.origin;
+										if (!origin || origin === "null") {
+											origin = window.location.protocol + "//" + window.location.host;
+										}
 										var path = window.location.pathname;
 										if (path.endsWith("/index.html")) {
 											path = path.substring(0, path.length - 10);
@@ -131,6 +136,9 @@
 									versionsXhr.onerror = versionsXhr.ontimeout = function() {
 										localStorage.removeItem("show_sites");
 										var origin = window.location.origin;
+										if (!origin || origin === "null") {
+											origin = window.location.protocol + "//" + window.location.host;
+										}
 										var path = window.location.pathname;
 										if (path.endsWith("/index.html")) {
 											path = path.substring(0, path.length - 10);
@@ -165,11 +173,6 @@
 				}
 			})();
 		</script>
-
-		<!-- Boot diagnostics & startup watchdog: must load before vendor/app scripts
-		     so it can capture early errors and recover from a frozen/black screen. -->
-		<script src="js/boot-diagnostics.js"></script>
-
 		<meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<meta content="yes" name="apple-mobile-web-app-capable">
 		<meta name="mobile-web-app-capable" content="yes">

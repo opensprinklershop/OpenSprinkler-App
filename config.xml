@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget android-versionCode="204" version="2.4.204" versionCode="204" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="de.opensprinklershop.sprinklers" >
+<widget android-versionCode="206" version="2.4.206" versionCode="206" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="de.opensprinklershop.sprinklers" >
   <name>OpenSprinklerASB</name>
   <description>
             Designed to allow intuitive control of the OpenSprinkler irrigation controller.
@@ -104,6 +104,9 @@
     	        <application android:usesCleartextTraffic="true"
     	                        android:networkSecurityConfig="@xml/network_security_config" />
         </edit-config>
+        <!-- Fail-safe: avoid infinite logo/splash when deviceready or JS init stalls. -->
+        <preference name="AutoHideSplashScreen" value="true" />
+        <preference name="SplashScreenDelay" value="3000" />
         <resource-file src="res/android/network_security_config.xml" target="app/src/main/res/xml/network_security_config.xml" />
         <config-file target="AndroidManifest.xml" parent="queries">
             <intent>

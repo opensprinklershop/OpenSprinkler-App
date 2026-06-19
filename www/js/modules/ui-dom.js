@@ -912,6 +912,9 @@ OSApp.UIDom.changePage = function( toPage, opts ) {
 		localStorage.setItem("show_sites", "1");
 
 		var origin = window.location.origin;
+		if (!origin || origin === "null") {
+			origin = window.location.protocol + "//" + window.location.host;
+		}
 		var path = window.location.pathname;
 		if (path.endsWith("/index.html")) {
 			path = path.substring(0, path.length - 10);

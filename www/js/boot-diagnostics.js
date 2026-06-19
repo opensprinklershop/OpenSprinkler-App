@@ -83,12 +83,18 @@
 			}
 		}
 		pushError(kind, message, detail);
+
+		// Surface the diagnostics overlay as soon as a real exception is thrown.
+		if (kind === "error") {
+			triggerDiagnose("exception: " + message);
+		}
 	}, true);
 
 	window.addEventListener("unhandledrejection", function (event) {
 		var reason = event ? event.reason : null;
 		var message = (reason && reason.message) ? reason.message : reason;
 		pushError("promise", message, (reason && reason.stack) ? reason.stack : "");
+		triggerDiagnose("unhandled promise rejection");
 	});
 
 	// Mirror console.error into the buffer (console.warn is intentionally left
@@ -124,14 +130,18 @@
 
 	var lastInteractiveTime = Date.now();
 	var recovered = false;
+	var bootCompleted = false;
 	var timer = null;
 
 	var CHECK_INTERVAL = 2500;
-	var FROZEN_THRESHOLD = 20000;   // in-app blank screen (e.g. stuck #loadingPage)
-	var FASTPATH_THRESHOLD = 9000;  // root fast-path blank screen (body hidden)
+	var FROZEN_THRESHOLD = 10000;   // show diagnostics if nothing usable appears within 10s
+	var FASTPATH_THRESHOLD = 10000; // same 10s budget for the root fast-path blank screen
 
 	function markActivity() {
 		lastInteractiveTime = Date.now();
+		// Any real user interaction means the UI is up: from now on exceptions are
+		// only logged (bug button), they must not pop the startup diagnostics.
+		bootCompleted = true;
 	}
 
 	["pointerdown", "touchstart", "keydown", "mousedown"].forEach(function (ev) {
@@ -208,6 +218,9 @@
 
 	function rootIndexUrl() {
 		var origin = window.location.origin;
+		if (!origin || origin === "null") {
+			origin = window.location.protocol + "//" + window.location.host;
+		}
 		var path = window.location.pathname;
 
 		if (path.indexOf("/index.html") === path.length - 11) {
@@ -234,6 +247,26 @@
 		if (document.body) {
 			document.body.style.display = "";
 		}
+	}
+
+	// Shows the diagnostics overlay once, e.g. when an exception is thrown or
+	// when the startup watchdog gives up. Only fires during the startup phase:
+	// after the UI is up (bootCompleted) runtime exceptions are just logged.
+	// Defers until <body> exists so it can fire even from very early errors.
+	function triggerDiagnose(reason) {
+		if (recovered || bootCompleted) {
+			return;
+		}
+		if (!document.body) {
+			document.addEventListener("DOMContentLoaded", function () {
+				triggerDiagnose(reason);
+			});
+			return;
+		}
+		recovered = true;
+		pushError("watchdog", "Diagnostics overlay shown", reason || "");
+		revealUI();
+		showOverlay();
 	}
 
 	function recover(reason) {
@@ -296,6 +329,7 @@
 
 		if (hasSelectableUI()) {
 			lastInteractiveTime = Date.now();
+			bootCompleted = true;
 			return;
 		}
 
