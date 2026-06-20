@@ -984,7 +984,10 @@ OSApp.ESP32Mode.showRainMakerPopup = function( rainmakerInfo ) {
 OSApp.ESP32Mode.setupZigBeeGateway = function() {
 	$.mobile.loading( "show" );
 
-	OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( data ) {
+	// Use an explicit timeout so an unresponsive controller (e.g. busy/low on
+	// memory) fails the request instead of leaving the loading spinner ("hourglass")
+	// up forever. The .fail() handler then hides the spinner and shows an error.
+	OSApp.Firmware.sendToOS( "/zg?pw=", "json", 25000 ).done( function( data ) {
 		$.mobile.loading( "hide" );
 
 		if ( data && data.result === 1 ) {

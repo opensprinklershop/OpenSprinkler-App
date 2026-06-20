@@ -1,4 +1,4 @@
-/* global $ */
+/* global $, md5 */
 
 /* OpenSprinkler App
  * Copyright (C) 2015 - present, Samer Albahra. All rights reserved.
@@ -1008,39 +1008,122 @@ OSApp.Firmware.getOTAInfoHTML = function() {
 /**
  * Poll update progress after starting an OTA upgrade.
  * Shows a loading overlay with progress.
+ *
+ * The ESP32-C5 two-phase OTA reboots the device several times (free-RAM reboot,
+ * phase-1 -> phase-2 reboot, final reboot). During each reboot the device is
+ * unreachable, and it reports transient REBOOTING_OTA (14) / REBOOTING_PHASE2 (13)
+ * states which are NOT failures. We therefore: treat only real error codes
+ * (9,10,11,12,15) as failure, keep polling through reboot/offline windows, and
+ * wait for the device to come back online at the end.
  */
 OSApp.Firmware.pollOTAProgress = function( popup ) {
-	var pollTimer = setInterval( function() {
-		OSApp.Firmware.sendToOS( "/us?pw=", "json" ).then( function( data ) {
-			if ( !data ) return;
+	var ST = OSApp.ESP32Mode.OTA_STATUS;
+	var failCount = 0;
+	var maxFails = 60; // 60 × 2s = 120s tolerance per offline/reboot window
+	var lastProgress = 0;
+	var reconnectStarted = false;
 
-			var statusText = data.message || "";
-			var progress = data.progress || 0;
-			var status = data.status;
+	var setText = function( txt, color ) {
+		if ( popup && popup.find ) {
+			popup.find( ".ota-progress-text" ).text( txt ).css( "color", color || "" );
+		}
+	};
+	var setBar = function( pct ) {
+		if ( popup && popup.find ) {
+			popup.find( ".ota-progress-bar" ).css( "width", pct + "%" );
+		}
+	};
+	var isError = function( status ) {
+		return status === ST.ERROR_NETWORK || status === ST.ERROR_PARSE ||
+			status === ST.ERROR_FLASH_ZIGBEE || status === ST.ERROR_FLASH_MATTER ||
+			status === ST.ERROR_LOW_MEMORY;
+	};
 
-			if ( popup && popup.find ) {
-				popup.find( ".ota-progress-text" ).text( statusText );
-				popup.find( ".ota-progress-bar" ).css( "width", progress + "%" );
-			}
+	// Final step: device performs its last reboot; wait until it answers again.
+	var startReconnectWait = function() {
+		if ( reconnectStarted ) { return; }
+		reconnectStarted = true;
+		clearInterval( pollTimer );
+		setBar( 95 );
+		setText( OSApp.Language._( "Waiting for device to come back online..." ) );
 
-			// OTA_STATUS_DONE = 8, errors >= 9
-			if ( status === 8 ) {
-				clearInterval( pollTimer );
-				if ( popup && popup.find ) {
-					popup.find( ".ota-progress-text" ).text( OSApp.Language._( "Update complete! Rebooting..." ) );
-				}
+		// After OTA the device may have reset the password to default — alternate
+		// between the session password and the default on each probe.
+		var originalPass = OSApp.currentSession.pass;
+		var defaultPass = md5( "opendoor" );
+		var baseUrl = OSApp.currentSession.token
+			? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
+			: OSApp.currentSession.prefix + OSApp.currentSession.ip;
+		var seconds = 0;
+		var probeCount = 0;
+		var pending = false;
+
+		var reconnectTimer = setInterval( function() {
+			seconds += 3;
+			setText( OSApp.Language._( "Waiting for device to restart..." ) + " (" + seconds + "s)" );
+			if ( seconds < 12 || pending ) { return; }
+			pending = true;
+			probeCount++;
+			var tryPass = ( probeCount % 2 === 1 ) ? originalPass : defaultPass;
+			$.ajax( {
+				url: baseUrl + "/jo?pw=" + encodeURIComponent( tryPass ),
+				type: "GET",
+				dataType: "json",
+				timeout: 5000
+			} ).done( function( data ) {
+				pending = false;
+				if ( !data ) { return; }
+				clearInterval( reconnectTimer );
+				OSApp.currentSession.pass = tryPass;
+				setBar( 100 );
+				setText( OSApp.Language._( "Update complete! Rebooting..." ) );
 				setTimeout( function() {
-					if ( popup ) popup.popup( "close" );
+					if ( popup ) { popup.popup( "close" ); }
 					OSApp.Errors.showError( OSApp.Language._( "Firmware updated. Device is rebooting..." ) );
 					// Clear cache so next check fetches fresh data
 					OSApp.Storage.setItemSync( "otaUpdateCheck", "" );
 					OSApp.Firmware._otaCache = null;
-				}, 3000 );
-			} else if ( status >= 9 ) {
-				clearInterval( pollTimer );
-				if ( popup && popup.find ) {
-					popup.find( ".ota-progress-text" ).text( OSApp.Language._( "Update failed" ) + ": " + statusText ).css( "color", "red" );
+				}, 2000 );
+			} ).fail( function() {
+				pending = false;
+				if ( seconds >= 120 ) {
+					clearInterval( reconnectTimer );
+					setText( OSApp.Language._( "Device rebooting \u2014 reconnect when ready" ), "#FF9800" );
 				}
+			} );
+		}, 3000 );
+	};
+
+	var pollTimer = setInterval( function() {
+		OSApp.Firmware.sendToOS( "/us?pw=", "json" ).done( function( data ) {
+			if ( !data ) { return; }
+			failCount = 0;
+			var status = data.status;
+			lastProgress = Math.max( lastProgress, data.progress || 0 );
+			setText( data.message || "" );
+			setBar( lastProgress );
+
+			if ( status === ST.DONE ) {
+				startReconnectWait();
+			} else if ( status === ST.REBOOTING_PHASE2 || status === ST.REBOOTING_OTA ) {
+				// Transient reboot states — not a failure. Keep polling.
+				setText( data.message || OSApp.Language._( "Rebooting..." ) );
+			} else if ( isError( status ) ) {
+				clearInterval( pollTimer );
+				setText( OSApp.Language._( "Update failed" ) + ": " + ( data.message || "" ), "red" );
+			}
+		} ).fail( function() {
+			// Device unreachable — almost certainly a mid-OTA reboot. Do NOT give
+			// up: keep polling; failCount resets as soon as the device answers.
+			failCount++;
+			if ( lastProgress >= 90 ) {
+				startReconnectWait();
+				return;
+			}
+			setText( OSApp.Language._( "Waiting for device to restart..." ) + " (" + ( failCount * 2 ) + "s)" );
+			if ( failCount >= maxFails ) {
+				clearInterval( pollTimer );
+				setText( OSApp.Language._( "Device rebooting \u2014 reconnect when ready" ), "#FF9800" );
 			}
 		} );
 	}, 2000 );

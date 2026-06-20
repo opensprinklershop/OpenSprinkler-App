@@ -360,6 +360,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					case "o52":
 					case "o53":
 					case "o79":
+					case "o82":
 						data = $item.is( ":checked" ) ? 1 : 0;
 						if ( !OSApp.Firmware.checkOSVersion( 219 ) && !data ) {
 							return true;
@@ -498,6 +499,16 @@ OSApp.Options.showOptions = function( expandItem ) {
 					   "<input data-mini='true' id='o36' type='checkbox' " + ( ( OSApp.currentSession.controller.options.lg === 1 ) ? "checked='checked'" : "" ) + ">";
                }
        list += "</div>";
+
+       if ( typeof OSApp.currentSession.controller.options.wims !== "undefined" &&
+                       !OSApp.Firmware.isOSPi() ) {
+               list += "<label for='o82'><input data-mini='true' id='o82' type='checkbox' " +
+                               ( ( OSApp.currentSession.controller.options.wims === 1 ) ? "checked='checked'" : "" ) + ">" +
+                       OSApp.Language._( "WiFi Power Saving" ) +
+                       "<button data-helptext='" +
+                               OSApp.Language._( "Enables WiFi modem sleep to lower power consumption and reduce self-heating, which can improve reception with weak signals. Leave disabled if you experience connection drops during continuous operation." ) +
+                               "' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button></label>";
+       }
 
        list += "</fieldset><fieldset data-role='collapsible'" +
                ( typeof expandItem === "string" && expandItem === "app" ? " data-collapsed='false'" : "" ) + ">" +
