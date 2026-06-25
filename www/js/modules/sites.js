@@ -172,7 +172,7 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 				}
 			);
 		},
-		function(err) {
+		function() {
 			console.log("Could not ping controller directly. Routing to default UI version 2.4.0.213.");
 			navigateToVersion( "2.4.0.213" );
 		}

@@ -45,6 +45,33 @@
 								// Inject lightweight dark styling immediately without modifying innerHTML to prevent contentscript/DOM parser crashes
 								document.write('<style id="fast-path-hide">html { background-color: #1a1a1a !important; } body { display: none !important; }</style>');
 
+								// Failsafe: never leave the body permanently hidden. If neither the
+								// controller probe nor the redirect completes (e.g. the request is
+								// silently blocked under file:// / mixed content, or send() throws),
+								// reveal the UI so the app shows the site list instead of a black
+								// screen with no logo. Cleared right before a successful redirect.
+								var fastPathRevealed = false;
+								var revealFastPath = function() {
+									if (fastPathRevealed) { return; }
+									fastPathRevealed = true;
+									try {
+										var hideStyle = document.getElementById("fast-path-hide");
+										if (hideStyle && hideStyle.parentNode) {
+											hideStyle.parentNode.removeChild(hideStyle);
+										}
+										var loaderEl = document.getElementById("fast-path-loader");
+										if (loaderEl && loaderEl.parentNode) {
+											loaderEl.parentNode.removeChild(loaderEl);
+										}
+										if (document.body) {
+											document.body.style.display = "";
+										}
+										// Show the site list on the next normal app boot.
+										localStorage.setItem("show_sites", "1");
+									} catch (e) {}
+								};
+								var fastPathFailsafe = window.setTimeout(revealFastPath, 6000);
+
 								// Inject loading indicator after DOMContentLoaded or inline if DOM is already parsed
 								var showLoader = function() {
 									var container = document.createElement("div");
@@ -131,6 +158,7 @@
 										path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
 										var baseHref = origin + (path.endsWith("/") ? path : path + "/");
 
+										window.clearTimeout(fastPathFailsafe);
 										window.location.href = baseHref + targetVersion + "/index.html";
 									};
 									versionsXhr.onerror = versionsXhr.ontimeout = function() {
@@ -148,6 +176,7 @@
 										}
 										path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
 										var baseHref = origin + (path.endsWith("/") ? path : path + "/");
+										window.clearTimeout(fastPathFailsafe);
 										window.location.href = baseHref + "2.4.0.213/index.html";
 									};
 									versionsXhr.send();
@@ -166,9 +195,27 @@
 								xhr.onerror = xhr.ontimeout = function() {
 									handleRedirect(null, null);
 								};
-								xhr.send();
+								try {
+									xhr.send();
+								} catch (e) {
+									// A synchronous failure (e.g. blocked mixed-content request under
+									// file://) must not leave the body hidden forever.
+									handleRedirect(null, null);
+								}
 							}
-						} catch (e) {}
+						} catch (e) {
+							// Any unexpected failure in the fast-path must never leave the body
+							// hidden (display:none) with nothing on screen. Reveal the UI and
+							// fall back to the normal app boot / site list.
+							try {
+								var hs = document.getElementById("fast-path-hide");
+								if (hs && hs.parentNode) { hs.parentNode.removeChild(hs); }
+								var ld = document.getElementById("fast-path-loader");
+								if (ld && ld.parentNode) { ld.parentNode.removeChild(ld); }
+								if (document.body) { document.body.style.display = ""; }
+								localStorage.setItem("show_sites", "1");
+							} catch (e2) {}
+						}
 					}
 				}
 			})();
@@ -301,7 +348,7 @@
 				<li data-icon="alert" class="localSite hidden"><a id="downgradeui" href="#" data-translate="Downgrade UI">Downgrade UI</a></li>
 				<li data-icon="info" class="weatherAdjust"><a href="#debugWU" class="squeeze" data-translate="System Diagnostics">System Diagnostics</a></li>
 				<li data-icon="bullets" class="live-debug-menu hidden"><a href="#liveDebug" data-translate="Live Debug">Live Debug</a></li>
-				<li data-icon="alert"><a href="#jsConsole" data-translate="JavaScript Console">JavaScript Console</a></li>
+				<li data-icon="alert" class="js-console-menu hidden"><a href="#jsConsole" data-translate="JavaScript Console">JavaScript Console</a></li>
 				<li data-icon="gear"><a href="#" class="theme-toggle" data-translate="Theme">Theme</a></li>
 			</ul>
 		</div>

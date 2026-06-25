@@ -60,6 +60,14 @@ for v in $VERSIONS; do
 	fi
 done
 
+# === Harden bundled versioned index.html against Cordova file:// origin "null" ===
+# Pinned older bundles compute their fast-path redirect URL from
+# window.location.origin, which is the literal "null" under file://. That yields an
+# invalid target like "null/.../<ver>/index.html" and a permanent black screen on
+# relaunch. This idempotently injects an origin null-guard into each bundle.
+echo "=== Hardening bundled version origin guards ==="
+node scripts/patch-bundled-versions.js www
+
 # Copy modules.json to www/ and platforms BEFORE building
 cp build/modules.json www/
 cp build/modules.json platforms/browser/www/

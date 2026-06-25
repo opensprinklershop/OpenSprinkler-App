@@ -315,10 +315,25 @@ OSApp.Analog.enc = function(s) {
 	return s;
 };
 
+// Compute an AJAX timeout that scales with the number of configured items.
+// Large /sl, /ml or /se responses (many sensors / monitors) can take noticeably
+// longer than the default 10s, especially on slow links; a too-small timeout
+// aborts the request and the list shows up empty on first load. Base 10s plus a
+// per-item budget, capped at 60s.
+OSApp.Analog.calcTimeout = function(count) {
+	var n = (typeof count === "number" && count > 0) ? count : 0;
+	return Math.min(60000, 10000 + n * 200);
+};
+
 OSApp.Analog.updateProgramAdjustments = function( callback ) {
 	callback = callback || function() { };
-	return OSApp.Firmware.sendToOS( "/se?pw=", "json" ).then( function( data ) {
-		OSApp.Analog.progAdjusts = data.progAdjust;
+	var timeout = OSApp.Analog.calcTimeout( OSApp.Analog.progAdjusts && OSApp.Analog.progAdjusts.length );
+	return OSApp.Firmware.sendToOS( "/se?pw=", "json", timeout ).then( function( data ) {
+		// Only adopt a well-formed response. A slow/partial reply (common with many
+		// sensors) must never wipe the last good adjustments list.
+		if ( data && Array.isArray( data.progAdjust ) ) {
+			OSApp.Analog.progAdjusts = data.progAdjust;
+		}
 		callback();
 	} );
 };
@@ -342,9 +357,14 @@ OSApp.Analog.updateMonitors = function(callback) {
 	OSApp.Analog.checkBackgroundMode();
 
 	if (OSApp.Firmware.checkOSVersion(233) || OSApp.Firmware.isOSPi()) {
-		return OSApp.Firmware.sendToOS("/ml?pw=", "json").then(function (data) {
+		var timeout = OSApp.Analog.calcTimeout( OSApp.Analog.monitors && OSApp.Analog.monitors.length );
+		return OSApp.Firmware.sendToOS("/ml?pw=", "json", timeout).then(function (data) {
 
-			OSApp.Analog.monitors = data.monitors;
+			// Guard against malformed / partial responses: keep the last good
+			// monitor list instead of clearing it (suddenly empty monitors).
+			if ( data && Array.isArray( data.monitors ) ) {
+				OSApp.Analog.monitors = data.monitors;
+			}
 			OSApp.Analog.checkMonitorAlerts();
 			callback();
 		});
@@ -356,14 +376,21 @@ OSApp.Analog.updateMonitors = function(callback) {
 
 OSApp.Analog.updateAnalogSensor = function( callback ) {
 	callback = callback || function() { };
-	return OSApp.Firmware.sendToOS( "/sl?pw=", "json" ).then( function( data ) {
-		OSApp.Analog.analogSensors = data.sensors;
-		if (Object.prototype.hasOwnProperty.call(data, "detected"))
-			OSApp.Analog.analogSensors.detected = data.detected;
-		if (Object.prototype.hasOwnProperty.call(data, "warnings"))
-			OSApp.Analog.analogSensors.warnings = data.warnings;
-		else
-			OSApp.Analog.analogSensors.warnings = [];
+	var timeout = OSApp.Analog.calcTimeout( OSApp.Analog.analogSensors && OSApp.Analog.analogSensors.length );
+	return OSApp.Firmware.sendToOS( "/sl?pw=", "json", timeout ).then( function( data ) {
+		// Guard against malformed / partial responses (e.g. a slow or truncated
+		// /sl reply when many sensors are configured). Never wipe the last good
+		// sensor list, otherwise the dashboard and sensor list render empty until
+		// the app is reloaded.
+		if ( data && Array.isArray( data.sensors ) ) {
+			OSApp.Analog.analogSensors = data.sensors;
+			if (Object.prototype.hasOwnProperty.call(data, "detected"))
+				OSApp.Analog.analogSensors.detected = data.detected;
+			if (Object.prototype.hasOwnProperty.call(data, "warnings"))
+				OSApp.Analog.analogSensors.warnings = data.warnings;
+			else
+				OSApp.Analog.analogSensors.warnings = [];
+		}
 		callback();
 	} );
 };
@@ -425,6 +452,11 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 
 	// Build sorted local copies according to saved row order
 	function sortedByOrder(arr, sectionId) {
+		// Tolerate a missing / non-array state (e.g. after a failed poll) so the
+		// dashboard never throws and clears itself.
+		if (!Array.isArray(arr)) {
+			return [];
+		}
 		var copy = arr.slice();
 		var order = OSApp.Analog.getRowOrder(sectionId);
 		if (!order || !order.length) {

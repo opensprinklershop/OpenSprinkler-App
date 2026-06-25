@@ -600,6 +600,19 @@ OSApp.UIDom.initAppData = function() {
 	}
 };
 
+// Live-update the developer-only menu items when developer mode is toggled
+// (boot-diagnostics.js calls this from the hidden 6-tap gesture).
+OSApp.UIDom.refreshDevMenu = function() {
+	var isDev = OSApp.ErrorConsole && typeof OSApp.ErrorConsole.isDevMode === "function" && OSApp.ErrorConsole.isDevMode(),
+		item = $( "#sprinklers-settings" ).find( ".js-console-menu" );
+
+	if ( isDev ) {
+		item.removeClass( "hidden" ).css( "display", "" );
+	} else {
+		item.addClass( "hidden" );
+	}
+};
+
 OSApp.UIDom.focusInput = function() {
 	$.fn.focusInput = function() {
 		if ( this.get( 0 ).setSelectionRange ) {
@@ -817,6 +830,14 @@ OSApp.UIDom.bindPanel = function() {
 					panel.find( ".live-debug-menu" ).removeClass( "hidden" ).css( "display", "" );
 				} else {
 					panel.find( ".live-debug-menu" ).addClass( "hidden" );
+				}
+
+				// Show the JavaScript Console menu item only when the hidden
+				// developer mode is active (toggled by tapping the screen 6x).
+				if ( OSApp.ErrorConsole && typeof OSApp.ErrorConsole.isDevMode === "function" && OSApp.ErrorConsole.isDevMode() ) {
+					panel.find( ".js-console-menu" ).removeClass( "hidden" ).css( "display", "" );
+				} else {
+					panel.find( ".js-console-menu" ).addClass( "hidden" );
 				}
 
 				// Update ESP32 Mode and sub-menu visibility

@@ -58,6 +58,88 @@
 		}
 	}
 
+	// ---- Developer mode ----------------------------------------------------
+	// The visible diagnostics (floating warning button, recovery overlay and the
+	// JavaScript Console menu / notice) are meant for developers and support only.
+	// Regular users should never see them. Developer mode is a hidden toggle that
+	// is switched by quickly tapping the screen six times in a row. The silent
+	// black-screen recovery (revealUI) always stays active regardless of it.
+	var DEV_MODE_KEY = "os_dev_mode";
+
+	function isDevMode() {
+		try {
+			return !!(window.localStorage && localStorage.getItem(DEV_MODE_KEY) === "1");
+		} catch (e) {
+			void e;
+			return false;
+		}
+	}
+
+	function setDevMode(on) {
+		try {
+			if (on) {
+				localStorage.setItem(DEV_MODE_KEY, "1");
+			} else {
+				localStorage.removeItem(DEV_MODE_KEY);
+			}
+		} catch (e) {
+			void e;
+		}
+	}
+
+	function showDevToast(text) {
+		if (!document.documentElement) {
+			return;
+		}
+		var toast = document.createElement("div");
+		toast.setAttribute("style", "position:fixed;left:50%;bottom:42px;transform:translateX(-50%);" +
+			"z-index:2147483600;background:rgba(20,20,20,0.95);color:#fff;font-family:sans-serif;" +
+			"font-size:14px;padding:10px 18px;border-radius:20px;max-width:80%;text-align:center;" +
+			"box-shadow:0 2px 8px rgba(0,0,0,0.5);opacity:0;transition:opacity 0.2s ease;");
+		toast.textContent = text;
+		document.documentElement.appendChild(toast);
+		window.setTimeout(function () { toast.style.opacity = "1"; }, 10);
+		window.setTimeout(function () {
+			toast.style.opacity = "0";
+			window.setTimeout(function () {
+				if (toast.parentNode) {
+					toast.parentNode.removeChild(toast);
+				}
+			}, 300);
+		}, 1900);
+	}
+
+	function toggleDevMode() {
+		var on = !isDevMode();
+		setDevMode(on);
+		showDevToast(on ? "Developer mode ON" : "Developer mode OFF");
+
+		if (on) {
+			// Surface any diagnostics that are already pending right away.
+			if (seriousCount > 0) {
+				ensureBugButton();
+				showOverlay();
+			}
+		} else {
+			// Immediately remove every visible developer surface.
+			removeBugButton();
+			var overlay = document.getElementById("osWatchdogOverlay");
+			if (overlay && overlay.parentNode) {
+				overlay.parentNode.removeChild(overlay);
+			}
+		}
+
+		// Let the running app refresh its menu (JavaScript Console entry).
+		try {
+			if (window.OSApp && window.OSApp.UIDom &&
+				typeof window.OSApp.UIDom.refreshDevMenu === "function") {
+				window.OSApp.UIDom.refreshDevMenu();
+			}
+		} catch (e) {
+			void e;
+		}
+	}
+
 	// ---- Global error capture ----------------------------------------------
 
 	window.addEventListener("error", function (event) {
@@ -147,6 +229,38 @@
 	["pointerdown", "touchstart", "keydown", "mousedown"].forEach(function (ev) {
 		window.addEventListener(ev, markActivity, true);
 	});
+
+	// ---- Hidden developer-mode gesture (tap the screen 6x quickly) ---------
+	var TAP_TARGET = 6;       // number of taps required
+	var TAP_MAX_GAP = 600;    // max milliseconds allowed between consecutive taps
+	var tapCount = 0;
+	var tapLastTime = 0;
+
+	function registerDevTap(event) {
+		// Ignore taps on interactive controls so normal button mashing cannot
+		// accidentally toggle developer mode; tap an empty area / the header.
+		var target = event && event.target;
+		if (target && target.closest &&
+			target.closest("a,button,input,select,textarea,[role=\"button\"],.ui-btn,.ui-slider,.ui-flipswitch")) {
+			return;
+		}
+
+		var now = Date.now();
+		if (now - tapLastTime > TAP_MAX_GAP) {
+			tapCount = 0;
+		}
+		tapLastTime = now;
+		tapCount++;
+
+		if (tapCount >= TAP_TARGET) {
+			tapCount = 0;
+			toggleDevMode();
+		}
+	}
+
+	var tapEventName = ("onpointerdown" in window) ? "pointerdown" :
+		(("ontouchstart" in window) ? "touchstart" : "mousedown");
+	window.addEventListener(tapEventName, registerDevTap, true);
 
 	function isFastPathHidden() {
 		if (document.getElementById("fast-path-hide")) {
@@ -254,6 +368,12 @@
 	// after the UI is up (bootCompleted) runtime exceptions are just logged.
 	// Defers until <body> exists so it can fire even from very early errors.
 	function triggerDiagnose(reason) {
+		// Only developers see the diagnostics overlay on exceptions. For regular
+		// users a genuine freeze is still handled silently by the watchdog
+		// (recover -> revealUI) and the index.html fast-path failsafe.
+		if (!isDevMode()) {
+			return;
+		}
 		if (recovered || bootCompleted) {
 			return;
 		}
@@ -313,9 +433,16 @@
 			} catch (e) { void e; /* fall through to overlay */ }
 		}
 
-		// Otherwise show a non-destructive recovery overlay: it reveals the
-		// screen, displays the captured error log and offers manual actions.
-		showOverlay();
+		// Otherwise developers get a non-destructive recovery overlay with the
+		// error log; regular users only get the UI revealed (already done above)
+		// plus a hint so the next normal boot lands on the site list.
+		if (isDevMode()) {
+			showOverlay();
+		} else {
+			try {
+				localStorage.setItem("show_sites", "1");
+			} catch (e) { void e; /* ignore */ }
+		}
 	}
 
 	function tick() {
@@ -366,6 +493,9 @@
 	}
 
 	function showOverlay() {
+		if (!isDevMode()) {
+			return;
+		}
 		if (document.getElementById("osWatchdogOverlay") || !document.body) {
 			var existing = document.getElementById("osWatchdogOverlay");
 			if (existing) {
@@ -410,7 +540,16 @@
 	// ---- Floating "show errors" button -------------------------------------
 
 	var bugButton = null;
+	function removeBugButton() {
+		if (bugButton && bugButton.parentNode) {
+			bugButton.parentNode.removeChild(bugButton);
+		}
+		bugButton = null;
+	}
 	function ensureBugButton() {
+		if (!isDevMode()) {
+			return;
+		}
 		if (bugButton || !document.body) {
 			return;
 		}
@@ -440,16 +579,18 @@
 		clearErrors: function () {
 			errors.length = 0;
 			seriousCount = 0;
-			if (bugButton && bugButton.parentNode) {
-				bugButton.parentNode.removeChild(bugButton);
-				bugButton = null;
-			}
+			removeBugButton();
 		},
 		recordError: pushError,
 		formatErrors: formatErrors,
 		openConsole: openConsole,
 		showOverlay: showOverlay,
 		recover: recover,
+		isDevMode: isDevMode,
+		setDevMode: function (on) {
+			setDevMode(on);
+		},
+		toggleDevMode: toggleDevMode,
 		stopWatchdog: function () {
 			if (timer) {
 				window.clearInterval(timer);

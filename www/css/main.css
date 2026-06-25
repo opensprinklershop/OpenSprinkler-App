@@ -1306,6 +1306,17 @@ html.theme-colorful .station-status.off:after {
 .changelog li {
     margin: 0.5em;
 }
+.ota-changelog-scrollbox {
+    max-height: 8em;
+    overflow: auto;
+    white-space: pre;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    margin-top: 0.4em;
+    padding: 6px 8px;
+    font-size: 0.85em;
+    line-height: 1.35;
+}
 .info-card {
     margin-top: 5px;
     max-width: 500px;

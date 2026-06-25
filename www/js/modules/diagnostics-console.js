@@ -25,6 +25,21 @@ OSApp.ErrorConsole.getLog = function() {
 	return OSApp.Language._( "Error capture is not available." );
 };
 
+// Developer mode: the JavaScript Console and the boot diagnostics surfaces are
+// only available when the hidden developer mode is active (toggled by tapping
+// the screen six times quickly, handled in boot-diagnostics.js).
+OSApp.ErrorConsole.isDevMode = function() {
+	if ( window.OSBoot && typeof window.OSBoot.isDevMode === "function" ) {
+		return window.OSBoot.isDevMode();
+	}
+	try {
+		return localStorage.getItem( "os_dev_mode" ) === "1";
+	} catch ( e ) {
+		void e;
+		return false;
+	}
+};
+
 // In-app viewer page for JavaScript / web console errors
 OSApp.ErrorConsole.displayPage = function() {
 	var page = $(`
@@ -133,6 +148,13 @@ OSApp.ErrorConsole.checkWatchdogNotice = function() {
 	try {
 		if ( sessionStorage.getItem( "osWatchdogNotice" ) === "1" ) {
 			sessionStorage.removeItem( "osWatchdogNotice" );
+
+			// The notice points the user at the JavaScript Console, which only
+			// exists in developer mode. Stay silent for regular users.
+			if ( !OSApp.ErrorConsole.isDevMode() ) {
+				return;
+			}
+
 			setTimeout( function() {
 				OSApp.Errors.showError(
 					OSApp.Language._( "The app stopped responding and was returned to the main menu. Open the JavaScript Console from the menu to view the error log." ),

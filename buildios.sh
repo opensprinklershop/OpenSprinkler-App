@@ -103,6 +103,31 @@ for v in $VERSIONS; do
 	fi
 done
 
+# === Inject boot diagnostics & startup watchdog into each bundled UI version ===
+# Versioned UI bundles can be restored directly by WebView on app relaunch.
+# Ensure every bundled version has the same early startup watchdog to avoid
+# frozen black screens when a versioned page fails during boot.
+echo "=== Injecting boot watchdog into bundled UI versions ==="
+for v in $VERSIONS; do
+	VER_DIR="www/$v"
+	[ -d "$VER_DIR" ] || continue
+	[ -f "$VER_DIR/index.html" ] || continue
+	mkdir -p "$VER_DIR/js"
+	cp www/js/boot-diagnostics.js "$VER_DIR/js/boot-diagnostics.js"
+	if ! grep -q "js/boot-diagnostics.js" "$VER_DIR/index.html"; then
+		perl -0777 -pi -e 's{<head>}{<head>\n\t\t<script src="js/boot-diagnostics.js"></script>}' "$VER_DIR/index.html"
+		echo "   Injected watchdog into $VER_DIR/index.html"
+	fi
+done
+
+# === Harden bundled versioned index.html against Cordova file:// origin "null" ===
+# Pinned older bundles compute their fast-path redirect URL from
+# window.location.origin, which is the literal "null" under file://. That yields an
+# invalid target like "null/.../<ver>/index.html" and a permanent black screen on
+# relaunch. This idempotently injects an origin null-guard into each bundle.
+echo "=== Hardening bundled version origin guards ==="
+node scripts/patch-bundled-versions.js www
+
 # Remove stale res/ symlinks in platform dirs to prevent EINVAL during cordova prepare.
 # platforms/ios/www/res and www/res both point to the same physical directory;
 # cordova would try to cp a file onto itself → EINVAL.

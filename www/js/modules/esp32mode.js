@@ -4521,7 +4521,7 @@ OSApp.ESP32Mode.showClassicVersionPicker = function( checkData ) {
 				"<b>" + verLabel + "</b>" +
 				( isCurrent ? " <span style='font-size:0.8em;color:#4CAF50;'>[" + OSApp.Language._( "current" ) + "]</span>" : "" ) +
 				( v.date ? " <span style='font-size:0.8em;color:#999;'>" + v.date + "</span>" : "" ) +
-				( v.changelog ? "<p class='ui-li-desc' style='white-space:pre-wrap;'>" + $( "<span>" ).text( v.changelog ).html() + "</p>" : "" ) +
+				( v.changelog ? "<div class='ota-changelog-scrollbox'>" + $( "<span>" ).text( v.changelog ).html() + "</div>" : "" ) +
 				"</a></li>";
 		} );
 		content += "</ul>";
@@ -5319,7 +5319,7 @@ OSApp.ESP32Mode.showLegacyVersionPicker = function( checkData ) {
 				"<a href='#' class='ota-legacy-version-item'" + itemData + ">" +
 				"<b>v" + verLabel + "</b>" + badge + dateStr;
 			if ( changelogSnippet ) {
-				content += "<p class='ui-li-desc' style='white-space:pre-wrap;'>" + changelogSnippet + "</p>";
+				content += "<div class='ota-changelog-scrollbox'>" + changelogSnippet + "</div>";
 			}
 			content += "</a></li>";
 		} );
@@ -5751,7 +5751,7 @@ OSApp.ESP32Mode.showVersionPicker = function( checkData ) {
 				" data-ver='" + verLabel + "'>" +
 				"<b>v" + verLabel + "</b>" + badge + dateStr;
 			if ( changelogSnippet ) {
-				content += "<p class='ui-li-desc' style='white-space:pre-wrap;'>" + changelogSnippet + "</p>";
+				content += "<div class='ota-changelog-scrollbox'>" + changelogSnippet + "</div>";
 			}
 			content += "</a></li>";
 		} );
