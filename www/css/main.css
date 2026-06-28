@@ -1428,6 +1428,14 @@ html.theme-colorful .station-status.off:after {
     justify-content: center;
 }
 .ai-chat-clear svg { display: block; }
+#ai-chat-overlay,
+#ai-chat-overlay * {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
+}
 .ai-chat-log {
     flex: 1 1 auto;
     overflow-y: auto;
