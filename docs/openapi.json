@@ -1,0 +1,1208 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "OpenSprinkler AI Assistant – Configuration API",
+    "version": "1.3.1",
+    "description": "Schema definition for AI-generated OpenSprinkler configuration changes. All configurations delivered by the OSAI assistant are validated against components.schemas.ConfigChangeSet to guarantee compatibility with the OpenSprinkler firmware API (/co, /cp, /cs). Also documents the OpenSprinklerPro analog-sensor / monitor API (/sc, /sl, /sf, /so, /sn, /sx, /mc, /ml, /mt). See https://opensprinklershop.github.io for firmware/API documentation. MAINTENANCE: whenever the OpenSprinkler/OSAI API changes (option keys, endpoints, program/station/sensor structures), this OpenAPI file MUST be updated in lockstep – it is the single source of truth used to validate every delivered configuration."
+  },
+  "x-maintenance": "On any API change (config keys, endpoints, analog sensor API), update this openapi.json. Source generator: scripts/gen-openapi (UI project) / OSAI plugin schema.",
+  "servers": [
+    {
+      "url": "https://opensprinklershop.de"
+    }
+  ],
+  "paths": {
+    "/wp-json/osai/v1/assist": {
+      "post": {
+        "summary": "Generate a validated OpenSprinkler configuration change from natural language.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "message",
+                  "config"
+                ],
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "locale": {
+                    "type": "string"
+                  },
+                  "firmware": {
+                    "type": "string"
+                  },
+                  "config": {
+                    "type": "object",
+                    "description": "Current controller configuration (secrets removed client-side)."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssistResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wp-json/osai/v1/schema": {
+      "get": {
+        "summary": "Return this OpenAPI document used to validate delivered configurations.",
+        "responses": {
+          "200": {
+            "description": "OpenAPI document"
+          }
+        }
+      }
+    },
+    "/wp-json/osai/v1/health": {
+      "get": {
+        "summary": "Service health/status.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/jc": {
+      "get": {
+        "summary": "Get controller variables.",
+        "description": "OpenSprinkler firmware endpoint (on the device, not on this service).",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/jo": {
+      "get": {
+        "summary": "Get options.",
+        "description": "OpenSprinkler firmware endpoint (on the device, not on this service).",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/jp": {
+      "get": {
+        "summary": "Get programs.",
+        "description": "OpenSprinkler firmware endpoint (on the device, not on this service).",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/jn": {
+      "get": {
+        "summary": "Get station names/attributes.",
+        "description": "OpenSprinkler firmware endpoint (on the device, not on this service).",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/co": {
+      "get": {
+        "summary": "Change options.",
+        "description": "OpenSprinkler firmware endpoint (on the device, not on this service).",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/cp": {
+      "get": {
+        "summary": "Change program (pid=-1 to add).",
+        "description": "OpenSprinkler firmware endpoint (on the device, not on this service).",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/cs": {
+      "get": {
+        "summary": "Change stations.",
+        "description": "OpenSprinkler firmware endpoint (on the device, not on this service).",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/sc": {
+      "get": {
+        "summary": "Configure (create/update) an analog sensor; nr identifies it, type=0 deletes.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/sl": {
+      "get": {
+        "summary": "List analog sensors and their current values.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/sf": {
+      "get": {
+        "summary": "List supported sensor types for the current build.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/so": {
+      "get": {
+        "summary": "Read/export a sensor value log (csv=1 for CSV).",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/sn": {
+      "get": {
+        "summary": "Delete a sensor value log.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/sx": {
+      "get": {
+        "summary": "Export/import sensor-only configuration.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/jw": {
+      "get": {
+        "summary": "Read monthly water-usage data.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/mc": {
+      "get": {
+        "summary": "Configure a monitor.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/ml": {
+      "get": {
+        "summary": "List monitors.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
+    "/mt": {
+      "get": {
+        "summary": "List/discover monitor types.",
+        "description": "OpenSprinklerPro firmware endpoint (on the device). See components.schemas.AnalogSensor / Monitor.",
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Options": {
+        "type": "object",
+        "description": "Controller options as returned by /jo and changed via /co. Keys are firmware option mnemonics; unknown keys are rejected. Values are integers; firmware additionally validates exact ranges (error 17 = Out of Range).",
+        "additionalProperties": false,
+        "properties": {
+          "tz": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "OpenSprinkler option 'tz' (/co index o1)."
+          },
+          "ntp": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'ntp' (/co index o2)."
+          },
+          "dhcp": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'dhcp' (/co index o3)."
+          },
+          "ip1": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ip1' (/co index o4)."
+          },
+          "ip2": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ip2' (/co index o5)."
+          },
+          "ip3": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ip3' (/co index o6)."
+          },
+          "ip4": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ip4' (/co index o7)."
+          },
+          "gw1": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'gw1' (/co index o8)."
+          },
+          "gw2": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'gw2' (/co index o9)."
+          },
+          "gw3": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'gw3' (/co index o10)."
+          },
+          "gw4": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'gw4' (/co index o11)."
+          },
+          "hp0": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "OpenSprinkler option 'hp0' (/co index o12)."
+          },
+          "hp1": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "OpenSprinkler option 'hp1' (/co index o13)."
+          },
+          "ar": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'ar' (/co index o14)."
+          },
+          "ext": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 247,
+            "description": "OpenSprinkler option 'ext' (/co index o15)."
+          },
+          "seq": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'seq' (/co index o16)."
+          },
+          "sdt": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767,
+            "description": "OpenSprinkler option 'sdt' (/co index o17)."
+          },
+          "mas": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "OpenSprinkler option 'mas' (/co index o18)."
+          },
+          "mton": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767,
+            "description": "OpenSprinkler option 'mton' (/co index o19)."
+          },
+          "mtof": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767,
+            "description": "OpenSprinkler option 'mtof' (/co index o20)."
+          },
+          "urs": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'urs' (/co index o21)."
+          },
+          "rso": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'rso' (/co index o22)."
+          },
+          "wl": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 250,
+            "description": "OpenSprinkler option 'wl' (/co index o23)."
+          },
+          "den": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'den' (/co index o24)."
+          },
+          "ipas": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'ipas' (/co index o25)."
+          },
+          "devid": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'devid' (/co index o26)."
+          },
+          "con": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "OpenSprinkler option 'con' (/co index o27)."
+          },
+          "lit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "OpenSprinkler option 'lit' (/co index o28)."
+          },
+          "dim": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "OpenSprinkler option 'dim' (/co index o29)."
+          },
+          "bst": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535,
+            "description": "OpenSprinkler option 'bst' (/co index o30)."
+          },
+          "uwt": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "OpenSprinkler option 'uwt' (/co index o31)."
+          },
+          "ntp1": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ntp1' (/co index o32)."
+          },
+          "ntp2": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ntp2' (/co index o33)."
+          },
+          "ntp3": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ntp3' (/co index o34)."
+          },
+          "ntp4": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ntp4' (/co index o35)."
+          },
+          "lg": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'lg' (/co index o36)."
+          },
+          "mas2": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "OpenSprinkler option 'mas2' (/co index o37)."
+          },
+          "mton2": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767,
+            "description": "OpenSprinkler option 'mton2' (/co index o38)."
+          },
+          "mtof2": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767,
+            "description": "OpenSprinkler option 'mtof2' (/co index o39)."
+          },
+          "fpr0": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'fpr0' (/co index o41)."
+          },
+          "fpr1": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'fpr1' (/co index o42)."
+          },
+          "re": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 're' (/co index o43)."
+          },
+          "dns1": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'dns1' (/co index o44)."
+          },
+          "dns2": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'dns2' (/co index o45)."
+          },
+          "dns3": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'dns3' (/co index o46)."
+          },
+          "dns4": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'dns4' (/co index o47)."
+          },
+          "sar": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'sar' (/co index o48)."
+          },
+          "ife": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ife' (/co index o49)."
+          },
+          "sn1t": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'sn1t' (/co index o50)."
+          },
+          "sn1o": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'sn1o' (/co index o51)."
+          },
+          "sn2t": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'sn2t' (/co index o52)."
+          },
+          "sn2o": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'sn2o' (/co index o53)."
+          },
+          "sn1on": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'sn1on' (/co index o54)."
+          },
+          "sn1of": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'sn1of' (/co index o55)."
+          },
+          "sn2on": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'sn2on' (/co index o56)."
+          },
+          "sn2of": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'sn2of' (/co index o57)."
+          },
+          "subn1": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'subn1' (/co index o58)."
+          },
+          "subn2": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'subn2' (/co index o59)."
+          },
+          "subn3": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'subn3' (/co index o60)."
+          },
+          "subn4": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'subn4' (/co index o61)."
+          },
+          "fwire": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'fwire' (/co index o62)."
+          },
+          "laton": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'laton' (/co index o63)."
+          },
+          "latof": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'latof' (/co index o64)."
+          },
+          "ife2": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ife2' (/co index o65)."
+          },
+          "imin": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'imin' (/co index o66)."
+          },
+          "imax": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'imax' (/co index o67)."
+          },
+          "tpdv": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'tpdv' (/co index o68)."
+          },
+          "tmpCo": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'tmpCo' (/co index o69)."
+          },
+          "comb": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'comb' (/co index o70)."
+          },
+          "belha": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'belha' (/co index o73)."
+          },
+          "belw1": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'belw1' (/co index o74)."
+          },
+          "belw2": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'belw2' (/co index o75)."
+          },
+          "ife3": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ife3' (/co index o76)."
+          },
+          "ife4": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'ife4' (/co index o77)."
+          },
+          "rken": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'rken' (/co index o78)."
+          },
+          "ginv": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'ginv' (/co index o79)."
+          },
+          "fpd0": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'fpd0' (/co index o80)."
+          },
+          "fpd1": {
+            "type": "integer",
+            "description": "OpenSprinkler option 'fpd1' (/co index o81)."
+          },
+          "wims": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ],
+            "description": "OpenSprinkler option 'wims' (/co index o82)."
+          }
+        }
+      },
+      "ProgramEntry": {
+        "type": "array",
+        "description": "A single program (pd entry): [flag, days0, days1, [startTimes], [stationDurations], name]. flag bits: 0=enabled,1=useWeather,2-3=dayRestriction,4-5=scheduleType(0 weekly/1 single-run/2 monthly/3 interval),6=startType(0 repeating/1 fixed),7=dateRangeEnabled. startTimes repeating=[start,repeat,interval] or fixed=[t0,t1,t2,t3] minutes-from-midnight (-1=unused). stationDurations: per-station seconds (0=off).",
+        "minItems": 6,
+        "prefixItems": [
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "flag"
+          },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "days0"
+          },
+          {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255,
+            "description": "days1"
+          },
+          {
+            "type": "array",
+            "description": "start times",
+            "items": {
+              "type": "integer",
+              "minimum": -1,
+              "maximum": 1440
+            }
+          },
+          {
+            "type": "array",
+            "description": "per-station durations (seconds)",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400
+            }
+          },
+          {
+            "type": "string",
+            "maxLength": 32,
+            "description": "program name"
+          }
+        ],
+        "items": {
+          "type": "integer"
+        }
+      },
+      "Programs": {
+        "type": "object",
+        "description": "Program data as returned by /jp and changed via /cp.",
+        "additionalProperties": false,
+        "properties": {
+          "pd": {
+            "type": "array",
+            "description": "Array of program definitions.",
+            "items": {
+              "$ref": "#/components/schemas/ProgramEntry"
+            }
+          },
+          "nprogs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "nboards": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mnp": {
+            "type": "integer"
+          },
+          "mnst": {
+            "type": "integer"
+          },
+          "pnsize": {
+            "type": "integer"
+          }
+        }
+      },
+      "Stations": {
+        "type": "object",
+        "description": "Station data as returned by /jn and changed via /cs. Per-attribute arrays are indexed by station.",
+        "additionalProperties": false,
+        "properties": {
+          "snames": {
+            "type": "array",
+            "description": "Station names.",
+            "items": {
+              "type": "string",
+              "maxLength": 32
+            }
+          },
+          "masop": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "masop2": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "ignore_rain": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "ignore_sn1": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "ignore_sn2": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "stn_dis": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "stn_spe": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "stn_seq": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "act_relay": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "stn_grp": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          },
+          "maxlen": {
+            "type": "integer"
+          }
+        }
+      },
+      "Settings": {
+        "type": "object",
+        "description": "Higher-level settings stored on the controller.",
+        "additionalProperties": false,
+        "properties": {
+          "loc": {
+            "type": "string",
+            "description": "Location (city name or lat,lon).",
+            "maxLength": 128
+          },
+          "dname": {
+            "type": "string",
+            "maxLength": 32,
+            "description": "Device name."
+          },
+          "ifkey": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "IFTTT Webhooks key."
+          },
+          "wto": {
+            "type": "object",
+            "description": "Weather adjustment options.",
+            "additionalProperties": true
+          },
+          "mqtt": {
+            "type": "object",
+            "description": "MQTT configuration.",
+            "additionalProperties": true
+          },
+          "email": {
+            "type": "object",
+            "description": "Email notification configuration.",
+            "additionalProperties": true
+          },
+          "otc": {
+            "type": "object",
+            "description": "OpenThings Cloud configuration.",
+            "additionalProperties": true
+          },
+          "influxdb": {
+            "type": "object",
+            "description": "InfluxDB configuration.",
+            "additionalProperties": true
+          },
+          "nbrd": {
+            "type": "integer"
+          }
+        }
+      },
+      "ConfigChangeSet": {
+        "type": "object",
+        "description": "Partial OpenSprinkler configuration patch produced by the AI assistant. Deep-merged into the current controller configuration and applied via the standard /co, /cp, /cs API. Only the four top-level sections are allowed; unknown keys are rejected so the result stays API compatible. Analog sensors and monitors are NOT part of this changeset – they are managed separately via the /sc and /mc endpoints (see components.schemas.AnalogSensor / Monitor).",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "options": {
+            "$ref": "#/components/schemas/Options"
+          },
+          "programs": {
+            "$ref": "#/components/schemas/Programs"
+          },
+          "stations": {
+            "$ref": "#/components/schemas/Stations"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/Settings"
+          }
+        }
+      },
+      "AnalogSensor": {
+        "type": "object",
+        "description": "OpenSprinklerPro analog/virtual sensor as created/updated via GET /sc and listed via /sl. Field set depends on the sensor type (see /sf for supported types). Extra runtime fields (value, data, last, data_ok) may be present.",
+        "additionalProperties": true,
+        "properties": {
+          "nr": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99999,
+            "description": "Unique sensor number."
+          },
+          "type": {
+            "type": "integer",
+            "description": "Sensor type / driver id (see /sf)."
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "group": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "ip": {
+            "type": [
+              "string",
+              "integer"
+            ],
+            "description": "IP address (network sensors)."
+          },
+          "port": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "id": {
+            "type": "integer",
+            "description": "Device / Modbus address."
+          },
+          "ri": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Read interval (seconds)."
+          },
+          "factor": {
+            "type": "integer",
+            "description": "Conversion factor."
+          },
+          "divider": {
+            "type": "integer",
+            "description": "Conversion divider."
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": -32768,
+            "maximum": 32767,
+            "description": "Offset (mV)."
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 10
+          },
+          "unitid": {
+            "type": "integer",
+            "description": "Chart unit id."
+          },
+          "enable": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "log": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "stdlog": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "show": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "topic": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "MQTT topic."
+          },
+          "filter": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "JSON/text filter."
+          },
+          "url": {
+            "type": "string",
+            "description": "Remote JSON / remote OpenSprinkler URL."
+          },
+          "device_ieee": {
+            "type": "string",
+            "description": "ZigBee IEEE address."
+          },
+          "endpoint": {
+            "type": "integer",
+            "description": "ZigBee endpoint."
+          },
+          "cluster_id": {
+            "type": "integer",
+            "description": "ZigBee cluster id."
+          },
+          "attribute_id": {
+            "type": "integer",
+            "description": "ZigBee attribute id."
+          },
+          "tuya_dp": {
+            "type": "integer"
+          },
+          "tuya_dp_value": {
+            "type": "integer"
+          },
+          "tuya_dp_batt": {
+            "type": "integer"
+          },
+          "tuya_dp_battery": {
+            "type": "integer"
+          },
+          "tuya_dp_unit": {
+            "type": "integer"
+          },
+          "dp_unit": {
+            "type": "integer"
+          },
+          "poll_interval": {
+            "type": "integer",
+            "description": "Poll interval (ms) for ZigBee/BLE."
+          },
+          "mac": {
+            "type": "string",
+            "description": "BLE MAC address."
+          },
+          "char_uuid": {
+            "type": "string",
+            "description": "BLE characteristic UUID."
+          },
+          "format": {
+            "type": "integer",
+            "description": "BLE value format."
+          }
+        }
+      },
+      "Monitor": {
+        "type": "object",
+        "description": "OpenSprinklerPro monitor (sensor-based rule) as managed via /mc (configure), /ml (list), /mt (types).",
+        "additionalProperties": true,
+        "properties": {
+          "nr": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "type": {
+            "type": "integer",
+            "description": "Monitor type (e.g. AND/OR/XOR/remote)."
+          },
+          "enable": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "prio": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "s1": {
+            "type": "integer",
+            "description": "Sensor 1 number."
+          },
+          "s2": {
+            "type": "integer",
+            "description": "Sensor 2 number."
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "time1": {
+            "type": "string",
+            "description": "Start time HH:MM."
+          },
+          "time2": {
+            "type": "string",
+            "description": "End time HH:MM."
+          }
+        }
+      },
+      "ProgramAdjustment": {
+        "type": "object",
+        "description": "Sensor-based program adjustment (links a sensor value to a program runtime).",
+        "additionalProperties": true,
+        "properties": {
+          "nr": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "type": {
+            "type": "integer"
+          },
+          "sensor": {
+            "type": "integer",
+            "description": "Sensor number to read."
+          },
+          "prog": {
+            "type": "integer",
+            "description": "Program id to adjust."
+          },
+          "enable": {
+            "type": "integer",
+            "enum": [
+              0,
+              1
+            ]
+          },
+          "fac1": {
+            "type": "number"
+          },
+          "fac2": {
+            "type": "number"
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          }
+        }
+      },
+      "AssistResponse": {
+        "type": "object",
+        "description": "Response of the /assist endpoint.",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "refused": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "explanation": {
+            "type": "string"
+          },
+          "changes": {
+            "$ref": "#/components/schemas/ConfigChangeSet"
+          }
+        }
+      }
+    }
+  }
+}

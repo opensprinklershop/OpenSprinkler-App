@@ -232,7 +232,7 @@
 		<link rel="stylesheet" href="css/fonts.css">
 		<link rel="stylesheet" href="css/jqm.css">
 		<link rel="stylesheet" href="css/analog.css">
-		<link rel="stylesheet" href="css/main.css">
+		<link rel="stylesheet" href="css/main.css?v=osai7">
 		<link rel="stylesheet" href="css/vis-timeline-graph2d.min.css">
 		<link rel="stylesheet" href="css/dataTables-2.1.8.dataTables.min.css"></link>
 
@@ -269,6 +269,7 @@
 		<!-- Load OSApp modules -->
 	<script src="js/modules/language.js"></script>
 	<script src="js/modules/about.js"></script>
+	<script src="js/modules/ai-assistant.js?v=osai7"></script>
 	<script src="js/modules/analog.js?v=5"></script>
 	<script src="js/modules/analog-log.js?v=1"></script>
 	<script src="js/modules/irrigation-db-integration.js"></script>
@@ -300,7 +301,7 @@
 		<script src="js/modules/system-diagnostics.js"></script>
 		<script src="js/modules/live-debug.js"></script>
 		<script src="js/modules/diagnostics-console.js"></script>
-		<script src="js/modules/ui-dom.js"></script>
+		<script src="js/modules/ui-dom.js?v=osai2"></script>
 		<script src="js/modules/utils.js"></script>
 		<script src="js/modules/welcome.js"></script>
 		<script src="js/modules/weather.js?v=3"></script>
@@ -327,6 +328,7 @@
 				<li data-icon="back"><a href="#" class="import_config" data-translate="Import Configuration">Import Configuration</a></li>
 				<li data-icon="mail"><a href="https://openthings.freshdesk.com/widgets/feedback_widget/new?&widgetType=popup&screenshot=no&attachFile=no&formTitle=Help%20%26%20Support" target="_blank" class="iab iabNoScale" data-translate="Help & Support">Help & Support</a></li>
 				<li data-icon="info"><a href="#about" data-translate="About">About</a></li>
+				<li data-icon="comment"><a href="#ai-assistant" data-translate="AI Assistant">AI Assistant</a></li>
 				<li data-icon="location"><a href="#localization" data-translate="Localization">Localization</a></li>
 				<li class="hidden logout-button" data-icon="power"><a id="logout" href="#" data-translate="Logout">Logout</a></li>
 				<li class="hidden login-button"><a class="cloud-login" href="#" data-translate="OpenSprinkler.com Login"></a></li>
@@ -358,6 +360,15 @@
 		</div>
 
 		<a id="footer-menu" style="display:none" class="ui-panel-animate tight ui-corner-all ui-btn ui-btn-icon-notext ui-btn-inline ui-icon-grid" href="#"></a>
+
+		<button id="ai-fab" data-role="none" data-enhance="false" type="button" aria-label="AI Assistant">
+			<svg class="ai-fab-glyph" width="26" height="26" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="none">
+				<path d="M12 3.2l1.7 4.1 4.1 1.7-4.1 1.7L12 14.8l-1.7-4.1L6.2 9l4.1-1.7L12 3.2z" fill="#ffffff"/>
+				<circle class="ai-spark s2" cx="18.5" cy="5.5" r="1.4" fill="#fff"/>
+				<circle class="ai-spark s3" cx="5.5" cy="16.5" r="1.6" fill="#fff"/>
+				<circle class="ai-spark" cx="18" cy="17" r="1.1" fill="#fff"/>
+			</svg>
+		</button>
 
 		<div id="footer" data-theme="b" data-role="footer" data-position="fixed" data-tap-toggle="false">
 			<div id="footer-running"></div>

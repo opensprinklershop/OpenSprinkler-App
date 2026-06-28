@@ -11,7 +11,7 @@ OSApp.Analog = OSApp.Analog || {};
  */
 
 OSApp.Analog.IrrigationDB = {
-    apiUrl: 'https://ui.opensprinklershop.de/irrigationdb/api.php',
+    apiUrl: 'https://opensprinklershop.de/irrigationdb/api.php',
     selectedZone: null,
 
     /**

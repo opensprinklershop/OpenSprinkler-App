@@ -159,6 +159,8 @@ OSApp.UIDom.launchApp = function() {
 			OSApp.Programs.displayPageManual();
 		} else if ( hash === "#about" ) {
 			OSApp.About.displayPage();
+		} else if ( hash === "#ai-assistant" ) {
+			OSApp.AIAssistant.displayPage();
 		} else if ( hash === "#liveDebug" ) {
 			OSApp.LiveDebug.displayPage();
 		} else if ( hash === "#jsConsole" ) {
@@ -226,6 +228,12 @@ OSApp.UIDom.launchApp = function() {
 
 			// Show header, footer and menu button on all other pages
 			$( "#header,#footer,#footer-menu" ).show();
+		}
+
+		// The AI assistant FAB is shown/hidden purely via its own class-based logic,
+		// which respects both the current page and the enable/disable setting.
+		if ( OSApp.AIAssistant && OSApp.AIAssistant.applyFabVisibility ) {
+			OSApp.AIAssistant.applyFabVisibility();
 		}
 
 		OSApp.Storage.get( "showDisabled", function( data ) {
@@ -521,6 +529,11 @@ OSApp.UIDom.initAppData = function() {
 		OSApp.UIDom.showHomeMenu( this );
 	} );
 
+	// Initialize the floating AI assistant button (can be fully disabled in App Settings)
+	if ( OSApp.AIAssistant && OSApp.AIAssistant.initFab ) {
+		OSApp.AIAssistant.initFab();
+	}
+
 	// Initialize the app header
 	$( "#header,#footer" ).toolbar();
 
@@ -660,6 +673,11 @@ OSApp.UIDom.bindPanel = function() {
 		return false;
 	} );
 
+	panel.find( "a[href='#ai-assistant']" ).on( "click", function() {
+		OSApp.UIDom.changePage( "#ai-assistant" );
+		return false;
+	} );
+
 	panel.find( "a[href='#liveDebug']" ).on( "click", function() {
 		OSApp.UIDom.changePage( "#liveDebug" );
 		return false;
@@ -714,7 +732,7 @@ OSApp.UIDom.bindPanel = function() {
 
 	panel.find( ".open-irrigationdb-menu" ).on( "click", function() {
 		OSApp.UIDom.closePanel( function() {
-			window.open( "https://ui.opensprinklershop.de/irrigationdb", OSApp.currentDevice.isOSXApp ? "_system" : "_blank" );
+			window.open( "https://opensprinklershop.de/irrigationdb", OSApp.currentDevice.isOSXApp ? "_system" : "_blank" );
 		} );
 		return false;
 	} );

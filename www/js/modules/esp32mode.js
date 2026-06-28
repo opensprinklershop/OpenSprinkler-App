@@ -4596,7 +4596,17 @@ OSApp.ESP32Mode.uploadClassicFirmwareBlob = function( blob, filename, variant ) 
 		formData.append( "slot", variant );
 	}
 
-	xhr.open( "POST", OSApp.ESP32Mode.getDirectDeviceUploadUrl(), true );
+	// IMPORTANT: send the slot as a URL query parameter, not only as a multipart
+	// field. The firmware reads the target slot at UPLOAD_FILE_START (before the
+	// body is fully parsed); a multipart "slot" field that comes after the file
+	// part is not yet available there, so it would default to the matter slot and
+	// fail with esp_ota_begin conflict when matter is the running partition.
+	var uploadUrl = OSApp.ESP32Mode.getDirectDeviceUploadUrl();
+	if ( !OSApp.Firmware.isESP8266Controller() && variant ) {
+		uploadUrl += ( uploadUrl.indexOf( "?" ) === -1 ? "?" : "&" ) + "slot=" + encodeURIComponent( variant );
+	}
+
+	xhr.open( "POST", uploadUrl, true );
 	xhr.timeout = 300000;
 	xhr.onload = function() {
 		var resp = null;
@@ -4769,16 +4779,76 @@ OSApp.ESP32Mode.waitForClassicUploadReboot = function( popup ) {
 
 OSApp.ESP32Mode.runClassicPostedUpdate = function( popup, versionEntry ) {
 	var isDual = OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller();
+
+	// The upload order depends on which firmware partition is currently RUNNING
+	// (the running slot cannot be flashed first). The running partition is given
+	// by the radio info "bootVariant" field (1=ZIGBEE/ota_0, 2=MATTER/ota_1) —
+	// NOT by activeMode. Always force-fetch the radio info so the order is correct
+	// even after a recent mode change or a stale cache.
+	if ( isDual ) {
+		OSApp.ESP32Mode.fetchRadioInfo( true ).always( function() {
+			OSApp.ESP32Mode.runClassicPostedUpdateInternal( popup, versionEntry );
+		} );
+		return;
+	}
+
+	OSApp.ESP32Mode.runClassicPostedUpdateInternal( popup, versionEntry );
+};
+
+OSApp.ESP32Mode.runClassicPostedUpdateInternal = function( popup, versionEntry ) {
+	var isDual = OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller();
 	var source = versionEntry || {};
-	var currentMode = OSApp.ESP32Mode.getCurrentMode();
-	var currentVariantIsMatter = ( currentMode === OSApp.ESP32Mode.MODE_MATTER );
+
+	// Determine the running firmware variant.
+	// Primary source: controller feature string (reflects running firmware build).
+	// Fallback source: /ir bootVariant (1=zigbee/ota_0, 2=matter/ota_1).
+	// We must upload the NON-running variant first.
+	var runningVariant = "";
+	var options = OSApp.Firmware.getControllerOptions();
+	var feature = options && options.feature;
+	var featureStr = Array.isArray( feature ) ? feature.join( "," ) : String( feature || "" );
+	featureStr = featureStr.toUpperCase();
+	var hasMatterFeature = featureStr.indexOf( "MATTER" ) !== -1;
+	var hasZigbeeFeature = featureStr.indexOf( "ZIGBEE" ) !== -1;
+
+	if ( hasMatterFeature && !hasZigbeeFeature ) {
+		runningVariant = "matter";
+	} else if ( hasZigbeeFeature && !hasMatterFeature ) {
+		runningVariant = "zigbee";
+	}
+
+	var radioInfo = OSApp.ESP32Mode._radioInfo;
+	var bootVariant = ( radioInfo && typeof radioInfo.bootVariant !== "undefined" )
+		? Number( radioInfo.bootVariant )
+		: -1;
+
+	if ( !runningVariant ) {
+		if ( bootVariant === 2 ) {
+			runningVariant = "matter";
+		} else if ( bootVariant === 1 ) {
+			runningVariant = "zigbee";
+		}
+	}
+
+	if ( isDual && !runningVariant ) {
+		// Could not reliably determine the running partition — abort instead of
+		// guessing, otherwise we might flash the running slot and fail.
+		OSApp.Errors.showError(
+			OSApp.Language._( "Could not determine the active firmware partition. Please retry in a moment." )
+		);
+		popup.find( ".classic-ota-action" ).prop( "disabled", false ).removeClass( "ui-state-disabled" );
+		return;
+	}
+
+	var runningIsMatter = ( runningVariant === "matter" );
 
 	// For ESP32 dual-partition: upload the non-running variant first so the
 	// running slot is not targeted before the reboot completes.
 	// For ESP8266 or single-partition: upload one firmware only
 	var uploads = [];
 	if ( isDual ) {
-		if ( currentVariantIsMatter ) {
+		if ( runningIsMatter ) {
+			// Running Matter (ota_1) → flash Zigbee (ota_0) first
 			if ( source.zigbee_url ) {
 				uploads.push( { url: source.zigbee_url, slot: "zigbee", label: "Zigbee" } );
 			}
@@ -4786,6 +4856,7 @@ OSApp.ESP32Mode.runClassicPostedUpdate = function( popup, versionEntry ) {
 				uploads.push( { url: source.matter_url, slot: "matter", label: "Matter" } );
 			}
 		} else {
+			// Running Zigbee (ota_0) → flash Matter (ota_1) first
 			if ( source.matter_url ) {
 				uploads.push( { url: source.matter_url, slot: "matter", label: "Matter" } );
 			}
@@ -5911,8 +5982,9 @@ OSApp.ESP32Mode.runInteractiveOTA = function( popup, urlParams ) {
  * @param {jQuery} popup  The OTA popup element.
  * @param {string} [urlParams]  Optional extra query params for /uu (e.g. "&zu=...&mu=...").
  */
-OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
+OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFallbackDone ) {
 	OSApp.ESP32Mode.ensureOTAProgressArea( popup );
+	lowMemFallbackDone = !!lowMemFallbackDone;
 
 	var uuCmd = OSApp.Firmware.buildOTAUpdateRequest( urlParams || "" );
 	OSApp.Firmware.sendToOS( uuCmd, "json" ).done( function( resp ) {
@@ -5934,6 +6006,102 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
 		var finalReconnectStarted = false;
 		var reconnectPoll = null;
 		var reconnectPending = false;
+
+		var tryDisableMatterAndRetry = function( reasonText ) {
+			if ( lowMemFallbackDone ) {
+				popup.find( "#ota-progress-bar" ).css( "background", "#FF9800" );
+				popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
+					"&#9746; <b>" + OSApp.Language._( "Not enough memory for OTA update" ) + "</b>"
+				);
+				popup.find( "#ota-progress-msg" ).html(
+					OSApp.Language._( "Automatic fallback already attempted. Keep IEEE802.15.4 disabled and retry manually." ) +
+					( reasonText ? "<br><small>" + $( "<span>" ).text( reasonText ).html() + "</small>" : "" )
+				).css( "color", "#c00" );
+				popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
+				popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+				return;
+			}
+
+			popup.find( "#ota-progress-bar" ).css( "background", "#FF9800" );
+			popup.find( "#ota-step-2" ).css( "color", "#FF9800" ).html(
+				"&#9658; <b>" + OSApp.Language._( "Low memory detected — switching mode and retrying..." ) + "</b>"
+			);
+			popup.find( "#ota-progress-msg" ).text(
+				OSApp.Language._( "Disabling Matter mode (IEEE802.15.4) and rebooting device for retry..." )
+			).css( "color", "#a65" );
+
+			OSApp.ESP32Mode.fetchRadioInfo( true ).done( function( info ) {
+				var mode = ( info && typeof info.activeMode !== "undefined" ) ? Number( info.activeMode ) : OSApp.ESP32Mode.getCurrentMode();
+				if ( mode !== OSApp.ESP32Mode.MODE_MATTER ) {
+					popup.find( "#ota-progress-msg" ).html(
+						OSApp.Language._( "Auto fallback only applies while Matter mode is active." )
+					).css( "color", "#c00" );
+					popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
+					popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+					return;
+				}
+
+				OSApp.Firmware.sendToOS( "/iw?pw=&mode=" + OSApp.ESP32Mode.MODE_DISABLED, "json" ).done( function( modeResp ) {
+					if ( !modeResp || modeResp.result !== 1 ) {
+						popup.find( "#ota-progress-msg" ).html(
+							OSApp.Language._( "Failed to switch mode automatically. Please disable IEEE802.15.4 manually and retry." )
+						).css( "color", "#c00" );
+						popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
+						popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+						return;
+					}
+
+					var waitSeconds = 0;
+					var baseUrl = OSApp.currentSession.token
+						? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
+						: OSApp.currentSession.prefix + OSApp.currentSession.ip;
+					var retryPoll = setInterval( function() {
+						waitSeconds += 3;
+						popup.find( "#ota-progress-msg" ).text(
+							OSApp.Language._( "Waiting for reboot after mode change..." ) + " (" + waitSeconds + "s)"
+						);
+						$.ajax( {
+							url: baseUrl + "/jo?pw=" + encodeURIComponent( OSApp.currentSession.pass ),
+							type: "GET",
+							dataType: "json",
+							timeout: 5000
+						} ).done( function( data ) {
+							if ( !data ) {
+								return;
+							}
+							clearInterval( retryPoll );
+							OSApp.ESP32Mode.clearRadioInfo();
+							popup.find( "#ota-step-2" ).css( "color", "#1976D2" ).html(
+								"&#9658; <b>" + OSApp.Language._( "Retrying firmware update..." ) + "</b>"
+							);
+							popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device online. Starting retry..." ) );
+							OSApp.ESP32Mode.runInteractiveOTA_step2( popup, urlParams, true );
+						} );
+
+						if ( waitSeconds >= 120 ) {
+							clearInterval( retryPoll );
+							popup.find( "#ota-progress-msg" ).html(
+								OSApp.Language._( "Device did not come back online in time after mode change." )
+							).css( "color", "#c00" );
+							popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
+							popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+						}
+					}, 3000 );
+				} ).fail( function() {
+					popup.find( "#ota-progress-msg" ).html(
+						OSApp.Language._( "Error while switching mode. Please disable IEEE802.15.4 manually and retry." )
+					).css( "color", "#c00" );
+					popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
+					popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+				} );
+			} ).fail( function() {
+				popup.find( "#ota-progress-msg" ).html(
+					OSApp.Language._( "Could not read current mode. Please disable IEEE802.15.4 manually and retry." )
+				).css( "color", "#c00" );
+				popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
+				popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+			} );
+		};
 
 		var startFinalReconnectWait = function() {
 			if ( finalReconnectStarted ) {
@@ -6112,28 +6280,23 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams ) {
 				if ( st.status === OSApp.ESP32Mode.OTA_STATUS.DONE ) {
 					startFinalReconnectWait();
 				} else if ( st.status === OSApp.ESP32Mode.OTA_STATUS.ERROR_LOW_MEMORY ) {
-					// Not enough internal RAM — tell user to disable IEEE802.15.4
 					clearInterval( pollInterval );
 					OSApp.ESP32Mode.stopOTADurationTimer( popup );
-					popup.find( "#ota-progress-bar" ).css( "background", "#FF9800" );
-					popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
-						"&#9746; <b>" + OSApp.Language._( "Not enough memory for OTA update" ) + "</b>"
-					);
-					popup.find( "#ota-progress-msg" ).html(
-						OSApp.Language._( "Disable IEEE802.15.4 (Zigbee/Matter) in settings, reboot the device, then retry the update." )
-					).css( "color", "#c00" );
-					popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
-					popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+					tryDisableMatterAndRetry( st.message || "" );
 				} else if ( st.status >= OSApp.ESP32Mode.OTA_STATUS.ERROR_NETWORK &&
 							st.status <= OSApp.ESP32Mode.OTA_STATUS.ERROR_FLASH_MATTER ) {
 					clearInterval( pollInterval );
 					OSApp.ESP32Mode.stopOTADurationTimer( popup );
-					popup.find( "#ota-progress-bar" ).css( "background", "#f44336" );
-					var failStep = phase2Started ? "#ota-step-4" : "#ota-step-2";
-					popup.find( failStep ).css( "color", "#f44336" ).html(
-						"&#9746; " + OSApp.Language._( "Update failed" ) + ": " +
-						$( "<span>" ).text( st.message ).html()
-					);
+					if ( !phase2Started ) {
+						tryDisableMatterAndRetry( st.message || "" );
+					} else {
+						popup.find( "#ota-progress-bar" ).css( "background", "#f44336" );
+						var failStep = phase2Started ? "#ota-step-4" : "#ota-step-2";
+						popup.find( failStep ).css( "color", "#f44336" ).html(
+							"&#9746; " + OSApp.Language._( "Update failed" ) + ": " +
+							$( "<span>" ).text( st.message ).html()
+						);
+					}
 				}
 			} ).fail( function() {
 				failCount++;

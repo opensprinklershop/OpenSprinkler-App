@@ -559,6 +559,19 @@ OSApp.Options.showOptions = function( expandItem ) {
 		"<option value='3'"+sel[3]+">"+OSApp.Language._( "Show all")+"</option>"+
 		"</select></div>";
 
+	//AI assistant on/off (floating assistant button)
+	var aiEnabled = !OSApp.AIAssistant || OSApp.AIAssistant.isEnabled();
+	list += "<div class='ui-field-contain'>" +
+		"<label for='aiAssistantEnabled'>" + OSApp.Language._( "AI Assistant" ) +
+			"<button data-helptext='" +
+				OSApp.Language._( "Shows a floating AI assistant button that lets you configure your OpenSprinkler using natural language. Turn off to hide it completely." ) +
+				"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+		"</label>" +
+		"<select name='aiAssistantEnabled' id='aiAssistantEnabled' data-role='flipswitch' data-mini='true'>" +
+			"<option value='0'" + ( aiEnabled ? "" : " selected='selected'" ) + ">" + OSApp.Language._( "Off" ) + "</option>" +
+			"<option value='1'" + ( aiEnabled ? " selected='selected'" : "" ) + ">" + OSApp.Language._( "On" ) + "</option>" +
+		"</select></div>";
+
 	list += "</fieldset><fieldset data-role='collapsible'" +
 		( typeof expandItem === "string" && expandItem === "master" ? " data-collapsed='false'" : "" ) + ">" +
 		"<legend>" + OSApp.Language._( "Configure Master" ) + "</legend>";
@@ -1836,7 +1849,13 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 	page.find( "#displayOption").on( "change", function() {
 		localStorage.displayOption = page.find( "#displayOption").val();
-	} );
+	});
+
+	page.find( "#aiAssistantEnabled" ).on( "change", function() {
+		if ( OSApp.AIAssistant && OSApp.AIAssistant.setEnabled ) {
+			OSApp.AIAssistant.setEnabled( $( this ).val() === "1" );
+		}
+	});
 
 	page.find( "#o18,#o37" ).on( "change", function() {
 		page.find( "#o19,#o20" ).parents( ".ui-field-contain" ).toggle( parseInt( page.find( "#o18" ).val() ) === 0 ? false : true );
