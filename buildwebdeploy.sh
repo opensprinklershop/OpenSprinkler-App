@@ -49,8 +49,14 @@ echo "=== Promoting betaui -> ui ($DST_DIR) ==="
 mkdir -p "$DST_DIR"
 
 # 1. Update/copy the root "Standortverwaltung" (from the root of build output)
-# We exclude the dev and version-specific subdirectories during root copy.
-rsync -a --delete --exclude="/dev/" --exclude="/[0-9]*/" "$SRC_DIR/" "$DST_DIR/"
+# Keep live versions.json stable: it is managed by release promotions, not by
+# every dev deploy from ui-test.
+rsync -a --delete --exclude="/dev/" --exclude="/[0-9]*/" --exclude="/versions.json" "$SRC_DIR/" "$DST_DIR/"
+
+# Bootstrap versions.json on first deploy if ui-live does not have one yet.
+if [ ! -f "$DST_DIR/versions.json" ] && [ -f "$SRC_DIR/versions.json" ]; then
+	cp "$SRC_DIR/versions.json" "$DST_DIR/versions.json"
+fi
 
 # 2. Update/copy the dev version.
 mkdir -p "$DST_DIR/dev"
@@ -69,8 +75,16 @@ if [ -n "$RELEASE_VER" ]; then
 			mkdir -p "$RELEASE_DIR"
 			rsync -a --delete "$SRC_DIR/dev/" "$RELEASE_DIR/"
 
-			# Automatically update versions.json at root if it exists.
+			# Ensure versions.json exists before registration.
 			VERSIONS_JSON="$DST_DIR/versions.json"
+			if [ ! -f "$VERSIONS_JSON" ]; then
+				if [ -f "$SRC_DIR/versions.json" ]; then
+					cp "$SRC_DIR/versions.json" "$VERSIONS_JSON"
+				else
+					echo '{"versions":["dev"],"default":"dev"}' > "$VERSIONS_JSON"
+				fi
+			fi
+
 			if [ -f "$VERSIONS_JSON" ]; then
 				echo "=== Registering version $RELEASE_VER in versions.json ==="
 				node -e '

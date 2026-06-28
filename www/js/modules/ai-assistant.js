@@ -57,6 +57,21 @@ OSApp.AIAssistant.I18N = {
 		"Applied to device.": "Auf das Gerät übertragen.",
 		"Apply to device": "Auf Gerät anwenden",
 		"Discard": "Verwerfen",
+		"Program": "Programm",
+		"Name": "Name",
+		"Status": "Status",
+		"Type": "Typ",
+		"Start": "Start",
+		"Duration": "Laufzeit",
+		"Days": "Tage",
+		"Here are your programs as a table.": "Hier sind Ihre Programme als Tabelle.",
+		"Weekly": "Wöchentlich",
+		"Interval": "Intervall",
+		"Single run": "Einmalig",
+		"Monthly": "Monatlich",
+		"Every": "Alle",
+		"day": "Tag",
+		"days": "Tage",
 		"The assistant could not process this request.": "Der Assistent konnte diese Anfrage nicht verarbeiten.",
 		"This request is outside the allowed topic (OpenSprinkler / irrigation only).": "Diese Anfrage liegt außerhalb des erlaubten Themas (nur OpenSprinkler / Bewässerung).",
 		"Could not reach the assistant service.": "Der Assistenten-Dienst ist nicht erreichbar.",
@@ -507,6 +522,290 @@ OSApp.AIAssistant.collectSensors = function() {
 	return out;
 };
 
+OSApp.AIAssistant.isSensorListingRequest = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	return /\b(sensor(en)?|sensors)\b/u.test( msg ) &&
+		/\b(list|liste|show|zeige|anzeigen|auflisten|my|meine|alle)\b/u.test( msg );
+};
+
+OSApp.AIAssistant.formatSensorListing = function() {
+	var sensors = OSApp.AIAssistant.collectSensors();
+	var lines = [];
+	for ( var i = 0; i < sensors.length; i++ ) {
+		var s = sensors[ i ] || {};
+		var parts = [];
+		var nr = ( s.nr !== undefined && s.nr !== null && s.nr !== "" ) ? String( s.nr ) : "?";
+		var name = String( s.name || "" ).trim();
+		var value = s.value;
+		if ( Array.isArray( value ) || ( value && typeof value === "object" ) ) {
+			try {
+				value = JSON.stringify( value );
+			} catch ( e ) {
+				value = "";
+			}
+		}
+		value = String( value == null ? "" : value ).trim();
+		var unit = String( s.unit || "" ).trim();
+		if ( s.type ) { parts.push( s.type ); }
+		if ( s.group ) { parts.push( s.group ); }
+		if ( s.enable !== undefined ) { parts.push( Number( s.enable ) ? "on" : "off" ); }
+		if ( s.data_ok !== undefined ) { parts.push( Number( s.data_ok ) ? "ok" : "not-ok" ); }
+		var line = "#" + nr;
+		if ( name ) {
+			line += " " + name;
+		}
+		if ( value ) {
+			line += ": " + value + ( unit ? " " + unit : "" );
+		}
+		if ( parts.length ) {
+			line += " (" + parts.join( ", " ) + ")";
+		}
+		lines.push( line );
+	}
+	if ( !lines.length ) {
+		return {
+			summary: OSApp.AIAssistant.t( "No sensors found." ),
+			explanation: OSApp.AIAssistant.t( "I could not find any sensors in the current context. Please open the sensor view first so the device can load the data." )
+		};
+	}
+	return {
+		summary: OSApp.AIAssistant.t( "Here are your sensors." ),
+		explanation: lines.join( "\n" )
+	};
+};
+
+OSApp.AIAssistant.isProgramListingRequest = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	return /\b(programm(e|s)?|schedule(s)?|tim(e|er))\b/u.test( msg ) &&
+		/\b(list|liste|show|zeige|anzeigen|auflisten|my|meine|alle|table|tabelle)\b/u.test( msg );
+};
+
+OSApp.AIAssistant.escapeHtml = function( s ) {
+	return String( s == null ? "" : s ).replace( /[&<>"']/g, function( c ) {
+		return { "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;", "'": "&#39;" }[ c ];
+	} );
+};
+
+OSApp.AIAssistant.formatProgramListingHtml = function() {
+	var pd = ( OSApp.currentSession && OSApp.currentSession.controller && OSApp.currentSession.controller.programs &&
+		Array.isArray( OSApp.currentSession.controller.programs.pd ) ) ? OSApp.currentSession.controller.programs.pd : [];
+	if ( !pd.length || !OSApp.Programs || typeof OSApp.Programs.readProgram !== "function" ) {
+		return {
+			summary: OSApp.AIAssistant.t( "No programs found." ),
+			html: ""
+		};
+	}
+	function programTypeLabel( type ) {
+		switch ( Number( type ) ) {
+			case 1: return OSApp.AIAssistant.t( "Interval" );
+			case 2: return OSApp.AIAssistant.t( "Single run" );
+			case 3: return OSApp.AIAssistant.t( "Monthly" );
+			default: return OSApp.AIAssistant.t( "Weekly" );
+		}
+	}
+	function dayNamesFromBits( bits ) {
+		var week = [ OSApp.AIAssistant.t( "Monday" ), OSApp.AIAssistant.t( "Tuesday" ), OSApp.AIAssistant.t( "Wednesday" ), OSApp.AIAssistant.t( "Thursday" ), OSApp.AIAssistant.t( "Friday" ), OSApp.AIAssistant.t( "Saturday" ), OSApp.AIAssistant.t( "Sunday" ) ];
+		var out = [];
+		bits = String( bits || "" );
+		for ( var i = 0; i < 7; i++ ) {
+			if ( bits.charAt( i ) === "1" ) {
+				out.push( week[ i ] );
+			}
+		}
+		return out.join( ", " );
+	}
+	function formatStart( raw, prog ) {
+		if ( Array.isArray( raw ) ) {
+			var start = raw[ 0 ];
+			var repeat = raw[ 1 ];
+			var interval = raw[ 2 ];
+			var txt = OSApp.Programs.readStartTime ? OSApp.Programs.readStartTime( start ) : String( start );
+			if ( Number( repeat ) > 0 ) {
+				txt += " · " + OSApp.AIAssistant.t( "Every" ) + " " + repeat + "× ";
+				if ( OSApp.Dates && OSApp.Dates.dhms2str && OSApp.Dates.sec2dhms ) {
+					txt += OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( Number( interval ) * 60 ) );
+				} else {
+					txt += String( interval );
+				}
+			}
+			return txt;
+		}
+		if ( raw !== undefined && raw !== null ) {
+			return OSApp.Programs.readStartTime ? OSApp.Programs.readStartTime( raw ) : String( raw );
+		}
+		return "";
+	}
+	function formatDuration( raw, prog ) {
+		var sec = 0;
+		if ( Array.isArray( prog.stations ) ) {
+			for ( var i = 0; i < prog.stations.length; i++ ) {
+				sec += Number( prog.stations[ i ] ) || 0;
+			}
+		} else if ( typeof prog.duration === "number" ) {
+			sec = Number( prog.duration ) || 0;
+		} else if ( typeof raw === "number" ) {
+			sec = Number( raw ) || 0;
+		}
+		if ( !sec ) {
+			return "";
+		}
+		if ( OSApp.Dates && OSApp.Dates.dhms2str && OSApp.Dates.sec2dhms ) {
+			return OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( sec ) );
+		}
+		return String( sec );
+	}
+	function formatDays( raw, prog ) {
+		if ( typeof prog.days === "string" ) {
+			return dayNamesFromBits( prog.days ) || prog.days;
+		}
+		if ( Array.isArray( prog.days ) ) {
+			if ( prog.type === 1 ) {
+				return OSApp.AIAssistant.t( "Every" ) + " " + prog.days[ 0 ] + " " + OSApp.AIAssistant.t( "days" ) + ( prog.days[ 1 ] ? " · " + prog.days[ 1 ] : "" );
+			}
+			if ( prog.type === 2 ) {
+				return OSApp.AIAssistant.t( "Single run" );
+			}
+			if ( prog.type === 3 ) {
+				return OSApp.AIAssistant.t( "Day" ) + " " + prog.days[ 0 ];
+			}
+			return prog.days.join( ", " );
+		}
+		return "";
+	}
+	var rows = [];
+	for ( var i = 0; i < pd.length; i++ ) {
+		var raw = pd[ i ];
+		var p = OSApp.Programs.readProgram( raw ) || {};
+		var name = String( p.name || "" ).trim() || ( OSApp.AIAssistant.t( "Program" ) + " " + ( i + 1 ) );
+		var start = formatStart( p.start, p );
+		var duration = formatDuration( raw[ 6 ], p );
+		var days = formatDays( raw, p );
+		rows.push(
+			"<tr>" +
+				"<td>" + ( i + 1 ) + "</td>" +
+				"<td>" + OSApp.AIAssistant.escapeHtml( name ) + "</td>" +
+				"<td>" + OSApp.AIAssistant.escapeHtml( p.en ? OSApp.AIAssistant.t( "On" ) : OSApp.AIAssistant.t( "Off" ) ) + "</td>" +
+				"<td>" + OSApp.AIAssistant.escapeHtml( programTypeLabel( p.type ) ) + "</td>" +
+				"<td>" + OSApp.AIAssistant.escapeHtml( start ) + "</td>" +
+				"<td>" + OSApp.AIAssistant.escapeHtml( duration ) + "</td>" +
+				"<td>" + OSApp.AIAssistant.escapeHtml( days ) + "</td>" +
+			"</tr>"
+		);
+	}
+	return {
+		summary: OSApp.AIAssistant.t( "Here are your programs as a table." ),
+		html:
+			"<table class='ai-table' style='width:100%;border-collapse:collapse;font-size:13px'>" +
+				"<thead><tr>" +
+					"<th style='text-align:left;border-bottom:1px solid #ddd;padding:6px'>#</th>" +
+					"<th style='text-align:left;border-bottom:1px solid #ddd;padding:6px'>" + OSApp.AIAssistant.escapeHtml( OSApp.AIAssistant.t( "Name" ) ) + "</th>" +
+					"<th style='text-align:left;border-bottom:1px solid #ddd;padding:6px'>" + OSApp.AIAssistant.escapeHtml( OSApp.AIAssistant.t( "Status" ) ) + "</th>" +
+					"<th style='text-align:left;border-bottom:1px solid #ddd;padding:6px'>" + OSApp.AIAssistant.escapeHtml( OSApp.AIAssistant.t( "Type" ) ) + "</th>" +
+					"<th style='text-align:left;border-bottom:1px solid #ddd;padding:6px'>" + OSApp.AIAssistant.escapeHtml( OSApp.AIAssistant.t( "Start" ) ) + "</th>" +
+					"<th style='text-align:left;border-bottom:1px solid #ddd;padding:6px'>" + OSApp.AIAssistant.escapeHtml( OSApp.AIAssistant.t( "Duration" ) ) + "</th>" +
+					"<th style='text-align:left;border-bottom:1px solid #ddd;padding:6px'>" + OSApp.AIAssistant.escapeHtml( OSApp.AIAssistant.t( "Days" ) ) + "</th>" +
+				"</tr></thead>" +
+				"<tbody>" + rows.join( "" ) + "</tbody>" +
+			"</table>"
+	};
+};
+
+OSApp.AIAssistant.isProgramRuntimeChangeRequest = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	return /\b(programm?|program)\s*\d+\b/u.test( msg ) &&
+		/\b(laufzeit|run\s*time|runtime|duration|dauer)\b/u.test( msg ) &&
+		/\b(verdoppel\w*|halbier\w*|verdreifach\w*|double|halve|triple)\b/u.test( msg );
+};
+
+OSApp.AIAssistant.buildProgramRuntimeChangeResponse = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	var match = msg.match( /\b(programm?|program)\s*(\d+)\b/u );
+	if ( !match ) {
+		return null;
+	}
+	var factor = 0;
+	if ( /\b(verdoppel\w*|double)\b/u.test( msg ) ) {
+		factor = 2;
+	} else if ( /\b(halbier\w*|halve)\b/u.test( msg ) ) {
+		factor = 0.5;
+	} else if ( /\b(verdreifach\w*|triple)\b/u.test( msg ) ) {
+		factor = 3;
+	}
+	if ( !factor ) {
+		return null;
+	}
+
+	var pd = ( OSApp.currentSession && OSApp.currentSession.controller && OSApp.currentSession.controller.programs &&
+		Array.isArray( OSApp.currentSession.controller.programs.pd ) ) ? OSApp.currentSession.controller.programs.pd : [];
+	var idx = parseInt( match[ 2 ], 10 ) - 1;
+	if ( idx < 0 || idx >= pd.length ) {
+		return null;
+	}
+
+	var raw = $.extend( true, [], pd[ idx ] );
+	if ( !Array.isArray( raw ) ) {
+		return null;
+	}
+
+	var before = 0;
+	var after = 0;
+	var changed = false;
+
+	if ( Array.isArray( raw[ 4 ] ) ) {
+		var durs = [];
+		for ( var i = 0; i < raw[ 4 ].length; i++ ) {
+			var cur = Number( raw[ 4 ][ i ] ) || 0;
+			before += cur;
+			var next = Math.max( 0, Math.round( cur * factor ) );
+			after += next;
+			durs.push( next );
+		}
+		raw[ 4 ] = durs;
+		changed = true;
+	} else if ( typeof raw[ 6 ] === "number" ) {
+		before = Number( raw[ 6 ] ) || 0;
+		after = Math.max( 0, Math.round( before * factor ) );
+		raw[ 6 ] = after;
+		changed = true;
+	}
+
+	if ( !changed ) {
+		return null;
+	}
+
+	var updatedPd = pd.slice();
+	updatedPd[ idx ] = raw;
+
+	var isDe = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de";
+	var fmt = function( sec ) {
+		if ( OSApp.Dates && OSApp.Dates.dhms2str && OSApp.Dates.sec2dhms ) {
+			return OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( sec ) );
+		}
+		return String( sec ) + "s";
+	};
+
+	return {
+		ok: true,
+		refused: false,
+		reason: "",
+		summary: isDe ? ( "Programm " + ( idx + 1 ) + " Laufzeit angepasst." ) : ( "Program " + ( idx + 1 ) + " runtime adjusted." ),
+		explanation: isDe ?
+			( "Die Laufzeit von Programm " + ( idx + 1 ) + " wurde von " + fmt( before ) + " auf " + fmt( after ) + " angepasst." ) :
+			( "Program " + ( idx + 1 ) + " runtime was adjusted from " + fmt( before ) + " to " + fmt( after ) + "." ),
+		changes: {
+			programs: {
+				pd: updatedPd
+			}
+		},
+		usage: {
+			prompt_tokens: 0,
+			completion_tokens: 0
+		},
+		model: "deterministic",
+		error_code: ""
+	};
+};
+
 OSApp.AIAssistant.ask = function( message, callbacks ) {
 	callbacks = callbacks || {};
 	var safeConfig = {};
@@ -534,27 +833,45 @@ OSApp.AIAssistant.ask = function( message, callbacks ) {
 	}
 	var locale = OSApp.AIAssistant.currentLang().substr( 0, 2 );
 
-	$.ajax( {
-		url: OSApp.AIAssistant.getServiceUrl().replace( /\/+$/, "" ) + "/assist",
-		method: "POST",
-		contentType: "application/json",
-		dataType: "json",
-		timeout: 35000,
-		data: JSON.stringify( {
-			message: message,
-			firmware: fw,
-			locale: locale,
-			config: safeConfig
-		} )
-	} ).done( function( res ) {
-		if ( callbacks.done ) {
-			callbacks.done( res );
-		}
-	} ).fail( function( xhr ) {
-		if ( callbacks.fail ) {
-			callbacks.fail( xhr );
-		}
-	} );
+	var serviceUrl = OSApp.AIAssistant.getServiceUrl().replace( /\/+$/, "" );
+	var defaultUrl = OSApp.AIAssistant.DEFAULT_SERVICE.replace( /\/+$/, "" );
+	var triedFallback = false;
+
+	function doRequest( url ) {
+		$.ajax( {
+			url: url + "/assist",
+			method: "POST",
+			contentType: "application/json",
+			dataType: "json",
+			timeout: 35000,
+			data: JSON.stringify( {
+				message: message,
+				firmware: fw,
+				locale: locale,
+				config: safeConfig
+			} )
+		} ).done( function( res ) {
+			if ( callbacks.done ) {
+				callbacks.done( res );
+			}
+		} ).fail( function( xhr ) {
+			if ( !triedFallback && url !== defaultUrl ) {
+				triedFallback = true;
+				doRequest( defaultUrl );
+				return;
+			}
+			if ( xhr && ( !xhr.status || xhr.status === 0 ) && !xhr.responseJSON ) {
+				xhr.responseJSON = {
+					message: "Plugin service unreachable; request was forwarded, but no response arrived."
+				};
+			}
+			if ( callbacks.fail ) {
+				callbacks.fail( xhr );
+			}
+		} );
+	}
+
+	doRequest( serviceUrl );
 };
 
 OSApp.AIAssistant.ensureAnalogContext = function() {
@@ -704,7 +1021,22 @@ OSApp.AIAssistant.openDialog = function() {
 	var sendBtn = overlay.find( "#ai-chat-send" );
 
 	function scrollDown() {
-		log.scrollTop( log[ 0 ].scrollHeight );
+		if ( !log.length ) {
+			return;
+		}
+		var el = log[ 0 ];
+		var doScroll = function() {
+			el.scrollTop = el.scrollHeight;
+		};
+		if ( window.requestAnimationFrame ) {
+			window.requestAnimationFrame( function() {
+				doScroll();
+				window.requestAnimationFrame( doScroll );
+			} );
+		} else {
+			doScroll();
+			setTimeout( doScroll, 0 );
+		}
 	}
 
 	function addMessage( who, text, cssExtra ) {
@@ -720,6 +1052,15 @@ OSApp.AIAssistant.openDialog = function() {
 		log.append( msg );
 		scrollDown();
 		return msg;
+	}
+
+	function addHtmlMessage( title, html, cssExtra ) {
+		var bot = addMessage( "bot", title || "", cssExtra );
+		if ( html ) {
+			$( html ).appendTo( bot );
+			scrollDown();
+		}
+		return bot;
 	}
 
 	function addTyping() {
@@ -777,6 +1118,22 @@ OSApp.AIAssistant.openDialog = function() {
 		OSApp.AIAssistant.pushHistory( "user", message );
 		textarea.val( "" ).css( "height", "auto" );
 		sendBtn.prop( "disabled", true );
+		if ( OSApp.AIAssistant.isSensorListingRequest( message ) ) {
+			var local = OSApp.AIAssistant.formatSensorListing();
+			var localText = local.summary + ( local.explanation ? "\n" + local.explanation : "" );
+			addMessage( "bot", localText );
+			OSApp.AIAssistant.pushHistory( "bot", localText );
+			sendBtn.prop( "disabled", false );
+			return;
+		}
+		if ( OSApp.AIAssistant.isProgramListingRequest( message ) ) {
+			var programView = OSApp.AIAssistant.formatProgramListingHtml();
+			var programText = programView.summary;
+			addHtmlMessage( programText, programView.html );
+			OSApp.AIAssistant.pushHistory( "bot", programText );
+			sendBtn.prop( "disabled", false );
+			return;
+		}
 		var typing = addTyping();
 		function sendRequest() {
 			OSApp.AIAssistant.ask( message, {
@@ -904,10 +1261,10 @@ OSApp.AIAssistant.openDialog = function() {
 		history.forEach( function( m ) {
 			addMessage( m.role === "user" ? "user" : "bot", m.text, m.cls );
 		} );
-		scrollDown();
 	} else {
 		addMessage( "bot", L( "Hi! I'm your OpenSprinkler assistant. Tell me what you'd like to change, or ask a question about irrigation." ) );
 	}
+	scrollDown();
 
 	setTimeout( function() {
 		textarea.focus();

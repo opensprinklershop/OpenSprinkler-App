@@ -36,9 +36,29 @@ OSApp.Sites.isRootPath = function() {
 	return path === "" || path === "/";
 };
 
+OSApp.Sites.getCurrentBundleVersion = function() {
+	var path = window.location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "");
+	var m = path.match(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/);
+	return m ? m[1] : null;
+};
+
+OSApp.Sites.getKnownFallbackVersion = function() {
+	var fromPath = OSApp.Sites.getCurrentBundleVersion();
+	if ( fromPath ) {
+		return fromPath;
+	}
+
+	var cached = localStorage.getItem( "last_ui_version" );
+	if ( cached ) {
+		return cached;
+	}
+
+	return "2.4.0.213";
+};
+
 OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
 	if (!fwv) {
-		return "2.4.0.213";
+		return OSApp.Sites.getKnownFallbackVersion();
 	}
 
 	// 2.2.1 and below (fwv <= 221) should use 2.2.1 legacy
@@ -74,7 +94,7 @@ OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
 		}
 	}
 
-	return "2.4.0.213";
+	return OSApp.Sites.getKnownFallbackVersion();
 };
 
 OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
@@ -107,6 +127,33 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 			window.location.href = baseHref + "index.html";
 		}
 	};
+	var resolveFallbackVersion = function( done ) {
+		var preferred = OSApp.Sites.getKnownFallbackVersion();
+		$.ajax( {
+			url: "versions.json",
+			type: "GET",
+			dataType: "json",
+			timeout: 5000
+		} ).then( function( vData ) {
+			var versions = ( vData && Array.isArray( vData.versions ) ) ? vData.versions : [];
+			if ( versions.indexOf( preferred ) !== -1 ) {
+				done( preferred );
+				return;
+			}
+
+			var firstRelease = versions.find( function( v ) {
+				return typeof v === "string" && v !== "dev";
+			} );
+			if ( firstRelease ) {
+				done( firstRelease );
+				return;
+			}
+
+			done( preferred );
+		}, function() {
+			done( preferred );
+		} );
+	};
 	var navigateToVersion = function( targetVersion ) {
 		var targetHref = baseHref + targetVersion + "/index.html";
 
@@ -136,7 +183,9 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 	};
 
 	if (forceDefault || !siteData) {
-		navigateToVersion( "2.4.0.213" );
+		resolveFallbackVersion( function( fallbackVer ) {
+			navigateToVersion( fallbackVer );
+		} );
 		return;
 	}
 
@@ -147,7 +196,7 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 		url: url,
 		type: "GET",
 		dataType: "json",
-		timeout: 5000,
+		timeout: 10000,
 		beforeSend: function( xhr ) {
 			if ( !siteData.os_token && typeof siteData.auth_user !== "undefined" && typeof siteData.auth_pw !== "undefined" ) {
 				xhr.setRequestHeader( "Authorization", "Basic " + btoa( siteData.auth_user + ":" + siteData.auth_pw ) );
@@ -161,20 +210,25 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 				url: "versions.json",
 				type: "GET",
 				dataType: "json",
-				timeout: 3000
+				timeout: 5000
 			}).then(
 				function(vData) {
 					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion(fwv, vData.versions || [], fwm);
+					localStorage.setItem( "last_ui_version", targetVersion );
 					navigateToVersion( targetVersion );
 				},
 				function() {
-					navigateToVersion( "2.4.0.213" );
+					resolveFallbackVersion( function( fallbackVer ) {
+						navigateToVersion( fallbackVer );
+					} );
 				}
 			);
 		},
 		function() {
-			console.log("Could not ping controller directly. Routing to default UI version 2.4.0.213.");
-			navigateToVersion( "2.4.0.213" );
+			console.log("Could not ping controller directly. Routing using cached/catalog fallback UI version.");
+			resolveFallbackVersion( function( fallbackVer ) {
+				navigateToVersion( fallbackVer );
+			} );
 		}
 	);
 };
@@ -1668,7 +1722,7 @@ OSApp.Sites.updateControllerSettings = function( callback ) {
 				}
 			} );
 	} else {
-		return OSApp.Firmware.sendToOS( "/jc?pw=" ).then(
+		return OSApp.Firmware.sendToOS( "/jc?pw=", "text", OSApp.currentSession.token ? 30000 : 10000 ).then(
 			function( settings ) {
 				if ( typeof settings !== "object" ) {
 					var parsedSettings = OSApp.Sites.parseControllerSettings( settings );

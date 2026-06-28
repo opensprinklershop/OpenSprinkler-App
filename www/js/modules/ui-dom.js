@@ -2410,8 +2410,20 @@ OSApp.UIDom.updateTimers = function() {
 	var lastCheck = new Date().getTime();
 
 	setInterval( function() {
+		var session = OSApp.currentSession,
+			isConnected = false;
 
-		if ( !OSApp.currentSession.isControllerConnected() ) {
+		if ( !session || typeof session.isControllerConnected !== "function" ) {
+			return false;
+		}
+
+		try {
+			isConnected = session.isControllerConnected();
+		} catch {
+			return false;
+		}
+
+		if ( !isConnected ) {
 			return false;
 		}
 

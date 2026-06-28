@@ -172,13 +172,16 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 		// Use POST when sending data to the controller (requires firmware 2.1.8 or newer)
 		usePOST = ( isChange && OSApp.Firmware.checkOSVersion( 300 ) ),
 		urlDest = usePOST ? dest.split( "?" )[ 0 ] : dest,
+		requestTimeout = ( typeof timeout === "number" ) ? timeout : ( OSApp.currentSession.token ? 30000 : undefined ),
 		normalizedIp = OSApp.currentSession.token ? OSApp.currentSession.ip : OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix ),
 		obj = {
 			url: OSApp.currentSession.token ? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + urlDest : OSApp.currentSession.prefix + normalizedIp + urlDest,
 			type: usePOST ? "POST" : "GET",
 			data: usePOST ? OSApp.Firmware.getUrlVars( dest ) : null,
 			dataType: type,
-			timeout: timeout,
+			// Cloud-forwarded OTC requests can exceed the global 10s ajax timeout.
+			// Use a larger default unless a caller explicitly passes a timeout.
+			timeout: requestTimeout,
 			headers: {},
 			shouldRetry: function( xhr, current ) {
 				if ( xhr.status === 0 && xhr.statusText === "abort" || OSApp.Constants.http.RETRY_COUNT < current ) {

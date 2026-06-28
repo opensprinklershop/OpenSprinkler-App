@@ -852,7 +852,8 @@ OSApp.Network.changePassword = function( opt ) {
 				$.ajax( {
 					url: OSApp.currentSession.token ? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + urlDest : OSApp.currentSession.prefix + OSApp.currentSession.ip + urlDest,
 					type: "GET",
-					dataType: "json"
+					dataType: "json",
+					timeout: OSApp.currentSession.token ? 30000 : 10000
 				} ).then(
 					function() {
 						sites[ current ].os_pw = OSApp.currentSession.pass = pw;
