@@ -1482,6 +1482,13 @@ OSApp.Dashboard.displayPage = function() {
 				updateStandardView( cardHolder, cardList );
 			}
 		},
+		getDashboardTitle = function() {
+			if ( OSApp.currentSession.local ) {
+				return OSApp.currentSession.controller.settings?.dname || "";
+			}
+
+			return OSApp.currentSession.currentSite || currentSite || siteSelect.val() || "";
+		},
 		updateContent = function() {
 			var cardHolder = page.find( "#os-stations-list" ),
 				cardList = cardHolder.children(),
@@ -1504,7 +1511,7 @@ OSApp.Dashboard.displayPage = function() {
 				sites[ currentSite ].images = {};
 			}
 
-			page.find( ".sitename" ).text( OSApp.currentSession.local ? OSApp.currentSession.controller.settings?.dname || "" : siteSelect.val() );
+			page.find( ".sitename" ).text( getDashboardTitle() );
 			page.find( ".sitename" ).toggleClass( "hidden", OSApp.currentSession.local ? ( OSApp.currentSession.controller.settings?.dname ? false : true ) : false );
 
 			// New view: Show program instead of zones
@@ -1635,7 +1642,7 @@ OSApp.Dashboard.displayPage = function() {
 		updateSites = function( callback ) {
 			callback = callback || function() {};
 
-			currentSite = siteSelect.val() || currentSite || "default";
+			currentSite = OSApp.currentSession.currentSite || siteSelect.val() || currentSite || "default";
 			OSApp.Storage.get( "sites", function( data ) {
 				sites = OSApp.Sites.parseSites( data.sites ) || {};
 				if ( typeof sites !== "object" ) {
@@ -1731,7 +1738,7 @@ OSApp.Dashboard.displayPage = function() {
 		} );
 
 		page.find( ".sitename" ).toggleClass( "hidden", OSApp.currentSession.local ? (OSApp.currentSession.controller.settings?.dname ? false : true) : false );
-		page.find( ".sitename" ).text( OSApp.currentSession.local ? OSApp.currentSession.controller.settings?.dname || "" : siteSelect.val() );
+		page.find( ".sitename" ).text( getDashboardTitle() );
 		page.find( ".waterlevel" ).text( OSApp.currentSession.controller.options.wl );
 
 		OSApp.Analog.updateSensorShowArea( page );
