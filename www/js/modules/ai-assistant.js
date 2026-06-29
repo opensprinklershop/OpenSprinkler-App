@@ -129,7 +129,7 @@ OSApp.AIAssistant.isMcpRequest = function( message ) {
 
 OSApp.AIAssistant.buildMcpResponse = function( message ) {
 	var msg = String( message || "" ).toLowerCase();
-	var url = "https://github.com/opensprinklershop/OpenSprinkler-Firmware/blob/main/tools/mcp-server/README.md";
+	var url = "https://opensprinklershop.de/en/2026/04/06/mcp-server-ki-integration/";
 	var setup = /\b(einricht|setup|install|how to|wie richte|konfig|configure)\b/u.test( msg );
 	return {
 		ok: true,
@@ -137,8 +137,8 @@ OSApp.AIAssistant.buildMcpResponse = function( message ) {
 		reason: "",
 		summary: setup ? "MCP-Server einrichten" : "MCP-Server für OpenSprinkler",
 		explanation: setup ?
-			"Ja. Der MCP-Server für OpenSprinkler liegt hier: [tools/mcp-server/README.md](" + url + ").\nDort stehen Einrichtung, Betriebsarten und die verfügbaren Tools." :
-			"Ja. Es gibt einen MCP-Server für OpenSprinkler: [tools/mcp-server/README.md](" + url + ").\nDer Server stellt dokumentierte Tools bereit, mit denen ein Assistent den Controller abfragen und steuern kann.",
+			"Ja. Das Handbuch zum MCP-Server für OpenSprinkler ist hier: [MCP Server — AI Integration](" + url + ").\nDort stehen Einrichtung, Betriebsarten und die verfügbaren Tools." :
+			"Ja. Es gibt einen MCP-Server für OpenSprinkler. Das Handbuch dazu ist hier: [MCP Server — AI Integration](" + url + ").\nDer Server stellt dokumentierte Tools bereit, mit denen ein Assistent den Controller abfragen und steuern kann.",
 		changes: {},
 		usage: { prompt_tokens: 0, completion_tokens: 0 },
 		model: "deterministic",
@@ -670,12 +670,18 @@ OSApp.AIAssistant.isSensorListingRequest = function( message ) {
 		/\b(list|liste|show|zeige|anzeigen|auflisten|my|meine|alle)\b/u.test( msg );
 };
 
-OSApp.AIAssistant.formatSensorListing = function() {
+OSApp.AIAssistant.isGermanMessage = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	return /[äöüß]/i.test( msg ) ||
+		/\b(liste|liste\s+meine|zeige|anzeigen|auflisten|sensoren|meine|bitte|wie|gibt es|welche)\b/u.test( msg );
+};
+
+OSApp.AIAssistant.formatSensorListing = function( message ) {
 	var sensors = OSApp.AIAssistant.collectSensors();
-	var lines = [];
+	var isDe = OSApp.AIAssistant.isGermanMessage( message ) || OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de";
+	var rows = [];
 	for ( var i = 0; i < sensors.length; i++ ) {
 		var s = sensors[ i ] || {};
-		var parts = [];
 		var nr = ( s.nr !== undefined && s.nr !== null && s.nr !== "" ) ? String( s.nr ) : "?";
 		var name = String( s.name || "" ).trim();
 		var value = s.value;
@@ -687,32 +693,31 @@ OSApp.AIAssistant.formatSensorListing = function() {
 			}
 		}
 		value = String( value == null ? "" : value ).trim();
-		var unit = String( s.unit || "" ).trim();
-		if ( s.type ) { parts.push( s.type ); }
-		if ( s.group ) { parts.push( s.group ); }
-		if ( s.enable !== undefined ) { parts.push( Number( s.enable ) ? "on" : "off" ); }
-		if ( s.data_ok !== undefined ) { parts.push( Number( s.data_ok ) ? "ok" : "not-ok" ); }
-		var line = "#" + nr;
-		if ( name ) {
-			line += " " + name;
-		}
-		if ( value ) {
-			line += ": " + value + ( unit ? " " + unit : "" );
-		}
-		if ( parts.length ) {
-			line += " (" + parts.join( ", " ) + ")";
-		}
-		lines.push( line );
+		rows.push( [
+			nr,
+			name,
+			String( s.type || "" ),
+			String( s.group || "" ),
+			s.enable !== undefined ? ( Number( s.enable ) ? ( isDe ? "an" : "on" ) : ( isDe ? "aus" : "off" ) ) : "",
+			s.data_ok !== undefined ? ( Number( s.data_ok ) ? ( isDe ? "ok" : "ok" ) : ( isDe ? "nicht ok" : "not-ok" ) ) : "",
+			value,
+			String( s.unit || "" )
+		] );
 	}
-	if ( !lines.length ) {
+	if ( !rows.length ) {
 		return {
-			summary: OSApp.AIAssistant.t( "No sensors found." ),
-			explanation: OSApp.AIAssistant.t( "I could not find any sensors in the current context. Please open the sensor view first so the device can load the data." )
+			summary: isDe ? "Keine Sensoren gefunden." : OSApp.AIAssistant.t( "No sensors found." ),
+			explanation: isDe ?
+				"Ich konnte im aktuellen Kontext keine Sensoren finden. Bitte oeffne zuerst die Sensoransicht, damit das Geraet die Daten laden kann." :
+				OSApp.AIAssistant.t( "I could not find any sensors in the current context. Please open the sensor view first so the device can load the data." )
 		};
 	}
+	var headers = isDe ?
+		[ "#", "Name", "Typ", "Gruppe", "Status", "Daten", "Wert", "Einheit" ] :
+		[ "#", OSApp.AIAssistant.t( "Name" ), OSApp.AIAssistant.t( "Type" ), OSApp.AIAssistant.t( "Group" ), OSApp.AIAssistant.t( "Status" ), "Data", "Value", OSApp.AIAssistant.t( "Unit" ) ];
 	return {
-		summary: OSApp.AIAssistant.t( "Here are your sensors." ),
-		explanation: lines.join( "\n" )
+		summary: isDe ? "Hier sind Ihre Sensoren." : OSApp.AIAssistant.t( "Here are your sensors." ),
+		html: OSApp.AIAssistant.formatTable( isDe ? "Hier sind Ihre Sensoren." : OSApp.AIAssistant.t( "Here are your sensors." ), headers, rows ).html
 	};
 };
 
@@ -1883,10 +1888,8 @@ OSApp.AIAssistant.openDialog = function() {
 		textarea.val( "" ).css( "height", "auto" );
 		sendBtn.prop( "disabled", true );
 		if ( OSApp.AIAssistant.isSensorListingRequest( message ) ) {
-			var local = OSApp.AIAssistant.formatSensorListing();
-			var localText = local.summary + ( local.explanation ? "\n" + local.explanation : "" );
-			addMessage( "bot", localText );
-			OSApp.AIAssistant.pushHistory( "bot", localText );
+			var local = OSApp.AIAssistant.formatSensorListing( message );
+			addResult( local );
 			sendBtn.prop( "disabled", false );
 			return;
 		}

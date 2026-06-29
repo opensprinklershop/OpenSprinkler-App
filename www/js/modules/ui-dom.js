@@ -33,7 +33,7 @@ OSApp.UIDom.ensureAIAssistant = function( onReady ) {
 	}
 	OSApp.UIDom.aiAssistantLoading = true;
 	var script = document.createElement( "script" );
-	script.src = "js/modules/ai-assistant.js?v=osai16";
+	script.src = "js/modules/ai-assistant.js?v=osai18";
 	script.onload = function() {
 		OSApp.UIDom.aiAssistantLoading = false;
 		$( document ).trigger( "osai:loaded" );
