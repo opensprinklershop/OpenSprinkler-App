@@ -122,6 +122,30 @@ OSApp.AIAssistant.isReleaseNotesRequest = function( message ) {
 	return /\b(release notes?|changelog|release|what'?s new|whats new|neu(?:e|es)?|aenderungen|änderungen|release-?notizen)\b/u.test( msg );
 };
 
+OSApp.AIAssistant.isMcpRequest = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	return /\bmcp\b/u.test( msg ) || /\b(model context protocol|mcp-server|mcp server)\b/u.test( msg );
+};
+
+OSApp.AIAssistant.buildMcpResponse = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	var url = "https://github.com/opensprinklershop/OpenSprinkler-Firmware/blob/main/tools/mcp-server/README.md";
+	var setup = /\b(einricht|setup|install|how to|wie richte|konfig|configure)\b/u.test( msg );
+	return {
+		ok: true,
+		refused: false,
+		reason: "",
+		summary: setup ? "MCP-Server einrichten" : "MCP-Server für OpenSprinkler",
+		explanation: setup ?
+			"Ja. Der MCP-Server für OpenSprinkler liegt hier: [tools/mcp-server/README.md](" + url + ").\nDort stehen Einrichtung, Betriebsarten und die verfügbaren Tools." :
+			"Ja. Es gibt einen MCP-Server für OpenSprinkler: [tools/mcp-server/README.md](" + url + ").\nDer Server stellt dokumentierte Tools bereit, mit denen ein Assistent den Controller abfragen und steuern kann.",
+		changes: {},
+		usage: { prompt_tokens: 0, completion_tokens: 0 },
+		model: "deterministic",
+		error_code: ""
+	};
+};
+
 OSApp.AIAssistant.parseReleaseQuery = function( message ) {
 	var msg = String( message || "" );
 	var version = "";
@@ -1794,6 +1818,12 @@ OSApp.AIAssistant.openDialog = function() {
 		return bot;
 	}
 
+	function appendRichText( parent, text ) {
+		var box = $( '<div class="smaller" style="color:#666;margin-top:4px;white-space:pre-wrap"></div>' );
+		box.html( OSApp.AIAssistant.linkify( text || "" ) );
+		box.appendTo( parent );
+	}
+
 	function addTyping() {
 		var t = $( '<div class="ai-msg ai-bot"><span class="ai-typing"><span></span><span></span><span></span></span></div>' );
 		log.append( t );
@@ -1804,7 +1834,7 @@ OSApp.AIAssistant.openDialog = function() {
 	function addResult( res ) {
 		var bot = addMessage( "bot", res.summary || L( "Done." ) );
 		if ( res.explanation ) {
-			$( '<div class="smaller" style="color:#666;margin-top:4px"></div>' ).text( res.explanation ).appendTo( bot );
+			appendRichText( bot, res.explanation );
 		}
 		if ( res.html ) {
 			$( res.html ).appendTo( bot );
@@ -1884,6 +1914,12 @@ OSApp.AIAssistant.openDialog = function() {
 				OSApp.AIAssistant.pushHistory( "bot", res.summary + "\n" + res.explanation );
 				scrollDown();
 			} );
+			return;
+		}
+		if ( OSApp.AIAssistant.isMcpRequest( message ) ) {
+			var mcpRes = OSApp.AIAssistant.buildMcpResponse( message );
+			addResult( mcpRes );
+			sendBtn.prop( "disabled", false );
 			return;
 		}
 		var localCrud = OSApp.AIAssistant.runAnalogCrud( message );
