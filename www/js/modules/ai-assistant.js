@@ -46,16 +46,16 @@ OSApp.AIAssistant.currentLang = function() {
 OSApp.AIAssistant.I18N = {
 	de: {
 		"AI Assistant": "KI-Assistent",
-		"Close": "Schließen",
-		"Clear chat": "Chat löschen",
-		"Proposed changes": "Vorgeschlagene Änderungen",
+		"Close": "Schliessen",
+		"Clear chat": "Chat loeschen",
+		"Proposed changes": "Vorgeschlagene Aenderungen",
 		"Send": "Senden",
 		"Voice input": "Spracheingabe",
-		"Type your message…": "Nachricht eingeben …",
-		"Hi! I'm your OpenSprinkler assistant. Tell me what you'd like to change, or ask a question about irrigation.": "Hallo! Ich bin dein OpenSprinkler-Assistent. Sag mir, was du ändern möchtest, oder stelle eine Frage zur Bewässerung.",
+		"Type your message...": "Nachricht eingeben ...",
+		"Hi! I'm your OpenSprinkler assistant. Tell me what you'd like to change, or ask a question about irrigation.": "Hallo! Ich bin dein OpenSprinkler-Assistent. Sag mir, was du \u00e4ndern m\u00f6chtest, oder stelle eine Frage zur Bew\u00e4sserung.",
 		"Done.": "Erledigt.",
-		"Applied to device.": "Auf das Gerät übertragen.",
-		"Apply to device": "Auf Gerät anwenden",
+		"Applied to device.": "Auf das Geraet uebertragen.",
+		"Apply to device": "Auf Geraet anwenden",
 		"Discard": "Verwerfen",
 		"Program": "Programm",
 		"Name": "Name",
@@ -65,7 +65,7 @@ OSApp.AIAssistant.I18N = {
 		"Duration": "Laufzeit",
 		"Days": "Tage",
 		"Here are your programs as a table.": "Hier sind Ihre Programme als Tabelle.",
-		"Weekly": "Wöchentlich",
+		"Weekly": "Woechentlich",
 		"Interval": "Intervall",
 		"Single run": "Einmalig",
 		"Monthly": "Monatlich",
@@ -73,11 +73,16 @@ OSApp.AIAssistant.I18N = {
 		"day": "Tag",
 		"days": "Tage",
 		"The assistant could not process this request.": "Der Assistent konnte diese Anfrage nicht verarbeiten.",
-		"This request is outside the allowed topic (OpenSprinkler / irrigation only).": "Diese Anfrage liegt außerhalb des erlaubten Themas (nur OpenSprinkler / Bewässerung).",
+		"This request is outside the allowed topic (OpenSprinkler / irrigation only).": "Diese Anfrage liegt ausserhalb des erlaubten Themas (nur OpenSprinkler / Bewaesserung).",
 		"Could not reach the assistant service.": "Der Assistenten-Dienst ist nicht erreichbar.",
 		"Too many requests. Please try again later.": "Zu viele Anfragen. Bitte später erneut versuchen.",
 		"The proposed configuration is not API compliant and was not applied.": "Die vorgeschlagene Konfiguration ist nicht API-konform und wurde nicht angewendet.",
-		"Could not apply the changes.": "Die Änderungen konnten nicht angewendet werden."
+		"Could not apply the changes.": "Die Aenderungen konnten nicht angewendet werden.",
+		"Release notes": "Release-Notizen",
+		"Latest release": "Neueste Version",
+		"All releases": "Alle Versionen",
+		"Release notes are not available for this version.": "Fuer diese Version sind keine Release-Notizen verfuegbar.",
+		"I could not load the release catalog.": "Ich konnte das Release-Verzeichnis nicht laden."
 	}
 };
 
@@ -110,6 +115,119 @@ OSApp.AIAssistant.getAutoApply = function() {
 
 OSApp.AIAssistant.setAutoApply = function( on ) {
 	localStorage.setItem( "osai_auto_apply", on ? "1" : "0" );
+};
+
+OSApp.AIAssistant.isReleaseNotesRequest = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	return /\b(release notes?|changelog|release|what'?s new|whats new|neu(?:e|es)?|aenderungen|änderungen|release-?notizen)\b/u.test( msg );
+};
+
+OSApp.AIAssistant.parseReleaseQuery = function( message ) {
+	var msg = String( message || "" );
+	var version = "";
+	var match = msg.match( /\b(\d+\.\d+\.\d+(?:\.\d+)?)\b/ );
+	if ( match ) {
+		version = match[ 1 ];
+	} else {
+		match = msg.match( /\bbuild\s*(\d+)\b/i );
+		if ( match ) {
+			version = match[ 1 ];
+		}
+	}
+	return {
+		version: version,
+		latest: !version
+	};
+};
+
+OSApp.AIAssistant.getVersionCatalogUrl = function() {
+	return ( OSApp.Firmware && OSApp.Firmware.getVersionCatalogUrl ) ? OSApp.Firmware.getVersionCatalogUrl() : "https://opensprinklershop.de/upgrade/versions.json";
+};
+
+OSApp.AIAssistant.fetchReleaseCatalog = function() {
+	return $.getJSON( OSApp.AIAssistant.getVersionCatalogUrl() ).then( function( data ) {
+		return Array.isArray( data ) ? data : [];
+	}, function() {
+		return [];
+	} );
+};
+
+OSApp.AIAssistant.formatReleaseEntry = function( entry ) {
+	if ( !entry ) {
+		return null;
+	}
+	var major = Math.floor( Number( entry.fw_version ) / 100 );
+	var minor = Math.floor( ( Number( entry.fw_version ) / 10 ) % 10 );
+	var patch = Number( entry.fw_version ) % 10;
+	var version = major + "." + minor + "." + patch + ( entry.fw_minor ? "." + entry.fw_minor : "" );
+	var lines = String( entry.changelog || "" ).split( /\r?\n/ ).filter( function( line ) {
+		return line.trim().length > 0;
+	} );
+	var summary = lines.length ? lines[ 0 ] : "";
+	var detail = lines.slice( 1, 9 ).join( "\n" );
+	return {
+		version: version,
+		date: entry.date || "",
+		summary: summary,
+		detail: detail,
+		changelog: String( entry.changelog || "" )
+	};
+};
+
+OSApp.AIAssistant.buildReleaseNotesResponse = function( message, catalog ) {
+	var query = OSApp.AIAssistant.parseReleaseQuery( message );
+	var entries = Array.isArray( catalog ) ? catalog : [];
+	if ( !entries.length ) {
+		return {
+			ok: false,
+			refused: false,
+			reason: "",
+			summary: OSApp.AIAssistant.t( "Release notes" ),
+			explanation: OSApp.AIAssistant.t( "I could not load the release catalog." ),
+			changes: {},
+			usage: { prompt_tokens: 0, completion_tokens: 0 },
+			model: "deterministic",
+			error_code: "release_catalog_unavailable"
+		};
+	}
+	var picked = null;
+	if ( query.version ) {
+		picked = entries.find( function( e ) {
+			var formatted = OSApp.AIAssistant.formatReleaseEntry( e );
+			return formatted && ( formatted.version === query.version || String( e.fw_minor ) === query.version || String( e.fw_version ) === query.version );
+		} );
+	}
+	if ( !picked ) {
+		picked = entries[ 0 ];
+	}
+	var info = OSApp.AIAssistant.formatReleaseEntry( picked );
+	if ( !info ) {
+		return {
+			ok: false,
+			refused: false,
+			reason: "",
+			summary: OSApp.AIAssistant.t( "Release notes" ),
+			explanation: OSApp.AIAssistant.t( "Release notes are not available for this version." ),
+			changes: {},
+			usage: { prompt_tokens: 0, completion_tokens: 0 },
+			model: "deterministic",
+			error_code: "release_notes_missing"
+		};
+	}
+	var latestLine = OSApp.AIAssistant.t( "Latest release" ) + ": " + info.version + ( info.date ? " (" + info.date + ")" : "" );
+	var detail = info.detail || info.changelog || "";
+	var allLink = "https://github.com/opensprinklershop/OpenSprinkler-Firmware/releases";
+	return {
+		ok: true,
+		refused: false,
+		reason: "",
+		summary: OSApp.AIAssistant.t( "Release notes" ) + ": " + info.version,
+		explanation: latestLine + ( info.summary ? "\n" + info.summary : "" ) + ( detail ? "\n" + detail : "" ) + "\n" + OSApp.AIAssistant.t( "All releases" ) + ": " + allLink,
+		changes: {},
+		usage: { prompt_tokens: 0, completion_tokens: 0 },
+		model: "deterministic",
+		error_code: ""
+	};
 };
 
 // Rekursive, clientseitige Redaktion von Geheimnissen (Defense in depth).
@@ -227,7 +345,7 @@ OSApp.AIAssistant.displayPage = function() {
 			return;
 		}
 		page.find( "#osai-result" ).addClass( "hidden" );
-		setStatus( OSApp.Language._( "Thinking…" ), false );
+		setStatus( OSApp.Language._( "Thinking..." ), false );
 
 		// Kontext: vollständige Controller-Config, clientseitig von Secrets befreit.
 		var safeConfig = OSApp.AIAssistant.redact( $.extend( true, {}, OSApp.currentSession.controller ) );
@@ -257,7 +375,7 @@ OSApp.AIAssistant.displayPage = function() {
 				return;
 			}
 			if ( res.refused ) {
-				setStatus( "⚠️ " + ( res.reason || OSApp.Language._( "This request is outside the allowed topic (OpenSprinkler / irrigation only)." ) ), true );
+				setStatus( "\u26a0\ufe0f " + ( res.reason || OSApp.Language._( "This request is outside the allowed topic (OpenSprinkler / irrigation only)." ) ), true );
 				return;
 			}
 			page.find( "#osai-status" ).addClass( "hidden" );
@@ -338,7 +456,7 @@ OSApp.AIAssistant.applyChanges = function( changes ) {
 
 	try {
 		var merged = OSApp.AIAssistant.deepMerge( $.extend( true, {}, OSApp.currentSession.controller ), changes );
-		OSApp.ImportExport.importConfig( merged );
+		OSApp.ImportExport.importConfig( merged, { skipConfirm: true, silent: true } );
 	} catch ( e ) {
 		if ( OSApp.UIDom && OSApp.UIDom.errorMessage ) {
 			OSApp.UIDom.errorMessage( OSApp.AIAssistant.t( "Could not apply the changes." ) + ( e && e.message ? " (" + e.message + ")" : "" ) );
@@ -621,7 +739,7 @@ OSApp.AIAssistant.formatProgramListingHtml = function() {
 			var interval = raw[ 2 ];
 			var txt = OSApp.Programs.readStartTime ? OSApp.Programs.readStartTime( start ) : String( start );
 			if ( Number( repeat ) > 0 ) {
-				txt += " · " + OSApp.AIAssistant.t( "Every" ) + " " + repeat + "× ";
+				txt += " - " + OSApp.AIAssistant.t( "Every" ) + " " + repeat + "x ";
 				if ( OSApp.Dates && OSApp.Dates.dhms2str && OSApp.Dates.sec2dhms ) {
 					txt += OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( Number( interval ) * 60 ) );
 				} else {
@@ -660,7 +778,7 @@ OSApp.AIAssistant.formatProgramListingHtml = function() {
 		}
 		if ( Array.isArray( prog.days ) ) {
 			if ( prog.type === 1 ) {
-				return OSApp.AIAssistant.t( "Every" ) + " " + prog.days[ 0 ] + " " + OSApp.AIAssistant.t( "days" ) + ( prog.days[ 1 ] ? " · " + prog.days[ 1 ] : "" );
+				return OSApp.AIAssistant.t( "Every" ) + " " + prog.days[ 0 ] + " " + OSApp.AIAssistant.t( "days" ) + ( prog.days[ 1 ] ? " - " + prog.days[ 1 ] : "" );
 			}
 			if ( prog.type === 2 ) {
 				return OSApp.AIAssistant.t( "Single run" );
@@ -806,6 +924,615 @@ OSApp.AIAssistant.buildProgramRuntimeChangeResponse = function( message ) {
 	};
 };
 
+OSApp.AIAssistant.collectProgAdjusts = function() {
+	var out = [];
+	try {
+		var arr = ( OSApp.Analog && Array.isArray( OSApp.Analog.progAdjusts ) ) ? OSApp.Analog.progAdjusts : [];
+		for ( var i = 0; i < arr.length; i++ ) {
+			var p = arr[ i ] || {};
+			out.push( {
+				nr: p.nr,
+				name: p.name,
+				type: p.type,
+				sensor: p.sensor,
+				prog: p.prog,
+				factor1: p.factor1,
+				factor2: p.factor2,
+				min: p.min,
+				max: p.max,
+				stale_timeout: p.stale_timeout,
+				stale_policy: p.stale_policy,
+				stale_fallback: p.stale_fallback
+			} );
+		}
+	} catch ( err ) {
+		void err;
+		return [];
+	}
+	return out;
+};
+
+OSApp.AIAssistant.collectMonitors = function() {
+	var out = [];
+	try {
+		var arr = ( OSApp.Analog && Array.isArray( OSApp.Analog.monitors ) ) ? OSApp.Analog.monitors : [];
+		for ( var i = 0; i < arr.length; i++ ) {
+			var m = arr[ i ] || {};
+			out.push( {
+				nr: m.nr,
+				name: m.name,
+				type: m.type,
+				sensor: m.sensor,
+				prog: m.prog,
+				zone: m.zone,
+				maxrun: m.maxrun,
+				prio: m.prio,
+				rs: m.rs,
+				value1: m.value1,
+				value2: m.value2,
+				sensor12: m.sensor12,
+				invers: m.invers,
+				monitor1: m.monitor1,
+				monitor2: m.monitor2,
+				monitor3: m.monitor3,
+				monitor4: m.monitor4,
+				invers1: m.invers1,
+				invers2: m.invers2,
+				invers3: m.invers3,
+				invers4: m.invers4,
+				from: m.from,
+				to: m.to,
+				wdays: m.wdays,
+				rmonitor: m.rmonitor,
+				ip: m.ip,
+				port: m.port
+			} );
+		}
+	} catch ( err ) {
+		void err;
+		return [];
+	}
+	return out;
+};
+
+OSApp.AIAssistant.formatTable = function( title, headers, rows ) {
+	var head = headers.map( function( h ) {
+		return "<th style='text-align:left;border-bottom:1px solid #ddd;padding:6px'>" + OSApp.AIAssistant.escapeHtml( h ) + "</th>";
+	} ).join( "" );
+	var body = rows.map( function( row ) {
+		return "<tr>" + row.map( function( cell ) {
+			return "<td style='border-bottom:1px solid #f0f0f0;padding:6px;vertical-align:top'>" + OSApp.AIAssistant.escapeHtml( cell ) + "</td>";
+		} ).join( "" ) + "</tr>";
+	} ).join( "" );
+	return {
+		summary: title,
+		html:
+			"<div style='overflow-x:auto;margin-top:6px'>" +
+				"<table class='ai-table' style='width:100%;border-collapse:collapse;font-size:13px'>" +
+					"<thead><tr>" + head + "</tr></thead>" +
+					"<tbody>" + body + "</tbody>" +
+				"</table>" +
+			"</div>"
+	};
+};
+
+OSApp.AIAssistant.formatSensorListing = function() {
+	var sensors = OSApp.AIAssistant.collectSensors();
+	if ( !sensors.length ) {
+		return {
+			summary: OSApp.AIAssistant.t( "No sensors found." ),
+			explanation: OSApp.AIAssistant.t( "I could not find any sensors in the current context. Please open the sensor view first so the device can load the data." )
+		};
+	}
+	var rows = sensors.map( function( s ) {
+		return [
+			String( s.nr || "" ),
+			String( s.name || "" ),
+			String( s.type || "" ),
+			String( s.group || "" ),
+			String( s.enable !== undefined ? ( Number( s.enable ) ? "on" : "off" ) : "" ),
+			String( s.value === undefined || s.value === null ? "" : s.value ),
+			String( s.unit || "" )
+		];
+	} );
+	return OSApp.AIAssistant.formatTable(
+		OSApp.AIAssistant.t( "Here are your sensors." ),
+		[ "#", OSApp.AIAssistant.t( "Name" ), OSApp.AIAssistant.t( "Type" ), OSApp.AIAssistant.t( "Group" ), OSApp.AIAssistant.t( "Status" ), "Value", OSApp.AIAssistant.t( "Unit" ) ],
+		rows
+	);
+};
+
+OSApp.AIAssistant.formatProgAdjustListing = function() {
+	var items = OSApp.AIAssistant.collectProgAdjusts();
+	if ( !items.length ) {
+		return {
+			summary: OSApp.AIAssistant.t( "No program adjustments found." ),
+			explanation: OSApp.AIAssistant.t( "I could not find any program adjustments in the current context." )
+		};
+	}
+	var rows = items.map( function( p ) {
+		return [
+			String( p.nr || "" ),
+			String( p.name || "" ),
+			String( p.type || "" ),
+			String( p.sensor || "" ),
+			String( p.prog || "" ),
+			String( p.factor1 !== undefined ? Math.round( Number( p.factor1 ) * 100 ) : "" ),
+			String( p.factor2 !== undefined ? Math.round( Number( p.factor2 ) * 100 ) : "" ),
+			String( p.min || "" ),
+			String( p.max || "" )
+		];
+	} );
+	return OSApp.AIAssistant.formatTable(
+		OSApp.AIAssistant.t( "Here are your program adjustments." ),
+		[ "#", OSApp.AIAssistant.t( "Name" ), OSApp.AIAssistant.t( "Type" ), OSApp.AIAssistant.t( "Sensor" ), OSApp.AIAssistant.t( "Program" ), OSApp.AIAssistant.t( "Factor 1 in % (adjustment for min)" ), OSApp.AIAssistant.t( "Factor 2 in % (adjustment for max)" ), OSApp.AIAssistant.t( "Min sensor value" ), OSApp.AIAssistant.t( "Max sensor value" ) ],
+		rows
+	);
+};
+
+OSApp.AIAssistant.formatMonitorListing = function() {
+	var items = OSApp.AIAssistant.collectMonitors();
+	if ( !items.length ) {
+		return {
+			summary: OSApp.AIAssistant.t( "No monitors found." ),
+			explanation: OSApp.AIAssistant.t( "I could not find any monitors in the current context." )
+		};
+	}
+	var rows = items.map( function( m ) {
+		return [
+			String( m.nr || "" ),
+			String( m.name || "" ),
+			String( m.type || "" ),
+			String( m.sensor || "" ),
+			String( m.prog || "" ),
+			String( m.zone || "" ),
+			String( m.prio || "" ),
+			String( m.rs || "" )
+		];
+	} );
+	return OSApp.AIAssistant.formatTable(
+		OSApp.AIAssistant.t( "Here are your monitors." ),
+		[ "#", OSApp.AIAssistant.t( "Name" ), OSApp.AIAssistant.t( "Type" ), OSApp.AIAssistant.t( "Sensor" ), OSApp.AIAssistant.t( "Program" ), OSApp.AIAssistant.t( "Zone" ), OSApp.AIAssistant.t( "Priority" ), OSApp.AIAssistant.t( "Reset status after (s)" ) ],
+		rows
+	);
+};
+
+OSApp.AIAssistant.matchAnalogEntity = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	if ( /\b(sensor(en)?|sensors?)\b/u.test( msg ) ) {
+		return "sensor";
+	}
+	if ( /\b(prog(raum)?(anpassung|adjustment|adjustments)?|program(?:m)?\s*adjust(?:ment|ments)?|adjustments?)\b/u.test( msg ) ) {
+		return "progadjust";
+	}
+	if ( /\b(monitor(en)?|monitors?)\b/u.test( msg ) ) {
+		return "monitor";
+	}
+	return "";
+};
+
+OSApp.AIAssistant.matchAnalogOperation = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	if ( /\b(delete|remove|löschen|loeschen|entfernen)\b/u.test( msg ) ) {
+		return "delete";
+	}
+	if ( /\b(create|add|new|anlegen|erstellen|hinzufügen|hinzufuegen)\b/u.test( msg ) ) {
+		return "create";
+	}
+	if ( /\b(rename|change|update|edit|bearbeiten|ändern|aendern|anpassen)\b/u.test( msg ) ) {
+		return "edit";
+	}
+	if ( /\b(list|liste|show|anzeigen|auflisten|view|übersicht|uebersicht)\b/u.test( msg ) ) {
+		return "list";
+	}
+	return "";
+};
+
+OSApp.AIAssistant.extractNumber = function( message, labels ) {
+	var msg = String( message || "" );
+	for ( var i = 0; i < labels.length; i++ ) {
+		var re = new RegExp( "(?:\\b" + labels[ i ] + "\\b)\\s*(?:=|:|to|zu|auf|ist|is)?\\s*(-?\\d+(?:\\.\\d+)?)", "i" );
+		var match = msg.match( re );
+		if ( match ) {
+			return parseFloat( match[ 1 ] );
+		}
+	}
+	return null;
+};
+
+OSApp.AIAssistant.extractText = function( message, labels ) {
+	var msg = String( message || "" );
+	for ( var i = 0; i < labels.length; i++ ) {
+		var re = new RegExp( "(?:\\b" + labels[ i ] + "\\b)\\s*(?:=|:|to|zu|in|as|als)?\\s*[\"'“”]?([^\"'“”\\n\\r]+?)[\"'“”]?(?:$|[,.;)])", "i" );
+		var match = msg.match( re );
+		if ( match ) {
+			return $.trim( match[ 1 ] );
+		}
+	}
+	return "";
+};
+
+OSApp.AIAssistant.extractBool = function( message, labels ) {
+	var msg = String( message || "" ).toLowerCase();
+	for ( var i = 0; i < labels.length; i++ ) {
+		var re = new RegExp( "\\b" + labels[ i ] + "\\b\\s*(?:=|:|to|zu|is|ist)?\\s*(on|off|yes|no|true|false|1|0|an|aus|ja|nein)", "i" );
+		var match = msg.match( re );
+		if ( match ) {
+			var v = match[ 1 ].toLowerCase();
+			return ( v === "on" || v === "yes" || v === "true" || v === "1" || v === "an" || v === "ja" );
+		}
+	}
+	return null;
+};
+
+OSApp.AIAssistant.parseAnalogTarget = function( message, entity ) {
+	var msg = String( message || "" );
+	var patterns = {
+		sensor: [ "\\bsensor\\s*#?\\s*(\\d+)", "\\bsensor\\s+(\\d+)", "\\bnr\\s*(\\d+)", "\\b#\\s*(\\d+)" ],
+		progadjust: [ "\\badjust(?:ment)?\\s*#?\\s*(\\d+)", "\\bprog(?:ramm)?\\s*#?\\s*(\\d+)", "\\banpassung\\s*(\\d+)", "\\bnr\\s*(\\d+)" ],
+		monitor: [ "\\bmonitor\\s*#?\\s*(\\d+)", "\\bmonitor\\s+(\\d+)", "\\bnr\\s*(\\d+)", "\\b#\\s*(\\d+)" ]
+	};
+	var list = patterns[ entity ] || [];
+	for ( var i = 0; i < list.length; i++ ) {
+		var match = msg.match( new RegExp( list[ i ], "i" ) );
+		if ( match ) {
+			return parseInt( match[ 1 ], 10 );
+		}
+	}
+	return null;
+};
+
+OSApp.AIAssistant.nextNr = function( items ) {
+	var max = 0;
+	for ( var i = 0; i < items.length; i++ ) {
+		var nr = parseInt( items[ i ] && items[ i ].nr, 10 );
+		if ( nr > max ) {
+			max = nr;
+		}
+	}
+	return max + 1;
+};
+
+OSApp.AIAssistant.defaultAnalogObject = function( entity ) {
+	if ( entity === "sensor" ) {
+		return { nr: OSApp.AIAssistant.nextNr( ( OSApp.Analog && OSApp.Analog.analogSensors ) || [] ), name: OSApp.AIAssistant.t( "new sensor" ), type: 1, ri: 600, enable: 1, log: 1 };
+	}
+	if ( entity === "progadjust" ) {
+		return { nr: OSApp.AIAssistant.nextNr( ( OSApp.Analog && OSApp.Analog.progAdjusts ) || [] ), type: 1, factor1: 1, factor2: 0, min: 5, max: 15 };
+	}
+	return { nr: OSApp.AIAssistant.nextNr( ( OSApp.Analog && OSApp.Analog.monitors ) || [] ), type: 1, prio: 0 };
+};
+
+OSApp.AIAssistant.findAnalogItem = function( entity, nr ) {
+	var arr = [];
+	if ( entity === "sensor" ) {
+		arr = ( OSApp.Analog && Array.isArray( OSApp.Analog.analogSensors ) ) ? OSApp.Analog.analogSensors : [];
+	} else if ( entity === "progadjust" ) {
+		arr = ( OSApp.Analog && Array.isArray( OSApp.Analog.progAdjusts ) ) ? OSApp.Analog.progAdjusts : [];
+	} else if ( entity === "monitor" ) {
+		arr = ( OSApp.Analog && Array.isArray( OSApp.Analog.monitors ) ) ? OSApp.Analog.monitors : [];
+	}
+	for ( var i = 0; i < arr.length; i++ ) {
+		if ( parseInt( arr[ i ] && arr[ i ].nr, 10 ) === parseInt( nr, 10 ) ) {
+			return { item: arr[ i ], index: i };
+		}
+	}
+	return null;
+};
+
+OSApp.AIAssistant.mergeAnalogChanges = function( entity, base, message ) {
+	var out = $.extend( true, {}, base );
+	if ( entity === "sensor" ) {
+		var name = OSApp.AIAssistant.extractText( message, [ "name", "benenne", "rename", "umbenennen" ] );
+		if ( name ) out.name = name;
+		var type = OSApp.AIAssistant.extractNumber( message, [ "type", "typ" ] );
+		if ( type !== null ) out.type = parseInt( type, 10 );
+		var group = OSApp.AIAssistant.extractNumber( message, [ "group", "grupp", "gruppe" ] );
+		if ( group !== null ) out.group = parseInt( group, 10 );
+		var ri = OSApp.AIAssistant.extractNumber( message, [ "ri", "read interval", "read interval s", "intervall", "intervall s" ] );
+		if ( ri !== null ) out.ri = parseInt( ri, 10 );
+		var unit = OSApp.AIAssistant.extractText( message, [ "unit", "einheit" ] );
+		if ( unit ) out.unit = unit;
+		var unitid = OSApp.AIAssistant.extractNumber( message, [ "unitid", "unit id", "chart unit" ] );
+		if ( unitid !== null ) out.unitid = parseInt( unitid, 10 );
+		var factor = OSApp.AIAssistant.extractNumber( message, [ "factor", "faktor" ] );
+		if ( factor !== null ) out.fac = parseInt( factor, 10 );
+		var divider = OSApp.AIAssistant.extractNumber( message, [ "divider", "divisor", "teiler" ] );
+		if ( divider !== null ) out.div = parseInt( divider, 10 );
+		var offset = OSApp.AIAssistant.extractNumber( message, [ "offset", "offset (mv)", "versatz" ] );
+		if ( offset !== null ) out.offset = parseInt( offset, 10 );
+		var ip = OSApp.AIAssistant.extractText( message, [ "ip", "address", "adresse" ] );
+		if ( ip ) out.ip = OSApp.Analog ? OSApp.Analog.intFromBytes( ip.split( "." ) ) : ip;
+		var port = OSApp.AIAssistant.extractNumber( message, [ "port", "portnummer" ] );
+		if ( port !== null ) out.port = parseInt( port, 10 );
+		var id = OSApp.AIAssistant.extractNumber( message, [ "id", "modbus id" ] );
+		if ( id !== null ) out.id = parseInt( id, 10 );
+		var mac = OSApp.AIAssistant.extractText( message, [ "mac", "mac address", "mac-adresse" ] );
+		if ( mac ) out.mac = mac;
+		var topic = OSApp.AIAssistant.extractText( message, [ "topic", "mqtt topic" ] );
+		if ( topic ) out.topic = topic;
+		var filter = OSApp.AIAssistant.extractText( message, [ "filter", "mqtt filter", "json filter" ] );
+		if ( filter ) out.filter = filter;
+		var url = OSApp.AIAssistant.extractText( message, [ "url" ] );
+		if ( url ) out.url = url;
+		var enable = OSApp.AIAssistant.extractBool( message, [ "enable", "enabled", "active", "sensor enabled" ] );
+		if ( enable !== null ) out.enable = enable ? 1 : 0;
+		var log = OSApp.AIAssistant.extractBool( message, [ "log", "logging" ] );
+		if ( log !== null ) out.log = log ? 1 : 0;
+		var stdlog = OSApp.AIAssistant.extractBool( message, [ "stdlog", "standard log", "water log" ] );
+		if ( stdlog !== null ) out.stdlog = stdlog ? 1 : 0;
+		var show = OSApp.AIAssistant.extractBool( message, [ "show", "visible", "mainpage" ] );
+		if ( show !== null ) out.show = show ? 1 : 0;
+		if ( out.fac !== undefined && out.factor === undefined ) {
+			out.factor = out.fac;
+		}
+		if ( out.div !== undefined && out.divider === undefined ) {
+			out.divider = out.div;
+		}
+		delete out.fac;
+		delete out.div;
+	} else if ( entity === "progadjust" ) {
+		var pname = OSApp.AIAssistant.extractText( message, [ "name", "benenne", "rename" ] );
+		if ( pname ) out.name = pname;
+		var ptype = OSApp.AIAssistant.extractNumber( message, [ "type", "typ" ] );
+		if ( ptype !== null ) out.type = parseInt( ptype, 10 );
+		var psensor = OSApp.AIAssistant.extractNumber( message, [ "sensor" ] );
+		if ( psensor !== null ) out.sensor = parseInt( psensor, 10 );
+		var pprog = OSApp.AIAssistant.extractNumber( message, [ "program", "prog" ] );
+		if ( pprog !== null ) out.prog = parseInt( pprog, 10 );
+		var f1 = OSApp.AIAssistant.extractNumber( message, [ "factor 1", "factor1", "min factor", "min adjustment" ] );
+		if ( f1 !== null ) out.factor1 = parseFloat( f1 ) / 100;
+		var f2 = OSApp.AIAssistant.extractNumber( message, [ "factor 2", "factor2", "max factor", "max adjustment" ] );
+		if ( f2 !== null ) out.factor2 = parseFloat( f2 ) / 100;
+		var pmin = OSApp.AIAssistant.extractNumber( message, [ "min", "minimum" ] );
+		if ( pmin !== null ) out.min = parseFloat( pmin );
+		var pmax = OSApp.AIAssistant.extractNumber( message, [ "max", "maximum" ] );
+		if ( pmax !== null ) out.max = parseFloat( pmax );
+		var staleTimeout = OSApp.AIAssistant.extractNumber( message, [ "stale timeout", "stale-timeout", "timeout" ] );
+		if ( staleTimeout !== null ) out.stale_timeout = Math.max( 0, parseInt( staleTimeout, 10 ) ) * 60;
+		var stalePolicy = OSApp.AIAssistant.extractNumber( message, [ "stale policy", "stale-policy", "policy" ] );
+		if ( stalePolicy !== null ) out.stale_policy = parseInt( stalePolicy, 10 );
+		var staleFallback = OSApp.AIAssistant.extractNumber( message, [ "stale fallback", "fallback" ] );
+		if ( staleFallback !== null ) out.stale_fallback = Math.max( 0, Math.min( 200, parseFloat( staleFallback ) ) ) / 100;
+	} else if ( entity === "monitor" ) {
+		var mname = OSApp.AIAssistant.extractText( message, [ "name", "benenne", "rename" ] );
+		if ( mname ) out.name = mname;
+		var mtype = OSApp.AIAssistant.extractNumber( message, [ "type", "typ" ] );
+		if ( mtype !== null ) out.type = parseInt( mtype, 10 );
+		var msensor = OSApp.AIAssistant.extractNumber( message, [ "sensor" ] );
+		if ( msensor !== null ) out.sensor = parseInt( msensor, 10 );
+		var mprog = OSApp.AIAssistant.extractNumber( message, [ "program", "prog" ] );
+		if ( mprog !== null ) out.prog = parseInt( mprog, 10 );
+		var zone = OSApp.AIAssistant.extractNumber( message, [ "zone" ] );
+		if ( zone !== null ) out.zone = parseInt( zone, 10 );
+		var maxrun = OSApp.AIAssistant.extractNumber( message, [ "maxrun", "max runtime", "runtime" ] );
+		if ( maxrun !== null ) out.maxrun = parseFloat( maxrun );
+		var prio = OSApp.AIAssistant.extractNumber( message, [ "prio", "priority" ] );
+		if ( prio !== null ) out.prio = parseInt( prio, 10 );
+		var rs = OSApp.AIAssistant.extractNumber( message, [ "rs", "reset status after" ] );
+		if ( rs !== null ) out.rs = parseInt( rs, 10 );
+		var v1 = OSApp.AIAssistant.extractNumber( message, [ "value1", "activate value", "value for activate" ] );
+		if ( v1 !== null ) out.value1 = parseFloat( v1 );
+		var v2 = OSApp.AIAssistant.extractNumber( message, [ "value2", "deactivate value", "value for deactivate" ] );
+		if ( v2 !== null ) out.value2 = parseFloat( v2 );
+		var s12 = OSApp.AIAssistant.extractNumber( message, [ "sensor12", "digital sensor port" ] );
+		if ( s12 !== null ) out.sensor12 = parseInt( s12, 10 );
+		var invers = OSApp.AIAssistant.extractBool( message, [ "invers", "inverse" ] );
+		if ( invers !== null ) out.invers = invers ? 1 : 0;
+		var mon1 = OSApp.AIAssistant.extractNumber( message, [ "monitor1", "monitor 1" ] );
+		if ( mon1 !== null ) out.monitor1 = parseInt( mon1, 10 );
+		var mon2 = OSApp.AIAssistant.extractNumber( message, [ "monitor2", "monitor 2" ] );
+		if ( mon2 !== null ) out.monitor2 = parseInt( mon2, 10 );
+		var mon3 = OSApp.AIAssistant.extractNumber( message, [ "monitor3", "monitor 3" ] );
+		if ( mon3 !== null ) out.monitor3 = parseInt( mon3, 10 );
+		var mon4 = OSApp.AIAssistant.extractNumber( message, [ "monitor4", "monitor 4" ] );
+		if ( mon4 !== null ) out.monitor4 = parseInt( mon4, 10 );
+		var from = OSApp.AIAssistant.extractText( message, [ "from" ] );
+		if ( from ) out.from = from;
+		var to = OSApp.AIAssistant.extractText( message, [ "to" ] );
+		if ( to ) out.to = to;
+		var wdays = OSApp.AIAssistant.extractText( message, [ "wdays", "weekdays" ] );
+		if ( wdays ) out.wdays = wdays;
+		var rmonitor = OSApp.AIAssistant.extractNumber( message, [ "rmonitor", "remote monitor" ] );
+		if ( rmonitor !== null ) out.rmonitor = parseInt( rmonitor, 10 );
+		var mip = OSApp.AIAssistant.extractText( message, [ "ip", "address" ] );
+		if ( mip ) out.ip = OSApp.Analog ? OSApp.Analog.intFromBytes( mip.split( "." ) ) : mip;
+		var mport = OSApp.AIAssistant.extractNumber( message, [ "port" ] );
+		if ( mport !== null ) out.port = parseInt( mport, 10 );
+	}
+	return out;
+};
+
+OSApp.AIAssistant.runAnalogCrud = function( message ) {
+	var entity = OSApp.AIAssistant.matchAnalogEntity( message );
+	var op = OSApp.AIAssistant.matchAnalogOperation( message );
+	if ( !entity || !op ) {
+		return null;
+	}
+
+	if ( op === "list" ) {
+		if ( entity === "sensor" ) return Promise.resolve( OSApp.AIAssistant.formatSensorListing() );
+		if ( entity === "progadjust" ) return Promise.resolve( OSApp.AIAssistant.formatProgAdjustListing() );
+		if ( entity === "monitor" ) return Promise.resolve( OSApp.AIAssistant.formatMonitorListing() );
+	}
+
+	var targetNr = OSApp.AIAssistant.parseAnalogTarget( message, entity );
+	var itemInfo = targetNr !== null ? OSApp.AIAssistant.findAnalogItem( entity, targetNr ) : null;
+	var isCreate = ( op === "create" );
+	var isDelete = ( op === "delete" );
+
+	function refreshAfter( done ) {
+		if ( entity === "sensor" ) {
+			return OSApp.Analog.updateAnalogSensor( done );
+		}
+		if ( entity === "progadjust" ) {
+			return OSApp.Analog.updateProgramAdjustments( done );
+		}
+		return OSApp.Analog.updateMonitors( function() {
+			OSApp.Analog.updateAnalogSensor( function() {
+				OSApp.Analog.updateProgramAdjustments( done );
+			} );
+		} );
+	}
+
+	function buildSummary( action, item ) {
+		var noun = entity === "progadjust" ? OSApp.AIAssistant.t( "Program adjustment" ) : ( entity === "monitor" ? OSApp.AIAssistant.t( "Monitor" ) : OSApp.AIAssistant.t( "Sensor" ) );
+		var verb = action === "create" ? OSApp.AIAssistant.t( "created" ) : action === "delete" ? OSApp.AIAssistant.t( "deleted" ) : OSApp.AIAssistant.t( "updated" );
+		return noun + " #" + item.nr + " " + verb + ".";
+	}
+
+	return new Promise( function( resolve ) {
+		OSApp.AIAssistant.ensureAnalogContext().then( function() {
+			if ( isDelete ) {
+				if ( !itemInfo ) {
+					resolve( {
+						ok: false,
+						refused: false,
+						reason: "",
+						summary: "",
+						explanation: OSApp.AIAssistant.t( "I could not find the requested item." ),
+						changes: {},
+						usage: { prompt_tokens: 0, completion_tokens: 0 },
+						model: "deterministic",
+						error_code: "item_not_found"
+					} );
+					return;
+				}
+				var item = itemInfo.item;
+				var itemNr = parseInt( item.nr, 10 );
+				var endpoint = ( entity === "sensor" ) ? "/sc?pw=&nr=" + itemNr + "&type=0" : ( entity === "progadjust" ) ? "/sb?pw=&nr=" + itemNr + "&type=0" : "/mc?pw=&nr=" + itemNr + "&type=0";
+				var confirmText = entity === "sensor" ? OSApp.AIAssistant.t( "Are you sure you want to delete the sensor?" ) :
+					( entity === "progadjust" ? OSApp.AIAssistant.t( "Are you sure you want to delete this program adjustment?" ) : OSApp.AIAssistant.t( "Are you sure you want to delete this monitor?" ) );
+				OSApp.UIDom.areYouSure( confirmText, String( itemNr ), function() {
+					OSApp.Firmware.sendToOS( endpoint, "json" ).done( function( info ) {
+						var result = info && info.result;
+						if ( !result || result > 1 ) {
+							resolve( {
+								ok: false,
+								refused: false,
+								reason: "",
+								summary: "",
+								explanation: OSApp.AIAssistant.t( "Could not apply the changes." ),
+								changes: {},
+								usage: { prompt_tokens: 0, completion_tokens: 0 },
+								model: "deterministic",
+								error_code: "delete_failed"
+							} );
+							return;
+						}
+						refreshAfter( function() {
+							resolve( {
+								ok: true,
+								refused: false,
+								reason: "",
+								summary: buildSummary( "delete", item ),
+								explanation: "",
+								changes: {},
+								usage: { prompt_tokens: 0, completion_tokens: 0 },
+								model: "deterministic",
+								error_code: ""
+							} );
+						} );
+					} );
+				}, function() {
+					resolve( {
+						cancelled: true,
+						ok: false,
+						refused: false,
+						reason: "",
+						summary: "",
+						explanation: "",
+						changes: {},
+						usage: { prompt_tokens: 0, completion_tokens: 0 },
+						model: "deterministic",
+						error_code: "cancelled"
+					} );
+				} );
+				return;
+			}
+
+			var base = isCreate ? OSApp.AIAssistant.defaultAnalogObject( entity ) : ( itemInfo ? $.extend( true, {}, itemInfo.item ) : null );
+			if ( !base ) {
+				resolve( {
+					ok: false,
+					refused: false,
+					reason: "",
+					summary: "",
+					explanation: OSApp.AIAssistant.t( "I could not find the requested item." ),
+					changes: {},
+					usage: { prompt_tokens: 0, completion_tokens: 0 },
+					model: "deterministic",
+					error_code: "item_not_found"
+				} );
+				return;
+			}
+			if ( !isCreate && !itemInfo ) {
+				resolve( {
+					ok: false,
+					refused: false,
+					reason: "",
+					summary: "",
+					explanation: OSApp.AIAssistant.t( "I could not find the requested item." ),
+					changes: {},
+					usage: { prompt_tokens: 0, completion_tokens: 0 },
+					model: "deterministic",
+					error_code: "item_not_found"
+				} );
+				return;
+			}
+
+			if ( isCreate ) {
+				base.nr = OSApp.AIAssistant.nextNr( entity === "sensor" ? OSApp.Analog.analogSensors : entity === "progadjust" ? OSApp.Analog.progAdjusts : OSApp.Analog.monitors );
+			}
+			var updated = OSApp.AIAssistant.mergeAnalogChanges( entity, base, message );
+			var request = entity === "sensor" ? OSApp.Analog.sendToOsObj( "/sc?pw=", updated ) :
+				( entity === "progadjust" ? OSApp.Analog.sendToOsObj( "/sb?pw=", updated ) : OSApp.Analog.sendToOsObj( "/mc?pw=", updated ) );
+			request.done( function( info ) {
+				var result = info && info.result;
+				if ( !result || result > 1 ) {
+					resolve( {
+						ok: false,
+						refused: false,
+						reason: "",
+						summary: "",
+						explanation: OSApp.AIAssistant.t( "Could not apply the changes." ),
+						changes: {},
+						usage: { prompt_tokens: 0, completion_tokens: 0 },
+						model: "deterministic",
+						error_code: "apply_failed"
+					} );
+					return;
+				}
+				refreshAfter( function() {
+					resolve( {
+						ok: true,
+						refused: false,
+						reason: "",
+						summary: buildSummary( isCreate ? "create" : "edit", updated ),
+						explanation: "",
+						changes: {},
+						usage: { prompt_tokens: 0, completion_tokens: 0 },
+						model: "deterministic",
+						error_code: ""
+					} );
+				} );
+			} );
+		} ).catch( function() {
+			resolve( {
+				ok: false,
+				refused: false,
+				reason: "",
+				summary: "",
+				explanation: OSApp.AIAssistant.t( "Could not reach the assistant service." ),
+				changes: {},
+				usage: { prompt_tokens: 0, completion_tokens: 0 },
+				model: "deterministic",
+				error_code: "context_unavailable"
+			} );
+		} );
+	} );
+};
+
 OSApp.AIAssistant.ask = function( message, callbacks ) {
 	callbacks = callbacks || {};
 	var safeConfig = {};
@@ -880,6 +1607,10 @@ OSApp.AIAssistant.ensureAnalogContext = function() {
 		if ( OSApp.Analog && typeof OSApp.Analog.updateAnalogSensor === "function" &&
 			( !Array.isArray( OSApp.Analog.analogSensors ) || !OSApp.Analog.analogSensors.length ) ) {
 			tasks.push( OSApp.Analog.updateAnalogSensor() );
+		}
+		if ( OSApp.Analog && typeof OSApp.Analog.updateProgramAdjustments === "function" &&
+			( !Array.isArray( OSApp.Analog.progAdjusts ) || !OSApp.Analog.progAdjusts.length ) ) {
+			tasks.push( OSApp.Analog.updateProgramAdjustments() );
 		}
 		if ( OSApp.Analog && typeof OSApp.Analog.updateMonitors === "function" &&
 			( !Array.isArray( OSApp.Analog.monitors ) || !OSApp.Analog.monitors.length ) ) {
@@ -1003,7 +1734,7 @@ OSApp.AIAssistant.openDialog = function() {
 				'</div>' +
 				'<div class="ai-chat-log" id="ai-chat-log"></div>' +
 				'<div class="ai-chat-input">' +
-					'<textarea id="ai-chat-text" rows="1" placeholder="' + L( "Type your message…" ) + '"></textarea>' +
+					'<textarea id="ai-chat-text" rows="1" placeholder="' + L( "Type your message..." ) + '"></textarea>' +
 					'<button type="button" class="ai-icon-btn ai-mic-btn" id="ai-chat-mic" aria-label="' + L( "Voice input" ) + '">' +
 						'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z"/></svg>' +
 					'</button>' +
@@ -1075,6 +1806,9 @@ OSApp.AIAssistant.openDialog = function() {
 		if ( res.explanation ) {
 			$( '<div class="smaller" style="color:#666;margin-top:4px"></div>' ).text( res.explanation ).appendTo( bot );
 		}
+		if ( res.html ) {
+			$( res.html ).appendTo( bot );
+		}
 		var hasChanges = res.changes && typeof res.changes === "object" && Object.keys( res.changes ).length > 0;
 
 		// Persistenter Verlauf (Zusammenfassung + Erklärung; Diff/Buttons sind sitzungsbezogen).
@@ -1134,6 +1868,49 @@ OSApp.AIAssistant.openDialog = function() {
 			sendBtn.prop( "disabled", false );
 			return;
 		}
+		if ( OSApp.AIAssistant.isReleaseNotesRequest( message ) ) {
+			var releaseTyping = addTyping();
+			OSApp.AIAssistant.fetchReleaseCatalog().then( function( catalog ) {
+				releaseTyping.remove();
+				sendBtn.prop( "disabled", false );
+				var res = OSApp.AIAssistant.buildReleaseNotesResponse( message, catalog );
+				if ( !res.ok ) {
+					addMessage( "bot", res.explanation, "ai-error" );
+					OSApp.AIAssistant.pushHistory( "bot", res.explanation, "ai-error" );
+					return;
+				}
+				var bot = addMessage( "bot", res.summary );
+				$( '<div class="smaller" style="color:#666;margin-top:4px;white-space:pre-wrap"></div>' ).text( res.explanation ).appendTo( bot );
+				OSApp.AIAssistant.pushHistory( "bot", res.summary + "\n" + res.explanation );
+				scrollDown();
+			} );
+			return;
+		}
+		var localCrud = OSApp.AIAssistant.runAnalogCrud( message );
+		if ( localCrud ) {
+			var localTyping = addTyping();
+			Promise.resolve( localCrud ).then( function( res ) {
+				localTyping.remove();
+				sendBtn.prop( "disabled", false );
+				if ( res && res.cancelled ) {
+					return;
+				}
+				if ( !res || !res.ok ) {
+					var em = L( "The assistant could not process this request." ) + ( res && res.explanation ? " (" + res.explanation + ")" : "" );
+					addMessage( "bot", em, "ai-error" );
+					OSApp.AIAssistant.pushHistory( "bot", em, "ai-error" );
+					return;
+				}
+				addResult( res );
+			} ).catch( function() {
+				localTyping.remove();
+				sendBtn.prop( "disabled", false );
+				var em = L( "The assistant could not process this request." );
+				addMessage( "bot", em, "ai-error" );
+				OSApp.AIAssistant.pushHistory( "bot", em, "ai-error" );
+			} );
+			return;
+		}
 		var typing = addTyping();
 		function sendRequest() {
 			OSApp.AIAssistant.ask( message, {
@@ -1147,7 +1924,7 @@ OSApp.AIAssistant.openDialog = function() {
 						return;
 					}
 					if ( res.refused ) {
-						var rm = "⚠️ " + ( res.reason || L( "This request is outside the allowed topic (OpenSprinkler / irrigation only)." ) );
+						var rm = "\u26a0\ufe0f " + ( res.reason || L( "This request is outside the allowed topic (OpenSprinkler / irrigation only)." ) );
 						addMessage( "bot", rm, "ai-error" );
 						OSApp.AIAssistant.pushHistory( "bot", rm, "ai-error" );
 						return;

@@ -15,7 +15,7 @@
 
 // Define a name for the current cache
 // BUILD_TIMESTAMP will be replaced by the build script to bust the cache
-var cacheName = "OpenSprinkler-v20260312120000";
+var cacheName = "OpenSprinkler-v20260629004800";
 
 // Html
 var cacheFiles = [
@@ -34,6 +34,7 @@ cacheFiles = cacheFiles.concat([
 // App modules javascript
 cacheFiles = cacheFiles.concat([
 	"/js/modules/about.js",
+	"/js/modules/ai-assistant.js",
 	"/js/modules/analog.js",
 	"/js/modules/programview.js",
 	"/js/modules/card-list.js",

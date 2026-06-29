@@ -104,7 +104,7 @@
 									versionsXhr.open("GET", "versions.json", true);
 									versionsXhr.timeout = 5000;
 									versionsXhr.onload = function() {
-										var targetVersion = "2.4.0.213";
+										var targetVersion = "2.4.0.215";
 										try {
 											var vData = JSON.parse(versionsXhr.responseText);
 											var versions = vData.versions || [];
@@ -139,7 +139,7 @@
 													if (baseMatching.length > 0) {
 														targetVersion = baseMatching[0];
 													} else {
-														targetVersion = "2.4.0.213";
+														targetVersion = "2.4.0.215";
 													}
 												}
 											}
@@ -179,7 +179,7 @@
 										path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
 										var baseHref = origin + (path.endsWith("/") ? path : path + "/");
 										window.clearTimeout(fastPathFailsafe);
-										window.location.href = baseHref + "2.4.0.213/index.html";
+										window.location.href = baseHref + "2.4.0.215/index.html";
 									};
 									versionsXhr.send();
 								};
@@ -238,23 +238,7 @@
 		<link rel="stylesheet" href="css/vis-timeline-graph2d.min.css">
 		<link rel="stylesheet" href="css/dataTables-2.1.8.dataTables.min.css"></link>
 
-		<script>
-			(function() {
-				var protocol = window.location.protocol || "";
-				var isCordovaRuntime = protocol === "file:" || protocol === "cdvfile:" || protocol.indexOf( "app" ) === 0;
-
-				if ( !isCordovaRuntime ) {
-					return;
-				}
-
-				var script = document.createElement( "script" );
-				script.src = "cordova.js";
-				script.onerror = function() {
-					console.warn( "Cordova not available" );
-				};
-				document.head.appendChild( script );
-			}() );
-		</script>
+		<script src="cordova.js" onerror="console.warn('Cordova not available')"></script>
 		<script>
 			// Suppress Cordova plugin errors gracefully
 			if (window.cordova && window.cordova.exec) {
@@ -297,17 +281,17 @@
 		<script src="js/modules/dashboard.js"></script>
 		<script src="js/modules/dates.js"></script>
 		<script src="js/modules/errors.js"></script>
-		<script src="js/modules/firmware.js?v=osai1"></script>
+		<script src="js/modules/firmware.js"></script>
 		<script src="js/modules/ssl.js"></script>
 		<script src="js/modules/groups.js"></script>
 		<script src="js/modules/import-export.js"></script>
 		<script src="js/modules/logs.js"></script>
 		<script src="js/modules/esp32mode.js"></script>
-		<script src="js/modules/network.js?v=osai1"></script>
+		<script src="js/modules/network.js"></script>
 		<script src="js/modules/notifications.js"></script>
 		<script src="js/modules/options.js?v=2"></script>
 		<script src="js/modules/programs.js"></script>
-		<script src="js/modules/sites.js?v=osai1"></script>
+		<script src="js/modules/sites.js"></script>
 		<script src="js/modules/sites-otc.js"></script>
 		<script src="js/modules/station-attributes.js"></script>
 		<script src="js/modules/station-queue.js"></script>
@@ -319,7 +303,8 @@
 		<script src="js/modules/system-diagnostics.js"></script>
 		<script src="js/modules/live-debug.js"></script>
 		<script src="js/modules/diagnostics-console.js"></script>
-		<script src="js/modules/ui-dom.js?v=osai3"></script>
+		<script src="js/modules/ai-assistant.js?v=osai16"></script>
+		<script src="js/modules/ui-dom.js?v=osai5"></script>
 		<script src="js/modules/utils.js"></script>
 		<script src="js/modules/welcome.js"></script>
 		<script src="js/modules/weather.js?v=3"></script>

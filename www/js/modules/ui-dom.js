@@ -16,6 +16,42 @@
 // Configure module
 var OSApp = OSApp || {};
 OSApp.UIDom = OSApp.UIDom || {};
+OSApp.UIDom.aiAssistantLoading = OSApp.UIDom.aiAssistantLoading || false;
+
+OSApp.UIDom.ensureAIAssistant = function( onReady ) {
+	if ( OSApp.AIAssistant && OSApp.AIAssistant.displayPage ) {
+		if ( typeof onReady === "function" ) {
+			onReady();
+		}
+		return;
+	}
+	if ( OSApp.UIDom.aiAssistantLoading ) {
+		if ( typeof onReady === "function" ) {
+			$( document ).one( "osai:loaded", onReady );
+		}
+		return;
+	}
+	OSApp.UIDom.aiAssistantLoading = true;
+	var script = document.createElement( "script" );
+	script.src = "js/modules/ai-assistant.js?v=osai16";
+	script.onload = function() {
+		OSApp.UIDom.aiAssistantLoading = false;
+		$( document ).trigger( "osai:loaded" );
+		if ( OSApp.AIAssistant && OSApp.AIAssistant.initFab ) {
+			OSApp.AIAssistant.initFab();
+		}
+		if ( typeof onReady === "function" ) {
+			onReady();
+		}
+	};
+	script.onerror = function() {
+		OSApp.UIDom.aiAssistantLoading = false;
+		if ( OSApp.Errors && OSApp.Errors.showError ) {
+			OSApp.Errors.showError( OSApp.Language._( "AI Assistant module is not available. Please reload the page." ) );
+		}
+	};
+	document.head.appendChild( script );
+};
 
 // FIXME: this file needs refactoring attention!
 
@@ -160,7 +196,13 @@ OSApp.UIDom.launchApp = function() {
 		} else if ( hash === "#about" ) {
 			OSApp.About.displayPage();
 		} else if ( hash === "#ai-assistant" ) {
-			OSApp.AIAssistant.displayPage();
+			OSApp.UIDom.ensureAIAssistant( function() {
+				if ( OSApp.AIAssistant && OSApp.AIAssistant.displayPage ) {
+					OSApp.AIAssistant.displayPage();
+				} else if ( OSApp.Errors && OSApp.Errors.showError ) {
+					OSApp.Errors.showError( OSApp.Language._( "AI Assistant module is not available. Please reload the page." ) );
+				}
+			} );
 		} else if ( hash === "#liveDebug" ) {
 			OSApp.LiveDebug.displayPage();
 		} else if ( hash === "#jsConsole" ) {

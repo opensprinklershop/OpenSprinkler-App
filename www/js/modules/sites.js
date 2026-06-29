@@ -53,7 +53,7 @@ OSApp.Sites.getKnownFallbackVersion = function() {
 		return cached;
 	}
 
-	return "2.4.0.213";
+	return "2.4.0.215";
 };
 
 OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
@@ -1722,7 +1722,7 @@ OSApp.Sites.updateControllerSettings = function( callback ) {
 				}
 			} );
 	} else {
-		return OSApp.Firmware.sendToOS( "/jc?pw=", "text", OSApp.currentSession.token ? 30000 : 10000 ).then(
+		return OSApp.Firmware.sendToOS( "/jc?pw=" ).then(
 			function( settings ) {
 				if ( typeof settings !== "object" ) {
 					var parsedSettings = OSApp.Sites.parseControllerSettings( settings );

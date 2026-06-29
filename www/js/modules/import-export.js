@@ -155,7 +155,8 @@ OSApp.ImportExport.getImportMethod = function( localData ) {
 	OSApp.UIDom.openPopup( popup, { positionTo: $( "#sprinklers-settings" ).find( ".import_config" ) } );
 };
 
-OSApp.ImportExport.importConfig = function( data ) {
+OSApp.ImportExport.importConfig = function( data, options ) {
+	var opts = options || {};
 	var warning = "";
 
 	if ( typeof data !== "object" || !data.settings ) {
@@ -180,7 +181,7 @@ OSApp.ImportExport.importConfig = function( data ) {
 		warning = OSApp.Language._( "Warning: Network changes will be made and the device may no longer be accessible from this address." );
 	}
 
-	OSApp.UIDom.areYouSure( OSApp.Language._( "Are you sure you want to restore the configuration?" ), warning, function() {
+	var applyConfig = function() {
 		$.mobile.loading( "show" );
 
 		// Safety net: hide spinner after 60 s in case of unexpected failures
@@ -459,7 +460,9 @@ OSApp.ImportExport.importConfig = function( data ) {
 						function() {
 							clearTimeout( loadingGuard );
 							$.mobile.loading( "hide" );
-							OSApp.Errors.showError( OSApp.Language._( "Backup restored to your device" ) );
+							if ( !opts.silent ) {
+								OSApp.Errors.showError( OSApp.Language._( "Backup restored to your device" ) );
+							}
 							OSApp.Weather.updateWeather();
 							OSApp.UIDom.goHome( true );
 						},
@@ -483,5 +486,12 @@ OSApp.ImportExport.importConfig = function( data ) {
 			$.mobile.loading( "hide" );
 			OSApp.Errors.showError( OSApp.Language._( "Unable to import configuration." ) );
 		}
-	} );
+	};
+
+	if ( opts.skipConfirm ) {
+		applyConfig();
+		return;
+	}
+
+	OSApp.UIDom.areYouSure( OSApp.Language._( "Are you sure you want to restore the configuration?" ), warning, applyConfig );
 };
