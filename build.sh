@@ -80,6 +80,25 @@ cp network_security_config.xml /srv/www/htdocs/ui/platforms/android/app/src/main
 mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
 cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
 
+# Force a JDK version compatible with Android lint (Java 25 currently breaks lint).
+for jdk in /usr/lib64/jvm/java-17-openjdk /usr/lib/jvm/java-17-openjdk /usr/lib64/jvm/java-21-openjdk /usr/lib/jvm/java-21-openjdk; do
+	if [ -x "$jdk/bin/java" ]; then
+		export JAVA_HOME="$jdk"
+		export PATH="$JAVA_HOME/bin:$PATH"
+		break
+	fi
+done
+echo "Using JAVA_HOME=${JAVA_HOME}"
+
+# Ensure Gradle does not reuse a daemon started with an incompatible JDK.
+if [ -x "platforms/android/gradlew" ]; then
+	(cd platforms/android && ./gradlew --stop >/dev/null 2>&1 || true)
+fi
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
 # Sync www/ into Android platform assets before building
 cordova prepare android
 

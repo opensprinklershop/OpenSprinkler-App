@@ -917,6 +917,24 @@
           },
           "settings": {
             "$ref": "#/components/schemas/Settings"
+          },
+          "sensors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AnalogSensor"
+            }
+          },
+          "monitors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Monitor"
+            }
+          },
+          "progadjust": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProgramAdjustment"
+            }
           }
         }
       },

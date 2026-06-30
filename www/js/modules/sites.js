@@ -803,7 +803,8 @@ OSApp.Sites.checkConfigured = function( firstLoad ) {
 			}
 
 			var showSites = localStorage.getItem("show_sites") === "1";
-			if ( !showSites && current !== null && ( current in sites ) ) {
+			var forceSiteControl = ( window.location.hash || "" ).toLowerCase() === "#site-control";
+			if ( !showSites && !forceSiteControl && current !== null && ( current in sites ) ) {
 				OSApp.Sites.routeToVersion( current, sites[ current ] );
 				return;
 			}

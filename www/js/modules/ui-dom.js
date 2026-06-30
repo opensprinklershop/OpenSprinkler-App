@@ -33,7 +33,7 @@ OSApp.UIDom.ensureAIAssistant = function( onReady ) {
 	}
 	OSApp.UIDom.aiAssistantLoading = true;
 	var script = document.createElement( "script" );
-	script.src = "js/modules/ai-assistant.js?v=osai18";
+	script.src = "js/modules/ai-assistant.js?v=osai21";
 	script.onload = function() {
 		OSApp.UIDom.aiAssistantLoading = false;
 		$( document ).trigger( "osai:loaded" );
@@ -716,7 +716,13 @@ OSApp.UIDom.bindPanel = function() {
 	} );
 
 	panel.find( "a[href='#ai-assistant']" ).on( "click", function() {
-		OSApp.UIDom.changePage( "#ai-assistant" );
+		OSApp.UIDom.closePanel( function() {
+			OSApp.UIDom.ensureAIAssistant( function() {
+				if ( OSApp.AIAssistant && OSApp.AIAssistant.openDialog ) {
+					OSApp.AIAssistant.openDialog();
+				}
+			} );
+		} );
 		return false;
 	} );
 
@@ -1006,7 +1012,8 @@ OSApp.UIDom.changePage = function( toPage, opts ) {
 		path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
 		var baseHref = origin + path;
 
-		window.location.href = (baseHref.endsWith("/") ? baseHref : baseHref + "/") + "index.html";
+		var targetHash = ( toPage === "#site-control" ) ? "#site-control" : "#start";
+		window.location.href = (baseHref.endsWith("/") ? baseHref : baseHref + "/") + "index.html" + targetHash;
 		return;
 	}
 

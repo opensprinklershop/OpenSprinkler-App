@@ -36,8 +36,9 @@
 					var sitesStr = localStorage.getItem("sites");
 					var currentSite = localStorage.getItem("current_site");
 					var showSites = localStorage.getItem("show_sites") === "1";
+					var forcedSitesPage = window.location.hash === "#site-control" || window.location.hash === "#start";
 
-					if (sitesStr && currentSite && !showSites) {
+					if (sitesStr && currentSite && !showSites && !forcedSitesPage) {
 						try {
 							var sites = JSON.parse(sitesStr);
 							var siteData = sites[currentSite];
@@ -271,7 +272,7 @@
 		<!-- Load OSApp modules -->
 	<script src="js/modules/language.js"></script>
 	<script src="js/modules/about.js"></script>
-	<script src="js/modules/ai-assistant.js?v=osai18"></script>
+	<script src="js/modules/ai-assistant.js?v=osai21"></script>
 	<script src="js/modules/analog.js?v=5"></script>
 	<script src="js/modules/analog-log.js?v=1"></script>
 	<script src="js/modules/irrigation-db-integration.js"></script>
@@ -291,7 +292,7 @@
 		<script src="js/modules/notifications.js"></script>
 		<script src="js/modules/options.js?v=2"></script>
 		<script src="js/modules/programs.js"></script>
-		<script src="js/modules/sites.js"></script>
+		<script src="js/modules/sites.js?v=osai2"></script>
 		<script src="js/modules/sites-otc.js"></script>
 		<script src="js/modules/station-attributes.js"></script>
 		<script src="js/modules/station-queue.js"></script>
@@ -303,8 +304,7 @@
 		<script src="js/modules/system-diagnostics.js"></script>
 		<script src="js/modules/live-debug.js"></script>
 		<script src="js/modules/diagnostics-console.js"></script>
-		<script src="js/modules/ai-assistant.js?v=osai18"></script>
-		<script src="js/modules/ui-dom.js?v=osai5"></script>
+		<script src="js/modules/ui-dom.js?v=osai7"></script>
 		<script src="js/modules/utils.js"></script>
 		<script src="js/modules/welcome.js"></script>
 		<script src="js/modules/weather.js?v=3"></script>

@@ -18,6 +18,23 @@
 var OSApp = OSApp || {};
 OSApp.AIAssistant = OSApp.AIAssistant || {};
 
+// Monkeypatch core Language module translation to support dynamic BETA name formatting for the main menu.
+if ( OSApp.Language && OSApp.Language._ && !OSApp.AIAssistant._langPatched ) {
+	OSApp.AIAssistant._langPatched = true;
+	var originalTranslate = OSApp.Language._;
+	OSApp.Language._ = function( key ) {
+		if ( key === "AI Assistant" ) {
+			var lang = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase();
+			if ( lang === "de" ) {
+				return "KI-Assistent (BETA)";
+			} else {
+				return "AI Assistant (BETA)";
+			}
+		}
+		return originalTranslate.apply( this, arguments );
+	};
+}
+
 // Standard-Service-Endpoint (kann in den Einstellungen überschrieben werden).
 OSApp.AIAssistant.DEFAULT_SERVICE = "https://opensprinklershop.de/wp-json/osai/v1";
 
@@ -91,12 +108,26 @@ OSApp.AIAssistant.I18N = {
 OSApp.AIAssistant.t = function( en ) {
 	var translated = OSApp.Language && OSApp.Language._ ? OSApp.Language._( en ) : en;
 	if ( translated && translated !== en ) {
+		if ( en === "AI Assistant" ) {
+			if ( translated.indexOf( "(BETA)" ) === -1 ) {
+				return translated + " (BETA)";
+			}
+		}
 		return translated;
 	}
 	var lang = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase();
 	var map = OSApp.AIAssistant.I18N[ lang ];
 	if ( map && map[ en ] ) {
-		return map[ en ];
+		var res = map[ en ];
+		if ( en === "AI Assistant" ) {
+			if ( res.indexOf( "(BETA)" ) === -1 ) {
+				return res + " (BETA)";
+			}
+		}
+		return res;
+	}
+	if ( en === "AI Assistant" ) {
+		return en + " (BETA)";
 	}
 	return en;
 };
@@ -442,7 +473,7 @@ OSApp.AIAssistant.displayPage = function() {
 		} );
 
 		OSApp.UIDom.changeHeader( {
-			title: OSApp.Language._( "AI Assistant" ),
+			title: OSApp.AIAssistant.t( "AI Assistant" ),
 			leftBtn: {
 				icon: "carat-l",
 				text: OSApp.Language._( "Back" ),
@@ -478,13 +509,46 @@ OSApp.AIAssistant.applyChanges = function( changes ) {
 		return;
 	}
 
-	try {
-		var merged = OSApp.AIAssistant.deepMerge( $.extend( true, {}, OSApp.currentSession.controller ), changes );
-		OSApp.ImportExport.importConfig( merged, { skipConfirm: true, silent: true } );
-	} catch ( e ) {
-		if ( OSApp.UIDom && OSApp.UIDom.errorMessage ) {
-			OSApp.UIDom.errorMessage( OSApp.AIAssistant.t( "Could not apply the changes." ) + ( e && e.message ? " (" + e.message + ")" : "" ) );
+	// Separate core changes (for importConfig) and analog changes (/sc, /mc, /sb)
+	var coreChanges = {};
+	var hasCore = false;
+	[ "options", "programs", "stations", "settings" ].forEach( function( k ) {
+		if ( changes[ k ] !== undefined ) {
+			coreChanges[ k ] = changes[ k ];
+			hasCore = true;
 		}
+	} );
+
+	if ( hasCore ) {
+		try {
+			var merged = OSApp.AIAssistant.deepMerge( $.extend( true, {}, OSApp.currentSession.controller ), coreChanges );
+			OSApp.ImportExport.importConfig( merged, { skipConfirm: true, silent: true } );
+		} catch ( e ) {
+			if ( OSApp.UIDom && OSApp.UIDom.errorMessage ) {
+				OSApp.UIDom.errorMessage( OSApp.AIAssistant.t( "Could not apply the changes." ) + ( e && e.message ? " (" + e.message + ")" : "" ) );
+			}
+		}
+	}
+
+	// Apply Analog Sensors
+	if ( changes.sensors && Array.isArray( changes.sensors ) && OSApp.Analog && typeof OSApp.Analog.sendToOsObj === "function" ) {
+		changes.sensors.forEach( function( sensor ) {
+			OSApp.Analog.sendToOsObj( "/sc?pw=", sensor );
+		} );
+	}
+
+	// Apply Monitors
+	if ( changes.monitors && Array.isArray( changes.monitors ) && OSApp.Analog && typeof OSApp.Analog.sendToOsObj === "function" ) {
+		changes.monitors.forEach( function( monitor ) {
+			OSApp.Analog.sendToOsObj( "/mc?pw=", monitor );
+		} );
+	}
+
+	// Apply Program Adjustments
+	if ( changes.progadjust && Array.isArray( changes.progadjust ) && OSApp.Analog && typeof OSApp.Analog.sendToOsObj === "function" ) {
+		changes.progadjust.forEach( function( adjust ) {
+			OSApp.Analog.sendToOsObj( "/sb?pw=", adjust );
+		} );
 	}
 };
 
@@ -503,7 +567,7 @@ OSApp.AIAssistant.validateChanges = function( changes ) {
 		return { valid: false, errors: [ "changes must be an object" ] };
 	}
 
-	var allowedTop = [ "options", "programs", "stations", "settings" ];
+	var allowedTop = [ "options", "programs", "stations", "settings", "sensors", "monitors", "progadjust" ];
 	Object.keys( changes ).forEach( function( k ) {
 		if ( allowedTop.indexOf( k ) === -1 ) {
 			errors.push( "unknown top-level key '" + k + "'" );
@@ -593,6 +657,36 @@ OSApp.AIAssistant.linkify = function( text ) {
 	return esc;
 };
 
+OSApp.AIAssistant.looksLikeHtml = function( text ) {
+	var s = String( text || "" );
+	return /<\/?[a-z][\s\S]*>/i.test( s ) && /<(table|a|ul|ol|li|div|p|br|strong|em|span|tr|td|th)\b/i.test( s );
+};
+
+OSApp.AIAssistant.safeHtmlToJQ = function( rawHtml ) {
+	var nodes = $.parseHTML( String( rawHtml || "" ), document, false ) || [];
+	var wrap = $( "<div></div>" ).append( nodes );
+	wrap.find( "script,style,iframe,object,embed,link,meta" ).remove();
+	wrap.find( "*" ).each( function() {
+		var attrs = this.attributes ? Array.prototype.slice.call( this.attributes ) : [];
+		for ( var i = 0; i < attrs.length; i++ ) {
+			var name = String( attrs[ i ].name || "" ).toLowerCase();
+			var value = String( attrs[ i ].value || "" );
+			if ( name.indexOf( "on" ) === 0 ) {
+				this.removeAttribute( attrs[ i ].name );
+				continue;
+			}
+			if ( ( name === "href" || name === "src" ) && /^\s*javascript:/i.test( value ) ) {
+				this.removeAttribute( attrs[ i ].name );
+			}
+		}
+		if ( this.tagName && this.tagName.toLowerCase() === "a" ) {
+			this.setAttribute( "target", "_blank" );
+			this.setAttribute( "rel", "noopener noreferrer" );
+		}
+	} );
+	return wrap.contents();
+};
+
 OSApp.AIAssistant.isEnabled = function() {
 	// Standard: aktiv. Nur explizit "0" deaktiviert den Assistenten.
 	return localStorage.getItem( OSApp.AIAssistant.ENABLED_KEY ) !== "0";
@@ -625,7 +719,7 @@ OSApp.AIAssistant.initFab = function() {
 		return;
 	}
 	fab.data( "osaiBound", true );
-	fab.attr( "aria-label", OSApp.Language._( "AI Assistant" ) );
+	fab.attr( "aria-label", OSApp.AIAssistant.t( "AI Assistant" ) );
 	fab.on( "click", function( e ) {
 		e.preventDefault();
 		OSApp.AIAssistant.openDialog();
@@ -725,6 +819,23 @@ OSApp.AIAssistant.isProgramListingRequest = function( message ) {
 	var msg = String( message || "" ).toLowerCase();
 	return /\b(programm(e|s)?|schedule(s)?|tim(e|er))\b/u.test( msg ) &&
 		/\b(list|liste|show|zeige|anzeigen|auflisten|my|meine|alle|table|tabelle)\b/u.test( msg );
+};
+
+OSApp.AIAssistant.isTableFollowupRequest = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	return /\b(as table|als tabelle|table|tabelle)\b/u.test( msg );
+};
+
+OSApp.AIAssistant.hasRecentProgramContext = function() {
+	var history = OSApp.AIAssistant.loadHistory();
+	var pattern = /\b(programm(e|s)?|program(s)?|schedule(s)?|laufzeit)\b/u;
+	for ( var i = history.length - 1, seen = 0; i >= 0 && seen < 8; i--, seen++ ) {
+		var item = history[ i ];
+		if ( item && typeof item.text === "string" && pattern.test( item.text.toLowerCase() ) ) {
+			return true;
+		}
+	}
+	return false;
 };
 
 OSApp.AIAssistant.escapeHtml = function( s ) {
@@ -1148,13 +1259,24 @@ OSApp.AIAssistant.matchAnalogOperation = function( message ) {
 	if ( /\b(create|add|new|anlegen|erstellen|hinzufügen|hinzufuegen)\b/u.test( msg ) ) {
 		return "create";
 	}
-	if ( /\b(rename|change|update|edit|bearbeiten|ändern|aendern|anpassen)\b/u.test( msg ) ) {
+	if ( /\b(rename|change|update|edit|bearbeiten|ändern|aendern|anpassen|deaktivieren|deaktivier|disable|disabled|aktivieren|aktivier|enable|enabled)\b/u.test( msg ) ) {
 		return "edit";
 	}
 	if ( /\b(list|liste|show|anzeigen|auflisten|view|übersicht|uebersicht)\b/u.test( msg ) ) {
 		return "list";
 	}
 	return "";
+};
+
+OSApp.AIAssistant.detectEnableIntent = function( message ) {
+	var msg = String( message || "" ).toLowerCase();
+	if ( /\b(deaktivieren|deaktivier|disable|disabled|abschalten|ausschalten|turn off)\b/u.test( msg ) ) {
+		return false;
+	}
+	if ( /\b(aktivieren|aktivier|enable|enabled|einschalten|anschalten|turn on)\b/u.test( msg ) ) {
+		return true;
+	}
+	return null;
 };
 
 OSApp.AIAssistant.extractNumber = function( message, labels ) {
@@ -1285,6 +1407,9 @@ OSApp.AIAssistant.mergeAnalogChanges = function( entity, base, message ) {
 		var url = OSApp.AIAssistant.extractText( message, [ "url" ] );
 		if ( url ) out.url = url;
 		var enable = OSApp.AIAssistant.extractBool( message, [ "enable", "enabled", "active", "sensor enabled" ] );
+		if ( enable === null ) {
+			enable = OSApp.AIAssistant.detectEnableIntent( message );
+		}
 		if ( enable !== null ) out.enable = enable ? 1 : 0;
 		var log = OSApp.AIAssistant.extractBool( message, [ "log", "logging" ] );
 		if ( log !== null ) out.log = log ? 1 : 0;
@@ -1817,7 +1942,7 @@ OSApp.AIAssistant.openDialog = function() {
 	function addHtmlMessage( title, html, cssExtra ) {
 		var bot = addMessage( "bot", title || "", cssExtra );
 		if ( html ) {
-			$( html ).appendTo( bot );
+			$( "<div></div>" ).append( OSApp.AIAssistant.safeHtmlToJQ( html ) ).appendTo( bot );
 			scrollDown();
 		}
 		return bot;
@@ -1827,6 +1952,20 @@ OSApp.AIAssistant.openDialog = function() {
 		var box = $( '<div class="smaller" style="color:#666;margin-top:4px;white-space:pre-wrap"></div>' );
 		box.html( OSApp.AIAssistant.linkify( text || "" ) );
 		box.appendTo( parent );
+	}
+
+	function appendBotDetail( parent, text, htmlOverride ) {
+		var rawHtml = htmlOverride || "";
+		if ( !rawHtml && OSApp.AIAssistant.looksLikeHtml( text ) ) {
+			rawHtml = text;
+		}
+		if ( rawHtml ) {
+			$( '<div class="smaller" style="color:#666;margin-top:4px"></div>' )
+				.append( OSApp.AIAssistant.safeHtmlToJQ( rawHtml ) )
+				.appendTo( parent );
+			return;
+		}
+		appendRichText( parent, text );
 	}
 
 	function addTyping() {
@@ -1839,10 +1978,10 @@ OSApp.AIAssistant.openDialog = function() {
 	function addResult( res ) {
 		var bot = addMessage( "bot", res.summary || L( "Done." ) );
 		if ( res.explanation ) {
-			appendRichText( bot, res.explanation );
+			appendBotDetail( bot, res.explanation, res.explanation_html );
 		}
 		if ( res.html ) {
-			$( res.html ).appendTo( bot );
+			$( "<div></div>" ).append( OSApp.AIAssistant.safeHtmlToJQ( res.html ) ).appendTo( bot );
 		}
 		var hasChanges = res.changes && typeof res.changes === "object" && Object.keys( res.changes ).length > 0;
 
@@ -1901,6 +2040,14 @@ OSApp.AIAssistant.openDialog = function() {
 			sendBtn.prop( "disabled", false );
 			return;
 		}
+		if ( OSApp.AIAssistant.isTableFollowupRequest( message ) && OSApp.AIAssistant.hasRecentProgramContext() ) {
+			var programTable = OSApp.AIAssistant.formatProgramListingHtml();
+			var tableSummary = programTable.summary;
+			addHtmlMessage( tableSummary, programTable.html );
+			OSApp.AIAssistant.pushHistory( "bot", tableSummary );
+			sendBtn.prop( "disabled", false );
+			return;
+		}
 		if ( OSApp.AIAssistant.isReleaseNotesRequest( message ) ) {
 			var releaseTyping = addTyping();
 			OSApp.AIAssistant.fetchReleaseCatalog().then( function( catalog ) {
@@ -1913,7 +2060,7 @@ OSApp.AIAssistant.openDialog = function() {
 					return;
 				}
 				var bot = addMessage( "bot", res.summary );
-				$( '<div class="smaller" style="color:#666;margin-top:4px;white-space:pre-wrap"></div>' ).text( res.explanation ).appendTo( bot );
+				appendRichText( bot, res.explanation );
 				OSApp.AIAssistant.pushHistory( "bot", res.summary + "\n" + res.explanation );
 				scrollDown();
 			} );
