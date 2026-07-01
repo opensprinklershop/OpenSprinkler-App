@@ -18,9 +18,11 @@ var OSApp = OSApp || {};
 OSApp.Status = OSApp.Status || {};
 
 // Current status related functions
-OSApp.Status.refreshStatus = function( callback ) {
+OSApp.Status.refreshStatus = function( callback, fail ) {
 	callback = callback || function() {};
+	fail = fail || function() {};
 	if ( !OSApp.currentSession.isControllerConnected() ) {
+		fail();
 		return;
 	}
 
@@ -32,14 +34,21 @@ OSApp.Status.refreshStatus = function( callback ) {
 		callback();
 	};
 
+	// Always signal completion so interval-driven pollers can release their
+	// re-entrancy guard even when the request fails.
+	var onFail = function() {
+		OSApp.Network.networkFail();
+		fail();
+	};
+
 	if ( OSApp.Firmware.checkOSVersion( 216 ) ) {
-		OSApp.Sites.updateController( finish, OSApp.Network.networkFail );
+		OSApp.Sites.updateController( finish, onFail );
 	} else {
 		$.when(
 			OSApp.Sites.updateControllerStatus(),
 			OSApp.Sites.updateControllerSettings(),
 			OSApp.Sites.updateControllerOptions()
-		).then( finish, OSApp.Network.networkFail );
+		).then( finish, onFail );
 	}
 };
 

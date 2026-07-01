@@ -1680,14 +1680,26 @@ OSApp.Dashboard.displayPage = function() {
 
 		// Fetch sensor data on page load and poll every 5s while dashboard is visible
 		var sensorInterval = null;
+		var sensorRefreshPending = false;
 		var refreshSensors = function() {
+			// Skip this tick if the previous sensor poll is still in flight. All reads share a
+			// single serialized AJAX queue; without this guard a slow controller (many sensors /
+			// monitors) lets each 5s tick pile up more /sl, /se and /ml requests than can drain,
+			// backing up the queue and delaying every other request. Use .always so the guard is
+			// released even when a request fails.
+			if ( sensorRefreshPending ) {
+				return;
+			}
+			sensorRefreshPending = true;
+
 			// Fetch all sensor data: analog sensors, program adjustments, and monitors
-			OSApp.Analog.updateAnalogSensor( function() {
-				OSApp.Analog.updateProgramAdjustments( function() {
-					OSApp.Analog.updateMonitors( function() {
+			OSApp.Analog.updateAnalogSensor().always( function() {
+				OSApp.Analog.updateProgramAdjustments().always( function() {
+					OSApp.Analog.updateMonitors().always( function() {
 						if ( page.hasClass( "ui-page-active" ) ) {
 							OSApp.Analog.updateSensorShowArea( page );
 						}
+						sensorRefreshPending = false;
 					} );
 				} );
 			} );

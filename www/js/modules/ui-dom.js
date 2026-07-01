@@ -301,8 +301,18 @@ OSApp.UIDom.launchApp = function() {
 
 		if ( OSApp.currentSession.isControllerConnected() && newpage !== "#site-control" && newpage !== "#start" && newpage !== "#loadingPage" ) {
 
-			// Update the controller status every 5 seconds and the program and station data every 30 seconds
-			var refreshStatusInterval = setInterval( function() { OSApp.Status.refreshStatus(); }, 4000 ), // FIXME: refactor this 4000 interval out to Constants or config/settings
+			// Update the controller status every 4 seconds and the program and station data every 20 seconds.
+			// Guard against overlapping polls: on slow controllers a status refresh can take longer than the
+			// interval. All reads share a single serialized AJAX queue, so without this guard every tick keeps
+			// enqueuing another batch of requests that grows the queue without bound and delays every other
+			// request. Skip a tick while the previous status refresh is still pending.
+			var statusRefreshPending = false,
+				settleStatusRefresh = function() { statusRefreshPending = false; },
+				refreshStatusInterval = setInterval( function() {
+					if ( statusRefreshPending ) { return; }
+					statusRefreshPending = true;
+					OSApp.Status.refreshStatus( settleStatusRefresh, settleStatusRefresh );
+				}, 4000 ), // FIXME: refactor this 4000 interval out to Constants or config/settings
 				refreshDataInterval;
 
 			if ( !OSApp.Firmware.checkOSVersion( 216 ) ) {

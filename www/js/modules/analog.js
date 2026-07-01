@@ -5967,6 +5967,7 @@ OSApp.Analog.buildSensorConfig = function() {
 			"MQTT_DISABLED":      OSApp.Language._("MQTT sensor configured, but MQTT is disabled in settings."),
 			"MQTT_DISCONNECTED":  OSApp.Language._("MQTT sensor configured, but MQTT is not connected."),
 			"ZIGBEE_WRONG_MODE":  OSApp.Language._("Zigbee sensor configured, but Zigbee mode is not active."),
+			"ZIGBEE_GW_REDUCED":  OSApp.Language._("ZigBee Gateway runs in reduced mode (WiFi, no Ethernet): zone control works, but sensor reports are not received. Connect Ethernet for full sensor support."),
 			"ZIGBEE_NOT_AVAILABLE": OSApp.Language._("Zigbee sensor configured, but Zigbee is not available in this firmware."),
 			"BLE_NOT_AVAILABLE":  OSApp.Language._("Bluetooth sensor configured, but BLE is not available in this firmware.")
 		};
