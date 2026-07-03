@@ -453,19 +453,26 @@ OSApp.Logs.displayPage = function() {
 
 			page.find( "#logs_list" ).empty();
 
-			if ( typeof vis === "undefined" ) {
-				logsList.html( "<p class='center'>" + OSApp.Language._( "Timeline library not available. Please reload the page." ) + "</p>" );
-				return;
+			var timeline;
+			var renderTimeline = function() {
+				timeline = new vis.Timeline( logsList.get( 0 ), fullData, options );
+				timeline.setGroups( groups );
+
+				$.mobile.window.on( "resize", resize );
+				page.one( "pagehide", reset );
+				page.find( "input:radio[name='log_type']" ).one( "change", reset );
+
+				logsList.prepend( showStats( stats ) );
+			};
+
+			// Load the timeline library on demand; it is kept off the critical path.
+			if ( OSApp.Lazy.hasTimeline() ) {
+				renderTimeline();
+			} else {
+				OSApp.Lazy.ensureTimeline( renderTimeline ).catch( function() {
+					logsList.html( "<p class='center'>" + OSApp.Language._( "Timeline library not available. Please reload the page." ) + "</p>" );
+				} );
 			}
-
-			var timeline = new vis.Timeline( logsList.get( 0 ), fullData, options );
-			timeline.setGroups( groups );
-
-			$.mobile.window.on( "resize", resize );
-			page.one( "pagehide", reset );
-			page.find( "input:radio[name='log_type']" ).one( "change", reset );
-
-			logsList.prepend( showStats( stats ) );
 		},
 		prepTable = function() {
 			if ( data.length < 1 ) {

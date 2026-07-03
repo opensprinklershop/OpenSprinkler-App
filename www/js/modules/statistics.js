@@ -546,6 +546,13 @@ OSApp.Statistics.displayPage = function() {
 };
 
 OSApp.Statistics.refresh = function( page ) {
+	// The statistics page is entirely chart-driven; make sure the charting
+	// library is loaded before rendering (it is kept off the critical path).
+	if ( !OSApp.Lazy.hasApexCharts() ) {
+		OSApp.Lazy.ensureApexCharts( function() { OSApp.Statistics.refresh( page ); } );
+		return;
+	}
+
 	var range = OSApp.Statistics._range;
 
 	OSApp.UIDom.showLoading( "#stats-kpi" );

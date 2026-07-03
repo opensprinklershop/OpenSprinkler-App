@@ -389,6 +389,10 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 
 			var sel = document.querySelector("#progChart-" + i);
 			if (sel) {
+				if (!OSApp.Lazy.hasApexCharts()) {
+					OSApp.Lazy.ensureApexCharts(function() { OSApp.ProgramView.updateProgramShowArea(page, visible); });
+					return;
+				}
 				chart = new ApexCharts(sel, options);
 				chart.render();
 				// Track touch movement to prevent swipe-triggered program start

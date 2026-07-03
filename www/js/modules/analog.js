@@ -572,6 +572,11 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 		});
 
 		// Create ApexCharts instances for prog adjustments
+		// Load the charting library on demand (kept off the critical path).
+		if (orderedProgAdjusts.length > 0 && !OSApp.Lazy.hasApexCharts()) {
+			OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.updateSensorShowArea(page); });
+			return;
+		}
 		/* jshint loopfunc:true */
 		for (i = 0; i < orderedProgAdjusts.length; i++) {
 			var el = document.querySelector("#mainpageChart-" + i);
@@ -1479,6 +1484,10 @@ OSApp.Analog.updateAdjustmentChart = function(popup) {
 		};
 		let sel = document.querySelector("#adjchart");
 		if (sel) {
+			if (!OSApp.Lazy.hasApexCharts()) {
+				OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.updateAdjustmentChart(popup); });
+				return;
+			}
 			while (sel.firstChild)
 				sel.removeChild(sel.lastChild);
 			let chart = new ApexCharts(sel, options);
@@ -1576,6 +1585,9 @@ OSApp.Analog.getMonitor = function(popup) {
 	OSApp.Analog.addToObjectFlt(popup, "#maxrun", result);
 	OSApp.Analog.addToObjectInt(popup, "#prio", result);
 	OSApp.Analog.addToObjectInt(popup, "#rs", result);
+	OSApp.Analog.addToObjectInt(popup, "#om", result);
+	OSApp.Analog.addToObjectInt(popup, "#stt", result);
+	OSApp.Analog.addToObjectInt(popup, "#fsa", result);
 
 	//Min+Max
 	OSApp.Analog.addToObjectFlt(popup, "#value1", result);
@@ -1770,6 +1782,25 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 		if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 178) {
 			list += "<label for='rs'>" + OSApp.Language._("Reset status after (s)") +
 			"</label><input id='rs' type='number' inputmode='decimal' min='0' max='99999' value='" + monitor.rs + "'>";
+		}
+
+		//output mode (om) + failsafe on stale input (stt/fsa)  [fw >= 2.4.0(217)]
+		if (OSApp.Firmware.checkOSVersion(240) && OSApp.currentSession.controller.options.fwm >= 217) {
+			if (typeof monitor.om === "undefined") { monitor.om = 0; }
+			if (typeof monitor.stt === "undefined") { monitor.stt = 0; }
+			if (typeof monitor.fsa === "undefined") { monitor.fsa = 0; }
+			list += "<label for='om' class='select'>" + OSApp.Language._("Output mode") + "</label>" +
+				"<select data-mini='true' id='om'>" +
+				"<option " + (monitor.om == 1 ? "" : "selected") + " value='0'>" + OSApp.Language._("Start and stop") + "</option>" +
+				"<option " + (monitor.om == 1 ? "selected" : "") + " value='1'>" + OSApp.Language._("Only switch off") + "</option>" +
+				"</select>" +
+				"<label for='stt'>" + OSApp.Language._("Failsafe after (s)") +
+				"</label><input id='stt' type='number' inputmode='decimal' min='0' max='999999' value='" + monitor.stt + "'>" +
+				"<label for='fsa' class='select'>" + OSApp.Language._("Failsafe state") + "</label>" +
+				"<select data-mini='true' id='fsa'>" +
+				"<option " + (monitor.fsa == 1 ? "" : "selected") + " value='0'>" + OSApp.Language._("Off") + "</option>" +
+				"<option " + (monitor.fsa == 1 ? "selected" : "") + " value='1'>" + OSApp.Language._("On") + "</option>" +
+				"</select>";
 		}
 
 		//typ = MIN+MAX
@@ -6355,6 +6386,11 @@ OSApp.Analog.getMonitorName = function(monitorNr) {
 
 // Show Sensor Charts with apexcharts
 OSApp.Analog.showAnalogSensorCharts = function(limit2sensor, returnPageId) {
+
+	if (!OSApp.Lazy.hasApexCharts()) {
+		OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.showAnalogSensorCharts(limit2sensor, returnPageId); });
+		return;
+	}
 
 	var max = OSApp.Analog.Constants.CHARTS;
 	for (let j = 0; j < OSApp.Analog.analogSensors.length; j++) {

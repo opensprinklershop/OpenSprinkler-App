@@ -158,5 +158,12 @@ OSApp.currentSession.isControllerConnected = function() {
 /* Setup DOM handlers and launch app*/
 OSApp.UIDom.launchApp();
 
+// Warm the heavy charting libraries in the background once the app has booted so
+// they are ready before the user opens a page that needs them, without blocking
+// the initial render.
+if ( OSApp.Lazy && OSApp.Lazy.prefetchCharts ) {
+	OSApp.Lazy.prefetchCharts();
+}
+
 // Focus any input
 OSApp.UIDom.focusInput();

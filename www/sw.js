@@ -15,7 +15,7 @@
 
 // Define a name for the current cache
 // BUILD_TIMESTAMP will be replaced by the build script to bust the cache
-var cacheName = "OpenSprinkler-v20260629004800";
+var cacheName = "OpenSprinkler-v__BUILD_TIMESTAMP__";
 
 // Html
 var cacheFiles = [
@@ -33,6 +33,7 @@ cacheFiles = cacheFiles.concat([
 // FIXME: this module list needs to be dynamic so newly added modules are automatically inserted!
 // App modules javascript
 cacheFiles = cacheFiles.concat([
+	"/js/modules/lazy.js",
 	"/js/modules/about.js",
 	"/js/modules/ai-assistant.js",
 	"/js/modules/analog.js",
@@ -263,7 +264,7 @@ self.addEventListener("fetch", function (e) {
     // for all precached files (styles, scripts, images, locales) except the index page itself.
     if (requestUrl.origin === self.location.origin) {
         var pathname = requestUrl.pathname;
-        
+
         // Match both exact listed files in cacheFiles or general static directories
         var isStaticAsset = (cacheFiles.includes(pathname) && pathname !== "/index.html") ||
                             pathname.startsWith("/vendor-js/") ||

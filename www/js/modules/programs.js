@@ -1588,6 +1588,11 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 	};
 
 	render = function() {
+		if ( !OSApp.Lazy.hasTimeline() ) {
+			OSApp.Lazy.ensureTimeline( render ).catch( function() {} );
+			return;
+		}
+
 		processPrograms( date[ 1 ], date[ 2 ], date[ 0 ] );
 
 		navi.hide();

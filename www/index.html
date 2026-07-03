@@ -98,17 +98,61 @@
 								if (!siteData.os_token && siteData.auth_user && siteData.auth_pw) {
 									xhr.setRequestHeader("Authorization", "Basic " + btoa(siteData.auth_user + ":" + siteData.auth_pw));
 								}
-								xhr.timeout = 10000;
+								// Fix C: keep the controller probe timeout low so a weak controller
+								// link does not dominate the "Connecting..." delay. The failsafe above
+								// (15s) still guards against a stuck redirect.
+								xhr.timeout = 5000;
+
+								// Fix C: load versions.json in parallel with the controller probe
+								// instead of sequentially after it. The result is cached and any
+								// pending redirect resolves as soon as both are ready.
+								var versionsResult = null, versionsDone = false, versionsWaiters = [];
+								var whenVersions = function(cb) {
+									if (versionsDone) { cb(versionsResult); } else { versionsWaiters.push(cb); }
+								};
+								(function() {
+									var vx = new XMLHttpRequest();
+									vx.open("GET", "versions.json", true);
+									vx.timeout = 4000;
+									var finish = function(data) {
+										if (versionsDone) { return; }
+										versionsDone = true;
+										versionsResult = data;
+										for (var i = 0; i < versionsWaiters.length; i++) {
+											try { versionsWaiters[i](data); } catch (e) {}
+										}
+										versionsWaiters = [];
+									};
+									vx.onload = function() {
+										var d = null;
+										try { d = JSON.parse(vx.responseText); } catch (e) {}
+										finish(d);
+									};
+									vx.onerror = vx.ontimeout = function() { finish(null); };
+									try { vx.send(); } catch (e) { finish(null); }
+								})();
+
+								var computeBaseHref = function() {
+									var origin = window.location.origin;
+									if (!origin || origin === "null") {
+										origin = window.location.protocol + "//" + window.location.host;
+									}
+									var path = window.location.pathname;
+									if (path.endsWith("/index.html")) {
+										path = path.substring(0, path.length - 10);
+									}
+									if (path.length > 1 && path.endsWith("/")) {
+										path = path.slice(0, -1);
+									}
+									path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
+									return origin + (path.endsWith("/") ? path : path + "/");
+								};
 
 								var handleRedirect = function(fwv, fwm) {
-									var versionsXhr = new XMLHttpRequest();
-									versionsXhr.open("GET", "versions.json", true);
-									versionsXhr.timeout = 5000;
-									versionsXhr.onload = function() {
+									whenVersions(function(vData) {
 										var targetVersion = "2.4.0.215";
 										try {
-											var vData = JSON.parse(versionsXhr.responseText);
-											var versions = vData.versions || [];
+											var versions = (vData && vData.versions) || [];
 
 											if (!fwv || fwv <= 221) {
 												targetVersion = "2.2.1";
@@ -145,44 +189,11 @@
 												}
 											}
 										} catch (e) {}
-										localStorage.removeItem("show_sites");
 
-										var origin = window.location.origin;
-										if (!origin || origin === "null") {
-											origin = window.location.protocol + "//" + window.location.host;
-										}
-										var path = window.location.pathname;
-										if (path.endsWith("/index.html")) {
-											path = path.substring(0, path.length - 10);
-										}
-										if (path.length > 1 && path.endsWith("/")) {
-											path = path.slice(0, -1);
-										}
-										path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
-										var baseHref = origin + (path.endsWith("/") ? path : path + "/");
-
-										window.clearTimeout(fastPathFailsafe);
-										window.location.href = baseHref + targetVersion + "/index.html";
-									};
-									versionsXhr.onerror = versionsXhr.ontimeout = function() {
 										localStorage.removeItem("show_sites");
-										var origin = window.location.origin;
-										if (!origin || origin === "null") {
-											origin = window.location.protocol + "//" + window.location.host;
-										}
-										var path = window.location.pathname;
-										if (path.endsWith("/index.html")) {
-											path = path.substring(0, path.length - 10);
-										}
-										if (path.length > 1 && path.endsWith("/")) {
-											path = path.slice(0, -1);
-										}
-										path = path.replace(/\/([0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?|dev)$/, "");
-										var baseHref = origin + (path.endsWith("/") ? path : path + "/");
 										window.clearTimeout(fastPathFailsafe);
-										window.location.href = baseHref + "2.4.0.215/index.html";
-									};
-									versionsXhr.send();
+										window.location.href = computeBaseHref() + targetVersion + "/index.html";
+									});
 								};
 
 								xhr.onload = function() {
@@ -262,21 +273,26 @@
 			}, true);
 		</script>
 		<script src="vendor-js/jquery.js"></script>
-		<script src="vendor-js/vis-timeline-graph2d.min.js?v=2"></script>
 		<script src="vendor-js/libs.js"></script>
-		<script src="vendor-js/apexcharts.min.js"></script>
 		<script src="vendor-js/qrcode.min.js"></script>
 		<script src="vendor-js/jqm.js"></script>
 		<script src="vendor-js/dataTables-2.1.8.min.js"></script>
+		<!--
+			The heavy charting libraries (apexcharts ~800 KB, vis-timeline ~300 KB)
+			are intentionally NOT loaded here. They are only needed on the
+			statistics / analog-chart / program-preview / logs pages and are loaded
+			on demand by js/modules/lazy.js to keep them off the critical render path.
+		-->
 
 		<!-- Load OSApp modules -->
+	<script src="js/modules/lazy.js"></script>
 	<script src="js/modules/language.js"></script>
 	<script src="js/modules/about.js"></script>
 	<script src="js/modules/ai-assistant.js?v=osai21"></script>
-	<script src="js/modules/analog.js?v=5"></script>
+	<script src="js/modules/analog.js?v=6"></script>
 	<script src="js/modules/analog-log.js?v=1"></script>
 	<script src="js/modules/irrigation-db-integration.js"></script>
-		<script src="js/modules/programview.js"></script>
+		<script src="js/modules/programview.js?v=1"></script>
 		<script src="js/modules/card-list.js"></script>
 		<script src="js/modules/cards.js"></script>
 		<script src="js/modules/dashboard.js"></script>
@@ -286,18 +302,18 @@
 		<script src="js/modules/ssl.js"></script>
 		<script src="js/modules/groups.js"></script>
 		<script src="js/modules/import-export.js"></script>
-		<script src="js/modules/logs.js"></script>
+		<script src="js/modules/logs.js?v=1"></script>
 		<script src="js/modules/esp32mode.js"></script>
 		<script src="js/modules/network.js"></script>
 		<script src="js/modules/notifications.js"></script>
 		<script src="js/modules/options.js?v=2"></script>
-		<script src="js/modules/programs.js"></script>
+		<script src="js/modules/programs.js?v=1"></script>
 		<script src="js/modules/sites.js?v=osai2"></script>
 		<script src="js/modules/sites-otc.js"></script>
 		<script src="js/modules/station-attributes.js"></script>
 		<script src="js/modules/station-queue.js"></script>
 		<script src="js/modules/stations.js"></script>
-		<script src="js/modules/statistics.js"></script>
+		<script src="js/modules/statistics.js?v=1"></script>
 		<script src="js/modules/status.js"></script>
 		<script src="js/modules/storage.js"></script>
 		<script src="js/modules/supported.js"></script>

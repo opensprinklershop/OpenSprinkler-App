@@ -1108,11 +1108,24 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 		var mfrLower = mfr.toLowerCase();
 		var mdlLower = mdl.toLowerCase();
 
-		// GIEX GX04 Soil Sensor (Tuya TS0601 family with _TZE284_)
+		// GIEX GX03 2-zone watering timer (Tuya TS0601 with _TZE284_8zizsafo).
+		// Must be checked BEFORE the generic GX04 "_TZE284_" prefix rule below,
+		// otherwise the GX03 (whose manufacturer also starts with "_TZE284_")
+		// is misclassified as a GX04 Soil Sensor.
+		if (
+			mdlLower === "gx03" ||
+			mfrLower.indexOf( "_tze284_8zizsafo" ) !== -1 ||
+			mfrLower.indexOf( "_tze284_iilebqoo" ) !== -1
+		) {
+			return "GIEX GX03 2-zone watering timer";
+		}
+
+		// GIEX GX04 Soil Sensor (Tuya TS0601 family with _TZE284_).
+		// Exclude the known GX03 fingerprints from the broad "_TZE284_" prefix match.
 		if (
 			mdlLower === "ts0601_soil_3" ||
-			mfrLower.indexOf( "_tze284_" ) === 0 ||
-			( mdlLower === "ts0601" && mfrLower.indexOf( "_tze284_" ) !== -1 )
+			( mfrLower.indexOf( "_tze284_" ) === 0 && mfrLower.indexOf( "_tze284_8zizsafo" ) === -1 && mfrLower.indexOf( "_tze284_iilebqoo" ) === -1 ) ||
+			( mdlLower === "ts0601" && mfrLower.indexOf( "_tze284_" ) !== -1 && mfrLower.indexOf( "_tze284_8zizsafo" ) === -1 && mfrLower.indexOf( "_tze284_iilebqoo" ) === -1 )
 		) {
 			return "GIEX GX04 Soil Sensor";
 		}
@@ -1125,15 +1138,6 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 			( mdlLower === "ts0601" && mfrLower.indexOf( "_tze200_sh1btabb" ) !== -1 )
 		) {
 			return "GIEX GX02 Water Valve";
-		}
-
-		// GIEX GX03 2-zone watering timer (Tuya TS0601 with _TZE284_8zizsafo)
-		if (
-			mdlLower === "gx03" ||
-			mfrLower.indexOf( "_tze284_8zizsafo" ) !== -1 ||
-			( mdlLower === "ts0601" && mfrLower.indexOf( "_tze284_8zizsafo" ) !== -1 )
-		) {
-			return "GIEX GX03 2-zone watering timer";
 		}
 
 		// Tuya fallback placeholder to avoid displaying raw technical name
@@ -1967,12 +1971,18 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			if ( pickedManuf ) { popup.find( "#zbed-manuf" ).val( pickedManuf ); }
 			if ( pickedModel ) { popup.find( "#zbed-model" ).val( pickedModel ); }
 			if ( picked ) {
-				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( pickedManuf, pickedModel );
+				// The user explicitly picked a specific database entry, so trust
+				// the server-resolved name/description for THAT entry. Re-deriving
+				// the name from the raw manufacturer/model_id (e.g. "TS0601") via
+				// the local heuristic can mislabel devices — several GX03 variants
+				// share the generic "_TZE284_" prefix that the heuristic maps to
+				// "GX04 Soil Sensor".
+				var devName = String( picked.description || "" ).trim();
 				if ( !devName ) {
-					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, pickedModel, picked.description );
+					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, picked.model || pickedModel, picked.description );
 				}
 				if ( !devName ) {
-					devName = picked.description || "";
+					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( pickedManuf, pickedModel ) || "";
 				}
 				popup.find( "#zbed-name" ).val( String( devName ).slice( 0, 40 ) );
 			}
@@ -2931,6 +2941,60 @@ OSApp.ESP32Mode.showZigBeeScanVariantPopup = function( selectedDevice, discovere
 };
 
 /**
+ * WiFi-off ZigBee scan (WiFi-only gateways).
+ *
+ * On a gateway that talks to us over WiFi (no Ethernet), the shared 2.4 GHz
+ * radio keeps ZigBee joining from working while WiFi is active. The controller
+ * therefore turns WiFi OFF for a fixed join window and reconnects afterwards.
+ * During that window the UI cannot reach the controller, so this flow is a
+ * fire-and-forget request followed by a non-interactive countdown; it does NOT
+ * poll the device. When the countdown ends (WiFi is back) the panel is reloaded,
+ * which resolves the friendly names / logical devices from the online DB.
+ *
+ * @param {jQuery} scanBtn   The scan button (disabled during the join window).
+ * @param {jQuery} reloadBtn The reload button (disabled during the join window).
+ * @param {jQuery} popup     The gateway popup (closed before reloading).
+ */
+OSApp.ESP32Mode.startZigBeeWifiOffScan = function( scanBtn, reloadBtn, popup ) {
+	var DURATION = 30;          // firmware join window (seconds)
+	var RECONNECT_BUFFER = 10;  // extra time for WiFi to reconnect afterwards
+	var TOTAL = DURATION + RECONNECT_BUFFER;
+	var origText = scanBtn.text();
+
+	scanBtn.addClass( "ui-state-disabled ui-disabled" ).attr( "disabled", "disabled" );
+	reloadBtn.addClass( "ui-state-disabled ui-disabled" ).attr( "disabled", "disabled" );
+
+	// Fire the WiFi-off join. The controller replies just before dropping WiFi,
+	// but we must not depend on the reply since WiFi goes down during joining.
+	try {
+		OSApp.Firmware.sendToOS( "/zo?pw=&wifi_off=1&duration=" + DURATION, "json" );
+	} catch ( e ) { void e; }
+
+	var startedAt = Date.now();
+	scanBtn.text( OSApp.Language._( "Joining (WiFi off)" ) + " " + TOTAL + "s" );
+
+	var tick = setInterval( function() {
+		var elapsed = Math.floor( ( Date.now() - startedAt ) / 1000 );
+		var remaining = Math.max( 0, TOTAL - elapsed );
+		if ( remaining > 0 ) {
+			var phase = elapsed < DURATION
+				? OSApp.Language._( "Joining (WiFi off)" )
+				: OSApp.Language._( "Reconnecting WiFi" );
+			scanBtn.text( phase + " " + remaining + "s" );
+			return;
+		}
+		clearInterval( tick );
+		scanBtn.text( origText );
+		scanBtn.removeClass( "ui-state-disabled ui-disabled" ).removeAttr( "disabled" );
+		reloadBtn.removeClass( "ui-state-disabled ui-disabled" ).removeAttr( "disabled" );
+		// WiFi should be back now \u2014 reconnect to the controller and reload the
+		// device list (this also resolves names / logical devices from the DB).
+		popup.popup( "close" );
+		setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 500 );
+	}, 1000 );
+};
+
+/**
  * Display the ZigBee Gateway management panel.
  * Compact table list, white background, icon-only action buttons, "New" entry button.
  * Response format: { result:1, action:"list", devices:[ {ieee, short_addr, model, manufacturer, endpoint, device_id, is_new, last_rx_s, online} ], count:N }
@@ -2941,6 +3005,12 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	var supportsEditor = OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor();
 	var supportsScan = supportsEditor &&
 		typeof OSApp.ESP32Mode.showZigBeeScanVariantPopup === "function";
+	// WiFi-only gateway: the controller talks to us over WiFi (no Ethernet), so
+	// joining requires temporarily turning WiFi OFF. In that case the rolling
+	// permit-join and per-device rejoin (which need continuous HTTP access) are
+	// unavailable; only the self-contained WiFi-off scan is offered. Older
+	// firmware omits use_eth (undefined) — treat that as Ethernet (full features).
+	var wifiOnly = ( data.use_eth === 0 || data.use_eth === "0" );
 
 	content += "<div class='ui-content' role='main'>";
 	content += "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'>";
@@ -3015,8 +3085,10 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 					content += "<a href='#' class='zigbee-device-edit ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-edit ui-btn-icon-notext' " +
 						"title='" + OSApp.Language._( "Edit" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
 				}
-				content += "<a href='#' class='zigbee-device-rejoin ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-refresh ui-btn-icon-notext' " +
-					"title='" + OSApp.Language._( "Force Rejoin" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
+				if ( !wifiOnly ) {
+					content += "<a href='#' class='zigbee-device-rejoin ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-refresh ui-btn-icon-notext' " +
+						"title='" + OSApp.Language._( "Force Rejoin" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
+				}
 				content += "<a href='#' class='zigbee-device-remove ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-delete ui-btn-icon-notext' " +
 					"title='" + OSApp.Language._( "Remove" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
 			}
@@ -3048,7 +3120,12 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	if ( supportsScan ) {
 		content += "<button class='zigbee-scan-valve ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Scan for Zigbee devices" ) + "</button>";
 	}
-	content += "<button class='zigbee-permit-join ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Allow ZigBee Pairing" ) + "</button>";
+	// The rolling permit-join window needs continuous HTTP access, so it is only
+	// offered on Ethernet gateways. On WiFi-only gateways the WiFi-off scan above
+	// is the only supported join method.
+	if ( !wifiOnly ) {
+		content += "<button class='zigbee-permit-join ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._( "Allow ZigBee Pairing" ) + "</button>";
+	}
 	content += "<button class='cancel-zigbee-gw ui-btn ui-corner-all'>" + OSApp.Language._( "Close" ) + "</button>";
 	content += "</div></div>";
 
@@ -3068,6 +3145,14 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	popup.on( "click", ".zigbee-scan-valve", function() {
 		var scanBtn = $( this );
 		var reloadBtn = popup.find( ".zigbee-gw-reload" );
+
+		// WiFi-only gateway: joining needs WiFi off, which disconnects the UI.
+		// Run the self-contained WiFi-off scan instead of the HTTP-polling flow.
+		if ( wifiOnly ) {
+			OSApp.ESP32Mode.startZigBeeWifiOffScan( scanBtn, reloadBtn, popup );
+			return false;
+		}
+
 		var state = scanBtn.data( "zbScanState" ) || {};
 
 		// Toggle: a second click while a scan is running stops it immediately,

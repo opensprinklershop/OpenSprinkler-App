@@ -737,9 +737,7 @@
             "description": "program name"
           }
         ],
-        "items": {
-          "type": "integer"
-        }
+        "items": true
       },
       "Programs": {
         "type": "object",

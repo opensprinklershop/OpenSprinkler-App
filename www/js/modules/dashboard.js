@@ -1503,12 +1503,32 @@ OSApp.Dashboard.displayPage = function() {
 			OSApp.Dashboard.updateWaterLevel();
 			OSApp.Analog.updateSensorShowArea( page );
 
-			if ( !sites || !currentSite || !sites[ currentSite ] ) {
-				return;
+			// updateSites() populates sites[ currentSite ] inside an async Storage.get callback,
+			// so on the synchronous path here (and on the very first datarefresh) the entry may
+			// not exist yet. Ensure a valid structure exists before any .images/.notes/.lastRunTime
+			// access below and in addCard(), otherwise rendering throws
+			// "can't access property images, sites[currentSite] is undefined".
+			if ( !sites || typeof sites !== "object" ) {
+				sites = {};
 			}
-
+			if ( !currentSite ) {
+				currentSite = "default";
+			}
+			if ( !sites[ currentSite ] || typeof sites[ currentSite ] !== "object" ) {
+				sites[ currentSite ] = {
+					images: {},
+					notes: {},
+					lastRunTime: {}
+				};
+			}
 			if ( typeof sites[ currentSite ].images !== "object" ) {
 				sites[ currentSite ].images = {};
+			}
+			if ( typeof sites[ currentSite ].notes !== "object" ) {
+				sites[ currentSite ].notes = {};
+			}
+			if ( typeof sites[ currentSite ].lastRunTime !== "object" ) {
+				sites[ currentSite ].lastRunTime = {};
 			}
 
 			page.find( ".sitename" ).text( getDashboardTitle() );

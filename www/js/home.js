@@ -136,11 +136,9 @@ window.currLocal = true;
 		// Insert libraries
 		insertScript( assetLocation + "vendor-js/libs.js", function() {
 
-			// Insert timeline library for program preview and logs
-			insertScript( assetLocation + "vendor-js/vis-timeline-graph2d.min.js" );
-
-			// Insert charting library for analog support
-			insertScript( assetLocation + "vendor-js/apexcharts.min.js" );
+			// The charting libraries (vis-timeline for program preview/logs and
+			// apexcharts for analog/statistics) are loaded on demand by
+			// js/modules/lazy.js to keep ~1.1 MB off the critical render path.
 
 			// Insert datatables grid library
 			insertScript( assetLocation + "vendor-js/dataTables-2.1.8.min.js" );
