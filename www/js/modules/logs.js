@@ -466,12 +466,14 @@ OSApp.Logs.displayPage = function() {
 			};
 
 			// Load the timeline library on demand; it is kept off the critical path.
-			if ( OSApp.Lazy.hasTimeline() ) {
+			if ( typeof vis !== "undefined" && vis.Timeline ) {
 				renderTimeline();
-			} else {
+			} else if ( window.OSApp && OSApp.Lazy && OSApp.Lazy.ensureTimeline ) {
 				OSApp.Lazy.ensureTimeline( renderTimeline ).catch( function() {
 					logsList.html( "<p class='center'>" + OSApp.Language._( "Timeline library not available. Please reload the page." ) + "</p>" );
 				} );
+			} else {
+				logsList.html( "<p class='center'>" + OSApp.Language._( "Timeline library not available. Please reload the page." ) + "</p>" );
 			}
 		},
 		prepTable = function() {

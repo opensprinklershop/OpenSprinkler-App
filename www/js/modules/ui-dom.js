@@ -1052,7 +1052,12 @@ OSApp.UIDom.openPopup = function( popup, args ) {
 			OSApp.uiState.popupData.shift = updateRemainingStations;
 		}
 
-		popup.popup( "destroy" ).remove();
+		// Some callers may already remove the popup in their own close handlers.
+		// Only destroy the jQM widget when it is still initialized on this node.
+		if ( popup.data( "mobile-popup" ) ) {
+			popup.popup( "destroy" );
+		}
+		popup.remove();
 	} ).popup( args ).enhanceWithin();
 
 	popup.popup( "open" );

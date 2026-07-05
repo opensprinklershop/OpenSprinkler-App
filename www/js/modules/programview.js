@@ -389,8 +389,10 @@ OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
 
 			var sel = document.querySelector("#progChart-" + i);
 			if (sel) {
-				if (!OSApp.Lazy.hasApexCharts()) {
-					OSApp.Lazy.ensureApexCharts(function() { OSApp.ProgramView.updateProgramShowArea(page, visible); });
+				if (typeof window.ApexCharts === "undefined") {
+					if (window.OSApp && OSApp.Lazy && OSApp.Lazy.ensureApexCharts) {
+						OSApp.Lazy.ensureApexCharts(function() { OSApp.ProgramView.updateProgramShowArea(page, visible); });
+					}
 					return;
 				}
 				chart = new ApexCharts(sel, options);

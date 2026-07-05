@@ -874,7 +874,7 @@ OSApp.Sites.checkConfigured = function( firstLoad ) {
 			OSApp.currentSession.fw183 = false;
 		}
 
-		OSApp.Sites.newLoad();
+		OSApp.Sites.newLoad( firstLoad );
 	} );
 };
 
@@ -1280,7 +1280,7 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 };
 
 // Gather new controller information and load home page
-OSApp.Sites.newLoad = function() {
+OSApp.Sites.newLoad = function( firstLoad ) {
 
 	// Get the current site name from the session (not from selector which may not be updated yet)
 	var name = OSApp.currentSession.currentSite || $( "#site-selector" ).val(),
@@ -1424,9 +1424,10 @@ OSApp.Sites.newLoad = function() {
 				// calls Dashboard.displayPage when #sprinklers doesn't exist)
 				$( "#sprinklers" ).remove();
 
-				// goHome() without firstLoad=true skips the hash check
-				// and navigates directly to #sprinklers
-				OSApp.UIDom.goHome();
+				// Honor a deep-linked hash (e.g. #analogsensorconfig) on the initial
+				// page load / browser refresh via goHome's whitelist; other reconnects
+				// (firstLoad not set) fall through directly to #sprinklers.
+				OSApp.UIDom.goHome( firstLoad === true );
 			}
 		},
 		function( error ) {

@@ -573,8 +573,10 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 
 		// Create ApexCharts instances for prog adjustments
 		// Load the charting library on demand (kept off the critical path).
-		if (orderedProgAdjusts.length > 0 && !OSApp.Lazy.hasApexCharts()) {
-			OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.updateSensorShowArea(page); });
+		if (orderedProgAdjusts.length > 0 && typeof window.ApexCharts === "undefined") {
+			if (window.OSApp && OSApp.Lazy && OSApp.Lazy.ensureApexCharts) {
+				OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.updateSensorShowArea(page); });
+			}
 			return;
 		}
 		/* jshint loopfunc:true */
@@ -1484,8 +1486,10 @@ OSApp.Analog.updateAdjustmentChart = function(popup) {
 		};
 		let sel = document.querySelector("#adjchart");
 		if (sel) {
-			if (!OSApp.Lazy.hasApexCharts()) {
-				OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.updateAdjustmentChart(popup); });
+			if (typeof window.ApexCharts === "undefined") {
+				if (window.OSApp && OSApp.Lazy && OSApp.Lazy.ensureApexCharts) {
+					OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.updateAdjustmentChart(popup); });
+				}
 				return;
 			}
 			while (sel.firstChild)
@@ -2459,6 +2463,9 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 		};
 
 		var resolveScannerDeviceLabel = function(device, idx, shortAddr) {
+			if (device.friendly_name) {
+				return device.friendly_name;
+			}
 			var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
 			var cachedLabel = (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel === "function") ?
 				OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel(ieeeAddr) : null;
@@ -3616,6 +3623,9 @@ list += "</select></div>" +
 		};
 
 		var resolveZigBeeDeviceLabel = function(device, i) {
+			if (device.friendly_name) {
+				return device.friendly_name;
+			}
 			var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
 			var cachedLabel = (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel === "function") ?
 				OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel(ieeeAddr) : null;
@@ -6387,8 +6397,10 @@ OSApp.Analog.getMonitorName = function(monitorNr) {
 // Show Sensor Charts with apexcharts
 OSApp.Analog.showAnalogSensorCharts = function(limit2sensor, returnPageId) {
 
-	if (!OSApp.Lazy.hasApexCharts()) {
-		OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.showAnalogSensorCharts(limit2sensor, returnPageId); });
+	if (typeof window.ApexCharts === "undefined") {
+		if (window.OSApp && OSApp.Lazy && OSApp.Lazy.ensureApexCharts) {
+			OSApp.Lazy.ensureApexCharts(function() { OSApp.Analog.showAnalogSensorCharts(limit2sensor, returnPageId); });
+		}
 		return;
 	}
 

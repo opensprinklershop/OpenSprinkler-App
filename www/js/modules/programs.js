@@ -1588,8 +1588,10 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 	};
 
 	render = function() {
-		if ( !OSApp.Lazy.hasTimeline() ) {
-			OSApp.Lazy.ensureTimeline( render ).catch( function() {} );
+		if ( typeof window.vis === "undefined" || !window.vis.Timeline ) {
+			if ( window.OSApp && OSApp.Lazy && OSApp.Lazy.ensureTimeline ) {
+				OSApp.Lazy.ensureTimeline( render ).catch( function() {} );
+			}
 			return;
 		}
 

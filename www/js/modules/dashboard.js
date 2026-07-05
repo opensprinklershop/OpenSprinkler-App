@@ -518,7 +518,15 @@ OSApp.Dashboard.displayPage = function() {
 									}
 								}
 							} else {
+								if ( targetDev ) {
+									var fallbackEp = parseInt( targetDev.endpoint, 10 ) || 1;
+									lSel.append( "<option value='" + fallbackEp + ":0:0' data-endpoint='" + fallbackEp + "' data-usetuya='0' data-tuyadp='0' selected='selected'>" + OSApp.Language._( "Default endpoint" ) + " (EP: " + fallbackEp + ")</option>" );
+									select.find( "#zigbee-endpoint" ).val( fallbackEp );
+									select.find( "#zigbee-use-tuya" ).val( 0 );
+									select.find( "#zigbee-tuya-dp" ).val( 0 );
+								} else {
 								lSel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "No logical devices" ) + "</option>" );
+								}
 							}
 
 							try { lSel.selectmenu( "refresh", true ); } catch( e ) { void e; }
@@ -601,6 +609,7 @@ OSApp.Dashboard.displayPage = function() {
 								sel.append( "<option value=''>" + OSApp.Language._( "-- Select or Enter Custom --" ) + "</option>" );
 								if ( response && response.result === 1 && response.devices && response.devices.length > 0 ) {
 									loadedDevices = response.devices || [];
+									var selectedDeviceIeee = "";
 									for ( var i = 0; i < response.devices.length; i++ ) {
 										var dev = response.devices[ i ];
 										var label = dev.model || dev.manufacturer || "Device";
@@ -608,6 +617,7 @@ OSApp.Dashboard.displayPage = function() {
 										if ( cachedLabel ) { label = cachedLabel; }
 										var optionText = label + " (" + dev.ieee + ")";
 										var selectedStr = ( normalizeZigbeeIeee( dev.ieee ) === normalizeZigbeeIeee( chosenIeee ) ) ? "selected='selected'" : "";
+										if ( selectedStr ) { selectedDeviceIeee = dev.ieee; }
 										sel.append( "<option value='" + dev.ieee + "' data-endpoint='" + dev.endpoint + "' data-manufacturer='" + OSApp.Utils.htmlEscape( dev.manufacturer || "" ) + "' data-model='" + OSApp.Utils.htmlEscape( dev.model || "" ) + "' " + selectedStr + ">" + OSApp.Utils.htmlEscape( optionText ) + "</option>" );
 
 										if ( dev.ieee && dev.manufacturer && dev.model && OSApp.ESP32Mode.ZigbeeDeviceDB ) {
@@ -620,6 +630,10 @@ OSApp.Dashboard.displayPage = function() {
 												};
 											})( dev.ieee ) );
 										}
+									}
+
+									if ( selectedDeviceIeee ) {
+										sel.val( selectedDeviceIeee );
 									}
 								} else {
 									sel.append( "<option value='' disabled='disabled'>" + OSApp.Language._( "No paired devices found" ) + "</option>" );
