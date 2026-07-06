@@ -187,13 +187,17 @@ OSApp.Dashboard.displayPage = function() {
 				return "zigbee-error";
 			}
 
-			if ( statusCode === 3 || statusCode === 4 ) {
+			if ( statusCode === 1 || statusCode === 3 || statusCode === 4 ) {
 				return "zigbee-on";
 			}
 
 			return "zigbee-off";
 		},
 		addTimer = function( station, rem ) {
+			var existing = OSApp.uiState.timers[ "station-" + station ];
+			if ( existing && Math.abs( existing.val - rem ) <= 5 ) {
+				return;
+			}
 			OSApp.uiState.timers[ "station-" + station ] = {
 				val: rem,
 				station: station,

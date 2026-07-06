@@ -1971,7 +1971,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		// Quick send value row for testing logical device control
 		h += "  <div style='display:flex;gap:6px;align-items:flex-end;margin-top:8px;padding:6px;background:#f7fff4;border:1px solid #d8efcf;border-radius:4px;'>";
 		h += "    <div style='flex:1;min-width:80px;'>";
-		h += "      <label style='font-size:0.8em;margin:0 0 2px;">" + OSApp.Language._( "Send Value" ) + "</label>";
+		h += "      <label style='font-size:0.8em;margin:0 0 2px;'>" + OSApp.Language._( "Send Value" ) + "</label>";
 		h += "      <input type='number' class='zbed-send-value' data-idx='" + idx + "' value='1' data-mini='true' step='1'>";
 		h += "    </div>";
 		h += "    <button type='button' class='zbed-send-logical ui-btn ui-mini ui-corner-all ui-icon-action ui-btn-icon-left ui-btn-inline' data-idx='" + idx + "' style='margin:0;white-space:nowrap;'>" + OSApp.Language._( "Send" ) + "</button>";
