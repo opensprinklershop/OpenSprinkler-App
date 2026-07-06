@@ -917,7 +917,7 @@ OSApp.UIDom.bindPanel = function() {
 				}
 
 				// Update ESP32 Mode and sub-menu visibility
-				if ( OSApp.ESP32Mode && OSApp.ESP32Mode.isESP32Supported() ) {
+				if ( OSApp.ESP32Mode && typeof OSApp.ESP32Mode.isESP32Supported === "function" && OSApp.ESP32Mode.isESP32Supported() ) {
 
 					// Remove hidden class and clear any inline display style
 					// that jQuery Mobile may have cached from initial enhancement

@@ -617,7 +617,9 @@ OSApp.Firmware.checkFirmwareUpdate = function() {
 
 								popup.find( ".update" ).on( "click", function() {
 									if ( OSApp.currentSession.controller.options.hwv === 30 ) {
-										$( "<a class='hidden iab' href='" + OSApp.ESP32Mode.getDirectDeviceUpdateUrl() + "'></a>" ).appendTo( popup ).click();
+										if ( OSApp.ESP32Mode && typeof OSApp.ESP32Mode.getDirectDeviceUpdateUrl === "function" ) {
+											$( "<a class='hidden iab' href='" + OSApp.ESP32Mode.getDirectDeviceUpdateUrl() + "'></a>" ).appendTo( popup ).click();
+										}
 										return;
 									}
 
@@ -1020,7 +1022,7 @@ OSApp.Firmware.getOTAInfoHTML = function() {
  * wait for the device to come back online at the end.
  */
 OSApp.Firmware.pollOTAProgress = function( popup ) {
-	var ST = OSApp.ESP32Mode.OTA_STATUS;
+	var ST = (OSApp.ESP32Mode && OSApp.ESP32Mode.OTA_STATUS) || {};
 	var failCount = 0;
 	var maxFails = 60; // 60 × 2s = 120s tolerance per offline/reboot window
 	var lastProgress = 0;
@@ -1376,7 +1378,9 @@ OSApp.Firmware.initOTACheck = function() {
 				OSApp.Firmware.getOSVersion( data.fw_version ) + " (" + data.fw_minor + ")",
 			on: function() {
 				OSApp.Notifications.removeNotification( $( this ).parent() );
-				OSApp.ESP32Mode.startOnlineUpdateFlow();
+				if ( OSApp.ESP32Mode && typeof OSApp.ESP32Mode.startOnlineUpdateFlow === "function" ) {
+					OSApp.ESP32Mode.startOnlineUpdateFlow();
+				}
 				return false;
 			}
 		} );

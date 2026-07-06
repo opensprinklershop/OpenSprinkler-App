@@ -5354,7 +5354,9 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		// OTA update button handlers - delegate to Online Update flow
 		page.find(".ota-update-btn, .ota-manage-btn").on("click", function(e) {
 			e.preventDefault();
-			OSApp.ESP32Mode.startOnlineUpdateFlow();
+			if (OSApp.ESP32Mode && typeof OSApp.ESP32Mode.startOnlineUpdateFlow === "function") {
+				OSApp.ESP32Mode.startOnlineUpdateFlow();
+			}
 			return false;
 		});
 
