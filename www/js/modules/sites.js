@@ -1227,8 +1227,9 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 		$( "#addnew" ).popup( "reposition", { positionTo:"window" } );
 	}
 
-	var urlDest = "/jo?pw=" + md5( $( "#os_pw" ).val() ),
-		url = token ? "https://cloud.openthings.io/forward/v1/" + token + urlDest : prefix + ip + urlDest;
+	var normalizedIp = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) ? OSApp.Firmware.normalizeDirectHost( ip, prefix ) : ip,
+		urlDest = "/jo?pw=" + md5( $( "#os_pw" ).val() ),
+		url = token ? "https://cloud.openthings.io/forward/v1/" + token + urlDest : prefix + normalizedIp + urlDest;
 
 	//Submit form data to the server
 	$.ajax( {

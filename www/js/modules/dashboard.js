@@ -132,17 +132,19 @@ OSApp.Dashboard.displayPage = function() {
 				OSApp.ESP32Mode = {};
 			}
 
-			if ( !OSApp.ESP32Mode.cachedDevices && !OSApp.ESP32Mode.fetchingDevices ) {
-				OSApp.ESP32Mode.fetchingDevices = true;
-				OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( data ) {
-					OSApp.ESP32Mode.fetchingDevices = false;
-					if ( data && data.result === 1 && data.devices ) {
-						OSApp.ESP32Mode.cachedDevices = data.devices;
-						$( "html" ).trigger( "datarefresh" );
-					}
-				} ).fail( function() {
-					OSApp.ESP32Mode.fetchingDevices = false;
-				} );
+			if ( OSApp.ESP32Mode && typeof OSApp.ESP32Mode.isZigbeeSupported === "function" && OSApp.ESP32Mode.isZigbeeSupported() ) {
+				if ( !OSApp.ESP32Mode.cachedDevices && !OSApp.ESP32Mode.fetchingDevices ) {
+					OSApp.ESP32Mode.fetchingDevices = true;
+					OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( data ) {
+						OSApp.ESP32Mode.fetchingDevices = false;
+						if ( data && data.result === 1 && data.devices ) {
+							OSApp.ESP32Mode.cachedDevices = data.devices;
+							$( "html" ).trigger( "datarefresh" );
+						}
+					} ).fail( function() {
+						OSApp.ESP32Mode.fetchingDevices = false;
+					} );
+				}
 			}
 
 			if ( OSApp.ESP32Mode.cachedDevices && OSApp.ESP32Mode.cachedDevices.length > 0 ) {

@@ -41,36 +41,17 @@ OSApp.Firmware.Constants = {
 OSApp.Firmware.nativeHttpReady = false;
 
 OSApp.Firmware.normalizeDirectHost = function( host, prefix ) {
+	void prefix;
 	if ( typeof host !== "string" || !host ) {
 		return host;
 	}
 
-	var url;
-	try {
-		url = new URL( ( prefix || "http://" ) + host );
-	} catch {
-		if ( prefix === "https://" ) {
-			return host.replace( /:80(?=(?:$|\/|\?))/i, "" );
-		}
-		if ( prefix === "http://" ) {
-			return host.replace( /:443(?=(?:$|\/|\?))/i, "" );
-		}
-		return host;
-	}
+	var cleanHost = host.replace( /^https?:\/\//i, "" );
 
-	if ( prefix === "https://" ) {
-		url.protocol = "https:";
-		if ( url.port === "80" || url.port === "443" ) {
-			url.port = "";
-		}
-	} else if ( prefix === "http://" ) {
-		url.protocol = "http:";
-		if ( url.port === "80" || url.port === "443" ) {
-			url.port = "";
-		}
-	}
+	// Strip standard ports 80/443 for both connections to avoid protocol/port mismatch blocks.
+	cleanHost = cleanHost.replace( /:(?:80|443)(?=(?:$|\/|\?))/i, "" );
 
-	return ( url.host + url.pathname ).replace( /\/$/, "" ) + url.search;
+	return cleanHost;
 };
 
 OSApp.Firmware.canUseNativeHttp = function( url ) {

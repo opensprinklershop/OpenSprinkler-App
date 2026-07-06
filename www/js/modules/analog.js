@@ -4019,6 +4019,9 @@ list += "</select></div>" +
 
 		// Fetch registered ZigBee gateway devices (with logical_devices) and populate the dropdown
 		var preloadZigBeeDevices = function () {
+			if ( !OSApp.ESP32Mode || typeof OSApp.ESP32Mode.isZigbeeSupported !== "function" || !OSApp.ESP32Mode.isZigbeeSupported() ) {
+				return;
+			}
 			OSApp.Firmware.sendToOS("/zg?pw=", "json").then(function (data) {
 				var devicesRaw = (data && Array.isArray(data.devices)) ? data.devices : [];
 				var devices = devicesRaw.filter(function(device) {

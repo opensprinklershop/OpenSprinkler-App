@@ -310,10 +310,14 @@ OSApp.Network.checkPublicAccess = function( eip ) {
 		return;
 	}
 
-	port = ( port ? parseInt( port[ 1 ] ) : 80 );
+	var parsedPort = ( port ? parseInt( port[ 1 ] ) : ( OSApp.currentSession.prefix === "https://" ? 443 : 80 ) );
+	var rawHost = ip + ":" + parsedPort;
+	var normalizedHost = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" )
+		? OSApp.Firmware.normalizeDirectHost( rawHost, OSApp.currentSession.prefix )
+		: rawHost;
 
 	$.ajax( {
-		url: OSApp.currentSession.prefix + ip + ":" + port + "/jo?pw=" + OSApp.currentSession.pass,
+		url: OSApp.currentSession.prefix + normalizedHost + "/jo?pw=" + OSApp.currentSession.pass,
 		global: false,
 		dataType: "json",
 		type: "GET"

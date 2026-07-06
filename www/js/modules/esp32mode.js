@@ -93,6 +93,23 @@ OSApp.ESP32Mode.isESP32Supported = function() {
 };
 
 /**
+ * Check if the connected controller actually supports the ZigBee protocol features
+ */
+OSApp.ESP32Mode.isZigbeeSupported = function() {
+	if ( !OSApp.currentSession.controller || !OSApp.currentSession.controller.options ) {
+		return false;
+	}
+
+	var feature = OSApp.currentSession.controller.options.feature;
+	if ( !feature ) {
+		return false;
+	}
+
+	var featureStr = Array.isArray( feature ) ? feature.join( "," ) : String( feature );
+	return featureStr.toUpperCase().indexOf( "ZIGBEE" ) !== -1;
+};
+
+/**
  * Check if RainMaker feature is supported (feature string contains "RAINMAKER")
  */
 OSApp.ESP32Mode.isRainMakerSupported = function() {
