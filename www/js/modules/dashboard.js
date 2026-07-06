@@ -582,21 +582,52 @@ OSApp.Dashboard.displayPage = function() {
 							var refreshZigbeeSelect = function() {
 								try { sel.selectmenu( "refresh", true ); } catch( e ) { void e; }
 							};
+							var getZigbeeFriendlyLabel = function( dev ) {
+								var manufacturer = String( dev.manufacturer || "" ).trim();
+								var model = String( dev.model || "" ).trim();
+								var friendly = String( dev.friendly_name || dev.friendlyName || "" ).trim();
+								var cachedLabel = ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) || "";
+								var localLabel = ( manufacturer && model && OSApp.ESP32Mode.ZigbeeDeviceDB && OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName ) ? ( OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( manufacturer, model ) || "" ) : "";
+
+								if ( friendly ) { return friendly; }
+								if ( cachedLabel ) { return cachedLabel; }
+								if ( localLabel ) { return localLabel; }
+								if ( model ) { return model; }
+								if ( manufacturer ) { return manufacturer; }
+								return "Device";
+							};
 							var updateZigbeeOptionLabel = function( ieee, data ) {
 								var label = "";
+								var matchedOption;
 
-								if ( data && data.vendor && data.description ) {
-									label = data.vendor + " - " + data.description;
+								if ( !ieee ) {
+									return;
+								}
+
+								matchedOption = sel.find( "option" ).filter( function() {
+									return normalizeZigbeeIeee( $( this ).val() ) === normalizeZigbeeIeee( ieee );
+								} );
+
+								if ( !matchedOption.length ) {
+									return;
+								}
+
+								if ( data && data.vendor && data.model && OSApp.ESP32Mode.ZigbeeDeviceDB && OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName ) {
+									label = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( data.vendor, data.model, data.description );
 								} else if ( data ) {
 									label = data.vendor || data.description || data.model || "";
 								}
 
-								if ( label && ieee ) {
-									sel.find( "option" ).filter( function() {
-										return normalizeZigbeeIeee( $( this ).val() ) === normalizeZigbeeIeee( ieee );
-									} ).text( label + " (" + normalizeZigbeeIeee( ieee ) + ")" );
-									refreshZigbeeSelect();
+								if ( !label ) {
+									return;
 								}
+
+								if ( String( matchedOption.attr( "data-friendly-name" ) || "" ).trim() ) {
+									return;
+								}
+
+								matchedOption.text( label + " (" + normalizeZigbeeIeee( ieee ) + ")" );
+								refreshZigbeeSelect();
 							};
 							sel.empty();
 							sel.append( "<option value=''>" + OSApp.Language._( "Loading paired devices..." ) + "</option>" );
@@ -612,13 +643,12 @@ OSApp.Dashboard.displayPage = function() {
 									var selectedDeviceIeee = "";
 									for ( var i = 0; i < response.devices.length; i++ ) {
 										var dev = response.devices[ i ];
-										var label = dev.model || dev.manufacturer || "Device";
-										var cachedLabel = ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) );
-										if ( cachedLabel ) { label = cachedLabel; }
+										var label = getZigbeeFriendlyLabel( dev );
+										var friendlyNameAttr = String( dev.friendly_name || dev.friendlyName || "" ).trim();
 										var optionText = label + " (" + dev.ieee + ")";
 										var selectedStr = ( normalizeZigbeeIeee( dev.ieee ) === normalizeZigbeeIeee( chosenIeee ) ) ? "selected='selected'" : "";
 										if ( selectedStr ) { selectedDeviceIeee = dev.ieee; }
-										sel.append( "<option value='" + dev.ieee + "' data-endpoint='" + dev.endpoint + "' data-manufacturer='" + OSApp.Utils.htmlEscape( dev.manufacturer || "" ) + "' data-model='" + OSApp.Utils.htmlEscape( dev.model || "" ) + "' " + selectedStr + ">" + OSApp.Utils.htmlEscape( optionText ) + "</option>" );
+										sel.append( "<option value='" + dev.ieee + "' data-endpoint='" + dev.endpoint + "' data-manufacturer='" + OSApp.Utils.htmlEscape( dev.manufacturer || "" ) + "' data-model='" + OSApp.Utils.htmlEscape( dev.model || "" ) + "' data-friendly-name='" + OSApp.Utils.htmlEscape( friendlyNameAttr ) + "' " + selectedStr + ">" + OSApp.Utils.htmlEscape( optionText ) + "</option>" );
 
 										if ( dev.ieee && dev.manufacturer && dev.model && OSApp.ESP32Mode.ZigbeeDeviceDB ) {
 											OSApp.ESP32Mode.ZigbeeDeviceDB.lookup( dev.manufacturer, dev.model ).done( (function( deviceIeee ) {

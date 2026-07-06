@@ -1730,6 +1730,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			dpUnit:    parseDp( ld.unit_dp ),
 			dpBatt:    parseDp( ld.battery_dp ),
 			statusOn:  ld.status_on || "",
+			statusOff: ld.status_off || ld.status_of || "",
 			isTuya:    ( ld.control_mode === 1 ),
 			factor:    parseInt( ld.factor, 10 ) || 0,
 			divider:   parseInt( ld.divider, 10 ) || 0,
@@ -1769,6 +1770,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		params[ prefix + "dp_stat" ] = dpOrNeg( entry.dpStat );
 		params[ prefix + "dp_cons" ] = dpOrNeg( entry.dpCons );
 		params[ prefix + "status_on" ] = String( entry.statusOn || "" ).trim().slice( 0, 15 );
+		params[ prefix + "status_off" ] = String( entry.statusOff || "" ).trim().slice( 0, 15 );
 		params[ prefix + "factor"  ] = parseInt( entry.factor, 10 ) || 0;
 		params[ prefix + "div"     ] = parseInt( entry.divider, 10 ) || 0;
 		params[ prefix + "offset"  ] = parseInt( entry.offset, 10 ) || 0;
@@ -1820,6 +1822,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 				dpUnit:   parseDp( e.dp_unit ),
 				dpBatt:   parseDp( e.dp_battery ),
 				statusOn: e.tuya_status_on || e.status_on || "",
+				statusOff: e.tuya_status_off || e.status_off || e.tuya_status_of || e.status_of || "",
 				isTuya:   isTuya,
 				factor:   parseInt( e.factor, 10 ) || 0,
 				divider:  parseInt( e.divider, 10 ) || 0,
@@ -1852,6 +1855,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		{ key: "dpVal",  lbl: "Value DP"       },
 		{ key: "dpStat", lbl: "Status DP"      },
 		{ key: "statusOn", lbl: "Status ON"   },
+		{ key: "statusOff", lbl: "Status OFF" },
 		{ key: "dpCons", lbl: "Consumption DP" },
 		{ key: "dpUnit", lbl: "Unit DP"        },
 		{ key: "dpBatt", lbl: "Battery DP"     }
@@ -1955,13 +1959,22 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			var val = d[ f.key ] !== undefined && d[ f.key ] !== null ? d[ f.key ] : "";
 			h += "    <div style='flex:1;min-width:60px;'>";
 			h += "      <label style='font-size:0.75em;margin:0 0 2px;'>" + OSApp.Language._( f.lbl ) + "</label>";
-			if ( f.key === "statusOn" ) {
+			if ( f.key === "statusOn" || f.key === "statusOff" ) {
 				h += "      <input type='text' class='zbed-ld-field' data-idx='" + idx + "' data-field='" + f.key + "' value='" + val + "' data-mini='true' placeholder='e.g., 1,2'>";
 			} else {
 				h += "      <input type='number' class='zbed-ld-field' data-idx='" + idx + "' data-field='" + f.key + "' value='" + val + "' data-mini='true'>";
 			}
 			h += "    </div>";
 		} );
+		h += "  </div>";
+
+		// Quick send value row for testing logical device control
+		h += "  <div style='display:flex;gap:6px;align-items:flex-end;margin-top:8px;padding:6px;background:#f7fff4;border:1px solid #d8efcf;border-radius:4px;'>";
+		h += "    <div style='flex:1;min-width:80px;'>";
+		h += "      <label style='font-size:0.8em;margin:0 0 2px;">" + OSApp.Language._( "Send Value" ) + "</label>";
+		h += "      <input type='number' class='zbed-send-value' data-idx='" + idx + "' value='1' data-mini='true' step='1'>";
+		h += "    </div>";
+		h += "    <button type='button' class='zbed-send-logical ui-btn ui-mini ui-corner-all ui-icon-action ui-btn-icon-left ui-btn-inline' data-idx='" + idx + "' style='margin:0;white-space:nowrap;'>" + OSApp.Language._( "Send" ) + "</button>";
 		h += "  </div>";
 
 		// Delete button
@@ -2145,6 +2158,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 								status_dp:      intOrNeg( pl.dpStat ),
 								consumption_dp: intOrNeg( pl.dpCons ),
 								status_on:      pl.statusOn || "",
+								status_off:     pl.statusOff || "",
 								unit_dp:        intOrNeg( pl.dpUnit ),
 								battery_dp:     intOrNeg( pl.dpBatt ),
 								control_mode:   pl.isTuya ? 1 : 0,
@@ -2185,6 +2199,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			dpUnit:    "",
 			dpBatt:    "",
 			statusOn:  "",
+			statusOff: "",
 			isTuya:    false,
 			factor:    0,
 			divider:   0,
@@ -2203,6 +2218,57 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		}
 		pendingLogicals.splice( idx, 1 );
 		renderLogicalCards( pendingLogicals, true );
+		return false;
+	} );
+
+	popup.on( "click", ".zbed-send-logical", function() {
+		var idx = parseInt( $( this ).attr( "data-idx" ), 10 );
+		var rawValue = popup.find( ".zbed-send-value[data-idx='" + idx + "']" ).val();
+		var sendValue = parseInt( rawValue, 10 );
+		var logicalEntry;
+		var logicalName;
+		var $btn = $( this );
+
+		if ( isNaN( idx ) ) { return false; }
+
+		if ( pendingLogicals !== null ) {
+			OSApp.Errors.showError( OSApp.Language._( "Logical device changes are pending. Please save first, then send." ) );
+			return false;
+		}
+
+		if ( isNaN( sendValue ) ) {
+			OSApp.Errors.showError( OSApp.Language._( "Please enter a numeric value." ) );
+			return false;
+		}
+
+		logicalEntry = logicals[ idx ];
+		logicalName = String( logicalEntry && ( logicalEntry.name || logicalEntry.kind ) || "" ).trim();
+		if ( !logicalName ) {
+			OSApp.Errors.showError( OSApp.Language._( "Logical device name is missing." ) );
+			return false;
+		}
+
+		$btn.addClass( "ui-disabled" );
+		$.mobile.loading( "show" );
+		OSApp.Firmware.sendToOS(
+			"/zg?pw=&action=send_logical" +
+			"&ieee=" + encodeURIComponent( devIeee ) +
+			"&logical=" + encodeURIComponent( logicalName ) +
+			"&value=" + encodeURIComponent( String( sendValue ) ),
+			"json"
+		).done( function( resp ) {
+			if ( resp && resp.result === 1 ) {
+				OSApp.Errors.showError( OSApp.Language._( "Value sent." ) );
+			} else {
+				OSApp.Errors.showError( ( resp && resp.error ) || OSApp.Language._( "Failed to send value." ) );
+			}
+		} ).fail( function() {
+			OSApp.Errors.showError( OSApp.Language._( "Failed to send value." ) );
+		} ).always( function() {
+			$.mobile.loading( "hide" );
+			$btn.removeClass( "ui-disabled" );
+		} );
+
 		return false;
 	} );
 
