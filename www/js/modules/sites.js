@@ -189,8 +189,10 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 		return;
 	}
 
-	var urlDest = "/jo?pw=" + encodeURIComponent( siteData.os_pw ),
-		url = siteData.os_token ? "https://cloud.openthings.io/forward/v1/" + siteData.os_token + urlDest : ( siteData.ssl === "1" ? "https://" : "http://" ) + siteData.os_ip + urlDest;
+	var prefix = siteData.ssl === "1" ? "https://" : "http://",
+		normalizedIp = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) ? OSApp.Firmware.normalizeDirectHost( siteData.os_ip, prefix ) : siteData.os_ip,
+		urlDest = "/jo?pw=" + encodeURIComponent( siteData.os_pw ),
+		url = siteData.os_token ? "https://cloud.openthings.io/forward/v1/" + siteData.os_token + urlDest : prefix + normalizedIp + urlDest;
 
 	$.ajax( {
 		url: url,
@@ -707,8 +709,10 @@ list.find( ".add-otc-connection" ).on( "click", function() {
 
 OSApp.Sites.testSite = function( site, id, callback ) {
 	callback = callback || function() {};
-	var urlDest = "/jo?pw=" + encodeURIComponent( site.os_pw ),
-		url = site.os_token ? "https://cloud.openthings.io/forward/v1/" + site.os_token + urlDest : ( site.ssl === "1" ? "https://" : "http://" ) + site.os_ip + urlDest,
+	var prefix = site.ssl === "1" ? "https://" : "http://",
+		normalizedIp = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) ? OSApp.Firmware.normalizeDirectHost( site.os_ip, prefix ) : site.os_ip,
+		urlDest = "/jo?pw=" + encodeURIComponent( site.os_pw ),
+		url = site.os_token ? "https://cloud.openthings.io/forward/v1/" + site.os_token + urlDest : prefix + normalizedIp + urlDest,
 
 		// Use native HTTP for direct HTTPS device connections on Android (WebView
 		// cannot verify self-signed certs, but cordova-plugin-advanced-http can).
