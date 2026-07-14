@@ -92,9 +92,11 @@ OSApp.AIAssistant.I18N = {
 		"The assistant could not process this request.": "Der Assistent konnte diese Anfrage nicht verarbeiten.",
 		"This request is outside the allowed topic (OpenSprinkler / irrigation only).": "Diese Anfrage liegt ausserhalb des erlaubten Themas (nur OpenSprinkler / Bewaesserung).",
 		"Could not reach the assistant service.": "Der Assistenten-Dienst ist nicht erreichbar.",
+		"The assistant service timed out after 35 seconds.": "Der Assistenten-Dienst hat nach 35 Sekunden keine Antwort geliefert.",
 		"Too many requests. Please try again later.": "Zu viele Anfragen. Bitte später erneut versuchen.",
 		"The proposed configuration is not API compliant and was not applied.": "Die vorgeschlagene Konfiguration ist nicht API-konform und wurde nicht angewendet.",
 		"Could not apply the changes.": "Die Aenderungen konnten nicht angewendet werden.",
+		"Zone could not be found.": "Die Zone konnte nicht gefunden werden.",
 		"Release notes": "Release-Notizen",
 		"Latest release": "Neueste Version",
 		"All releases": "Alle Versionen",
@@ -349,8 +351,10 @@ OSApp.AIAssistant.displayPage = function() {
 				<div id="osai-result" class="hidden" style="margin-top:12px">
 					<div id="osai-summary" style="font-weight:600"></div>
 					<div id="osai-explanation" class="smaller" style="color:#666;margin:6px 0"></div>
-					<h3>${OSApp.Language._( "Proposed changes" )}</h3>
-					<pre id="osai-diff" style="background:#f6f6f6;border:1px solid #ddd;border-radius:6px;padding:10px;overflow:auto;max-height:240px;font-size:12px"></pre>
+					<details class="osai-changes-details" style="margin-top:12px; border:1px solid #ddd; border-radius:4px; padding:6px; background:#fafafa; font-size:12px; outline:none;">
+						<summary style="cursor:pointer; font-weight:600; outline:none; color:#1565c0; user-select:none;">${OSApp.Language._( "Proposed changes" )}</summary>
+						<pre id="osai-diff" style="margin-top:6px; padding:6px; background:#fff; border:1px solid #eee; border-radius:4px; overflow-x:auto; max-height:180px; font-family:monospace; font-size:11px; white-space:pre-wrap; margin-bottom:0;"></pre>
+					</details>
 					<div id="osai-apply-row" class="hidden">
 						<div class="ui-grid-a">
 							<div class="ui-block-a"><a href="#" id="osai-apply" class="ui-btn ui-btn-b ui-corner-all ui-icon-check ui-btn-icon-left">${OSApp.Language._( "Apply to device" )}</a></div>
@@ -435,10 +439,12 @@ OSApp.AIAssistant.displayPage = function() {
 			}
 			page.find( "#osai-status" ).addClass( "hidden" );
 			showResult( res );
-		} ).fail( function( xhr ) {
+		} ).fail( function( xhr, textStatus ) {
 			var msg = OSApp.Language._( "Could not reach the assistant service." );
 			if ( xhr && xhr.responseJSON && xhr.responseJSON.message ) {
 				msg = xhr.responseJSON.message;
+			} else if ( textStatus === "timeout" ) {
+				msg = OSApp.AIAssistant.t( "The assistant service timed out after 35 seconds." );
 			} else if ( xhr && xhr.status === 429 ) {
 				msg = OSApp.Language._( "Too many requests. Please try again later." );
 			}
@@ -550,6 +556,45 @@ OSApp.AIAssistant.applyChanges = function( changes ) {
 			OSApp.Analog.sendToOsObj( "/sb?pw=", adjust );
 		} );
 	}
+};
+
+OSApp.AIAssistant.ensureCommandEndpoint = function( endpoint ) {
+	var ep = String( endpoint || "" ).trim();
+	if ( !ep || ep.charAt( 0 ) !== "/" ) {
+		return "";
+	}
+	if ( /([?&])pw=/i.test( ep ) ) {
+		ep = ep.replace( /([?&])pw=[^&]*/i, "$1pw=" );
+	} else {
+		ep += ( ep.indexOf( "?" ) === -1 ? "?pw=" : "&pw=" );
+	}
+	return ep;
+};
+
+OSApp.AIAssistant.executeCommand = function( cmd ) {
+	var d = $.Deferred();
+	var ep = OSApp.AIAssistant.ensureCommandEndpoint( cmd && cmd.endpoint ? cmd.endpoint : "" );
+	if ( !ep ) {
+		d.reject( { error: "invalid_endpoint" } );
+		return d.promise();
+	}
+	OSApp.Firmware.sendToOS( ep, "json" ).done( function( info ) {
+		console.log( "[OSAI Command] Executed:", ep, info );
+		d.resolve( { endpoint: ep, info: info } );
+	} ).fail( function( xhr ) {
+		d.reject( { endpoint: ep, xhr: xhr } );
+	} );
+	return d.promise();
+};
+
+// Führt Steuerungskommandos wie Starten/Stoppen von Zonen oder Programmen direkt aus
+OSApp.AIAssistant.applyCommands = function( commands ) {
+	if ( !Array.isArray( commands ) ) {
+		return;
+	}
+	commands.forEach( function( cmd ) {
+		OSApp.AIAssistant.executeCommand( cmd );
+	} );
 };
 
 // Erlaubte OpenSprinkler-Optionsschlüssel (aus der OpenAPI-Definition, components/schemas/Options).
@@ -1279,6 +1324,135 @@ OSApp.AIAssistant.detectEnableIntent = function( message ) {
 	return null;
 };
 
+OSApp.AIAssistant.normalizeText = function( value ) {
+	var text = String( value || "" ).toLowerCase();
+	if ( typeof text.normalize === "function" ) {
+		text = text.normalize( "NFD" ).replace( /[\u0300-\u036f]/g, "" );
+	}
+	return text
+		.replace( /[^a-z0-9]+/g, " " )
+		.replace( /\s+/g, " " )
+		.trim();
+};
+
+OSApp.AIAssistant.parseStationControl = function( message ) {
+	var msg = String( message || "" ).trim();
+	var match = msg.match( /(?:^|\s)(?:starte|start|schalte|schalt|turn on|run)\s+(?:die\s+|the\s+)?(?:zone|station)\s+([a-z0-9äöüß _-]+?)\s*(?:f[üu]r|for)\s*(\d+(?:[.,]\d+)?)\s*(stunden?|hours?|h|minuten?|minutes?|mins?|min|m|sekunden?|seconds?|secs?|sec|s)?(?:\b|$)/iu );
+	var duration, unit;
+
+	if ( !match ) {
+		return null;
+	}
+
+	duration = parseFloat( String( match[ 2 ] ).replace( ",", "." ) );
+	if ( !isFinite( duration ) || duration <= 0 ) {
+		return null;
+	}
+
+	unit = String( match[ 3 ] || "min" ).toLowerCase();
+	if ( unit.indexOf( "h" ) === 0 ) {
+		duration *= 3600;
+	} else if ( unit.indexOf( "s" ) === 0 ) {
+		duration *= 1;
+	} else {
+		duration *= 60;
+	}
+
+	return {
+		zoneName: $.trim( match[ 1 ] ),
+		duration: Math.max( 1, Math.round( duration ) )
+	};
+};
+
+OSApp.AIAssistant.findStationIndexByName = function( zoneName ) {
+	var snames = OSApp.currentSession && OSApp.currentSession.controller && OSApp.currentSession.controller.stations && OSApp.currentSession.controller.stations.snames;
+	var target = OSApp.AIAssistant.normalizeText( zoneName );
+	var fallback = -1;
+
+	if ( !Array.isArray( snames ) || !target ) {
+		return -1;
+	}
+
+	for ( var i = 0; i < snames.length; i++ ) {
+		if ( OSApp.Stations && typeof OSApp.Stations.isMaster === "function" && OSApp.Stations.isMaster( i ) ) {
+			continue;
+		}
+		var candidate = OSApp.AIAssistant.normalizeText( snames[ i ] );
+		if ( !candidate ) {
+			continue;
+		}
+		if ( candidate === target ) {
+			return i;
+		}
+		if ( fallback === -1 && ( candidate.indexOf( target ) !== -1 || target.indexOf( candidate ) !== -1 ) ) {
+			fallback = i;
+		}
+	}
+
+	return fallback;
+};
+
+OSApp.AIAssistant.runStationControl = function( message ) {
+	var parsed = OSApp.AIAssistant.parseStationControl( message );
+	if ( !parsed ) {
+		return null;
+	}
+
+	return new Promise( function( resolve ) {
+		if ( !OSApp.currentSession || !OSApp.currentSession.controller || !OSApp.currentSession.controller.stations ) {
+			resolve( {
+				ok: false,
+				refused: false,
+				reason: "",
+				summary: "",
+				explanation: OSApp.AIAssistant.t( "Could not reach the assistant service." ),
+				changes: {},
+				usage: { prompt_tokens: 0, completion_tokens: 0 },
+				model: "deterministic",
+				error_code: "context_unavailable"
+			} );
+			return;
+		}
+
+		var sid = OSApp.AIAssistant.findStationIndexByName( parsed.zoneName );
+		if ( sid < 0 ) {
+			resolve( {
+				ok: false,
+				refused: false,
+				reason: "",
+				summary: "",
+				explanation: OSApp.AIAssistant.t( "Zone could not be found." ),
+				changes: {},
+				usage: { prompt_tokens: 0, completion_tokens: 0 },
+				model: "deterministic",
+				error_code: "station_not_found"
+			} );
+			return;
+		}
+
+		var stationName = ( OSApp.currentSession.controller.stations.snames[ sid ] !== undefined ) ? String( OSApp.currentSession.controller.stations.snames[ sid ] ) : parsed.zoneName;
+		var endpoint = "/cm?sid=" + sid + "&en=1&t=" + parsed.duration + "&pw=";
+		resolve( {
+			ok: true,
+			refused: false,
+			reason: "",
+			summary: "Befehl vorbereitet: " + stationName,
+			explanation: "Die Zone wird nach Bestätigung gestartet.",
+			changes: {},
+			commands: [
+				{
+					description: "Starte Zone '" + stationName + "' für " + parsed.duration + " Sekunden",
+					endpoint: endpoint
+				}
+			],
+			require_confirmation: true,
+			usage: { prompt_tokens: 0, completion_tokens: 0 },
+			model: "deterministic",
+			error_code: ""
+		} );
+	} );
+};
+
 OSApp.AIAssistant.extractNumber = function( message, labels ) {
 	var msg = String( message || "" );
 	for ( var i = 0; i < labels.length; i++ ) {
@@ -1735,19 +1909,21 @@ OSApp.AIAssistant.ask = function( message, callbacks ) {
 			if ( callbacks.done ) {
 				callbacks.done( res );
 			}
-		} ).fail( function( xhr ) {
+		} ).fail( function( xhr, textStatus ) {
 			if ( !triedFallback && url !== defaultUrl ) {
 				triedFallback = true;
 				doRequest( defaultUrl );
 				return;
 			}
-			if ( xhr && ( !xhr.status || xhr.status === 0 ) && !xhr.responseJSON ) {
+			if ( xhr && ( textStatus === "timeout" || !xhr.status || xhr.status === 0 ) && !xhr.responseJSON ) {
 				xhr.responseJSON = {
-					message: "Plugin service unreachable; request was forwarded, but no response arrived."
+					message: textStatus === "timeout" ?
+						OSApp.AIAssistant.t( "The assistant service timed out after 35 seconds." ) :
+						"Plugin service unreachable; request was forwarded, but no response arrived."
 				};
 			}
 			if ( callbacks.fail ) {
-				callbacks.fail( xhr );
+				callbacks.fail( xhr, textStatus );
 			}
 		} );
 	}
@@ -1984,18 +2160,73 @@ OSApp.AIAssistant.openDialog = function() {
 			$( "<div></div>" ).append( OSApp.AIAssistant.safeHtmlToJQ( res.html ) ).appendTo( bot );
 		}
 		var hasChanges = res.changes && typeof res.changes === "object" && Object.keys( res.changes ).length > 0;
+		var hasCommands = Array.isArray( res.commands ) && res.commands.length > 0;
+		var forceConfirm = !!res.require_confirmation;
 
 		// Persistenter Verlauf (Zusammenfassung + Erklärung; Diff/Buttons sind sitzungsbezogen).
 		var histText = ( res.summary || L( "Done." ) ) + ( res.explanation ? "\n" + res.explanation : "" );
 		if ( hasChanges ) {
 			histText += "\n\n[" + L( "Proposed changes" ) + "]\n" + JSON.stringify( res.changes, null, 2 );
 		}
+		if ( hasCommands ) {
+			histText += "\n\n[Commands]\n" + JSON.stringify( res.commands, null, 2 );
+		}
 		OSApp.AIAssistant.pushHistory( "bot", histText );
 
-		if ( hasChanges ) {
-			$( '<div class="ai-diff"></div>' ).text( JSON.stringify( res.changes, null, 2 ) ).appendTo( bot );
+		if ( hasCommands ) {
+			var isDe = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de";
+			var reqDetails = $( '<details style="margin-top:8px; border:1px solid #ddd; border-radius:4px; padding:6px; background:#fafafa; font-size:12px; outline:none;"></details>' );
+			var reqSummary = $( '<summary style="cursor:pointer; font-weight:600; outline:none; color:#1565c0; user-select:none;"></summary>' )
+				.text( isDe ? "Befehle anzeigen" : "Show commands" );
+			var reqBody = $( '<div style="margin-top:6px"></div>' );
+			res.commands.forEach( function( cmd ) {
+				var desc = cmd && cmd.description ? String( cmd.description ) : "Command";
+				var ep = OSApp.AIAssistant.ensureCommandEndpoint( cmd && cmd.endpoint ? String( cmd.endpoint ) : "" );
+				var row = $( '<div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #eee;"></div>' );
+				row.append(
+					$( '<div style="margin-bottom:4px"></div>' ).html(
+						"<strong>" + OSApp.AIAssistant.escapeHtml( desc ) + "</strong><br><code>" + OSApp.AIAssistant.escapeHtml( ep ) + "</code>"
+					)
+				);
+				var runBtn = $( '<button type="button" class="ai-btn-apply"></button>' ).text( isDe ? "Ausführen" : "Run" );
+				runBtn.on( "click", function() {
+					row.find( ".osai-cmd-status" ).remove();
+					runBtn.prop( "disabled", true );
+					OSApp.AIAssistant.executeCommand( cmd ).done( function() {
+						$( '<div class="smaller osai-cmd-status" style="color:#2e7d32;margin-top:4px"></div>' )
+							.text( isDe ? "Befehl ausgeführt." : "Command executed." )
+							.appendTo( row );
+					} ).fail( function() {
+						$( '<div class="smaller osai-cmd-status" style="color:#b00;margin-top:4px"></div>' )
+							.text( isDe ? "Befehl fehlgeschlagen." : "Command failed." )
+							.appendTo( row );
+					} ).always( function() {
+						runBtn.prop( "disabled", false );
+						scrollDown();
+					} );
+				} );
+				row.append( runBtn );
+				reqBody.append( row );
+			} );
+			reqDetails.append( reqSummary ).append( reqBody ).appendTo( bot );
+		}
 
-			if ( OSApp.AIAssistant.getAutoApply() ) {
+		if ( hasChanges ) {
+			var detailsLabel = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de" 
+				? "Konfigurationsänderungen einblenden (JSON)" 
+				: "Show configuration changes (JSON)";
+			var details = $(
+				'<details style="margin-top:8px; border:1px solid #ddd; border-radius:4px; padding:6px; background:#fafafa; font-size:12px; outline:none;">' +
+					'<summary style="cursor:pointer; font-weight:600; outline:none; color:#1565c0; user-select:none;">' + OSApp.AIAssistant.escapeHtml( detailsLabel ) + '</summary>' +
+					'<pre class="ai-diff" style="margin-top:6px; padding:6px; background:#fff; border:1px solid #eee; border-radius:4px; overflow-x:auto; max-height:180px; font-family:monospace; font-size:11px; white-space:pre-wrap; margin-bottom:0;"></pre>' +
+				'</details>'
+			);
+			details.find( ".ai-diff" ).text( JSON.stringify( res.changes, null, 2 ) );
+			details.appendTo( bot );
+		}
+
+		if ( hasChanges ) {
+			if ( OSApp.AIAssistant.getAutoApply() && !forceConfirm ) {
 				OSApp.AIAssistant.applyChanges( res.changes );
 				$( '<div class="smaller" style="color:#2e7d32;margin-top:6px"></div>' ).text( L( "Applied to device." ) ).appendTo( bot );
 			} else {
@@ -2070,6 +2301,28 @@ OSApp.AIAssistant.openDialog = function() {
 			var mcpRes = OSApp.AIAssistant.buildMcpResponse( message );
 			addResult( mcpRes );
 			sendBtn.prop( "disabled", false );
+			return;
+		}
+		var localStationAction = OSApp.AIAssistant.runStationControl( message );
+		if ( localStationAction ) {
+			var stationTyping = addTyping();
+			Promise.resolve( localStationAction ).then( function( res ) {
+				stationTyping.remove();
+				sendBtn.prop( "disabled", false );
+				if ( !res || !res.ok ) {
+					var em = L( "The assistant could not process this request." ) + ( res && res.explanation ? " (" + res.explanation + ")" : "" );
+					addMessage( "bot", em, "ai-error" );
+					OSApp.AIAssistant.pushHistory( "bot", em, "ai-error" );
+					return;
+				}
+				addResult( res );
+			} ).catch( function() {
+				stationTyping.remove();
+				sendBtn.prop( "disabled", false );
+				var em = L( "The assistant could not process this request." );
+				addMessage( "bot", em, "ai-error" );
+				OSApp.AIAssistant.pushHistory( "bot", em, "ai-error" );
+			} );
 			return;
 		}
 		var localCrud = OSApp.AIAssistant.runAnalogCrud( message );

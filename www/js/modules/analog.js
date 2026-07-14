@@ -884,43 +884,69 @@ OSApp.Analog.importConfigSensors = function(data, restore_type, callback) {
 	OSApp.UIDom.areYouSure(OSApp.Language._("Are you sure you want to restore the configuration?"), warning, function () {
 		$.mobile.loading("show");
 
-		if ((restore_type & 1) == 1 && Object.prototype.hasOwnProperty.call(data, "sensors")) { //restore Sensor
-			var sensorOut;
-			for (let i = 0; i < data.sensors.length; i++) {
-				sensorOut = data.sensors[i];
-				OSApp.Analog.sendToOsObj("/sc?pw=", sensorOut);
-			}
-		}
+		var sensors = ((restore_type & 1) === 1 && Array.isArray(data.sensors)) ? data.sensors : [];
+		var progadjust = ((restore_type & 2) === 2 && Array.isArray(data.progadjust)) ? data.progadjust : [];
+		var monitors = ((restore_type & 4) === 4 && Array.isArray(data.monitors)) ? data.monitors : [];
 
-		if ((restore_type & 2) == 2 && Object.prototype.hasOwnProperty.call(data, "progadjust")) { //restore program adjustments
-			var progAdjustOut;
-			for (let i = 0; i < data.progadjust.length; i++) {
-				progAdjustOut = data.progadjust[i];
-				OSApp.Analog.sendToOsObj("/sb?pw?=", progAdjustOut);
-			}
-		}
-
-		if ((restore_type & 4) == 4 && Object.prototype.hasOwnProperty.call(data, "monitors")) { //restore monitors
-			var monitor;
-			for (var i = 0; i < data.monitors.length; i++) {
-				monitor = data.monitors[i];
-				OSApp.Analog.sendToOsObj("/mc?pw=", monitor);
-			}
-		}
-
-		OSApp.Analog.expandItem.add("progadjust");
-		OSApp.Analog.updateProgramAdjustments(function () {
-			OSApp.Analog.updateMonitors(function () {
-				OSApp.Analog.updateAnalogSensor(function () {
-					$.mobile.loading("hide");
-					OSApp.Errors.showError(OSApp.Language._("Backup restored to your device"));
-					callback();
+		OSApp.Analog.sendRestoreBatch("/sc?pw=", sensors)
+			.then(function () {
+				return OSApp.Analog.sendRestoreBatch("/sb?pw=", progadjust);
+			})
+			.then(function () {
+				return OSApp.Analog.sendRestoreBatch("/mc?pw=", monitors);
+			})
+			.done(function () {
+				OSApp.Analog.expandItem.add("progadjust");
+				OSApp.Analog.updateProgramAdjustments(function () {
+					OSApp.Analog.updateMonitors(function () {
+						OSApp.Analog.updateAnalogSensor(function () {
+							$.mobile.loading("hide");
+							OSApp.Errors.showError(OSApp.Language._("Backup restored to your device"));
+							callback();
+						});
+					});
 				});
-
+			})
+			.fail(function () {
+				$.mobile.loading("hide");
+				OSApp.Errors.showError(OSApp.Language._("Restore failed"));
 			});
-		});
 
 	});
+};
+
+OSApp.Analog.sendRestoreBatch = function(endpoint, entries) {
+	var dfd = $.Deferred();
+	if (!Array.isArray(entries) || entries.length === 0) {
+		dfd.resolve();
+		return dfd.promise();
+	}
+
+	var idx = 0;
+	var total = entries.length;
+
+	var next = function() {
+		if (idx >= total) {
+			dfd.resolve();
+			return;
+		}
+
+		OSApp.Analog.sendToOsObj(endpoint, entries[idx])
+			.done(function() {
+				idx++;
+				if ((idx % 20) === 0) {
+					setTimeout(next, 10);
+				} else {
+					next();
+				}
+			})
+			.fail(function() {
+				dfd.reject();
+			});
+	};
+
+	next();
+	return dfd.promise();
 };
 
 OSApp.Analog.sendToOsObj = function(params, obj) {
@@ -3359,9 +3385,11 @@ list += "</select></div>" +
 			OSApp.Language._("delete log") + "</a>" +
 			"</label>" +
 
-			"<label class='stdlog_container' for='stdlog'><input data-mini='true' id='stdlog' type='checkbox' " + ((sensor.stdlog === 1) ? "checked='checked'" : "") + ">" +
+			"<div class='stdlog_container'>" +
+			"<label for='stdlog'><input data-mini='true' id='stdlog' type='checkbox' " + ((sensor.stdlog === 1) ? "checked='checked'" : "") + ">" +
 			OSApp.Language._("Add water consumption to standard log") +
 			"</label>" +
+			"</div>" +
 
 			"<label for='show'><input data-mini='true' id='show' type='checkbox' " + ((sensor.show === 1) ? "checked='checked'" : "") + ">" +
 			OSApp.Language._("Show on Mainpage") +	"</label>" +
@@ -5414,6 +5442,21 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 
 	// Always load fresh data from controller
 	var loadData = function() {
+		var loadFinished = false;
+		var loadGuard = setTimeout(function() {
+			if (loadFinished) return;
+			page.find("#analogsensorlist").html(
+				"<div style='text-align:center;padding:2em;'>" +
+				"<p>" + OSApp.Language._("Failed to load sensor data") + "</p>" +
+				"<a href='#' class='ui-btn ui-corner-all ui-mini analog-retry-load'>" + OSApp.Language._("Retry") + "</a>" +
+				"</div>"
+			);
+			page.find(".analog-retry-load").off("click").on("click", function(e) {
+				e.preventDefault();
+				loadData();
+			});
+		}, 15000);
+
 		var pa = $.Deferred(), mo = $.Deferred(), se = $.Deferred();
 
 		OSApp.Analog.updateProgramAdjustments(function() { pa.resolve(); })
@@ -5430,6 +5473,8 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		});
 
 		se.done(function() {
+			loadFinished = true;
+			clearTimeout(loadGuard);
 			updateSensorContent();
 		});
 	};
