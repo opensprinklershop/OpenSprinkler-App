@@ -884,35 +884,105 @@ OSApp.Analog.importConfigSensors = function(data, restore_type, callback) {
 	OSApp.UIDom.areYouSure(OSApp.Language._("Are you sure you want to restore the configuration?"), warning, function () {
 		$.mobile.loading("show");
 
-		var sensors = ((restore_type & 1) === 1 && Array.isArray(data.sensors)) ? data.sensors : [];
-		var progadjust = ((restore_type & 2) === 2 && Array.isArray(data.progadjust)) ? data.progadjust : [];
-		var monitors = ((restore_type & 4) === 4 && Array.isArray(data.monitors)) ? data.monitors : [];
+		// Only treat a category as "being restored" when it is explicitly
+		// selected AND actually present as an array in the backup. If the backup
+		// does not contain a category we must not purge that category on the
+		// device (otherwise selecting e.g. "restore sensors" on a monitors-only
+		// backup would wipe all sensors).
+		var restoreSensors = (restore_type & 1) === 1 && Array.isArray(data.sensors);
+		var restoreProg = (restore_type & 2) === 2 && Array.isArray(data.progadjust);
+		var restoreMonitors = (restore_type & 4) === 4 && Array.isArray(data.monitors);
 
-		OSApp.Analog.sendRestoreBatch("/sc?pw=", sensors)
-			.then(function () {
-				return OSApp.Analog.sendRestoreBatch("/sb?pw=", progadjust);
-			})
-			.then(function () {
-				return OSApp.Analog.sendRestoreBatch("/mc?pw=", monitors);
-			})
-			.done(function () {
-				OSApp.Analog.expandItem.add("progadjust");
-				OSApp.Analog.updateProgramAdjustments(function () {
-					OSApp.Analog.updateMonitors(function () {
-						OSApp.Analog.updateAnalogSensor(function () {
+		var sensors = restoreSensors ? data.sensors : [];
+		var progadjust = restoreProg ? data.progadjust : [];
+		var monitors = restoreMonitors ? data.monitors : [];
+
+		// Snapshot the current device configuration first so we can remove items
+		// that are NOT part of the backup. Without this a restore only adds/
+		// overwrites the backed-up items and any sensor/monitor/adjustment that
+		// was deleted after the backup was taken survives as a phantom entry
+		// (and its orphaned sensor logs stay around too).
+		OSApp.Analog.updateAnalogSensor(function () {
+			OSApp.Analog.updateProgramAdjustments(function () {
+				OSApp.Analog.updateMonitors(function () {
+					var sensorDeletes = OSApp.Analog.computeRestoreDeletes(restoreSensors, OSApp.Analog.analogSensors, sensors);
+					var progDeletes = OSApp.Analog.computeRestoreDeletes(restoreProg, OSApp.Analog.progAdjusts, progadjust);
+					var monitorDeletes = OSApp.Analog.computeRestoreDeletes(restoreMonitors, OSApp.Analog.monitors, monitors);
+
+					// Restore (add/overwrite) the backed-up items first, then purge
+					// the phantom leftovers. Doing the deletes last means an
+					// interrupted restore never removes data before its
+					// replacement has been written. Deleting a sensor via
+					// "type=0" also clears that sensor's logs on the firmware,
+					// which fixes the "phantom log data on a fresh sensor" issue.
+					OSApp.Analog.sendRestoreBatch("/sc?pw=", sensors)
+						.then(function () {
+							return OSApp.Analog.sendRestoreBatch("/sb?pw=", progadjust);
+						})
+						.then(function () {
+							return OSApp.Analog.sendRestoreBatch("/mc?pw=", monitors);
+						})
+						.then(function () {
+							return OSApp.Analog.sendRestoreBatch("/mc?pw=", monitorDeletes);
+						})
+						.then(function () {
+							return OSApp.Analog.sendRestoreBatch("/sb?pw=", progDeletes);
+						})
+						.then(function () {
+							return OSApp.Analog.sendRestoreBatch("/sc?pw=", sensorDeletes);
+						})
+						.done(function () {
+							OSApp.Analog.expandItem.add("progadjust");
+							OSApp.Analog.updateProgramAdjustments(function () {
+								OSApp.Analog.updateMonitors(function () {
+									OSApp.Analog.updateAnalogSensor(function () {
+										$.mobile.loading("hide");
+										OSApp.Errors.showError(OSApp.Language._("Backup restored to your device"));
+										callback();
+									});
+								});
+							});
+						})
+						.fail(function () {
 							$.mobile.loading("hide");
-							OSApp.Errors.showError(OSApp.Language._("Backup restored to your device"));
-							callback();
+							OSApp.Errors.showError(OSApp.Language._("Restore failed"));
 						});
-					});
 				});
-			})
-			.fail(function () {
-				$.mobile.loading("hide");
-				OSApp.Errors.showError(OSApp.Language._("Restore failed"));
 			});
-
+		});
 	});
+};
+
+// Compute the list of device items that must be deleted so the device matches
+// the backup. Returns an array of { nr, type: 0 } delete commands (type=0 is the
+// firmware's delete convention for /sc, /sb and /mc). Only runs when the given
+// category is actually part of the restore; otherwise returns an empty list so
+// nothing is removed.
+OSApp.Analog.computeRestoreDeletes = function (enabled, deviceItems, backupItems) {
+	if (!enabled || !Array.isArray(deviceItems)) {
+		return [];
+	}
+
+	var keep = {};
+	if (Array.isArray(backupItems)) {
+		for (var i = 0; i < backupItems.length; i++) {
+			if (backupItems[i] && backupItems[i].nr !== undefined && backupItems[i].nr !== null) {
+				keep[backupItems[i].nr] = true;
+			}
+		}
+	}
+
+	var deletes = [];
+	for (var j = 0; j < deviceItems.length; j++) {
+		var nr = deviceItems[j] ? deviceItems[j].nr : undefined;
+		if (nr === undefined || nr === null) {
+			continue;
+		}
+		if (!keep[nr]) {
+			deletes.push({ nr: nr, type: 0 });
+		}
+	}
+	return deletes;
 };
 
 OSApp.Analog.sendRestoreBatch = function(endpoint, entries) {
