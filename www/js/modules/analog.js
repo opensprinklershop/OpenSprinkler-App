@@ -40,10 +40,6 @@ OSApp.Analog = {
 		UNIT_LITER_CONSUMPTION: 16,
 		UNIT_GALLON_CONSUMPTION: 17,
 
-		CURRENT_FW : "2.4.0(212)",
-		CURRENT_FW_ID : 240,
-		CURRENT_FW_MIN : 212,
-
 		COLORS : ["#F3B415", "#F27036", "#663F59", "#6A6E94", "#4E88B4", "#00A7C6", "#18D8D8", '#A9D794', '#46AF78', '#A93F55', '#8C5E58', '#2176FF', '#33A1FD', '#7A918D', '#BAFF29'],
 		COLCOUNT : 15,
 		NOTIFICATION_COLORS : ["#2E7D32", "#F9A825", "#C62828"],
@@ -150,12 +146,15 @@ OSApp.Analog.requestNotificationPermission = function(callback) {
 	callback = callback || function() { };
 
 	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	if (!localNotification || typeof localNotification.registerPermission !== "function") {
+	// The maintained cordova-plugin-local-notification exposes requestPermission().
+	// (The legacy appplant plugin used registerPermission().)
+	var request = localNotification && ( localNotification.requestPermission || localNotification.registerPermission );
+	if (!localNotification || typeof request !== "function") {
 		callback(true);
 		return;
 	}
 
-	localNotification.registerPermission(function(granted) {
+	request.call(localNotification, function(granted) {
 		callback(granted !== false);
 	});
 };
@@ -198,28 +197,25 @@ OSApp.Analog.asb_init = function() {
 
 	if (OSApp.currentDevice.isAndroid && localNotification && typeof localNotification.createChannel === "function") {
 		localNotification.createChannel({
-			channelId: 'os_low',
-			channel:   'os_low',
-			channelName:'OpenSprinklerLowNotifications',
-			vibrate: false, // bool (optional), default is false
-			importance: 2, // int (optional) 0 to 4, default is IMPORTANCE_DEFAULT (3)
-			soundUsage: 5, // int (optional), default is USAGE_NOTIFICATION
+			androidChannelId: 'os_low',
+			androidChannelName:'OpenSprinklerLowNotifications',
+			androidChannelImportance: 'IMPORTANCE_LOW',
+			androidChannelEnableVibration: false,
+			androidChannelSoundUsage: 5, // int (optional), default is USAGE_NOTIFICATION
 			}, OSApp.Analog.success_callback, this);
 		localNotification.createChannel({
-			channelId: 'os_med',
-			channel:   'os_med',
-			channelName:'OpenSprinklerMedNotifications',
-			vibrate: false, // bool (optional), default is false
-			importance: 3, // int (optional) 0 to 4, default is IMPORTANCE_DEFAULT (3)
-			soundUsage: 5, // int (optional), default is USAGE_NOTIFICATION
+			androidChannelId: 'os_med',
+			androidChannelName:'OpenSprinklerMedNotifications',
+			androidChannelImportance: 'IMPORTANCE_DEFAULT',
+			androidChannelEnableVibration: false,
+			androidChannelSoundUsage: 5,
 			}, OSApp.Analog.success_callback, this);
 		localNotification.createChannel({
-			channelId: 'os_high',
-			channel:   'os_high',
-			channelName:'OpenSprinklerHighNotifications',
-			vibrate: true, // bool (optional), default is false
-			importance: 4, // int (optional) 0 to 4, default is IMPORTANCE_DEFAULT (3)
-			soundUsage: 5, // int (optional), default is USAGE_NOTIFICATION
+			androidChannelId: 'os_high',
+			androidChannelName:'OpenSprinklerHighNotifications',
+			androidChannelImportance: 'IMPORTANCE_HIGH',
+			androidChannelEnableVibration: true,
+			androidChannelSoundUsage: 5,
 			}, OSApp.Analog.success_callback, this);
 	}
 	if (window.nativeTimer && backgroundMode) {
@@ -356,22 +352,20 @@ OSApp.Analog.updateMonitors = function(callback) {
 
 	OSApp.Analog.checkBackgroundMode();
 
-	if (OSApp.Firmware.checkOSVersion(233) || OSApp.Firmware.isOSPi()) {
-		var timeout = OSApp.Analog.calcTimeout( OSApp.Analog.monitors && OSApp.Analog.monitors.length );
-		return OSApp.Firmware.sendToOS("/ml?pw=", "json", timeout).then(function (data) {
+	var timeout = OSApp.Analog.calcTimeout( OSApp.Analog.monitors && OSApp.Analog.monitors.length );
+	return OSApp.Firmware.sendToOS("/ml?pw=", "json", timeout).then(function (data) {
 
-			// Guard against malformed / partial responses: keep the last good
-			// monitor list instead of clearing it (suddenly empty monitors).
-			if ( data && Array.isArray( data.monitors ) ) {
-				OSApp.Analog.monitors = data.monitors;
-			}
-			OSApp.Analog.checkMonitorAlerts();
-			callback();
-		});
-	} else {
+		// Guard against malformed / partial responses: keep the last good
+		// monitor list instead of clearing it (suddenly empty monitors).
+		if ( data && Array.isArray( data.monitors ) ) {
+			OSApp.Analog.monitors = data.monitors;
+		}
+		OSApp.Analog.checkMonitorAlerts();
+		// Poll the firmware notification event log so configured events
+		// (IFTTT/MQTT/Email) are also shown as push/local notifications.
+		OSApp.Analog.updateEventLog();
 		callback();
-		return $.Deferred().resolve();
-	}
+	});
 };
 
 OSApp.Analog.updateAnalogSensor = function( callback ) {
@@ -399,6 +393,40 @@ OSApp.Analog.notification_action_callback = function() {
 	//	monitorAlerts[monitor.nr] = false;
 };
 
+// Map a notification priority (0=low, 1=medium, 2=high) to the Android channel /
+// color and schedule an OS-level local notification via the maintained
+// cordova-plugin-local-notification. Used for both monitor alerts and the
+// configured notification events polled from the firmware /nl endpoint.
+OSApp.Analog.showLocalNotification = function(opts) {
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	if (!localNotification || typeof localNotification.schedule !== "function") {
+		return;
+	}
+
+	var prio = parseInt(opts.prio, 10);
+	if (isNaN(prio)) prio = 0;
+	prio = Math.max(0, Math.min(OSApp.Analog.Constants.NOTIFICATION_COLORS.length - 1, prio));
+
+	var chan = (prio === 0) ? "os_low" : (prio === 1 ? "os_med" : "os_high");
+	var importance = (prio === 0) ? "IMPORTANCE_LOW" : (prio === 1 ? "IMPORTANCE_DEFAULT" : "IMPORTANCE_HIGH");
+
+	var options = {
+		id: opts.id,
+		androidChannelId: chan,
+		androidChannelImportance: importance,
+		title: opts.title || "OpenSprinkler",
+		text: opts.text || "",
+		androidColor: OSApp.Analog.Constants.NOTIFICATION_COLORS[prio],
+		androidLockscreen: true,
+		sound: prio >= 2 ? "default" : null
+	};
+	if (typeof opts.data !== "undefined") {
+		options.data = opts.data;
+	}
+
+	localNotification.schedule(options, OSApp.Analog.notification_action_callback, opts.context || this);
+};
+
 OSApp.Analog.checkMonitorAlerts = function() {
 	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
 	if (!localNotification || !OSApp.Analog.monitors || (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS))
@@ -410,38 +438,120 @@ OSApp.Analog.checkMonitorAlerts = function() {
 
 			if (!OSApp.Analog.monitorAlerts[monitor.nr]) {
 				OSApp.Analog.monitorAlerts[monitor.nr] = true;
-				var dname, chan;
+				var dname;
 				if ( typeof OSApp.currentSession.controller.settings.dname !== "undefined" )
 					dname = OSApp.currentSession.controller.settings.dname;
 				else
 				 	dname = "OpenSprinkler";
 				let prio = Object.prototype.hasOwnProperty.call(monitor, "prio") ? parseInt(monitor.prio, 10) : 0;
 				if (isNaN(prio)) prio = 0;
-				prio = Math.max(0, Math.min(OSApp.Analog.Constants.NOTIFICATION_COLORS.length - 1, prio));
 
-				if (prio === 0) chan = 'os_low';
-				else if (prio === 1) chan = 'os_med';
-				else chan = 'os_high';
-
-				var scheduleOptions = {
+				OSApp.Analog.showLocalNotification({
 					id: monitor.nr,
-					channelId: chan,
-					channel: chan,
+					prio: prio,
 					title: dname,
 					text: monitor.name,
-					priority: prio,
-					beep: prio>=2,
-					lockscreen: true,
-					color: OSApp.Analog.Constants.NOTIFICATION_COLORS[prio]
-				};
-
-				localNotification.schedule(scheduleOptions, OSApp.Analog.notification_action_callback, monitor);
+					context: monitor
+				});
 			}
 		}
 		else if (OSApp.Analog.monitorAlerts[monitor.nr]) {
 			OSApp.Analog.monitorAlerts[monitor.nr] = false;
 		}
 	}
+};
+
+// NOTIFY_MONITOR_LOW / MID / HIGH bit values (see firmware defines.h). Monitor
+// events are already surfaced by checkMonitorAlerts(), so they are skipped when
+// polling the /nl event log to avoid duplicate notifications.
+OSApp.Analog.isMonitorEventType = function(type) {
+	return type === 0x4000 || type === 0x8000 || type === 0x10000;
+};
+
+OSApp.Analog.eventIdStorageKey = function() {
+	var site = (OSApp.currentSession && OSApp.currentSession.currentSite) ||
+		(OSApp.currentSession && OSApp.currentSession.ip) || "default";
+	return "OSApp.Analog.lastEventId." + site;
+};
+
+OSApp.Analog.getLastEventId = function() {
+	try {
+		var v = parseInt(localStorage.getItem(OSApp.Analog.eventIdStorageKey()), 10);
+		return isNaN(v) ? 0 : v;
+	} catch (e) { void e; return 0; }
+};
+
+OSApp.Analog.setLastEventId = function(id) {
+	try {
+		if (typeof id !== "number" || isNaN(id)) return;
+		if (id > OSApp.Analog.getLastEventId()) {
+			localStorage.setItem(OSApp.Analog.eventIdStorageKey(), String(id));
+		}
+	} catch (e) { void e; }
+};
+
+// Schedule local notifications for freshly received events (skipping monitor
+// events, which are handled by checkMonitorAlerts()).
+OSApp.Analog.notifyEvents = function(events) {
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	if (!localNotification || !Array.isArray(events)) return;
+
+	var lastSeen = OSApp.Analog.getLastEventId();
+	var dname = (OSApp.currentSession && OSApp.currentSession.controller &&
+		OSApp.currentSession.controller.settings &&
+		typeof OSApp.currentSession.controller.settings.dname !== "undefined") ?
+		OSApp.currentSession.controller.settings.dname : "OpenSprinkler";
+
+	for (var i = 0; i < events.length; i++) {
+		var ev = events[i];
+		if (!ev || typeof ev.id !== "number") continue;
+		if (ev.id <= lastSeen) continue;
+		if (OSApp.Analog.isMonitorEventType(ev.type)) continue;
+
+		OSApp.Analog.showLocalNotification({
+			// Keep event notification ids in a separate range from monitor ids
+			// (monitor.nr) so they don't cancel each other.
+			id: 100000 + (ev.id % 900000),
+			prio: (typeof ev.prio === "number") ? ev.prio : 0,
+			title: dname,
+			text: ev.text || "",
+			data: { evid: ev.id, type: ev.type }
+		});
+	}
+};
+
+// Poll the firmware notification event log (/nl). Firmware without this endpoint
+// simply returns an error which is ignored (feature-detection by request).
+OSApp.Analog.updateEventLog = function(callback) {
+	callback = callback || function () { };
+
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	if (!localNotification || (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS)) {
+		callback();
+		return $.Deferred().resolve();
+	}
+
+	var lastId = OSApp.Analog.getLastEventId();
+	// First poll after a fresh install/site: establish a baseline without firing
+	// notifications for the backlog of historic events.
+	var baseline = (lastId === 0 && OSApp.Analog.eventBaselineDone !== true);
+	var timeout = OSApp.Analog.calcTimeout(24);
+
+	return OSApp.Firmware.sendToOS("/nl?after=" + lastId + "&pw=", "json", timeout).then(function (data) {
+		if (data && Array.isArray(data.events)) {
+			if (!baseline) {
+				OSApp.Analog.notifyEvents(data.events);
+			}
+			if (typeof data.last === "number") {
+				OSApp.Analog.setLastEventId(data.last);
+			}
+			OSApp.Analog.eventBaselineDone = true;
+		}
+		callback();
+	}, function () {
+		// Endpoint missing (older firmware) or transient error: ignore silently.
+		callback();
+	});
 };
 
 OSApp.Analog.updateSensorShowArea = function( page ) {
@@ -476,7 +586,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 	var orderedSensors     = sortedByOrder(OSApp.Analog.analogSensors, "sensors");
 	var pctFormatter = function(val) { return OSApp.Analog.formatValUnit(val, "%"); };
 	var orderedProgAdjusts = sortedByOrder(OSApp.Analog.progAdjusts, "progadjust");
-	var orderedMonitors    = (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors) ?
+	var orderedMonitors    = (OSApp.Analog.monitors) ?
 		sortedByOrder(OSApp.Analog.monitors, "monitors") : [];
 
 	var root = document.documentElement;
@@ -1230,14 +1340,12 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"<input class='nr' type='number' inputmode='decimal' min='1' max='99999' value='" + progAdjust.nr + (progAdjust.nr > 0 ? "' disabled='disabled'>" : "'>");
 
 			//Adjustment-Name:
-			if (OSApp.Firmware.checkOSVersion(233)) {
-				if (!Object.prototype.hasOwnProperty.call(progAdjust, "name"))
-					progAdjust.name = "";
-				list += "<label>" +
-				OSApp.Language._("Adjustment-Name") +
-				"</label>" +
-				"<input class='adj-name' type='text' maxlength='29' value='" + progAdjust.name + "' >";
-			}
+			if (!Object.prototype.hasOwnProperty.call(progAdjust, "name"))
+				progAdjust.name = "";
+			list += "<label>" +
+			OSApp.Language._("Adjustment-Name") +
+			"</label>" +
+			"<input class='adj-name' type='text' maxlength='29' value='" + progAdjust.name + "' >";
 
 			//Select Type:
 			list += "<label for='type' class='select'>" +
@@ -1879,29 +1987,25 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 		list += "</select></div>";
 
 		//reset seconds (rs)
-		if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 178) {
-			list += "<label for='rs'>" + OSApp.Language._("Reset status after (s)") +
-			"</label><input id='rs' type='number' inputmode='decimal' min='0' max='99999' value='" + monitor.rs + "'>";
-		}
+		list += "<label for='rs'>" + OSApp.Language._("Reset status after (s)") +
+		"</label><input id='rs' type='number' inputmode='decimal' min='0' max='99999' value='" + monitor.rs + "'>";
 
-		//output mode (om) + failsafe on stale input (stt/fsa)  [fw >= 2.4.0(217)]
-		if (OSApp.Firmware.checkOSVersion(240) && OSApp.currentSession.controller.options.fwm >= 217) {
-			if (typeof monitor.om === "undefined") { monitor.om = 0; }
-			if (typeof monitor.stt === "undefined") { monitor.stt = 0; }
-			if (typeof monitor.fsa === "undefined") { monitor.fsa = 0; }
-			list += "<label for='om' class='select'>" + OSApp.Language._("Output mode") + "</label>" +
-				"<select data-mini='true' id='om'>" +
-				"<option " + (monitor.om == 1 ? "" : "selected") + " value='0'>" + OSApp.Language._("Start and stop") + "</option>" +
-				"<option " + (monitor.om == 1 ? "selected" : "") + " value='1'>" + OSApp.Language._("Only switch off") + "</option>" +
-				"</select>" +
-				"<label for='stt'>" + OSApp.Language._("Failsafe after (s)") +
-				"</label><input id='stt' type='number' inputmode='decimal' min='0' max='999999' value='" + monitor.stt + "'>" +
-				"<label for='fsa' class='select'>" + OSApp.Language._("Failsafe state") + "</label>" +
-				"<select data-mini='true' id='fsa'>" +
-				"<option " + (monitor.fsa == 1 ? "" : "selected") + " value='0'>" + OSApp.Language._("Off") + "</option>" +
-				"<option " + (monitor.fsa == 1 ? "selected" : "") + " value='1'>" + OSApp.Language._("On") + "</option>" +
-				"</select>";
-		}
+		//output mode (om) + failsafe on stale input (stt/fsa)
+		if (typeof monitor.om === "undefined") { monitor.om = 0; }
+		if (typeof monitor.stt === "undefined") { monitor.stt = 0; }
+		if (typeof monitor.fsa === "undefined") { monitor.fsa = 0; }
+		list += "<label for='om' class='select'>" + OSApp.Language._("Output mode") + "</label>" +
+			"<select data-mini='true' id='om'>" +
+			"<option " + (monitor.om == 1 ? "" : "selected") + " value='0'>" + OSApp.Language._("Start and stop") + "</option>" +
+			"<option " + (monitor.om == 1 ? "selected" : "") + " value='1'>" + OSApp.Language._("Only switch off") + "</option>" +
+			"</select>" +
+			"<label for='stt'>" + OSApp.Language._("Failsafe after (s)") +
+			"</label><input id='stt' type='number' inputmode='decimal' min='0' max='999999' value='" + monitor.stt + "'>" +
+			"<label for='fsa' class='select'>" + OSApp.Language._("Failsafe state") + "</label>" +
+			"<select data-mini='true' id='fsa'>" +
+			"<option " + (monitor.fsa == 1 ? "" : "selected") + " value='0'>" + OSApp.Language._("Off") + "</option>" +
+			"<option " + (monitor.fsa == 1 ? "selected" : "") + " value='1'>" + OSApp.Language._("On") + "</option>" +
+			"</select>";
 
 		//typ = MIN+MAX
 		list +=	"<div id='type_minmax'>"+
@@ -5265,7 +5369,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			}, updateSensorContent);
 		});
 
-		if (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors)
+		if (OSApp.Analog.monitors)
 		{
 			//Edit a monitor:
 			list.find(".edit-monitor").on("click", function () {
@@ -5316,9 +5420,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 					nr: maxNr + 1,
 					type: 1,
 				};
-				if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 178) {
-					monitor.rs = 0;
-				}
+				monitor.rs = 0;
 
 
 				OSApp.Analog.expandItem.add("monitors");
@@ -5553,16 +5655,11 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 };
 
 OSApp.Analog.checkFirmwareUpdate = function() {
-	var minVersionWarning = "";
-	if (!(OSApp.Firmware.checkOSVersion(OSApp.Analog.Constants.CURRENT_FW_ID) && OSApp.currentSession.controller.options.fwm >= OSApp.Analog.Constants.CURRENT_FW_MIN)) {
-		minVersionWarning = "<td colspan='13' style='padding: 4px; color: red;'>" +
-			OSApp.Language._("Please update firmware to ") + OSApp.Analog.Constants.CURRENT_FW + "</td></tr><tr>";
-	}
 
 	// Show firmware version info + OTA update status
 	var otaInfo = OSApp.Firmware.getOTAInfoHTML ? OSApp.Firmware.getOTAInfoHTML() : "";
 
-	return minVersionWarning + otaInfo;
+	return otaInfo;
 };
 
 OSApp.Analog.setupFytaCredentials = function() {
@@ -6260,9 +6357,6 @@ OSApp.Analog.buildSensorConfig = function() {
 			progName = OSApp.Programs.readProgram(OSApp.currentSession.controller.programs.pd[item.prog - 1]).name;
 		}
 
-		if (!OSApp.Firmware.checkOSVersion(233))
-			item.name = sensorName+"/"+progName;
-
 		var $tr = $("<tr>").append(
 			$("<td>").text(item.nr),
 			$("<td class=\"hidecol\">").text(item.type),
@@ -6288,7 +6382,7 @@ OSApp.Analog.buildSensorConfig = function() {
 	list += "</fieldset>";
 
 	//Monitors table:
-	if (OSApp.Firmware.checkOSVersion(233) && OSApp.Analog.monitors) {
+	if (OSApp.Analog.monitors) {
 		list += "<fieldset data-role='collapsible' data-section-id='monitors' data-iconpos='left'" + (OSApp.Analog.expandItem.has("monitors") ? " data-collapsed='false'" : "") + ">" +
 			"<legend>" + OSApp.Language._("Monitoring and control") + "</legend>";
 		list += "<table style='width: 100%;' id='monitorstable'><tr style='width:100%;vertical-align: top;'>" +
@@ -6435,12 +6529,10 @@ OSApp.Analog.buildSensorConfig = function() {
 	list += "</fieldset>";
 
 	//FYTA Setup:
-	if (OSApp.Firmware.checkOSVersion(233) && OSApp.currentSession.controller.options.fwm >= 181) {
-		list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("fytasetup") ? " data-collapsed='false'" : "") + ">" +
-			"<legend>" + OSApp.Language._("FYTA Setup") + "</legend>";
-		list += "<a data-role='button' data-icon='grid' class='fytasetup' href='#' data-mini='true'>" + OSApp.Language._("Setup FYTA credentials") + "</a>" +
-			"</fieldset>";
-	}
+	list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("fytasetup") ? " data-collapsed='false'" : "") + ">" +
+		"<legend>" + OSApp.Language._("FYTA Setup") + "</legend>";
+	list += "<a data-role='button' data-icon='grid' class='fytasetup' href='#' data-mini='true'>" + OSApp.Language._("Setup FYTA credentials") + "</a>" +
+		"</fieldset>";
 
 	// Gardena Setup:
 	if (OSApp.Firmware.isGardenaAvailable()) {
@@ -6451,21 +6543,17 @@ OSApp.Analog.buildSensorConfig = function() {
 	}
 
 	//backup:
-	if (OSApp.Firmware.checkOSVersion(231)) {
-		list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("backup") ? " data-collapsed='false'" : "") + ">" +
-			"<legend>" + OSApp.Language._("Backup and Restore") + "</legend>";
-		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-all wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Config") + "</a>" +
-			"<a data-role='button' data-icon='back'      class='restore-all wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Config") + "</a>";
-		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-sensors wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Sensor Config") + "</a>" +
-			"<a data-role='button' data-icon='back'      class='restore-sensors wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Sensor Config") + "</a>";
-		list += "<a data-role='button' data-icon='arrow-d-r' class='backup-adjustments wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Program Adjustments") + "</a>" +
-			"<a data-role='button' data-icon='back'      class='restore-adjustments wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Program Adjustments") + "</a>";
-		if (OSApp.Firmware.checkOSVersion(233)) {
-			list += "<a data-role='button' data-icon='arrow-d-r' class='backup-monitors'  href='#' data-mini='true'>" + OSApp.Language._("Backup Monitors") + "</a>" +
-				"<a data-role='button' data-icon='back'      class='restore-monitors' href='#' data-mini='true'>" + OSApp.Language._("Restore Monitors") + "</a>";
-		}
-		list += "</fieldset>";
-	}
+	list += "<fieldset data-role='collapsible' data-iconpos='left'" + (OSApp.Analog.expandItem.has("backup") ? " data-collapsed='false'" : "") + ">" +
+		"<legend>" + OSApp.Language._("Backup and Restore") + "</legend>";
+	list += "<a data-role='button' data-icon='arrow-d-r' class='backup-all wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Config") + "</a>" +
+		"<a data-role='button' data-icon='back'      class='restore-all wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Config") + "</a>";
+	list += "<a data-role='button' data-icon='arrow-d-r' class='backup-sensors wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Sensor Config") + "</a>" +
+		"<a data-role='button' data-icon='back'      class='restore-sensors wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Sensor Config") + "</a>";
+	list += "<a data-role='button' data-icon='arrow-d-r' class='backup-adjustments wraptext'  href='#' data-mini='true'>" + OSApp.Language._("Backup Program Adjustments") + "</a>" +
+		"<a data-role='button' data-icon='back'      class='restore-adjustments wraptext' href='#' data-mini='true'>" + OSApp.Language._("Restore Program Adjustments") + "</a>";
+	list += "<a data-role='button' data-icon='arrow-d-r' class='backup-monitors'  href='#' data-mini='true'>" + OSApp.Language._("Backup Monitors") + "</a>" +
+		"<a data-role='button' data-icon='back'      class='restore-monitors' href='#' data-mini='true'>" + OSApp.Language._("Restore Monitors") + "</a>";
+	list += "</fieldset>";
 	return list;
 };
 

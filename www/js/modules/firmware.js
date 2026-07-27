@@ -455,10 +455,7 @@ OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION_OSPI = "2.4.0";
 OSApp.Firmware.CLASSIC_UPDATE_POST_MAX_BUILD = 193;
 
 OSApp.Firmware.isOnlineUpdateSupported = function() {
-	if ( OSApp.Firmware.isOSPi() ) {
-		return OSApp.Firmware.checkOSPiVersion( OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION_OSPI );
-	}
-	return OSApp.Firmware.checkOSVersion( OSApp.Firmware.MIN_ONLINE_UPDATE_VERSION );
+	return true;
 };
 
 OSApp.Firmware.getCurrentBuildNumber = function() {
@@ -536,119 +533,6 @@ OSApp.Firmware.getHWType = function() {
 		return " - Latching";
 	} else {
 		return "";
-	}
-};
-
-OSApp.Firmware.checkFirmwareUpdate = function() {
-
-	// Update checks are only be available for Arduino firmwares.
-	// Skip if the device supports the new OTA update system (firmware >= 2.3.3),
-	// which is handled by initOTACheck() and shows the version from the device directly.
-	if ( OSApp.Firmware.checkOSVersion( 200 ) && !OSApp.Firmware.checkOSVersion( 233 ) && ( ( typeof parseFloat(OSApp.Firmware.getHWVersion()) === "number" && parseFloat(OSApp.Firmware.getHWVersion()) >= 3 ) || OSApp.Firmware.isOSPi() ) ) {
-
-		// Github API to get releases for OpenSprinkler firmware
-		$.getJSON( "https://api.github.com/repos/opensprinkler/opensprinkler-firmware/releases" ).done( function( data ) {
-			// Convert both the controller version and the site version to decimals
-			let controller = OSApp.currentSession.controller.options.fwv;
-			let recent = data[ 0 ].tag_name;
-
-			if ( OSApp.currentSession.controller.options.fwm ) {
-				controller += OSApp.currentSession.controller.options.fwm / 10;
-			}
-
-			if ( typeof recent === "string" && recent.includes("(") ) {
-				recent = parseFloat(recent.replace("(", ".").replace(")", ""));
-			}
-
-			if ( controller < recent ) {
-
-				// Grab a local storage variable which defines the firmware version for the last dismissed update
-				OSApp.Storage.get( "updateDismiss", function( flag ) {
-
-					// If the variable does not exist or is lower than the newest update, show the update notification
-					if ( !flag.updateDismiss || flag.updateDismiss < data[ 0 ].tag_name ) {
-						OSApp.Notifications.addNotification( {
-							title: OSApp.Language._( "Firmware update available" ),
-							on: function() {
-
-								// Modify the changelog by parsing markdown of lists to HTML
-								var button = $( this ).parent(),
-									canUpdate = OSApp.currentSession.controller.options.hwv === 30 || OSApp.currentSession.controller.options.hwv > 63 && OSApp.Firmware.checkOSVersion( 216 ),
-									changelog = data[ 0 ][ "html_url" ],
-									popup = $(
-										"<div data-role='popup' class='modal' data-theme='a'>" +
-											"<h3 class='center' style='margin-bottom:0'>" +
-												OSApp.Language._( "Latest" ) + " " + OSApp.Language._( "Firmware" ) + ": " + data[ 0 ].name +
-											"</h3>" +
-											"<h5 class='center' style='margin:0'>" + OSApp.Language._( "This Controller" ) + ": " + OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion() + "</h5>" +
-											"<a class='iab ui-btn ui-corner-all ui-shadow' style='width:80%;margin:5px auto;' target='_blank' href='" + changelog + "'>" +
-												OSApp.Language._( "View Changelog" ) +
-											"</a>" +
-											"<a class='guide ui-btn ui-corner-all ui-shadow' style='width:80%;margin:5px auto;' href='#'>" +
-												OSApp.Language._( "Update Guide" ) +
-											"</a>" +
-											( canUpdate ? "<a class='update ui-btn ui-corner-all ui-shadow' style='width:80%;margin:5px auto;' href='#'>" +
-												OSApp.Language._( "Update Now" ) +
-											"</a>" : "" ) +
-											"<a class='dismiss ui-btn ui-btn-b ui-corner-all ui-shadow' style='width:80%;margin:5px auto;' href='#'>" +
-												OSApp.Language._( "Dismiss" ) +
-											"</a>" +
-										"</div>"
-									);
-
-								popup.find( ".update" ).on( "click", function() {
-									if ( OSApp.currentSession.controller.options.hwv === 30 ) {
-										if ( OSApp.ESP32Mode && typeof OSApp.ESP32Mode.getDirectDeviceUpdateUrl === "function" ) {
-											$( "<a class='hidden iab' href='" + OSApp.ESP32Mode.getDirectDeviceUpdateUrl() + "'></a>" ).appendTo( popup ).click();
-										}
-										return;
-									}
-
-									// For OSPi/OSBo with firmware 2.1.6 or newer, trigger the update script from the app
-									OSApp.Firmware.sendToOS( "/cv?pw=&update=1", "json" ).then(
-										function() {
-											OSApp.Errors.showError( OSApp.Language._( "Update successful" ) );
-											popup.find( ".dismiss" ).click();
-										},
-										function() {
-											$.mobile.loading( "show", {
-												html: "<div class='center'>" + OSApp.Language._( "Update did not complete." ) + "<br>" +
-													"<a class='iab ui-btn' href='https://openthings.freshdesk.com/support/solutions/articles/5000631599-installing-and-updating-the-unified-firmware#upgrade'>" + OSApp.Language._( "Update Guide" ) + "</a></div>",
-												textVisible: true,
-												theme: "b"
-											} );
-											setTimeout( function() { $.mobile.loading( "hide" ); }, 3000 );
-										}
-									);
-								} );
-
-								popup.find( ".guide" ).on( "click", function() {
-
-										var url = OSApp.currentSession.controller.options.hwv > 63 ?
-											"https://openthings.freshdesk.com/support/solutions/articles/5000631599-installing-and-updating-the-unified-firmware#upgrade"
-											: "https://openthings.freshdesk.com/support/solutions/articles/5000381694-opensprinkler-firmware-update-guide";
-
-										// Open the firmware upgrade guide in a child browser
-										$( "<a class='hidden iab' href='" + url + "'></a>" )
-											.appendTo( popup ).click();
-								} );
-
-								popup.find( ".dismiss" ).one( "click", function() {
-
-									// Update the notification dismiss variable with the latest available version
-									OSApp.Storage.set( { updateDismiss:data[ 0 ].tag_name } );
-									popup.popup( "close" );
-									OSApp.Notifications.removeNotification( button );
-									return false;
-								} );
-
-								OSApp.UIDom.openPopup( popup );
-							}
-						} );
-					}
-				} );
-			}
-		} );
 	}
 };
 

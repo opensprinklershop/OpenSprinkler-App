@@ -41,15 +41,7 @@ OSApp.Status.refreshStatus = function( callback, fail ) {
 		fail();
 	};
 
-	if ( OSApp.Firmware.checkOSVersion( 216 ) ) {
-		OSApp.Sites.updateController( finish, onFail );
-	} else {
-		$.when(
-			OSApp.Sites.updateControllerStatus(),
-			OSApp.Sites.updateControllerSettings(),
-			OSApp.Sites.updateControllerOptions()
-		).then( finish, onFail );
-	}
+	OSApp.Sites.updateController( finish, onFail );
 };
 
 // Actually change the status bar

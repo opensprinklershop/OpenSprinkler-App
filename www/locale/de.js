@@ -1501,6 +1501,7 @@
       "Waiting for device to come back online...": "Warte darauf, dass das Gerät wieder online kommt...",
       "Waiting for device to restart...": "Warte auf Geräte-Neustart...",
       "Waiting for device...": "Warte auf Gerät...",
+      "Waiting for device data\u2026": "Warte auf Sensor-Daten\u2026",
       "Waiting for reboot after mode change...": "Warte auf Neustart nach Moduswechsel...",
       "Warning: Network changes will be made and the device may no longer be accessible from this address.": "Achtung: Netzwerkänderungen werden übernommen und das Gerät wird unter der bisherigen Adresse nicht mehr erreichbar sein.",
       "Warning: The repeat interval": "Warnung: Das Wiederholungsintervall",

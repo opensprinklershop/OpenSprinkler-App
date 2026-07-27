@@ -538,7 +538,7 @@ OSApp.Logs.displayPage = function() {
 						continue;
 					}
 					groupArray[ i ] = "<div data-role='collapsible' data-collapsed='true'><h2>" +
-						( ( OSApp.Firmware.checkOSVersion( 210 ) && grouping === "day" ) ? "<a class='ui-btn red ui-btn-corner-all delete-day day-" +
+						( ( grouping === "day" ) ? "<a class='ui-btn red ui-btn-corner-all delete-day day-" +
 							group + "'>" + OSApp.Language._( "delete" ) + "</a>" : "" ) +
 						"<div class='ui-btn-up-c ui-btn-corner-all custom-count-pos'>" +
 						ct + " " + ( ( ct === 1 ) ? OSApp.Language._( "run" ) : OSApp.Language._( "runs" ) ) +
@@ -687,16 +687,8 @@ OSApp.Logs.displayPage = function() {
 				delay = 500;
 			}
 
-			var wlDefer = $.Deferred().resolve(),
-				flDefer = $.Deferred().resolve();
-
-			if ( OSApp.Firmware.checkOSVersion( 211 ) ) {
-				wlDefer = OSApp.Firmware.sendToOS( "/jl?pw=&type=wl&" + parms(), "json" );
-			}
-
-			if ( OSApp.Firmware.checkOSVersion( 216 ) ) {
+			var wlDefer = OSApp.Firmware.sendToOS( "/jl?pw=&type=wl&" + parms(), "json" ),
 				flDefer = OSApp.Firmware.sendToOS( "/jl?pw=&type=fl&" + parms() );
-			}
 
 			setTimeout( function() {
 				$.when(
@@ -756,16 +748,16 @@ OSApp.Logs.displayPage = function() {
 	page.find( "#log_table" ).prop( "checked", isNarrow );
 
 	function begin() {
-		var additionalMetrics = OSApp.Firmware.checkOSVersion( 219 ) ? [
+		var additionalMetrics = [
 			OSApp.currentSession.controller.options.sn1t === 3 ? OSApp.Language._( "Soil Sensor" ) :
 				( OSApp.currentSession.controller.options.sn1t === 1 ? OSApp.Language._( "Rain Sensor" ) : OSApp.Language._( "Sensor 1" ) ),
 			OSApp.currentSession.controller.options.sn2t === 3 ? OSApp.Language._( "Soil Sensor" ) :
 				( OSApp.currentSession.controller.options.sn2t === 1 ? OSApp.Language._( "Rain Sensor" ) : OSApp.Language._( "Sensor 2" ) ),
 			OSApp.Language._( "Rain Delay" )
-		] : [ OSApp.Language._( "Rain Sensor" ), OSApp.Language._( "Rain Delay" ) ];
+		];
 
 		stations = $.merge( $.merge( [], OSApp.currentSession.controller.stations?.snames ), additionalMetrics );
-		page.find( ".clear_logs" ).toggleClass( "hidden", ( OSApp.Firmware.isOSPi() || OSApp.Firmware.checkOSVersion( 210 ) ?  false : true ) );
+		page.find( ".clear_logs" ).removeClass( "hidden" );
 
 		if ( logStart.val() === "" || logEnd.val() === "" ) {
 			var now = new Date( OSApp.currentSession.controller.settings.devt * 1000 );

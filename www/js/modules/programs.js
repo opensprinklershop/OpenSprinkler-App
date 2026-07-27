@@ -77,24 +77,22 @@ OSApp.Programs.displayPage = function(programId) {
 			}
 		} );
 
-		if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-			list.find( ".move-up" ).removeClass( "hidden" ).on( "click", function() {
-				var group = $( this ).parents( "fieldset" ),
-					pid = parseInt( group.attr( "id" ).split( "-" )[ 1 ] );
+		list.find( ".move-up" ).removeClass( "hidden" ).on( "click", function() {
+			var group = $( this ).parents( "fieldset" ),
+				pid = parseInt( group.attr( "id" ).split( "-" )[ 1 ] );
 
-				$.mobile.loading( "show" );
+			$.mobile.loading( "show" );
 
-				OSApp.Firmware.sendToOS( "/up?pw=&pid=" + pid ).done( function() {
-					OSApp.Sites.updateControllerPrograms( function() {
-						$.mobile.loading( "hide" );
-						page.trigger( "programrefresh" );
-						OSApp.Programs.updateProgramHeader();
-					} );
+			OSApp.Firmware.sendToOS( "/up?pw=&pid=" + pid ).done( function() {
+				OSApp.Sites.updateControllerPrograms( function() {
+					$.mobile.loading( "hide" );
+					page.trigger( "programrefresh" );
+					OSApp.Programs.updateProgramHeader();
 				} );
-
-				return false;
 			} );
-		}
+
+			return false;
+		} );
 
 		list.find( ".program-copy" ).on( "click", function() {
 			var copyID = parseInt( $( this ).parents( "fieldset" ).attr( "id" ).split( "-" )[ 1 ] );
@@ -361,16 +359,7 @@ OSApp.Programs.displayPageRunOnce = function() {
 		if ( OSApp.currentSession.controller.programs.pd.length ) {
 			for ( z = 0; z < OSApp.currentSession.controller.programs.pd.length; z++ ) {
 				program = OSApp.Programs.readProgram( OSApp.currentSession.controller.programs.pd[ z ] );
-				var prog = [];
-
-				if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-					prog = program.stations;
-				} else {
-					var setStations = program.stations.split( "" );
-					for ( i = 0; i < OSApp.currentSession.controller.stations.snames.length; i++ ) {
-						prog.push( ( parseInt( setStations[ i ] ) ) ? program.duration : 0 );
-					}
-				}
+				var prog = program.stations;
 
 				progs.push( prog );
 
@@ -387,11 +376,7 @@ OSApp.Programs.displayPageRunOnce = function() {
 			"<option value='t'>" + OSApp.Language._( "Test All Stations" ) + "</option><option value='s' selected='selected'>" + OSApp.Language._( "Quick Programs" ) + "</option>";
 
 		for ( i = 0; i < progs.length; i++ ) {
-			if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-				name = OSApp.currentSession.controller.programs.pd[ i ][ 5 ];
-			} else {
-				name = OSApp.Language._( "Program" ) + " " + ( i + 1 );
-			}
+			name = OSApp.currentSession.controller.programs.pd[ i ][ 5 ];
 			quickPick += "<option value='" + i + "'>" + name + "</option>";
 		}
 		quickPick += "</select>";
@@ -424,7 +409,7 @@ OSApp.Programs.displayPageRunOnce = function() {
 				"<button class='pad_buttons' data-mini='true' name='repeat-runonce' id='repeat-runonce' value='0'>0</button></div>";
 			list += "</div></div>";
 
-			if ( OSApp.StationQueue.isActive() !== -1 && OSApp.Firmware.checkOSVersion ( 2214 ) ) {
+			if ( OSApp.StationQueue.isActive() !== -1 ) {
 				list += "<fieldset data-role='controlgroup' data-mini='true' id='queue-option' style='margin:12px 0 20px 0;'>" +
 						"<legend class='center'><b>" + OSApp.Language._("Scheduling Option") + "</b></legend>" +
 						"<label for='qo-append'>" +
@@ -543,7 +528,7 @@ OSApp.Programs.displayPageRunOnce = function() {
 					}
 				},
 				maximum: 65535,
-				showSun: OSApp.Firmware.checkOSVersion( 214 ) ? true : false
+				showSun: true
 			} );
 
 			return false;
@@ -561,8 +546,7 @@ OSApp.Programs.displayPageRunOnce = function() {
 					dur.text( OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( result ) ) );
 				},
 				maximum: 86340,
-				granularity: 1,
-				preventCompression: true
+				granularity: 1
 			} );
 		} );
 
@@ -658,9 +642,6 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 		let order = new Array( nstations );
 		for ( let i = 0; i < nstations; i++ ) {
 			order[ i ] = i;	// initialize
-		}
-		if ( !OSApp.Firmware.checkOSVersion( 2211 ) ) { // only firmware 2.2.1(1) supports runorder
-			return order;
 		}
 		let pname = prog[ 5 ]; // program name
 		let len = pname.length;
@@ -1311,9 +1292,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 			className = "delayed";
 		}
 
-		if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-			pname = OSApp.currentSession.controller.programs.pd[ pid - 1 ][ 5 ];
-		}
+		pname = OSApp.currentSession.controller.programs.pd[ pid - 1 ][ 5 ];
 
 		previewData.push( {
 			"start": start,
@@ -1726,9 +1705,9 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 	};
 
 	function begin() {
-		is21 = OSApp.Firmware.checkOSVersion( 210 );
-		is211 = OSApp.Firmware.checkOSVersion( 211 );
-		is216 = OSApp.Firmware.checkOSVersion( 216 );
+		is21 = true;
+		is211 = true;
+		is216 = true;
 
 		if ( OSApp.currentSession.controller.settings.devt && page.find( "#preview_date" ).val() === "" ) {
 			now = new Date( OSApp.currentSession.controller.settings.devt * 1000 );
@@ -1755,11 +1734,7 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 };
 // Translate program array into easier to use data
 OSApp.Programs.readProgram = function( program ) {
-	if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-		return OSApp.Programs.readProgram21( program );
-	} else {
-		return OSApp.Programs.readProgram183( program );
-	}
+	return OSApp.Programs.readProgram21( program );
 };
 
 OSApp.Programs.readProgram183 = function( program ) {
@@ -1928,7 +1903,7 @@ OSApp.Programs.pidToName = function( pid ) {
 		pname = OSApp.Language._( "Manual program" );
 	} else if ( pid === 254 || pid === 98 ) {
 		pname = OSApp.Language._( "Run-once program" );
-	} else if ( OSApp.Firmware.checkOSVersion( 210 ) && pid >= 1 && pid <= OSApp.currentSession.controller.programs.pd.length && OSApp.currentSession.controller.programs.pd[ pid - 1 ] ) {
+	} else if ( pid >= 1 && pid <= OSApp.currentSession.controller.programs.pd.length && OSApp.currentSession.controller.programs.pd[ pid - 1 ] ) {
 		pname = OSApp.currentSession.controller.programs.pd[ pid - 1 ][ 5 ];
 	}
 
@@ -1940,7 +1915,7 @@ OSApp.Programs.updateProgramHeader = function() {
 	$( "#programs_list" ).find( "[id^=program-]" ).each( function( a, b ) {
 		var item = $( b ),
 			heading = item.find( ".ui-collapsible-heading-toggle" ),
-			en = OSApp.Firmware.checkOSVersion( 210 ) ? ( OSApp.currentSession.controller.programs.pd[ a ][ 0 ] ) & 0x01 : OSApp.currentSession.controller.programs.pd[ a ][ 0 ];
+			en = ( OSApp.currentSession.controller.programs.pd[ a ][ 0 ] ) & 0x01;
 
 		if ( en ) {
 			heading.removeClass( "red" );
@@ -1992,11 +1967,7 @@ OSApp.Programs.makeAllPrograms = function() {
 };
 
 OSApp.Programs.makeProgram = function( n, isCopy ) {
-	if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-		return OSApp.Programs.makeProgram21( n, isCopy );
-	} else {
-		return OSApp.Programs.makeProgram183( n, isCopy );
-	}
+	return OSApp.Programs.makeProgram21( n, isCopy );
 };
 
 OSApp.Programs.makeProgram183 = function( n, isCopy ) {
@@ -2452,8 +2423,7 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 				dur.text( OSApp.Dates.dhms2str( OSApp.Dates.sec2dhms( result ) ) );
 			},
 			maximum: 86340,
-			granularity: 1,
-			preventCompression: true
+			granularity: 1
 		} );
 	} );
 
@@ -2463,7 +2433,7 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 		OSApp.UIDom.showTimeInput( {
 			minutes: time.val(),
 			title: OSApp.Language._( "Start Time" ),
-			showSun: OSApp.Firmware.checkOSVersion( 213 ) ? true : false,
+			showSun: true,
 			callback: function( result ) {
 				time.val( result );
 				time.text( OSApp.Programs.readStartTime( result ) );
@@ -2529,7 +2499,7 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 				updateProgramTime();
 			},
 			maximum: 65535,
-			showSun: OSApp.Firmware.checkOSVersion( 214 ) ? true : false
+			showSun: true
 		} );
 	} );
 
@@ -2613,11 +2583,7 @@ OSApp.Programs.deleteProgram = function( id ) {
 OSApp.Programs.submitProgram = function( id ) {
 	$( "#program-" + id ).find( ".hasChanges" ).removeClass( "hasChanges" );
 
-	if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-		OSApp.Programs.submitProgram21( id );
-	} else {
-		OSApp.Programs.submitProgram183( id );
-	}
+	OSApp.Programs.submitProgram21( id );
 };
 
 OSApp.Programs.submitProgram183 = function( id ) {
@@ -2709,7 +2675,7 @@ OSApp.Programs.submitProgram21 = function( id, ignoreWarning ) {
 		en = ( $( "#en-" + id ).is( ":checked" ) ) ? 1 : 0,
 		weather = ( $( "#uwt-" + id ).is( ":checked" ) ) ? 1 : 0,
 		j = 0,
-		minIntervalDays = OSApp.Firmware.checkOSVersion( 2199 ) ? 1 : 2,
+		minIntervalDays = 1,
 		daysin, i, name, url, daterange;
 
 	// Set enable/disable bit for program
@@ -2951,9 +2917,8 @@ OSApp.Programs.openRunProgramDialog = function (pid, stationsDurations, uwt, isR
 	$("#rp-repeat-wrap").toggle(!!isRepeatProgram);
 
 	// Show/hide scheduling options
-	var supportsQO = OSApp.Firmware.checkOSVersion(2214);
 	var hasActive = ( OSApp.StationQueue.isActive() !== -1 );
-	$("#rp-qo-wrap").toggle(supportsQO && hasActive);
+	$("#rp-qo-wrap").toggle(hasActive);
 
 	// Rebind buttons
 	$("#rp-cancel").off("click").on("click", function (e) {
@@ -3012,22 +2977,12 @@ OSApp.Programs.expandProgram = function( program ) {
 
 	program.find( "[id^='run-']" ).on( "click", function(e) {
 		e.stopPropagation();
-		var name = OSApp.Firmware.checkOSVersion( 210 ) ? OSApp.currentSession.controller.programs.pd[ id ][ 5 ] : "Program " + id;
+		var name = OSApp.currentSession.controller.programs.pd[ id ][ 5 ];
 		var annotation = name.slice(-2);
 		if( ! ( annotation.length === 2 && annotation[0] === '>' ) ) annotation = "";
 
 		// Build base durations array the same way your existing code does
-		var runonce = [];
-		if (OSApp.Firmware.checkOSVersion(210)) {
-			runonce = OSApp.currentSession.controller.programs.pd[id][4].slice(0); // clone
-		} else {
-			// Legacy: one duration for all selected stations
-			var durr = parseInt($("#duration-" + id).val());
-			var stations = $("[id^='station_'][id$='-" + id + "']");
-			$.each(stations, function () {
-				runonce.push($(this).is(":checked") ? durr : 0);
-			});
-		}
+		var runonce = OSApp.currentSession.controller.programs.pd[id][4].slice(0); // clone
 
 		// detect repeat and interval in the program data
 		var repeat = 0, interval = 0;
@@ -3054,9 +3009,8 @@ OSApp.Programs.expandProgram = function( program ) {
 				repeat = 0;
 			}
 
-			var supportsQO = OSApp.Firmware.checkOSVersion(2214);
 			var hasActive = ( OSApp.StationQueue.isActive() !== -1 );
-			var qo = (supportsQO && hasActive) ? ($("input[name='rp-qo']:checked").val() || "2") : "2";
+			var qo = (hasActive) ? ($("input[name='rp-qo']:checked").val() || "2") : "2";
 
 			runonce.push(0); // for legacy firmwares, need an extra element at the end
 

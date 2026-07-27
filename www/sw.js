@@ -15,7 +15,7 @@
 
 // Define a name for the current cache
 // BUILD_TIMESTAMP will be replaced by the build script to bust the cache
-var cacheName = "OpenSprinkler-v__BUILD_TIMESTAMP__";
+var cacheName = "OpenSprinkler-v20260721004120";
 
 // Html
 var cacheFiles = [
@@ -274,29 +274,36 @@ self.addEventListener("fetch", function (e) {
                             pathname.startsWith("/locale/");
 
         if (isStaticAsset) {
+            // Stale-While-Revalidate: serve the cached copy immediately (fast +
+            // offline), but always fetch a fresh copy in the background and
+            // update the cache. This ensures edits to /js/ and /locale/ files
+            // are picked up on the next reload even when the Service Worker
+            // cacheName was not re-stamped by a build step.
             e.respondWith(
                 caches.match(e.request).then(function (cachedResponse) {
-                    if (cachedResponse) {
-                        return cachedResponse;
-                    }
-
-                    // Fallback to network and cache it for future use
-                    return fetch(e.request).then(function (response) {
+                    var networkFetch = fetch(e.request).then(function (response) {
                         if (!response || response.status !== 200 || response.type !== "basic") {
                             return response;
                         }
-                        return caches.open(cacheName).then(function (cache) {
-                            cache.put(e.request, response.clone());
-                            return response;
+                        var respClone = response.clone();
+                        caches.open(cacheName).then(function (cache) {
+                            cache.put(e.request, respClone);
                         });
+                        return response;
                     }).catch(function () {
-                        // Offline or network error
+                        // Offline or network error — fall back to cache if we have it.
+                        if (cachedResponse) {
+                            return cachedResponse;
+                        }
                         return new Response("Static asset offline and not cached", {
                             status: 503,
                             statusText: "Service Unavailable",
                             headers: { "Content-Type": "text/plain; charset=utf-8" }
                         });
                     });
+
+                    // Return cache instantly when available; otherwise wait for network.
+                    return cachedResponse || networkFetch;
                 })
             );
             return;

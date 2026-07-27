@@ -324,7 +324,7 @@ OSApp.Network.checkPublicAccess = function( eip ) {
 	} ).then(
 		function( data ) {
 			if ( typeof data !== "object" || !Object.prototype.hasOwnProperty.call(data,  "fwv" ) || data.fwv !== OSApp.currentSession.controller.options.fwv ||
-				( OSApp.Firmware.checkOSVersion( 214 ) && OSApp.currentSession.controller.options.ip4 !== data.ip4 ) ) {
+				OSApp.currentSession.controller.options.ip4 !== data.ip4 ) {
 					fail();
 					return;
 			}
@@ -802,10 +802,8 @@ OSApp.Network.changePassword = function( opt ) {
 			OSApp.Errors.showError( OSApp.Language._( "Password cannot be longer than 32 characters" ) );
 		}
 
-		if ( OSApp.Firmware.checkOSVersion( 213 ) ) {
-			npw = md5( npw );
-			cpw = md5( cpw );
-		}
+		npw = md5( npw );
+		cpw = md5( cpw );
 
 		$.mobile.loading( "show" );
 		OSApp.Firmware.sendToOS( "/sp?pw=&npw=" + encodeURIComponent( npw ) + "&cpw=" + encodeURIComponent( cpw ), "json" ).done( function( info ) {

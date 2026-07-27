@@ -328,10 +328,8 @@ OSApp.Stations.submitRunonce = function( runonce, uwt, interval, repeat, annotat
 			}
 		}
 
-		if ( OSApp.Firmware.checkOSVersion ( 2214 ) ) {
-			if ( qo == null ) {
-				qo = $("input[name='qo-runonce']:checked").val();
-			}
+		if ( qo == null ) {
+			qo = $("input[name='qo-runonce']:checked").val();
 		}
 	}
 
@@ -347,10 +345,8 @@ OSApp.Stations.submitRunonce = function( runonce, uwt, interval, repeat, annotat
 				request += "&anno=" + annotation;
 			}
 		}
-		if ( OSApp.Firmware.checkOSVersion ( 2214 ) ) {
-			if ( qo != null ) {
-				request += "&qo=" + qo;
-			}
+		if ( qo != null ) {
+			request += "&qo=" + qo;
 		}
 
 		OSApp.Firmware.sendToOS( request ).done( function() {
@@ -361,35 +357,18 @@ OSApp.Stations.submitRunonce = function( runonce, uwt, interval, repeat, annotat
 			OSApp.Status.refreshStatus();
 			OSApp.UIDom.goBack();
 		} );
-	},
-	isOn = OSApp.StationQueue.isActive();
-
-	var checkIsOnAndSubmit = function() {
-		if ( !OSApp.Firmware.checkOSVersion ( 2214 ) && isOn !== -1 ){
-			// Add a short delay to allow the first popup to finish closing
-			setTimeout(function() {
-				OSApp.UIDom.areYouSure( OSApp.Language._( "Do you want to stop the currently running program?" ), OSApp.Programs.pidToName( OSApp.Stations.getPID( isOn ) ), function() {
-					$.mobile.loading( "show" );
-					OSApp.Stations.stopStations( submit );
-				} );
-			}, 100); // 100ms delay is usually enough for the DOM to settle
-		} else {
-			submit();
-		}
 	};
 
-	checkIsOnAndSubmit();
+	submit();
 };
 
 OSApp.Stations.getStationDuration = function( duration, date ) {
-	if ( OSApp.Firmware.checkOSVersion( 214 ) ) {
-		var sunTimes = OSApp.Weather.getSunTimes( date );
+	var sunTimes = OSApp.Weather.getSunTimes( date );
 
-		if ( duration === 65535 ) {
-			duration = ( ( sunTimes[ 0 ] + 1440 ) - sunTimes[ 1 ] ) * 60;
-		} else if ( duration === 65534 ) {
-			duration = ( sunTimes[ 1 ] - sunTimes[ 0 ] ) * 60;
-		}
+	if ( duration === 65535 ) {
+		duration = ( ( sunTimes[ 0 ] + 1440 ) - sunTimes[ 1 ] ) * 60;
+	} else if ( duration === 65534 ) {
+		duration = ( sunTimes[ 1 ] - sunTimes[ 0 ] ) * 60;
 	}
 
 	return duration;

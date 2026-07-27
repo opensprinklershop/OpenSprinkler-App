@@ -433,34 +433,32 @@ OSApp.Dashboard.displayPage = function() {
 						validateLength();
 						$( ".validate-length" ).on( "input", validateLength );
 					} else if (value === 7) { //RS485 Modbus Station
-						if (OSApp.Firmware.checkOSVersion( 233 ) && OSApp.currentSession.controller.options.fwm >= 180) {
-							data = OSApp.Stations.parseModbusStationData( ( type === value ) ? data : "00000000000000000600010006000000" );
-							if (OSApp.Firmware.getHWVersion() === "OSPi") {
-								opts.append(
-								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device Index" ) + ":</div>" +
-								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-device' required='true' type='number' min='0' max='3' placeholder='0' value='" + data.device + "'>"
-								);
-							} else {
-								opts.append(
-								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device IP" ) + ":</div>" +
-								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-ip' required='true' type='text' pattern='^(?:[0-9]{1,3}.){3}[0-9]{1,3}$' value='" + data.ip + "'>" +
-								"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device Port" ) + ":</div>" +
-								"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-port' required='true' type='number' placeholder='502' min='0' max='65535' value='" + data.port + "'>"
-								);
-							}
+						data = OSApp.Stations.parseModbusStationData( ( type === value ) ? data : "00000000000000000600010006000000" );
+						if (OSApp.Firmware.getHWVersion() === "OSPi") {
 							opts.append(
-							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Address" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-address' required='true' type='number' min='0' max='255' value='" + data.address + "'>" +
-							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Register On" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regon' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.regOn + "'>" +
-							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Data On" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataon' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.dataOn + "'>" +
-							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Register Off" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regoff' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.regOff + "'>" +
-							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Data Off" ) + ":</div>" +
-							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataoff' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.dataOff + "'>"
-							).enhanceWithin();
+							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device Index" ) + ":</div>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-device' required='true' type='number' min='0' max='3' placeholder='0' value='" + data.device + "'>"
+							);
+						} else {
+							opts.append(
+							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device IP" ) + ":</div>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-ip' required='true' type='text' pattern='^(?:[0-9]{1,3}.){3}[0-9]{1,3}$' value='" + data.ip + "'>" +
+							"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Device Port" ) + ":</div>" +
+							"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-port' required='true' type='number' placeholder='502' min='0' max='65535' value='" + data.port + "'>"
+							);
 						}
+						opts.append(
+						"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Address" ) + ":</div>" +
+						"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-address' required='true' type='number' min='0' max='255' value='" + data.address + "'>" +
+						"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Register On" ) + ":</div>" +
+						"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regon' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.regOn + "'>" +
+						"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Data On" ) + ":</div>" +
+						"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataon' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.dataOn + "'>" +
+						"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Register Off" ) + ":</div>" +
+						"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-regoff' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.regOff + "'>" +
+						"<div class='ui-bar-a ui-bar'>" + OSApp.Language._( "Data Off" ) + ":</div>" +
+						"<input class='center' data-corners='false' data-wrapper-class='tight ui-btn stn-name' id='modbus-dataoff' required='true' type='text' pattern='^[0-9A-Fa-f]{4}$' value='" + data.dataOff + "'>"
+						).enhanceWithin();
 					} else if (value === 8) { // Gardena station
 						data = ( type === value ) ? data : "0";
 						opts.append(
@@ -1079,14 +1077,14 @@ OSApp.Dashboard.displayPage = function() {
 					"<option data-hs='1' value='1'>" + OSApp.Language._( "RF" ) + "</option>" +
 					"<option data-hs='2' value='2'>" + OSApp.Language._( "Remote Station (IP)" ) + "</option>" +
 					"<option data-hs='3' value='3'" + (
-						OSApp.Firmware.checkOSVersion( 217 ) && (
+						(
 							( typeof OSApp.currentSession.controller.settings.gpio !== "undefined" && OSApp.currentSession.controller.settings.gpio.length > 0 ) || OSApp.Firmware.getHWVersion() === "OSPi" || OSApp.Firmware.getHWVersion() === "2.3"
 						) ? ">" : " disabled>"
 					) + OSApp.Language._( "GPIO" ) + "</option>" +
-					"<option data-hs='4' value='4'" + ( OSApp.Firmware.checkOSVersion( 217 ) ? ">" : " disabled>" ) + OSApp.Language._( "HTTP" ) + "</option>" +
+					"<option data-hs='4' value='4'>" + OSApp.Language._( "HTTP" ) + "</option>" +
 					"<option data-hs='5' value='5'" + ( typeof OSApp.currentSession.controller.settings.email === "object" ? ">" : " disabled>" ) + OSApp.Language._( "HTTPS" ) + "</option>" +
 					"<option data-hs='6' value='6'" + ( typeof OSApp.currentSession.controller.settings.email === "object" ? ">" : " disabled>" ) + OSApp.Language._( "Remote Station (OTC)" ) + "</option>" +
-					"<option data-hs='7' value='7'" + ( (OSApp.Firmware.checkOSVersion( 233 ) && OSApp.currentSession.controller.options.fwm >= 180) ? ">" : " disabled>" ) + OSApp.Language._( "RS 485 Modbus" ) + "</option>" +
+					"<option data-hs='7' value='7'>" + OSApp.Language._( "RS 485 Modbus" ) + "</option>" +
 					"<option data-hs='8' value='8'" + ( OSApp.Firmware.isGardenaAvailable() ? ">" : " disabled>" ) + OSApp.Language._( "Gardena" ) + "</option>" +
 					"<option data-hs='9' value='9'" + ( OSApp.Firmware.isZigbeeAvailable() ? ">" : " disabled>" ) + OSApp.Language._( "Zigbee" ) + "</option>" +
 					"</select>" +
@@ -1219,8 +1217,7 @@ OSApp.Dashboard.displayPage = function() {
 			refreshStationAttribLayout();
 		},
 		submitStations = function( id ) {
-			var is208 = ( OSApp.Firmware.checkOSVersion( 208 ) === true ),
-				master = {},
+			var master = {},
 				master2 = {},
 				sequential = {},
 				special = {},
@@ -1305,11 +1302,7 @@ OSApp.Dashboard.displayPage = function() {
 					if ( sid === id ) {
 
 						// Because the firmware has a bug regarding spaces, let us replace them out now with a compatible separator
-						if ( is208 ) {
-							names[ "s" + sid ] = page.find( "#station_" + sid ).text().replace( /\s/g, "_" );
-						} else {
-							names[ "s" + sid ] = page.find( "#station_" + sid ).text();
-						}
+						names[ "s" + sid ] = page.find( "#station_" + sid ).text().replace( /\s/g, "_" );
 
 						if ( OSApp.Supported.special() && attrib.data( "hs" ) ) {
 							special.st = attrib.data( "hs" );
@@ -1836,11 +1829,6 @@ OSApp.Dashboard.displayPage = function() {
 		} );
 
 		page.on( "click", ".card", function() {
-
-			// Bind delegate handler to stop specific station (supported on firmware 2.1.0+ on Arduino)
-			if ( !OSApp.Firmware.checkOSVersion( 210 ) ) {
-				return false;
-			}
 
 			var el = $( this ),
 				sid = OSApp.Cards.getSID( el ),

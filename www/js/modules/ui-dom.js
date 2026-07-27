@@ -315,10 +315,6 @@ OSApp.UIDom.launchApp = function() {
 				}, 4000 ), // FIXME: refactor this 4000 interval out to Constants or config/settings
 				refreshDataInterval;
 
-			if ( !OSApp.Firmware.checkOSVersion( 216 ) ) {
-				refreshDataInterval = setInterval( OSApp.Sites.refreshData, 20000 ); // FIXME: move the 20000 interval to Constants (or config/settings)
-			}
-
 			$newpage.one( "pagehide", function() {
 				clearInterval( refreshStatusInterval );
 				clearInterval( refreshDataInterval );
@@ -389,7 +385,7 @@ OSApp.UIDom.showHomeMenu = ( function() {
 				"<li data-role='list-divider'>" + OSApp.Language._( "Information" ) + "</li>" +
 				"<li><a href='#statistics'>" + OSApp.Language._( "Statistics" ) + "</a></li>" +
 				"<li><a href='#preview' class='squeeze'>" + OSApp.Language._( "Preview Programs" ) + "</a></li>" +
-				( OSApp.Firmware.checkOSVersion( 206 ) || OSApp.Firmware.checkOSPiVersion( "1.9" ) ? "<li><a href='#logs'>" + OSApp.Language._( "View Logs" ) + "</a></li>" : "" ) +
+				"<li><a href='#logs'>" + OSApp.Language._( "View Logs" ) + "</a></li>" +
 				"<li data-role='list-divider'>" + OSApp.Language._( "Programs and Settings" ) + "</li>" +
 				"<li><a href='#raindelay'>" + OSApp.Language._( "Change Rain Delay" ) + "</a></li>" +
 				( OSApp.Supported.pausing() ?
@@ -889,8 +885,7 @@ OSApp.UIDom.bindPanel = function() {
 
 				panel.find( ".toggleOperation span:first" ).html( operation ).attr( "data-translate", operation );
 
-				// Show Live Debug menu only if fwv >= 210 AND dbg mode is active in options/settings or "DEBUG" is a compiled feature
-				var isVersionSupported = OSApp.Firmware.checkOSVersion( 210 );
+				// Show Live Debug menu only if dbg mode is active in options/settings or "DEBUG" is a compiled feature
 				var isDebugEnabled = false;
 				if ( OSApp.currentSession.controller && OSApp.currentSession.controller.options && typeof OSApp.currentSession.controller.options.feature === "string" ) {
 					isDebugEnabled = OSApp.currentSession.controller.options.feature.indexOf( "DEBUG" ) !== -1;
@@ -902,7 +897,7 @@ OSApp.UIDom.bindPanel = function() {
 					isDebugEnabled = OSApp.currentSession.controller.options.dbg === 1;
 				}
 
-				if ( isVersionSupported && isDebugEnabled ) {
+				if ( isDebugEnabled ) {
 					panel.find( ".live-debug-menu" ).removeClass( "hidden" ).css( "display", "" );
 				} else {
 					panel.find( ".live-debug-menu" ).addClass( "hidden" );
@@ -2017,7 +2012,6 @@ OSApp.UIDom.showDurationBox = function( opt ) {
 			seconds: 0,
 			title: OSApp.Language._( "Duration" ),
 			granularity: 0,
-			preventCompression: false,
 			incrementalUpdate: false,
 			showBack: true,
 			showSun: false,
@@ -2042,10 +2036,6 @@ OSApp.UIDom.showDurationBox = function( opt ) {
 		opt.seconds = 0;
 	}
 
-	if ( OSApp.Firmware.checkOSVersion( 217 ) ) {
-		opt.preventCompression = true;
-	}
-
 	var keys = [ "days", "hours", "minutes", "seconds" ],
 		text = [ OSApp.Language._( "Days" ), OSApp.Language._( "Hours" ), OSApp.Language._( "Minutes" ), OSApp.Language._( "Seconds" ) ],
 		conv = [ 86400, 3600, 60, 1 ],
@@ -2054,10 +2044,6 @@ OSApp.UIDom.showDurationBox = function( opt ) {
 		start = 0,
 		arr = OSApp.Dates.sec2dhms( opt.seconds ),
 		i;
-
-	if ( !opt.preventCompression && ( OSApp.Firmware.checkOSVersion( 210 ) && opt.maximum > 64800 ) ) {
-		opt.maximum = OSApp.Firmware.checkOSVersion( 214 ) ? 57600 : 64800;
-	}
 
 	if ( opt.maximum ) {
 		for ( i = conv.length - 1; i >= 0; i-- ) {
@@ -2119,29 +2105,6 @@ OSApp.UIDom.showDurationBox = function( opt ) {
 			if ( opt.incrementalUpdate ) {
 				opt.callback( getValue(), getQueueOption() );
 			}
-
-			if ( !opt.preventCompression && OSApp.Firmware.checkOSVersion( 210 ) ) {
-				var state = ( dir === 1 ) ? true : false;
-
-				if ( dir === 1 ) {
-					if ( getValue() >= 60 ) {
-						toggleInput( "seconds", state );
-					}
-					if ( getValue() >= 10800 ) {
-						toggleInput( "minutes", state );
-					}
-				} else if ( dir === -1 ) {
-					if ( getValue() <= -60 ) {
-						toggleInput( "seconds", !state );
-					} else if ( getValue() <= -10800 ) {
-						toggleInput( "minutes", !state );
-					} else if ( getValue() < 60 ) {
-						toggleInput( "seconds", state );
-					} else if ( getValue() < 10800 ) {
-						toggleInput( "minutes", state );
-					}
-				}
-			}
 		},
 		getValue = function() {
 			var useSun = popup.find( ".useSun" ).find( "button.ui-btn-active" );
@@ -2162,15 +2125,6 @@ OSApp.UIDom.showDurationBox = function( opt ) {
 				return popup.find( "#qo-checkbox" ).is( ":checked" );
 			}
 			return false;
-		},
-		toggleInput = function( field, state ) {
-			popup.find( "." + field ).toggleClass( "ui-state-disabled", state ).prop( "disabled", state ).val( function() {
-				if ( state ) {
-					return 0;
-				} else {
-					return this.value;
-				}
-			} ).parent( ".ui-input-text" ).toggleClass( "ui-state-disabled", state );
 		};
 
 	for ( i = start; i < conv.length - opt.granularity; i++ ) {
@@ -2193,24 +2147,6 @@ OSApp.UIDom.showDurationBox = function( opt ) {
 		opt.callback( getValue(), getQueueOption() );
 		popup.popup( "destroy" ).remove();
 	} );
-
-	if ( !opt.preventCompression && OSApp.Firmware.checkOSVersion( 210 ) ) {
-		if ( opt.seconds <= -60 ) {
-			toggleInput( "seconds", true );
-		}
-
-		if ( opt.seconds <= -10800 ) {
-			toggleInput( "minutes", true );
-		}
-
-		if ( opt.seconds >= 60 ) {
-			toggleInput( "seconds", true );
-		}
-
-		if ( opt.seconds >= 10800 ) {
-			toggleInput( "minutes", true );
-		}
-	}
 
 	popup.on( "focus", "input[type='number']", function() {
 		this.value = "";
@@ -2595,11 +2531,7 @@ OSApp.UIDom.resetAllOptions = function( callback ) {
 			// on current ESP32 builds, so keep this reset payload to the safe /co subset.
 			co = "o2=1&o3=1&o12=80&o13=0&o15=0&o18=0&o22=1&o26=0&o27=110&o28=100&o29=15&" +
 				"o30=320&o31=0&o36=1&o37=0&o43=0&o48=0&o49=0&o50=0&o51=1&o52=0&o53=1&o54=0&o55=0&o56=0&o57=0&";
-			if ( OSApp.Firmware.checkOSVersion( 2199 ) ) {
-				co += "o32=0&o33=0&o34=0&o35=0&"; // For newer firmwares, resets ntp to 0.0.0.0
-			} else {
-				co += "o32=216&o33=239&o34=35&o35=12&"; // Time.google.com
-			}
+			co += "o32=0&o33=0&o34=0&o35=0&"; // Resets ntp to 0.0.0.0
 			co += "loc=Boston,MA&wto=%22key%22%3A%22%22";
 
 			co = OSApp.Utils.transformKeysinString( co );

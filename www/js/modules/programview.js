@@ -33,9 +33,6 @@ OSApp.ProgramView.hashcode = function( str ) {
 };
 
 OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
-	if (!OSApp.Firmware.checkOSVersion( 210 ))
-		return;
-
 	var i, j, reset = false, width, enabledPrograms = 0, renderedCharts;
 
 	if (OSApp.ProgramView.lastProgramRun == -2) {

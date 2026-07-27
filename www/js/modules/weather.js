@@ -23,9 +23,9 @@ OSApp.Weather.Constants = {
 	adjustmentMethods: [
         { name: "Manual", id: 0 },
         { name: "Zimmerman", id: 1 },
-        { name: "Auto Rain Delay", id: 2, minVersion: 216 },
-		{ name: "ETo", id: 3, minVersion: 216 },
-		{ name: "Monthly", id:4, minVersion: 220 }
+        { name: "Auto Rain Delay", id: 2 },
+		{ name: "ETo", id: 3 },
+		{ name: "Monthly", id:4 }
     ],
 
 	// Ensure error codes align with App errors.ts (codes > 0) and HTTP error codes in Firmware defines.h (codes < 0)
@@ -71,7 +71,7 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 	var options = $.extend( {}, OSApp.Weather.getDefaultAdjustmentOptions( 1 ), OSApp.Utils.unescapeJSON( button.value ) ),
 
 		// Enable Zimmerman extension to set weather conditions as baseline for adjustment
-		hasBaseline = OSApp.Firmware.checkOSVersion( 2162 );
+		hasBaseline = true;
 
 	// OSPi stores in imperial so convert to metric and adjust to nearest 1/10ths of a degree and mm
 	if ( OSApp.currentDevice.isMetric ) {
@@ -733,14 +733,10 @@ OSApp.Weather.updateWeather = function() {
 OSApp.Weather.checkURLandUpdateWeather = function() {
 	var finish = function( wsp ) {
 		if ( wsp ) {
-			if ( OSApp.Firmware.checkOSVersion( 2214 ) ) {
-				if ( /^https?:\/\//i.test(wsp) ) { // If a scheme is already present, honor it.
-					OSApp.currentSession.weatherServerUrl = wsp.replace(/\/+$/, "");
-				} else { // Default to HTTPS for custom WSP.to be consistent with firmware
-					OSApp.currentSession.weatherServerUrl = ("https://" + wsp).replace(/\/+$/, "");
-				}
-			} else {
-				OSApp.currentSession.weatherServerUrl = OSApp.currentSession.prefix + wsp;
+			if ( /^https?:\/\//i.test(wsp) ) { // If a scheme is already present, honor it.
+				OSApp.currentSession.weatherServerUrl = wsp.replace(/\/+$/, "");
+			} else { // Default to HTTPS for custom WSP.to be consistent with firmware
+				OSApp.currentSession.weatherServerUrl = ("https://" + wsp).replace(/\/+$/, "");
 			}
 		} else {
 			OSApp.currentSession.weatherServerUrl = OSApp.Constants.weather.DEFAULT_WEATHER_SERVER_URL;
@@ -956,7 +952,6 @@ OSApp.Weather.showRainDelay = function() {
 		label: OSApp.Language._( "Duration" ),
 		maximum: 31536000,
 		granularity: 2,
-		preventCompression: true,
 		incrementalUpdate: false,
 		updateOnChange: false,
 		helptext:

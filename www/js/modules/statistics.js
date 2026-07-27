@@ -99,12 +99,8 @@ OSApp.Statistics.loadData = function( range ) {
 	var parms = "start=" + startParam + "&end=" + endParam;
 
 	var logDefer = OSApp.Firmware.sendToOS( "/jl?pw=&" + parms, "json" );
-	var wlDefer = OSApp.Firmware.checkOSVersion( 211 )
-		? OSApp.Firmware.sendToOS( "/jl?pw=&type=wl&" + parms, "json" )
-		: $.Deferred().resolve( [] );
-	var flDefer = OSApp.Firmware.checkOSVersion( 216 )
-		? OSApp.Firmware.sendToOS( "/jl?pw=&type=fl&" + parms )
-		: $.Deferred().resolve( [] );
+	var wlDefer = OSApp.Firmware.sendToOS( "/jl?pw=&type=wl&" + parms, "json" );
+	var flDefer = OSApp.Firmware.sendToOS( "/jl?pw=&type=fl&" + parms );
 
 	return $.when( logDefer, wlDefer, flDefer );
 };

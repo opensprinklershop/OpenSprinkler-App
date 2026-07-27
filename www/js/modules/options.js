@@ -38,10 +38,10 @@ OSApp.Options.showOptions = function( expandItem ) {
 					"<label for='o" + index + "-rain'>" + OSApp.Language._( "Rain" ) + "</label>" +
 					( index === 52 ? "" : "<input class='noselect' type='radio' name='o" + index + "' id='o" + index + "-flow' value='2'" + ( sensorType === 2 ? " checked='checked'" : "" ) + ">" +
 						"<label for='o" + index + "-flow'>" + OSApp.Language._( "Flow" ) + "</label>" ) +
-					( OSApp.Firmware.checkOSVersion( 219 ) ? "<input class='noselect' type='radio' name='o" + index + "' id='o" + index + "-soil' value='3'" + ( sensorType === 3 ? " checked='checked'" : "" ) + ">" +
-						"<label for='o" + index + "-soil'>" + OSApp.Language._( "Soil" ) + "</label>" : "" ) +
-					( OSApp.Firmware.checkOSVersion( 217 ) ? "<input class='noselect' type='radio' name='o" + index + "' id='o" + index + "-program' value='240'" + ( sensorType === 240 ? " checked='checked'" : "" ) + ">" +
-						"<label for='o" + index + "-program'>" + OSApp.Language._( "Program Switch" ) + "</label>" : "" ) +
+					"<input class='noselect' type='radio' name='o" + index + "' id='o" + index + "-soil' value='3'" + ( sensorType === 3 ? " checked='checked'" : "" ) + ">" +
+						"<label for='o" + index + "-soil'>" + OSApp.Language._( "Soil" ) + "</label>" +
+					"<input class='noselect' type='radio' name='o" + index + "' id='o" + index + "-program' value='240'" + ( sensorType === 240 ? " checked='checked'" : "" ) + ">" +
+						"<label for='o" + index + "-program'>" + OSApp.Language._( "Program Switch" ) + "</label>" +
 				"</fieldset>" +
 			"</div>";
 		},
@@ -362,9 +362,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 					case "o79":
 					case "o82":
 						data = $item.is( ":checked" ) ? 1 : 0;
-						if ( !OSApp.Firmware.checkOSVersion( 219 ) && !data ) {
-							return true;
-						}
 						break;
 				}
 				if ( isPi ) {
@@ -377,7 +374,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 				}
 
 				// Because the firmware has a bug regarding spaces, let us replace them out now with a compatible separator
-				if ( OSApp.Firmware.checkOSVersion( 208 ) === true && id === "loc" ) {
+				if ( id === "loc" ) {
 					data = data.replace( /\s/g, "_" );
 				}
 
@@ -476,7 +473,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 		tz = OSApp.currentSession.controller.options.tz - 48;
 		tz = ( ( tz >= 0 ) ? "+" : "-" ) + OSApp.Utils.pad( ( Math.abs( tz ) / 4 >> 0 ) ) + ":" + ( ( Math.abs( tz ) % 4 ) * 15 / 10 >> 0 ) + ( ( Math.abs( tz ) % 4 ) * 15 % 10 );
 		list += "<div class='ui-field-contain'><label for='o1' class='select'>" + OSApp.Language._( "Timezone" ) + "</label>" +
-			"<select " + ( OSApp.Firmware.checkOSVersion( 210 ) && typeof OSApp.currentSession.weather === "object" ? "disabled='disabled' " : "" ) + "data-mini='true' id='o1'>";
+			"<select " + ( typeof OSApp.currentSession.weather === "object" ? "disabled='disabled' " : "" ) + "data-mini='true' id='o1'>";
 
 		for ( i = 0; i < timezones.length; i++ ) {
 			list += "<option " + ( ( timezones[ i ] === tz ) ? "selected" : "" ) + " value='" + timezones[ i ] + "'>" + timezones[ i ] + "</option>";
@@ -584,10 +581,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 		for ( i = 0; i < OSApp.currentSession.controller.stations.snames.length; i++ ) {
 			list += "<option " + ( ( OSApp.Stations.isMaster( i ) === 1 ) ? "selected" : "" ) + " value='" + ( i + 1 ) + "'>" +
 				OSApp.Stations.getName( i ) + "</option>";
-
-			if ( !OSApp.Firmware.checkOSVersion( 214 ) && i === 7 ) {
-				break;
-			}
 		}
 		list += "</select></div>";
 
@@ -616,10 +609,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 		for ( i = 0; i < OSApp.currentSession.controller.stations.snames.length; i++ ) {
 			list += "<option " + ( ( OSApp.Stations.isMaster( i ) === 2 ) ? "selected" : "" ) + " value='" + ( i + 1 ) + "'>" + OSApp.Stations.getName(i) +
 				"</option>";
-
-			if ( !OSApp.Firmware.checkOSVersion( 214 ) && i === 7 ) {
-				break;
-			}
 		}
 
 		list += "</select></div>";
@@ -692,55 +681,47 @@ OSApp.Options.showOptions = function( expandItem ) {
 		for ( i = 0; i < OSApp.Weather.getAdjustmentMethod().length; i++ ) {
 			var adjustmentMethod = OSApp.Weather.getAdjustmentMethod()[ i ];
 
-			// Skip unsupported adjustment options.
-			if ( adjustmentMethod.minVersion && !OSApp.Firmware.checkOSVersion( adjustmentMethod.minVersion ) ) {
-				continue;
-			}
 			list += "<option " + ( ( adjustmentMethod.id === OSApp.Weather.getCurrentAdjustmentMethodId() ) ? "selected" : "" ) + " value='" + adjustmentMethod.id + "'>" + OSApp.Language._(adjustmentMethod.name) + "</option>";
 		}
 		list += "</select></div>";
 
 		if ( typeof OSApp.currentSession.controller?.settings?.wto === "object" ) {
 			const method = OSApp.Weather.getCurrentAdjustmentMethodId();
-			if( OSApp.Firmware.checkOSVersion( 2213) ) {
-				list += "<div class='ui-field-contain" + ( method === 3 || method === 1 ? "" : " hidden" ) + "'><label for='historic'></label>" +
-					"<label for='historic' id='mdaLabel'>" +
+			list += "<div class='ui-field-contain" + ( method === 3 || method === 1 ? "" : " hidden" ) + "'><label for='historic'></label>" +
+				"<label for='historic' id='mdaLabel'>" +
 					"<button data-helptext='" +
 						OSApp.Language._( "Uses multiple days of historical weather data to calculate ETo or Zimmerman watering percentage for programs that run on a regular interval." ) +
 						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
 					"<input data-mini='true' id='mda' type='checkbox' " + ( ( OSApp.currentSession.controller.settings.wto.mda === 100 ) ? "checked='checked'" : "" ) + ">" + OSApp.Language._( "Adjust Interval Programs Using Multiple Days of Weather Data" ) + "</label></div>";
-			}
 			list += "<div class='ui-field-contain" + ( method === 0  ? " hidden" : "" ) + "'><label for='wto'>" + OSApp.Language._( "Adjustment Method Options" ) + "</label>" +
 				"<button data-mini='true' id='wto' value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) ) + "'>" +
 					OSApp.Language._( "Tap to Configure" ) +
 				"</button></div>";
 		}
 
-		if ( OSApp.Firmware.checkOSVersion( 214 ) ) {
-			if ( OSApp.Supported.restrictions() ) {
-				var wto = OSApp.currentSession.controller.settings.wto;
-				list += "<div class='ui-field-contain'><label for='weatherRestriction' class='select'>" + OSApp.Language._( "Weather Restrictions" ) +
-					"<button data-helptext='" + OSApp.Language._( "Prevents watering when the selected restrictions are met." ) +
+		if ( OSApp.Supported.restrictions() ) {
+			var wto = OSApp.currentSession.controller.settings.wto;
+			list += "<div class='ui-field-contain'><label for='weatherRestriction' class='select'>" + OSApp.Language._( "Weather Restrictions" ) +
+				"<button data-helptext='" + OSApp.Language._( "Prevents watering when the selected restrictions are met." ) +
+					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+				"</label>" +
+				"<button data-mini='true' id='weatherRestriction' " +
+					( ( ( typeof wto.rainDays !== "undefined" && typeof wto.rainAmt !== "undefined" && wto.rainDays > 0 && wto.rainAmt > 0 ) || ( typeof wto.minTemp !== "undefined" && wto.minTemp !== -40 ) || ( typeof wto.cali !== "undefined" && wto.cali ) ) ? "class='blue' " : "" ) +
+					"value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) ) + "'>" +
+						OSApp.Language._( "Tap to Configure" ) +
+				"</button></div>";
+		} else {
+			list += "<div class='ui-field-contain'><label for='weatherRestriction' class='select'>" + OSApp.Language._( "Weather Restrictions" ) +
+					"<button data-helptext='" + OSApp.Language._( "Prevents watering when the selected restriction is met." ) +
 						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-					"</label>" +
-					"<button data-mini='true' id='weatherRestriction' " +
-						( ( ( typeof wto.rainDays !== "undefined" && typeof wto.rainAmt !== "undefined" && wto.rainDays > 0 && wto.rainAmt > 0 ) || ( typeof wto.minTemp !== "undefined" && wto.minTemp !== -40 ) || ( typeof wto.cali !== "undefined" && wto.cali ) ) ? "class='blue' " : "" ) +
-						"value='" + OSApp.Utils.htmlEscape( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.wto ) ) + "'>" +
-							OSApp.Language._( "Tap to Configure" ) +
-					"</button></div>";
-			} else {
-				list += "<div class='ui-field-contain'><label for='weatherRestriction' class='select'>" + OSApp.Language._( "Weather Restrictions" ) +
-						"<button data-helptext='" + OSApp.Language._( "Prevents watering when the selected restriction is met." ) +
-							"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-					"</label>" +
-					"<select data-mini='true' class='noselect' id='weatherRestriction'>";
+				"</label>" +
+				"<select data-mini='true' class='noselect' id='weatherRestriction'>";
 
-				for ( i = 0; i < 2; i++ ) {
-					var restrict = OSApp.Weather.getRestriction( i );
-					list += "<option " + ( restrict.isCurrent === true ? "selected" : "" ) + " value='" + i + "'>" + restrict.name + "</option>";
-				}
-				list += "</select></div>";
+			for ( i = 0; i < 2; i++ ) {
+				var restrict = OSApp.Weather.getRestriction( i );
+				list += "<option " + ( restrict.isCurrent === true ? "selected" : "" ) + " value='" + i + "'>" + restrict.name + "</option>";
 			}
+			list += "</select></div>";
 		}
 	}
 
@@ -814,8 +795,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 	}
 
 	if ( typeof OSApp.currentSession.controller.options.fpr0 !== "undefined" ) {
-		var supportsFlowPulseDiv = OSApp.Firmware.checkOSVersion( 203 );
-		var flowPulseDiv = supportsFlowPulseDiv && OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ?
+		var flowPulseDiv = OSApp.currentSession.controller.options.fpd1 !== undefined && OSApp.currentSession.controller.options.fpd0 !== undefined ?
 			( OSApp.currentSession.controller.options.fpd1 * 256 + OSApp.currentSession.controller.options.fpd0 ) : 1;
 		var flowPulseRate100 = ( OSApp.currentSession.controller.options.fpr1 * 256 + OSApp.currentSession.controller.options.fpr0 );
 		var flowPulseRateDisplay = ( flowPulseRate100 / 100 );
@@ -838,15 +818,13 @@ OSApp.Options.showOptions = function( expandItem ) {
 							"<option value='gallon'>Gal/pulse</option>" +
 						"</select>" +
 					"</td>" +
-				"</tr>" +
+			"</tr>" +
 			"</table></div>";
 
-		if ( supportsFlowPulseDiv ) {
-			list += "<div class='ui-field-contain" + ( OSApp.currentSession.controller.options.urs === 2 || OSApp.currentSession.controller.options.sn1t === 2 ? "" : " hidden" ) + "'>" +
-				"<label for='o80'>" + OSApp.Language._( "Flow Pulse Divisor" ) + "</label>" +
-				"<input data-mini='true' type='number' pattern='[0-9]*' min='1' step='1' id='o80' value='" + flowPulseDiv + "'>" +
-			"</div>";
-		}
+		list += "<div class='ui-field-contain" + ( OSApp.currentSession.controller.options.urs === 2 || OSApp.currentSession.controller.options.sn1t === 2 ? "" : " hidden" ) + "'>" +
+			"<label for='o80'>" + OSApp.Language._( "Flow Pulse Divisor" ) + "</label>" +
+			"<input data-mini='true' type='number' pattern='[0-9]*' min='1' step='1' id='o80' value='" + flowPulseDiv + "'>" +
+		"</div>";
 	}
 
 	if ( typeof OSApp.currentSession.controller.options.sn1on !== "undefined" ) {
@@ -863,14 +841,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"</label><button data-mini='true' id='o55' value='" + OSApp.currentSession.controller.options.sn1of + "'>" + OSApp.currentSession.controller.options.sn1of + "m</button></div>";
 	}
 
-	if ( OSApp.Firmware.checkOSVersion( 217 ) ) {
-		list += "<label id='prgswitch' class='center smaller" + ( OSApp.currentSession.controller.options.urs === 240 ||
-			OSApp.currentSession.controller.options.sn1t === 240 || OSApp.currentSession.controller.options.sn2t === 240 ? "" : " hidden" ) + "'>" +
-			OSApp.Language._( "When using program switch, a switch is connected to the sensor port to trigger Program 1 every time the switch is pressed for at least 1 second." ) +
-		"</label>";
-	}
+	list += "<label id='prgswitch' class='center smaller" + ( OSApp.currentSession.controller.options.urs === 240 ||
+		OSApp.currentSession.controller.options.sn1t === 240 || OSApp.currentSession.controller.options.sn2t === 240 ? "" : " hidden" ) + "'>" +
+		OSApp.Language._( "When using program switch, a switch is connected to the sensor port to trigger Program 1 every time the switch is pressed for at least 1 second." ) +
+	"</label>";
 
-	if ( typeof OSApp.currentSession.controller.options.sn2t !== "undefined" && OSApp.Firmware.checkOSVersion( 219 ) ) {
+	if ( typeof OSApp.currentSession.controller.options.sn2t !== "undefined" ) {
 		list += generateSensorOptions( OSApp.Constants.keyIndex.sn2t, OSApp.currentSession.controller.options.sn2t, 2 );
 	}
 
@@ -1037,7 +1013,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					OSApp.Language._( "Relay pulsing is used for special situations where rapid pulsing is needed in the output with a range from 1 to 2000 milliseconds. A zero value disables the pulsing option." ) +
 					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
 			"</label><button data-mini='true' id='o30' value='" + OSApp.currentSession.controller.options.rlp + "'>" + OSApp.currentSession.controller.options.rlp + "ms</button></div>";
-	} else if ( OSApp.Firmware.checkOSVersion( 215 ) && typeof OSApp.currentSession.controller.options.bst !== "undefined" ) {
+	} else if ( typeof OSApp.currentSession.controller.options.bst !== "undefined" ) {
 		list += "<div class='ui-field-contain duration-field'>" +
 			"<label for='o30'>" + OSApp.Language._( "Boost Time" ) +
 				"<button data-helptext='" +
@@ -1046,7 +1022,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"</label><button data-mini='true' id='o30' value='" + OSApp.currentSession.controller.options.bst + "'>" + OSApp.currentSession.controller.options.bst + "ms</button></div>";
 	}
 
-	if ( OSApp.Firmware.checkOSVersion( 2214 ) && typeof OSApp.currentSession.controller.options.tpdv !== "undefined" && typeof OSApp.currentSession.controller.settings.apdv !== "undefined" && OSApp.currentSession.controller.settings.apdv > 0) {
+	if ( typeof OSApp.currentSession.controller.options.tpdv !== "undefined" && typeof OSApp.currentSession.controller.settings.apdv !== "undefined" && OSApp.currentSession.controller.settings.apdv > 0) {
 		list += "<div class='ui-field-contain'><label for='tpdv'>" + OSApp.Language._( "Target PD Voltage" ) +
 			"<button data-helptext='" +
 				OSApp.Language._( "The holding current of your solenoid multiplied by its coil resistance (e.g. 0.25A×30Ω=7.5V). Set to 0 to use system default." ) +
@@ -1058,7 +1034,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"<input type='range' id='tpdv' min='0' max='21' step='0.1' data-highlight='true' value='" + ( OSApp.currentSession.controller.options.tpdv / 10 ) + "'></div>";
 		}
 
-	if ( OSApp.Firmware.checkOSVersion( 2213 ) && typeof OSApp.currentSession.controller.options.imin !== "undefined" ) {
+	if ( typeof OSApp.currentSession.controller.options.imin !== "undefined" ) {
 		list += "<div class='ui-field-contain'><label for='imin'>" + OSApp.Language._( "Undercurrent Threshold" ) +
 			"<button data-helptext='" +
 				OSApp.Language._( "If the current draw (mA) falls below this threshold when a station finishes running, a low-current fault notification is triggered. The recommended value is 100. Set to 0 to disable this feature." ) +
@@ -1066,7 +1042,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"<input type='range' id='imin' min='0' max='1000' step='10' data-highlight='true' value='" + ( OSApp.currentSession.controller.options.imin ) + "'></div>";
 	}
 
-	if ( OSApp.Firmware.checkOSVersion( 2213 ) && typeof OSApp.currentSession.controller.options.imax !== "undefined" ) {
+	if ( typeof OSApp.currentSession.controller.options.imax !== "undefined" ) {
 		list += "<div class='ui-field-contain'><label for='imax'>" + OSApp.Language._( "Overcurrent Limit" ) +
 			"<button data-helptext='" +
 				OSApp.Language._( "If the current draw (mA) exceeds this threshold when stations are running, an overcurrent fault notification is triggered. Set to 0 to use the system default. Set to maximum (2550) to disable this feature." ) +
@@ -1074,7 +1050,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"<input type='range' id='imax' min='0' max='2550' step='50' data-highlight='true' value='" + ( OSApp.currentSession.controller.options.imax ) + "'></div>";
 	}
 
-	if ( OSApp.Firmware.checkOSVersion( 220 ) && typeof OSApp.currentSession.controller.options.laton !== "undefined" ) {
+	if ( typeof OSApp.currentSession.controller.options.laton !== "undefined" ) {
 		list += "<div class='ui-field-contain'><label for='laton'>" + OSApp.Language._( "Latch On Voltage" ) +
 			"<button data-helptext='" +
 				OSApp.Language._( "Maximum is 24V. Set to 0 for default." ) +
@@ -1082,7 +1058,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"<input type='range' id='laton' min='0' max='24' step='1' data-highlight='true' value='" + ( OSApp.currentSession.controller.options.laton ) + "'></div>";
 	}
 
-	if ( OSApp.Firmware.checkOSVersion( 220 ) && typeof OSApp.currentSession.controller.options.latof !== "undefined" ) {
+	if ( typeof OSApp.currentSession.controller.options.latof !== "undefined" ) {
 		list += "<div class='ui-field-contain'><label for='latof'>" + OSApp.Language._( "Latch Off Voltage" ) +
 			"<button data-helptext='" +
 				OSApp.Language._( "Maximum is 24V. Set to 0 for default." ) +
@@ -1090,13 +1066,13 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"<input type='range' id='latof' min='0' max='24' step='1' data-highlight='true' value='" + ( OSApp.currentSession.controller.options.latof ) + "'></div>";
 	}
 
-	if ( typeof OSApp.currentSession.controller.options.ntp !== "undefined" && OSApp.Firmware.checkOSVersion( 210 ) ) {
+	if ( typeof OSApp.currentSession.controller.options.ntp !== "undefined" ) {
 		var ntpIP = [ OSApp.currentSession.controller.options.ntp1, OSApp.currentSession.controller.options.ntp2, OSApp.currentSession.controller.options.ntp3, OSApp.currentSession.controller.options.ntp4 ].join( "." );
 		list += "<div class='" + ( ( OSApp.currentSession.controller.options.ntp === 1 ) ? "" : "hidden " ) + "ui-field-contain duration-field'><label for='ntp_addr'>" +
 			OSApp.Language._( "NTP IP Address" ) + "</label><button data-mini='true' id='ntp_addr' value='" + ntpIP + "'>" + ntpIP + "</button></div>";
 	}
 
-	if ( typeof OSApp.currentSession.controller.options.dhcp !== "undefined" && OSApp.Firmware.checkOSVersion( 210 ) ) {
+	if ( typeof OSApp.currentSession.controller.options.dhcp !== "undefined" ) {
 		var ip = [ OSApp.currentSession.controller.options.ip1, OSApp.currentSession.controller.options.ip2, OSApp.currentSession.controller.options.ip3, OSApp.currentSession.controller.options.ip4 ].join( "." ),
 			gw = [ OSApp.currentSession.controller.options.gw1, OSApp.currentSession.controller.options.gw2, OSApp.currentSession.controller.options.gw3, OSApp.currentSession.controller.options.gw4 ].join( "." );
 
@@ -1260,9 +1236,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					page.find( "#o1" ).selectmenu( "enable" );
 				}
 			} else {
-				if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-					page.find( "#o1" ).selectmenu( "disable" );
-				}
+				page.find( "#o1" ).selectmenu( "disable" );
 
 				if ( typeof selected === "string" ) {
 					loc.val( selected ).find( "span" ).text( selected );
@@ -1731,8 +1705,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 					dur.val( result ).text( result + "s" );
 				},
 				label: OSApp.Language._( "Seconds" ),
-				maximum: OSApp.Firmware.checkOSVersion( 220 ) ? 600 : 60,
-				minimum: OSApp.Firmware.checkOSVersion( 220 ) ? -600 : 0,
+				maximum: 600,
+				minimum: -600,
 				helptext: helptext
 			} );
 		} else if ( id === "o30" ) {
@@ -1754,8 +1728,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 					dur.val( result ).text( result + "s" );
 				},
 				label: OSApp.Language._( "Seconds" ),
-				maximum: OSApp.Firmware.checkOSVersion( 220 ) ? 600 : 0,
-				minimum: OSApp.Firmware.checkOSVersion( 220 ) ? -600 : -60,
+				maximum: 600,
+				minimum: -600,
 				helptext: helptext
 			} );
 		} else if ( id === "o23" ) {
@@ -1770,21 +1744,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 				helptext: helptext
 			} );
 		} else if ( id === "o17" ) {
-			var min = 0;
-
-			if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-				max = OSApp.Firmware.checkOSVersion( 214 ) ? 57600 : 64800;
-			}
-
-			if ( OSApp.Firmware.checkOSVersion( 211 ) ) {
-				min = -3540;
-				max = 3540;
-			}
-
-			if ( OSApp.Firmware.checkOSVersion( 217 ) ) {
-				min = -600;
-				max = 600;
-			}
+			var min = -600;
+			max = 600;
 
 			OSApp.UIDom.showSingleDurationInput( {
 				data: dur.val(),
@@ -1990,7 +1951,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 		$( ".ui-popup-active" ).find( "[data-role='popup']" ).popup( "close" );
 
-		var largeSOPTSupport = OSApp.Firmware.checkOSVersion( 221 ) || OSApp.Firmware.isOSPi();
 		var popup = $( "<div data-role='popup' data-theme='a' id='mqttSettings'>" +
 				"<div data-role='header' data-theme='b'>" +
 					"<h1>" + OSApp.Language._( "MQTT Settings" ) + "</h1>" +
@@ -2019,25 +1979,23 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"<label for='username' style='padding-top:10px'>" + OSApp.Language._( "Username" ) + "</label>" +
 							"</div>" +
 							"<div class='ui-block-b' style='width:60%'>" +
-								"<input class='mqtt-input' type='text' id='username' data-mini='true' maxlength='" + ( largeSOPTSupport ? "50" : "32" ) + "' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
+								"<input class='mqtt-input' type='text' id='username' data-mini='true' maxlength='50' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
 									( options.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "username (optional)" ) + "' value='" + options.user + "' required />" +
 							"</div>" +
 							"<div class='ui-block-a' style='width:40%'>" +
 								"<label for='password' style='padding-top:10px'>" + OSApp.Language._( "Password" ) + "</label>" +
 							"</div>" +
 							"<div class='ui-block-b' style='width:60%'>" +
-								"<input class='mqtt-input' type='password' id='password' data-mini='true' maxlength='" + ( largeSOPTSupport ? "100" : "32" ) + "' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
+								"<input class='mqtt-input' type='password' id='password' data-mini='true' maxlength='100' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
 									( options.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "password (optional)" ) + "' value='" + options.pass + "' required />" +
 							"</div>" +
-							( largeSOPTSupport ?
 							"<div class='ui-block-a' style='width:40%'>" +
 								"<label for='pubt' style='padding-top:10px'>" + OSApp.Language._( "Publish Topic" ) + "</label>" +
 							"</div>" +
 							"<div class='ui-block-b' style='width:60%'>" +
 								"<input class='mqtt-input' type='text' id='pubt' data-mini='true' maxlength='24' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
 									( options.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "publish topic" ) + "' value='" + options.pubt + "' required />" +
-							"</div>" : "" ) +
-							( largeSOPTSupport ?
+							"</div>" +
 							"<div class='ui-block-a' style='width:40%'>" +
 								"<label for='subt' style='padding-top:10px'>" + OSApp.Language._( "Subscribe Topic" ) + "</label>" +
 							"</div>" +
@@ -2047,7 +2005,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"<div data-role='controlgroup' data-mini='true' data-type='horizontal'>" +
 								"<button data-theme='a' id='defaultsubt'>Use Default</button><button data-theme='a' id='clearsubt'>Clear</button>" +
 								"</div>" +
-							"</div>" : "" ) +
+							"</div>" +
 						"</div>" +
 					"</div>" +
 					"<button class='submit' data-theme='b'>" + OSApp.Language._( "Submit" ) + "</button>" +

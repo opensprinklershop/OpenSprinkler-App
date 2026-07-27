@@ -230,23 +230,11 @@ OSApp.ESP32Mode.isZigBeeClientActive = function() {
 };
 
 /**
- * Check whether the connected firmware supports the in-app ZigBee gateway
- * device editor / scanner / DB-driven device profiles. Available from
- * firmware 2.4.0 build 203 and later, AND only if the editor UI is loaded.
+ * Check whether the in-app ZigBee gateway device editor / scanner /
+ * DB-driven device profiles UI is available (editor UI loaded).
  */
 OSApp.ESP32Mode.supportsZigBeeGatewayDeviceEditor = function() {
-	if ( typeof OSApp.ESP32Mode.showZigBeeDeviceEditor !== "function" ) {
-		return false;
-	}
-	if ( !OSApp.currentSession || !OSApp.currentSession.controller || !OSApp.currentSession.controller.options ) {
-		return false;
-	}
-	var opts = OSApp.currentSession.controller.options;
-	var fwv = parseInt( opts.fwv, 10 ) || 0;
-	var fwm = parseInt( opts.fwm, 10 ) || 0;
-	if ( fwv > 240 ) { return true; }
-	if ( fwv === 240 && fwm >= 203 ) { return true; }
-	return false;
+	return typeof OSApp.ESP32Mode.showZigBeeDeviceEditor === "function";
 };
 
 /**
@@ -866,7 +854,7 @@ OSApp.ESP32Mode.showRainMakerPopup = function( rainmakerInfo ) {
 				OSApp.Language._( "Add this device via the ESP RainMaker app:" ) + "</p>";
 			content += "<ul style='margin:4px 0 8px;padding-left:18px;font-size:0.85em;color:#555;'>";
 			content += "<li><b>" + OSApp.Language._( "On Network" ) + ":</b> " +
-				OSApp.Language._( "'Add Device' → 'On Network' (device and phone on same WiFi network)" ) + "</li>";
+				OSApp.Language._( "'Add Device' \u2192 'On Network' (device and phone on same WiFi network)" ) + "</li>";
 			content += "</ul>";
 		}
 
@@ -1855,7 +1843,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 		var h = "";
 		if ( isPending ) {
 			h += "<p style='color:#080;margin:4px 0 4px;font-size:0.85em;'>&#x2714; " +
-				OSApp.Language._( "Logical devices modified — click Save to write to the device." ) + "</p>";
+				OSApp.Language._( "Logical devices modified \u2014 click Save to write to the device." ) + "</p>";
 		}
 		if ( displayLogicals.length ) {
 			for ( var li = 0; li < displayLogicals.length; li++ ) {
@@ -2598,7 +2586,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			{ key: "dpVal",  cls: "d-dp-val",  label: "Value DP",       hint: OSApp.Language._( "on/off control" ) },
 			{ key: "dpStat", cls: "d-dp-stat", label: "Status DP",      hint: OSApp.Language._( "current state" ) },
 			{ key: "dpCons", cls: "d-dp-cons", label: "Consumption DP", hint: OSApp.Language._( "water meter (optional)" ) },
-			{ key: "dpUnit", cls: "d-dp-unit", label: "Unit DP",        hint: OSApp.Language._( "°C/°F or L/m³ (optional)" ) },
+			{ key: "dpUnit", cls: "d-dp-unit", label: "Unit DP",        hint: OSApp.Language._( "\u00B0C/\u00B0F or L/m\u00B3 (optional)" ) },
 			{ key: "dpBatt", cls: "d-dp-batt", label: "Battery DP",     hint: OSApp.Language._( "battery level (optional)" ) }
 		];
 
@@ -2782,7 +2770,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			var seedQ = nameQ || devName || devModel || devManuf;
 			if ( !manufQ && !modelQ && !seedQ ) {
 				$result.show().html( "<em style='color:#a00;'>" +
-					OSApp.Language._( "Manufacturer/Model unknown — cannot query database." ) + "</em>" );
+					OSApp.Language._( "Manufacturer/Model unknown \u2014 cannot query database." ) + "</em>" );
 				return false;
 			}
 			if ( !OSApp.ESP32Mode.ZigbeeDeviceDB || typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookupForEditor !== "function" ) {
@@ -2802,7 +2790,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 					logicals = [ emptyLogical() ];
 					logicalState = "ready";
 					renderLogicals();
-					$result.html( "<em>" + OSApp.Language._( "No database entry found — created default logical device." ) + "</em>" );
+					$result.html( "<em>" + OSApp.Language._( "No database entry found \u2014 created default logical device." ) + "</em>" );
 					return;
 				}
 				applyRecognizedEntries( entries );
@@ -2900,7 +2888,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 					logicals = [ emptyLogical() ];
 					logicalState = "ready";
 					renderLogicals();
-					$autoResult.html( "<em>" + OSApp.Language._( "No database entry found — created default logical device." ) + "</em>" );
+					$autoResult.html( "<em>" + OSApp.Language._( "No database entry found \u2014 created default logical device." ) + "</em>" );
 					return;
 				}
 				applyRecognizedEntries( entries );
@@ -3232,13 +3220,19 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 				( hasMfr ? dev.manufacturer : OSApp.Language._( "Unknown Device" ) );
 			var rowBg = dev.is_new ? "background-color:#fff8d0;" : "background-color:#fff;";
 
+			// A device is "waiting for data" when it has no logical devices yet
+			// (Tuya DPs not received) and was just discovered.
+			var hasLogicals = Array.isArray( dev.logical_devices ) && dev.logical_devices.length > 0;
+			var isWaiting = ( dev.is_new === 1 || dev.is_new === true || dev.is_new === "1" ) && !hasLogicals;
+
 			// Subtitle: "Manufacturer · Model" (omit empty parts gracefully)
 			var subParts = [];
 			if ( hasMfr )   { subParts.push( OSApp.Utils.htmlEscape( dev.manufacturer ) ); }
 			if ( hasModel ) { subParts.push( OSApp.Utils.htmlEscape( dev.model ) ); }
 			var subtitle = subParts.join( " &middot; " );
 
-			content += "<li" + ieeeAttr + " class='zg-dev-card' style='border:1px solid #ddd;border-radius:6px;padding:8px 10px;margin:6px 0;" + rowBg + "'>";
+			var waitingClass = isWaiting ? " zg-dev-waiting" : "";
+			content += "<li" + ieeeAttr + " class='zg-dev-card" + waitingClass + "' style='border:1px solid #ddd;border-radius:6px;padding:8px 10px;margin:6px 0;" + rowBg + "'>";
 
 			// Row 1: status + title + actions (actions wrap to next line on narrow screens)
 			content += "<div style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;'>";
@@ -3274,6 +3268,14 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 
 			// Row 4 (hidden until enriched): DB info
 			content += "<div class='zb-db-info' style='display:none;font-size:0.8em;color:#666;margin-top:2px;'></div>";
+
+			// Row 5: "Waiting for data" spinner — shown while Tuya DPs have not arrived yet
+			if ( isWaiting ) {
+				content += "<div class='zb-wait-row' style='margin-top:4px;display:flex;align-items:center;font-size:0.82em;color:#555;'>" +
+					"<span class='zb-data-spinner'></span>" +
+					OSApp.Utils.htmlEscape( OSApp.Language._( "Waiting for device data\u2026" ) ) +
+					"</div>";
+			}
 
 			content += "</li>";
 		}
@@ -3563,6 +3565,104 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 
 	OSApp.UIDom.openPopup( popup );
 
+	// Inject spinner keyframe CSS once (charset-safe, no raw non-ASCII)
+	if ( !$( "#zb-spinner-css" ).length ) {
+		$( "<style id='zb-spinner-css'>" +
+			"@keyframes zbSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}" +
+			".zb-data-spinner{display:inline-block;width:11px;height:11px;" +
+				"border:2px solid #bbb;border-top-color:#2196f3;border-radius:50%;" +
+				"animation:zbSpin 0.8s linear infinite;vertical-align:middle;margin-right:5px;flex-shrink:0;}" +
+		"</style>" ).appendTo( "head" );
+	}
+
+	// ── "Waiting for data" background watcher ────────────────────────────────
+	// While any newly-joined device has no logical devices yet (Tuya DPs not
+	// received), poll /zg every 3 s. As soon as one of those devices receives
+	// its first data packet (logical_devices becomes non-empty OR is_new
+	// transitions to false), reload the gateway panel so the new values and
+	// logical devices are shown immediately.
+	( function() {
+		// Cancel any previous watcher left from an earlier panel render.
+		if ( OSApp.ESP32Mode._zbDataWaitHandle ) {
+			clearInterval( OSApp.ESP32Mode._zbDataWaitHandle );
+			OSApp.ESP32Mode._zbDataWaitHandle = null;
+		}
+
+		var devices = data.devices || [];
+
+		// Build a snapshot of devices currently in "waiting" state:
+		// { ieee → logical_devices.length at render time }
+		var waitingSnapshot = {};
+		for ( var wi = 0; wi < devices.length; wi++ ) {
+			var wd = devices[ wi ];
+			if ( !wd || !wd.ieee ) { continue; }
+			var wIsNew = ( wd.is_new === 1 || wd.is_new === true || wd.is_new === "1" );
+			var wLds   = Array.isArray( wd.logical_devices ) ? wd.logical_devices.length : 0;
+			if ( wIsNew && wLds === 0 ) {
+				waitingSnapshot[ String( wd.ieee ).toLowerCase() ] = 0;
+			}
+		}
+
+		// Nothing to watch — skip.
+		if ( !Object.keys( waitingSnapshot ).length ) { return; }
+
+		var POLL_INTERVAL_MS = 3000;
+		var MAX_WAIT_MS      = 5 * 60 * 1000; // give up after 5 minutes
+		var startedAt        = Date.now();
+		var active           = true;
+
+		function stopWatcher() {
+			active = false;
+			if ( OSApp.ESP32Mode._zbDataWaitHandle ) {
+				clearInterval( OSApp.ESP32Mode._zbDataWaitHandle );
+				OSApp.ESP32Mode._zbDataWaitHandle = null;
+			}
+		}
+
+		// Stop the watcher if the popup is closed before data arrives.
+		popup.one( "popupafterclose", stopWatcher );
+
+		OSApp.ESP32Mode._zbDataWaitHandle = setInterval( function() {
+			if ( !active ) { return; }
+			if ( Date.now() - startedAt > MAX_WAIT_MS ) { stopWatcher(); return; }
+
+			OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( resp ) {
+				if ( !active ) { return; }
+				if ( !resp || !resp.devices ) { return; }
+
+				var gotData = false;
+				for ( var pi = 0; pi < resp.devices.length; pi++ ) {
+					var pd = resp.devices[ pi ];
+					if ( !pd || !pd.ieee ) { continue; }
+					var pKey = String( pd.ieee ).toLowerCase();
+					if ( !Object.prototype.hasOwnProperty.call( waitingSnapshot, pKey ) ) { continue; }
+					// Device transitions to "has data" when:
+					//   - logical_devices is now non-empty, OR
+					//   - is_new flag cleared
+					var pLds   = Array.isArray( pd.logical_devices ) ? pd.logical_devices.length : 0;
+					var pIsNew = ( pd.is_new === 1 || pd.is_new === true || pd.is_new === "1" );
+					if ( pLds > 0 || !pIsNew ) {
+						gotData = true;
+						break;
+					}
+				}
+
+				if ( gotData ) {
+					stopWatcher();
+					// Reload the gateway panel to show the updated device info
+					// and newly populated logical devices.
+					setTimeout( function() {
+						if ( typeof OSApp.ESP32Mode.setupZigBeeGateway === "function" ) {
+							popup.popup( "close" );
+							setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 200 );
+						}
+					}, 300 );
+				}
+			} );
+		}, POLL_INTERVAL_MS );
+	}() );
+	// ── end watcher ───────────────────────────────────────────────────────────
+
 	// Auto-fill manufacturer/model for registered devices whose Basic
 	// Cluster has not been answered yet. We throttle per-IEEE so reloads
 	// don't spam the firmware, and we reload the panel once after a short
@@ -3600,6 +3700,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
  * @returns {Boolean} true when at least one query was sent.
  */
 OSApp.ESP32Mode._zbAutoQueryCache = OSApp.ESP32Mode._zbAutoQueryCache || {};
+OSApp.ESP32Mode._zbDataWaitHandle = OSApp.ESP32Mode._zbDataWaitHandle || null;
 OSApp.ESP32Mode.autoQueryZigBeeMissingMeta = function( devices, opts ) {
 	opts = opts || {};
 	if ( !devices || !devices.length ) { return false; }
@@ -4295,7 +4396,7 @@ OSApp.ESP32Mode.restoreFromAppBackupInPopup = function( popup ) {
 	var backup = OSApp.ESP32Mode.hasAppBackup();
 	if ( !backup ) {
 		popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
-			"&#9888; " + OSApp.Language._( "No backup found — manual restore needed" )
+			"&#9888; " + OSApp.Language._( "No backup found \u2014 manual restore needed" )
 		);
 		OSApp.ESP32Mode.stopOTADurationTimer( popup );
 		return;
@@ -4341,11 +4442,6 @@ OSApp.ESP32Mode.restoreFromAppBackupInPopup = function( popup ) {
  *   Step 3: After reboot, offer config restore
  */
 OSApp.ESP32Mode.setupOnlineUpdate = function() {
-	if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
-		OSApp.Errors.showError( OSApp.Language._( "Online firmware update requires firmware version 2.4.0 or newer." ) );
-		return;
-	}
-
 	// OTC sessions cannot use browser upload to port 8080; use the device-side OTA flow.
 	if ( OSApp.currentSession && OSApp.currentSession.token ) {
 		OSApp.ESP32Mode.setupLegacyOnlineUpdate();
@@ -4960,7 +5056,7 @@ OSApp.ESP32Mode.waitForClassicUploadReboot = function( popup ) {
 			if ( pollCount > maxPolls ) {
 				clearInterval( rebootPoll );
 				popup.find( "#ota-step-4" ).css( "color", "#FF9800" ).html(
-					"&#9888; " + OSApp.Language._( "Device rebooting — reconnect when ready" )
+					"&#9888; " + OSApp.Language._( "Device rebooting \u2014 reconnect when ready" )
 				);
 				popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "The upload finished, but the device did not come back online in time." ) );
 				popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
@@ -5367,15 +5463,11 @@ OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
 
 		if ( serverAvailable ) {
 			OSApp.ESP32Mode.setupClassicPostedUpdate();
-		} else if ( OSApp.Firmware.isOnlineUpdateSupported() ) {
+		} else {
 			// Port 8080 not reachable — the device firmware predates the browser-push
 			// upload server.  Fall back to device-side download via /uu (the device
 			// fetches the binary from the update server itself).
 			OSApp.ESP32Mode.setupLegacyOnlineUpdate();
-		} else {
-			OSApp.Errors.showError(
-				OSApp.Language._( "The firmware update server on this device is not reachable (port 8080). Please update the firmware via USB or install a firmware that supports online updates." )
-			);
 		}
 	} );
 };
@@ -5402,11 +5494,6 @@ OSApp.ESP32Mode.setupClassicPostedUpdate = function() {
  * Uses direct online update endpoints (/uc, /uu, /us).
  */
 OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
-	if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
-		OSApp.Errors.showError( OSApp.Language._( "Online firmware update requires firmware version 2.4.0 or newer." ) );
-		return;
-	}
-
 	$.mobile.loading( "show" );
 	OSApp.Firmware.checkOTAUpdate( true ).done( function( data ) {
 		$.mobile.loading( "hide" );
@@ -5698,11 +5785,6 @@ OSApp.ESP32Mode.showLegacyVersionPicker = function( checkData ) {
 };
 
 OSApp.ESP32Mode.setupOSPiOnlineUpdate = function() {
-	if ( !OSApp.Firmware.isOnlineUpdateSupported() ) {
-		OSApp.Errors.showError( OSApp.Language._( "Online firmware update requires firmware version 2.4.0 or newer." ) );
-		return;
-	}
-
 	var curVer = OSApp.Firmware.getOSVersion();
 	var variantLabel = OSApp.ESP32Mode.getOnlineUpdateVariantLabel();
 	var content = "<div class='ui-content'>";
@@ -5883,7 +5965,7 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 						} );
 					} else {
 						popup.find( "#ota-step-4" ).css( "color", "#FF9800" ).html(
-							"&#9888; " + OSApp.Language._( "No backup found — manual restore needed" )
+							"&#9888; " + OSApp.Language._( "No backup found \u2014 manual restore needed" )
 						);
 						popup.find( ".legacy-ota-after-reboot" ).show();
 					}
@@ -6275,7 +6357,7 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 
 			popup.find( "#ota-progress-bar" ).css( "background", "#FF9800" );
 			popup.find( "#ota-step-2" ).css( "color", "#FF9800" ).html(
-				"&#9658; <b>" + OSApp.Language._( "Low memory detected — switching mode and retrying..." ) + "</b>"
+				"&#9658; <b>" + OSApp.Language._( "Low memory detected \u2014 switching mode and retrying..." ) + "</b>"
 			);
 			popup.find( "#ota-progress-msg" ).text(
 				OSApp.Language._( "Disabling Matter mode (IEEE802.15.4) and rebooting device for retry..." )
@@ -6575,7 +6657,7 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 						"&#9745; " + OSApp.Language._( "Firmware update sent" )
 					);
 					popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
-						"&#9658; <b>" + OSApp.Language._( "Device rebooting — reconnect when ready" ) + "</b>"
+						"&#9658; <b>" + OSApp.Language._( "Device rebooting \u2014 reconnect when ready" ) + "</b>"
 					);
 					popup.find( ".ota-start-interactive" ).remove();
 					popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );

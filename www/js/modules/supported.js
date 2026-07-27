@@ -54,10 +54,7 @@ OSApp.Supported.disabled = function() {
 };
 
 OSApp.Supported.sequential = function() {
-	if ( OSApp.Firmware.checkOSVersion( 220 ) ) {
-		return false;
-	}
-	return ( typeof OSApp.currentSession.controller.stations.stn_seq === "object" ) ? true : false;
+	return false;
 };
 
 OSApp.Supported.special = function() {
@@ -73,25 +70,24 @@ OSApp.Supported.groups = function() {
 };
 
 OSApp.Supported.dateRange = function() {
-	return OSApp.Firmware.checkOSVersion( 220 );
+	return true;
 };
 
 OSApp.Supported.changePause = function() {
-	return OSApp.Firmware.checkOSVersion( 2211 );
+	return true;
 };
 
 OSApp.Supported.verifyWeatherAPIKey = function() {
-	return OSApp.Firmware.checkOSVersion( 219 ) &&
-			typeof OSApp.currentSession.controller.options.uwt !== "undefined" &&
+	return typeof OSApp.currentSession.controller.options.uwt !== "undefined" &&
 			typeof OSApp.currentSession.controller.settings.wto === "object";
 };
 
 OSApp.Supported.singleRunAndMonthly = function() {
-	return OSApp.Firmware.checkOSVersion( 2211 );
+	return true;
 };
 
 OSApp.Supported.repeatedRunonce = function() {
-	return OSApp.Firmware.checkOSVersion( 2211 );
+	return true;
 };
 
 /* Flow Alert supported */
@@ -101,5 +97,5 @@ OSApp.Supported.fas = function() {
 
 OSApp.Supported.restrictions = function() {
 	const wto = typeof OSApp.currentSession.controller?.settings?.wto !== "undefined";
-	return wto && OSApp.Firmware.checkOSVersion( 2213 );
+	return wto;
 };

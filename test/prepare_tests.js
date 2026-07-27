@@ -66,6 +66,18 @@ before(function() {
 	});
 });
 
+// The Karma runner serves the app from /context.html, which is not a real
+// deployment root, so OSApp.Sites.isRootPath() returns false. In that case
+// OSApp.UIDom.changePage("#start"/"#site-control") performs a full-page
+// window.location redirect to index.html (the multi-version router fallback),
+// which aborts the suite with "Some of your tests did a full page reload!".
+// Force root-path semantics so page navigation stays in-page during tests.
+before(function () {
+	if (window.OSApp && OSApp.Sites) {
+		OSApp.Sites.isRootPath = function () { return true; };
+	}
+});
+
 after(function() {
 	if (server) {
 		server.restore();

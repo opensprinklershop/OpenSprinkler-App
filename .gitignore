@@ -30,6 +30,9 @@ typings/
 .secrets.json
 .env
 
+# Local deploy secrets (SSH keys, IONOS webspace host/user) - must never be committed
+deploy-ionos.inc
+
 # OS Meta data files
 Thumbs.db
 .DS_Store

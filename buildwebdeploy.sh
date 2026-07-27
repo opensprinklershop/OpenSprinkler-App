@@ -116,3 +116,32 @@ fi
 chown -R stefan:www "$DST_DIR" 2>/dev/null || true
 echo "=== ui deploy done ==="
 
+
+# === Deploy nach IONOS ===
+SCRIPT_DIR_IONOS="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR_IONOS/deploy-ionos.inc" ]; then
+	. "$SCRIPT_DIR_IONOS/deploy-ionos.inc"
+	# Minifizierte Dist erzeugen (terser/cleancss); bei Fehler Fallback auf DST_DIR
+	DEPLOY_SRC="$DST_DIR"
+	if [ -x "$SCRIPT_DIR_IONOS/minify-dist.sh" ]; then
+		echo "=== Minifiziere JS/CSS fuer Deploy ==="
+		MINDIR="$("$SCRIPT_DIR_IONOS/minify-dist.sh" "$DST_DIR" | tail -1)"
+		if [ -n "$MINDIR" ] && [ -d "$MINDIR" ]; then
+			DEPLOY_SRC="$MINDIR"
+			echo "  -> minifizierte Version: $MINDIR"
+			# JS zu einer Datei buendeln (reduziert ~47 Requests -> 3, entlastet Webspace)
+			if [ -f "$SCRIPT_DIR_IONOS/bundle-dist.js" ]; then
+				echo "=== Buendle JS (bundle-dist.js) ==="
+				if node "$SCRIPT_DIR_IONOS/bundle-dist.js" "$MINDIR"; then
+					echo "  -> gebuendelte Version wird deployt"
+				else
+					echo "  WARN: Bundling fehlgeschlagen, deploye minifiziert (unbundled)." >&2
+				fi
+			fi
+		else
+			echo "  WARN: Minifizierung fehlgeschlagen, deploye unminifiziert." >&2
+		fi
+	fi
+	# OS-UI-Webspace: ui.opensprinklershop.de (eigenes Webprojekt)
+	ionos_mirror_osui "$DEPLOY_SRC/"
+fi

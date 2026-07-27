@@ -60,8 +60,8 @@ describe("Analog Notification Checks", function () {
 		OSApp.Analog.checkMonitorAlerts();
 
 		assert.equal(7, scheduled.id);
-		assert.equal("os_high", scheduled.channelId);
-		assert.equal("#C62828", scheduled.color);
+		assert.equal("os_high", scheduled.androidChannelId);
+		assert.equal("#C62828", scheduled.androidColor);
 		assert.equal(true, OSApp.Analog.monitorAlerts[7]);
 	});
 

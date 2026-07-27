@@ -58,3 +58,7 @@ rsync -a --delete "$SRC_DIR" "$BETAUI_TARGET/dev/"
 
 chown -R stefan:www "$BETAUI_TARGET" 2>/dev/null || true
 echo "=== betaui deploy done ==="
+
+# === IONOS-Deploy von betaui entfernt (2026-07-22) ===
+# betaui.opensprinklershop.de wurde aufgeloest; kein IONOS-Mirror mehr.
+# Lokales Staging (ui-test/www) oben bleibt fuer die Entwicklung erhalten.

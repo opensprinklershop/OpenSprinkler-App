@@ -19,22 +19,18 @@ OSApp.Utils = OSApp.Utils || {};
 
 // Transform keys to JSON names for 2.1.9+
 OSApp.Utils.transformKeys = function( opt ) {
-	if ( OSApp.Firmware.checkOSVersion( 219 ) ) {
-		var renamedOpt = {};
-		Object.keys( opt ).forEach( function( item ) {
-			var name = item.match( /^o(\d+)$/ );
+	var renamedOpt = {};
+	Object.keys( opt ).forEach( function( item ) {
+		var name = item.match( /^o(\d+)$/ );
 
-			if ( name && name[ 1 ] ) {
-				renamedOpt[ Object.keys( OSApp.Constants.keyIndex ).find( function( index ) { return OSApp.Constants.keyIndex[ index ] === parseInt( name[ 1 ], 10 ); } ) ] = opt[ item ];
-			} else {
-				renamedOpt[ item ] = opt[ item ];
-			}
-		} );
+		if ( name && name[ 1 ] ) {
+			renamedOpt[ Object.keys( OSApp.Constants.keyIndex ).find( function( index ) { return OSApp.Constants.keyIndex[ index ] === parseInt( name[ 1 ], 10 ); } ) ] = opt[ item ];
+		} else {
+			renamedOpt[ item ] = opt[ item ];
+		}
+	} );
 
-		return renamedOpt;
-	}
-
-	return opt;
+	return renamedOpt;
 };
 
 OSApp.Utils.transformKeysinString = function( co ) {

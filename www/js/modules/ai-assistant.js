@@ -828,6 +828,7 @@ OSApp.AIAssistant.formatSensorListing = function( message ) {
 			try {
 				value = JSON.stringify( value );
 			} catch ( e ) {
+				void e;
 				value = "";
 			}
 		}
@@ -917,7 +918,7 @@ OSApp.AIAssistant.formatProgramListingHtml = function() {
 		}
 		return out.join( ", " );
 	}
-	function formatStart( raw, prog ) {
+	function formatStart( raw ) {
 		if ( Array.isArray( raw ) ) {
 			var start = raw[ 0 ];
 			var repeat = raw[ 1 ];
@@ -2212,8 +2213,8 @@ OSApp.AIAssistant.openDialog = function() {
 		}
 
 		if ( hasChanges ) {
-			var detailsLabel = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de" 
-				? "Konfigurationsänderungen einblenden (JSON)" 
+			var detailsLabel = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de"
+				? "Konfigurationsänderungen einblenden (JSON)"
 				: "Show configuration changes (JSON)";
 			var details = $(
 				'<details style="margin-top:8px; border:1px solid #ddd; border-radius:4px; padding:6px; background:#fafafa; font-size:12px; outline:none;">' +

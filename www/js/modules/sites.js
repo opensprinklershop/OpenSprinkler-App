@@ -1366,11 +1366,7 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 			$.mobile.loading( "hide" );
 			OSApp.Weather.checkURLandUpdateWeather();
 
-			if ( OSApp.Firmware.checkOSVersion( 210 ) ) {
-				weatherAdjust.css( "display", "" );
-			} else {
-				weatherAdjust.hide();
-			}
+			weatherAdjust.css( "display", "" );
 
 			if ( OSApp.Analog.checkAnalogSensorAvail() ) {
 				OSApp.Analog.updateAnalogSensor();
@@ -1379,11 +1375,7 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 			}
 
 			// Hide change password feature for unsupported devices
-			if ( OSApp.Firmware.isOSPi() || OSApp.Firmware.checkOSVersion( 208 ) ) {
-				changePassword.css( "display", "" );
-			} else {
-				changePassword.hide();
-			}
+			changePassword.css( "display", "" );
 
 			// Show site name instead of default Information bar
 			if ( !OSApp.currentSession.local ) {
@@ -1393,9 +1385,6 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 				$( "#info-list" ).find( "li[data-role='list-divider']" ).text( OSApp.Language._( "Information" ) );
 			}
 
-			// Check if a firmware update is available
-			OSApp.Firmware.checkFirmwareUpdate();
-
 			// Check for OTA firmware updates (weekly, via device /uc endpoint)
 			OSApp.Firmware.initOTACheck();
 
@@ -1403,7 +1392,7 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 			OSApp.Firmware.detectUnusedExpansionBoards();
 
 			// Check if password is plain text (older method) and hash the password, if needed
-			if ( OSApp.Firmware.checkOSVersion( 213 ) && OSApp.currentSession.controller.options.hwv !== 255 ) {
+			if ( OSApp.currentSession.controller.options.hwv !== 255 ) {
 				OSApp.Sites.fixPasswordHash( name );
 			}
 
@@ -1496,7 +1485,7 @@ OSApp.Sites.updateController = function( callback, fail ) {
 		callback();
 	};
 
-	if ( OSApp.currentSession.isControllerConnected() && OSApp.Firmware.checkOSVersion( 216 ) ) {
+	if ( OSApp.currentSession.isControllerConnected() ) {
 		OSApp.Firmware.sendToOS( "/ja?pw=", "json" ).then( function( data ) {
 
 			if ( typeof data === "undefined" || $.isEmptyObject( data ) ) {

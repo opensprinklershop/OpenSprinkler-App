@@ -174,7 +174,7 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 		return;
 	}
 
-	if ( OSApp.Firmware.checkOSVersion( 210 ) && typeof data.options === "object" &&
+	if ( typeof data.options === "object" &&
 		( data.options.hp0 !== OSApp.currentSession.controller.options.hp0 || data.options.hp1 !== OSApp.currentSession.controller.options.hp1 ) ||
 		( data.options.dhcp !== OSApp.currentSession.controller.options.dhcp ) || ( data.options.devid !== OSApp.currentSession.controller.options.devid ) ) {
 
@@ -208,7 +208,7 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 					continue;
 				}
 				if ( key === 3 ) {
-					if ( OSApp.Firmware.checkOSVersion( 210 ) && OSApp.currentSession.controller.options.dhcp === 1 ) {
+					if ( OSApp.currentSession.controller.options.dhcp === 1 ) {
 						co += "&o3=1";
 					}
 					continue;
@@ -219,7 +219,7 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 						continue;
 					}
 				}
-				if ( OSApp.Firmware.checkOSVersion( 208 ) === true && typeof data.options[ i ] === "string" ) {
+				if ( typeof data.options[ i ] === "string" ) {
 					option = data.options[ i ].replace( /\s/g, "_" );
 				} else {
 					option = data.options[ i ];
@@ -229,43 +229,43 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 		}
 
 		// Handle import from versions prior to 2.1.1 for enable logging flag
-		if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv < 211 && OSApp.Firmware.checkOSVersion( 211 ) ) {
+		if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv < 211 ) {
 
 			// Enables logging since prior firmwares always had logging enabled
 			co += "&o36=1";
 		}
 
 		// Import Weather Adjustment Options, if available
-		if ( typeof data.settings.wto === "object" && OSApp.Firmware.checkOSVersion( 215 ) ) {
+		if ( typeof data.settings.wto === "object" ) {
 			co += "&wto=" + OSApp.Utils.escapeJSON2( data.settings.wto );
 		}
 
 		// Import IFTTT Key, if available
-		if ( typeof data.settings.ifkey === "string" && OSApp.Firmware.checkOSVersion( 217 ) ) {
+		if ( typeof data.settings.ifkey === "string" ) {
 			co += "&ifkey=" + data.settings.ifkey;
 		}
 
 		// Import device name, if available
-		if ( typeof data.settings.dname === "string" && OSApp.Firmware.checkOSVersion( 2191 ) ) {
+		if ( typeof data.settings.dname === "string" ) {
 			co += "&dname=" + data.settings.dname;
 		}
 
 		// Import mqtt options, if available
-		if ( typeof data.settings.mqtt === "object" && OSApp.Firmware.checkOSVersion( 2191 ) ) {
+		if ( typeof data.settings.mqtt === "object" ) {
 			co += "&mqtt=" + OSApp.Utils.escapeJSON2( data.settings.mqtt );
 			}
 
 		// Import influxdb options, if available
-		if ( typeof data.settings.influxdb === "object" && OSApp.Firmware.checkOSVersion( 232 ) ) {
+		if ( typeof data.settings.influxdb === "object" ) {
 			co += "&influxdb=" + OSApp.Utils.escapeJSON2( data.settings.influxdb );
 			}
 
 		//Import email options, if available
-		if ( typeof data.settings.email === "object" && OSApp.Firmware.checkOSVersion( 2191 ) ) {
+		if ( typeof data.settings.email === "object" ) {
 			co += "&email=" + OSApp.Utils.escapeJSON2( data.settings.email );
 			}
 
-		if ( typeof data.settings.otc === "object" && OSApp.Firmware.checkOSVersion( 2191 ) ) {
+		if ( typeof data.settings.otc === "object" ) {
 			co += "&otc=" + OSApp.Utils.escapeJSON2( data.settings.otc );
 		}
 
@@ -274,11 +274,7 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 		// Due to potentially large number of zones, we split zone names import to maximum 16 per group
 		for ( k = 0; k < ncs; k++ ) {
 			for ( i = k * 16; i < ( k + 1 ) * 16 && i < data.stations.snames.length; i++ ) {
-				if ( OSApp.Firmware.checkOSVersion( 208 ) === true ) {
-					station = data.stations.snames[ i ].replace( /\s/g, "_" );
-				} else {
-					station = data.stations.snames[ i ];
-				}
+				station = data.stations.snames[ i ].replace( /\s/g, "_" );
 				csi[ k ] += "&s" + i + "=" + encodeURIComponent( station );
 			}
 		}
@@ -327,11 +323,6 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 			for ( i = 0; i < data.stations.stn_seq.length; i++ ) {
 				cs += "&q" + i + "=" + data.stations.stn_seq[ i ];
 			}
-		} else if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv < 211 && !OSApp.Firmware.checkOSVersion( 211 ) ) {
-			var bid;
-			for ( bid = 0; bid < data.settings.nbrd; bid++ ) {
-				cs += "&q" + bid + "=" + ( data.options.seq === 1 ? 255 : 0 );
-			}
 		}
 
 		if ( typeof data.stations.act_relay === "object" ) {
@@ -374,15 +365,9 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 					return false;
 				}
 
-				// Handle data from firmware 2.1+ being imported to a firmware prior to 2.1
-				if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv >= 210 && !OSApp.Firmware.checkOSVersion( 210 ) ) {
-					OSApp.Errors.showError( OSApp.Language._( "Program data is newer than the device firmware and cannot be imported" ) );
-					return false;
-				}
-
 				// Handle data from firmware 2.1+ being imported to a 2.1+ device
 				// The firmware does not accept program name inside the program array and must be submitted separately
-				if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv >= 210 && OSApp.Firmware.checkOSVersion( 210 ) ) {
+				if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv >= 210 ) {
 					name = "&name=" + encodeURIComponent( prog[ 5 ] );
 
 					// Truncate the program name off the array
@@ -390,7 +375,7 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 				}
 
 				// Handle data from firmware prior to 2.1 being imported to a 2.1+ device
-				if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv < 210 && OSApp.Firmware.checkOSVersion( 210 ) ) {
+				if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv < 210 ) {
 					var program = OSApp.Programs.readProgram183( prog ),
 						total = ( prog.length - 7 ),
 						allDur = [],
@@ -449,9 +434,7 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 				OSApp.Firmware.sendToOS( cpStart + "&pid=-1&v=" + JSON.stringify( prog ) + name );
 			} ),
 			$.each( data.special, function( sid, info ) {
-				if ( OSApp.Firmware.checkOSVersion( 216 ) ) {
-					OSApp.Firmware.sendToOS( "/cs?pw=&sid=" + sid + "&st=" + info.st + "&sd=" + encodeURIComponent( info.sd ) );
-				}
+				OSApp.Firmware.sendToOS( "/cs?pw=&sid=" + sid + "&st=" + info.st + "&sd=" + encodeURIComponent( info.sd ) );
 			} )
 		).then(
 			function() {
