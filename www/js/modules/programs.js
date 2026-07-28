@@ -2645,8 +2645,12 @@ OSApp.Programs.submitProgram183 = function( id ) {
 	if ( stationSelected === 0 ) {OSApp.Errors.showError( OSApp.Language._( "Error: You have not selected any stations." ) );return;}
 	$.mobile.loading( "show" );
 	if ( id === "new" ) {
-		OSApp.Firmware.sendToOS( "/cp?pw=&pid=-1&v=" + program ).done( function() {
+		OSApp.Firmware.sendToOS( "/cp?pw=&pid=-1&v=" + program ).done( function( data ) {
 			$.mobile.loading( "hide" );
+			if ( data && data.result === 65 ) {
+				OSApp.Errors.showError( OSApp.Language._( "Not enough storage space on the device to save this new entry. Please delete unused sensors, monitors or logs (or reduce logging) before adding new ones." ) );
+				return;
+			}
 			OSApp.Sites.updateControllerPrograms( function() {
 				$.mobile.document.one( "pageshow", function() {
 					OSApp.Errors.showError( OSApp.Language._( "Program added successfully" ) );
@@ -2828,8 +2832,12 @@ OSApp.Programs.submitProgram21 = function( id, ignoreWarning ) {
 
 	$.mobile.loading( "show" );
 	if ( id === "new" ) {
-		OSApp.Firmware.sendToOS( "/cp?pw=&pid=-1" + url + daterange ).done( function() {
+		OSApp.Firmware.sendToOS( "/cp?pw=&pid=-1" + url + daterange ).done( function( data ) {
 			$.mobile.loading( "hide" );
+			if ( data && data.result === 65 ) {
+				OSApp.Errors.showError( OSApp.Language._( "Not enough storage space on the device to save this new entry. Please delete unused sensors, monitors or logs (or reduce logging) before adding new ones." ) );
+				return;
+			}
 			OSApp.Sites.updateControllerPrograms( function() {
 				$.mobile.document.one( "pageshow", function() {
 					OSApp.Errors.showError( OSApp.Language._( "Program added successfully" ) );

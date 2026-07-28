@@ -427,6 +427,52 @@ OSApp.Analog.showLocalNotification = function(opts) {
 	localNotification.schedule(options, OSApp.Analog.notification_action_callback, opts.context || this);
 };
 
+// Small informational popup (used by the notification self-test).
+OSApp.Analog.showNotifInfo = function(message) {
+	var popup = $(
+		"<div data-role='popup' data-theme='a' class='ui-content' style='max-width:340px;'>" +
+			"<p style='margin:2px 6px 12px;'>" + message + "</p>" +
+			"<a href='#' data-rel='back' class='ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._("OK") + "</a>" +
+		"</div>");
+	if (OSApp.UIDom && typeof OSApp.UIDom.openPopup === "function") {
+		OSApp.UIDom.openPopup(popup);
+	}
+};
+
+// Notification self-test: lets the user verify that OS-level notifications work
+// on this device (triggers the Android 13+ permission prompt on first use) and
+// always adds an entry to the in-app notification panel.
+OSApp.Analog.testNotification = function() {
+	var dname = (OSApp.currentSession && OSApp.currentSession.controller &&
+		OSApp.currentSession.controller.settings &&
+		typeof OSApp.currentSession.controller.settings.dname !== "undefined") ?
+		OSApp.currentSession.controller.settings.dname : "OpenSprinkler";
+	var msg = OSApp.Language._("This is a test notification");
+
+	// Always visible in the in-app notification panel (works in the browser too).
+	OSApp.Analog.addEventToPanel(dname, msg);
+
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	if (!localNotification) {
+		OSApp.Analog.showNotifInfo(OSApp.Language._("System notifications are only available in the installed app. The test was added to the in-app notification panel instead."));
+		return;
+	}
+
+	OSApp.Analog.requestNotificationPermission(function(granted) {
+		if (!granted) {
+			OSApp.Analog.showNotifInfo(OSApp.Language._("Notifications are not permitted for this app. Please enable them in the system settings."));
+			return;
+		}
+		OSApp.Analog.showLocalNotification({
+			id: 999999,
+			prio: 2,
+			title: dname,
+			text: msg,
+			data: { test: true }
+		});
+	});
+};
+
 OSApp.Analog.checkMonitorAlerts = function() {
 	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
 	if (!localNotification || !OSApp.Analog.monitors || (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS))
@@ -490,12 +536,28 @@ OSApp.Analog.setLastEventId = function(id) {
 	} catch (e) { void e; }
 };
 
-// Schedule local notifications for freshly received events (skipping monitor
-// events, which are handled by checkMonitorAlerts()).
-OSApp.Analog.notifyEvents = function(events) {
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	if (!localNotification || !Array.isArray(events)) return;
+// Add an event to the in-app notification panel (badge + slide-out list). This
+// makes events visible in the UI on every platform, including the browser where
+// OS-level local notifications are not available.
+OSApp.Analog.addEventToPanel = function(dname, text) {
+	if (!OSApp.Notifications || typeof OSApp.Notifications.addNotification !== "function") return;
+	OSApp.Notifications.addNotification({
+		title: text || dname,
+		desc: dname,
+		on: function() { }
+	});
+};
 
+// Surface freshly received events. Every new event is added to the in-app
+// notification panel; on iOS/Android an OS-level local notification is fired in
+// addition (monitor events are skipped there because checkMonitorAlerts()
+// already raises them, to avoid duplicate OS notifications). When panelOnly is
+// true only the in-app panel is updated (used for the initial baseline so the UI
+// is populated without buzzing the device with a backlog of historic events).
+OSApp.Analog.notifyEvents = function(events, panelOnly) {
+	if (!Array.isArray(events)) return;
+
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
 	var lastSeen = OSApp.Analog.getLastEventId();
 	var dname = (OSApp.currentSession && OSApp.currentSession.controller &&
 		OSApp.currentSession.controller.settings &&
@@ -506,30 +568,53 @@ OSApp.Analog.notifyEvents = function(events) {
 		var ev = events[i];
 		if (!ev || typeof ev.id !== "number") continue;
 		if (ev.id <= lastSeen) continue;
-		if (OSApp.Analog.isMonitorEventType(ev.type)) continue;
 
-		OSApp.Analog.showLocalNotification({
-			// Keep event notification ids in a separate range from monitor ids
-			// (monitor.nr) so they don't cancel each other.
-			id: 100000 + (ev.id % 900000),
-			prio: (typeof ev.prio === "number") ? ev.prio : 0,
-			title: dname,
-			text: ev.text || "",
-			data: { evid: ev.id, type: ev.type }
-		});
+		var text = ev.text || "";
+		var prio = (typeof ev.prio === "number") ? ev.prio : 0;
+
+		// Always show in the in-app notification panel.
+		OSApp.Analog.addEventToPanel(dname, text);
+
+		// Additionally raise an OS-level local notification on device, except for
+		// monitor events which are handled by checkMonitorAlerts().
+		if (!panelOnly && localNotification && !OSApp.Analog.isMonitorEventType(ev.type)) {
+			OSApp.Analog.showLocalNotification({
+				// Keep event notification ids in a separate range from monitor ids
+				// (monitor.nr) so they don't cancel each other.
+				id: 100000 + (ev.id % 900000),
+				prio: prio,
+				title: dname,
+				text: text,
+				data: { evid: ev.id, type: ev.type }
+			});
+		}
 	}
 };
 
-// Poll the firmware notification event log (/nl). Firmware without this endpoint
-// simply returns an error which is ignored (feature-detection by request).
+// Poll the firmware notification event log (/nl) and surface new events. Runs on
+// all platforms so the in-app notification panel works in the browser too.
+// Firmware without this endpoint simply returns an error which is ignored
+// (feature-detection by request). Throttled and guarded against overlap so it
+// can be called from the frequent status-refresh loop.
 OSApp.Analog.updateEventLog = function(callback) {
 	callback = callback || function () { };
 
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	if (!localNotification || (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS)) {
+	if (!OSApp.currentSession || typeof OSApp.currentSession.isControllerConnected !== "function" ||
+		!OSApp.currentSession.isControllerConnected()) {
 		callback();
 		return $.Deferred().resolve();
 	}
+	if (OSApp.Analog.eventPollInFlight) {
+		callback();
+		return $.Deferred().resolve();
+	}
+	var now = Date.now();
+	if (OSApp.Analog.lastEventPoll && (now - OSApp.Analog.lastEventPoll) < 12000) {
+		callback();
+		return $.Deferred().resolve();
+	}
+	OSApp.Analog.lastEventPoll = now;
+	OSApp.Analog.eventPollInFlight = true;
 
 	var lastId = OSApp.Analog.getLastEventId();
 	// First poll after a fresh install/site: establish a baseline without firing
@@ -537,20 +622,30 @@ OSApp.Analog.updateEventLog = function(callback) {
 	var baseline = (lastId === 0 && OSApp.Analog.eventBaselineDone !== true);
 	var timeout = OSApp.Analog.calcTimeout(24);
 
+	var done = function () {
+		OSApp.Analog.eventPollInFlight = false;
+		callback();
+	};
+
 	return OSApp.Firmware.sendToOS("/nl?after=" + lastId + "&pw=", "json", timeout).then(function (data) {
 		if (data && Array.isArray(data.events)) {
-			if (!baseline) {
-				OSApp.Analog.notifyEvents(data.events);
+			if (baseline) {
+				// Populate the in-app panel with the most recent few events (no OS
+				// notifications) so the UI is not empty on first load, without
+				// replaying the whole backlog to the notification center.
+				OSApp.Analog.notifyEvents(data.events.slice(-5), true);
+			} else {
+				OSApp.Analog.notifyEvents(data.events, false);
 			}
 			if (typeof data.last === "number") {
 				OSApp.Analog.setLastEventId(data.last);
 			}
 			OSApp.Analog.eventBaselineDone = true;
 		}
-		callback();
+		done();
 	}, function () {
 		// Endpoint missing (older firmware) or transient error: ignore silently.
-		callback();
+		done();
 	});
 };
 
@@ -568,6 +663,18 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 			return [];
 		}
 		var copy = arr.slice();
+		// Prefer the device-persisted order field (survives reloads, browser
+		// changes and power cycles). Fall back to the local per-browser order,
+		// then to the entry number.
+		var hasDeviceOrder = copy.some(function(e) { return e && e.order > 0; });
+		if (hasDeviceOrder) {
+			copy.sort(function(a, b) {
+				var oa = (a && a.order > 0) ? a.order : Number.POSITIVE_INFINITY;
+				var ob = (b && b.order > 0) ? b.order : Number.POSITIVE_INFINITY;
+				return oa === ob ? (a.nr || 0) - (b.nr || 0) : oa - ob;
+			});
+			return copy;
+		}
 		var order = OSApp.Analog.getRowOrder(sectionId);
 		if (!order || !order.length) {
 			copy.sort(function(a, b) { return (a.nr || 0) - (b.nr || 0); });
@@ -1053,9 +1160,9 @@ OSApp.Analog.importConfigSensors = function(data, restore_type, callback) {
 								});
 							});
 						})
-						.fail(function () {
+						.fail(function (reason) {
 							$.mobile.loading("hide");
-							OSApp.Errors.showError(OSApp.Language._("Restore failed"));
+							OSApp.Errors.showError(typeof reason === "string" && reason ? reason : OSApp.Language._("Restore failed"));
 						});
 				});
 			});
@@ -1112,7 +1219,14 @@ OSApp.Analog.sendRestoreBatch = function(endpoint, entries) {
 		}
 
 		OSApp.Analog.sendToOsObj(endpoint, entries[idx])
-			.done(function() {
+			.done(function(info) {
+				// Stop early with a clear reason if the device ran out of space
+				// while restoring (HTML_NOT_ENOUGH_SPACE = 65) instead of
+				// silently dropping the remaining entries (#295).
+				if (info && info.result === 65) {
+					dfd.reject(OSApp.Analog.saveResultError(65));
+					return;
+				}
 				idx++;
 				if ((idx % 20) === 0) {
 					setTimeout(next, 10);
@@ -1139,6 +1253,17 @@ OSApp.Analog.sendToOsObj = function(params, obj) {
 		}
 	}
 	return OSApp.Firmware.sendToOS(params, "json");
+};
+
+// Map a firmware result code to a user-facing error message. The firmware
+// rejects creating a new sensor/monitor/program adjustment when the device
+// filesystem is too full to store it safely (HTML_NOT_ENOUGH_SPACE = 0x41 = 65)
+// so the user gets a clear reason instead of silent data loss (#295).
+OSApp.Analog.saveResultError = function(result) {
+	if (result === 65) {
+		return OSApp.Language._("Not enough storage space on the device to save this new entry. Please delete unused sensors, monitors or logs (or reduce logging) before adding new ones.");
+	}
+	return OSApp.Language._("Error calling rest service: ") + " " + result;
 };
 
 OSApp.Analog.getSupportedSensorTypes = function(forceRefresh) {
@@ -5252,6 +5377,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 				sensorOut.nativedata = sensor.nativedata;
 				sensorOut.data = sensor.data;
 				sensorOut.last = sensor.last;
+				if (sensor.order) sensorOut.order = sensor.order;  // keep device-persisted display order
 				return OSApp.Analog.sendToOsObj("/sc?pw=", sensorOut).done(function (info) {
 					var result = info.result;
 					if (!result || result > 1)
@@ -5285,7 +5411,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 				return OSApp.Analog.sendToOsObj("/sc?pw=", sensorOut).done(function (info) {
 					var result = info.result;
 					if (!result || result > 1)
-						OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
+						OSApp.Errors.showError(OSApp.Analog.saveResultError(result));
 					else if (sensorOut.enable)
 						OSApp.Firmware.sendToOS("/sr?pw=&nr=" + sensorOut.nr);
 					OSApp.Analog.updateAnalogSensor(function () {
@@ -5327,6 +5453,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			OSApp.Analog.expandItem.add("progadjust");
 			OSApp.Analog.showAdjustmentsEditor(progAdjust, row, function (progAdjustOut) {
 
+				if (progAdjust.order) progAdjustOut.order = progAdjust.order;  // keep device-persisted display order
 				return OSApp.Analog.sendToOsObj("/sb?pw=", progAdjustOut).done(function (info) {
 					var result = info.result;
 					if (!result || result > 1)
@@ -5361,7 +5488,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 				return OSApp.Analog.sendToOsObj("/sb?pw=", progAdjustOut).done(function (info) {
 					var result = info.result;
 					if (!result || result > 1)
-						OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
+						OSApp.Errors.showError(OSApp.Analog.saveResultError(result));
 					else
 						OSApp.Analog.progAdjusts.push(progAdjustOut);
 						OSApp.Analog.updateProgramAdjustments(updateSensorContent);
@@ -5391,6 +5518,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 				OSApp.Analog.expandItem.add("monitors");
 				OSApp.Analog.showMonitorEditor(monitor, row, function (monitorOut) {
 
+					if (monitor.order) monitorOut.order = monitor.order;  // keep device-persisted display order
 					return OSApp.Analog.sendToOsObj("/mc?pw=", monitorOut).done(function (info) {
 						var result = info.result;
 						if (!result || result > 1) {
@@ -5428,7 +5556,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 					return OSApp.Analog.sendToOsObj("/mc?pw=", monitorOut).done(function (info) {
 						var result = info.result;
 						if (!result || result > 1) {
-							OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
+							OSApp.Errors.showError(OSApp.Analog.saveResultError(result));
 						} else {
 							OSApp.Analog.monitors.push(monitorOut);
 							OSApp.Analog.updateMonitors(function() {
@@ -5938,10 +6066,38 @@ OSApp.Analog.setRowOrder = function(sectionId, order) {
 	localStorage.setItem("OSApp.Analog.rowOrder." + sectionId, JSON.stringify(order));
 };
 
+// Persist a section's display order on the device so it survives page reloads,
+// browser changes, cache clears and power cycles (#295). A 1-based order index
+// is stored per entry and the section is saved once on the firmware.
+OSApp.Analog.persistRowOrderToDevice = function(sectionId, order) {
+	var t = sectionId === "sensors" ? "s" :
+		(sectionId === "monitors" ? "m" : (sectionId === "progadjust" ? "p" : null));
+	if (!t || !order || !order.length) {
+		return;
+	}
+
+	// Reflect the new order on the in-memory objects immediately so a redraw
+	// keeps the order even before the device round-trip completes.
+	var target = sectionId === "sensors" ? OSApp.Analog.analogSensors :
+		(sectionId === "monitors" ? OSApp.Analog.monitors : OSApp.Analog.progAdjusts);
+	if (Array.isArray(target)) {
+		var pos = {};
+		for (var i = 0; i < order.length; i++) {
+			pos[order[i]] = i + 1;
+		}
+		for (var j = 0; j < target.length; j++) {
+			if (target[j] && pos[target[j].nr]) {
+				target[j].order = pos[target[j].nr];
+			}
+		}
+	}
+
+	OSApp.Firmware.sendToOS("/od?pw=&t=" + t + "&o=" + order.join(","), "json");
+};
+
 // Reorder in-memory data arrays according to saved order
 OSApp.Analog.applyRowOrderToData = function(sectionId) {
 	var order = OSApp.Analog.getRowOrder(sectionId);
-	if (!order || !order.length) return;
 
 	var target;
 	switch (sectionId) {
@@ -5959,6 +6115,20 @@ OSApp.Analog.applyRowOrderToData = function(sectionId) {
 	}
 
 	if (!Array.isArray(target)) return;
+
+	// Prefer the device-persisted order field when present.
+	var hasDeviceOrder = target.some(function(e) { return e && e.order > 0; });
+	if (hasDeviceOrder) {
+		target.sort(function(a, b) {
+			var oa = (a && a.order > 0) ? a.order : Number.POSITIVE_INFINITY;
+			var ob = (b && b.order > 0) ? b.order : Number.POSITIVE_INFINITY;
+			if (oa === ob) return (a.nr || 0) - (b.nr || 0);
+			return oa - ob;
+		});
+		return;
+	}
+
+	if (!order || !order.length) return;
 
 	// Build a lookup for quick positioning
 	var pos = new Map();
@@ -6167,6 +6337,7 @@ OSApp.Analog.toggleSortMode = function(container) {
 			});
 			OSApp.Analog.setRowOrder(sectionId, newOrder);
 			OSApp.Analog.applyRowOrderToData(sectionId);
+			OSApp.Analog.persistRowOrderToDevice(sectionId, newOrder);
 
 			// Reset button text to "Sort" and exit visual state
 			sortButton.text(OSApp.Language._("Sort"));

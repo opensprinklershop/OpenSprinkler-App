@@ -1895,8 +1895,16 @@ OSApp.Options.showOptions = function( expandItem ) {
 					"<div class='ui-bar ui-bar-a'>" + OSApp.Language._( "Select Notification Events" ) + "</div>" +
 						inputs +
 					"<input data-wrapper-class='attrib-submit' class='submit' data-theme='b' type='submit' value='" + OSApp.Language._( "Submit" ) + "' />" +
+					"<a href='#' class='test-notif ui-btn ui-btn-a ui-corner-all ui-mini' style='margin:6px 0 0;'>" + OSApp.Language._( "Test notification" ) + "</a>" +
 				"</div>" +
 			"</div>" );
+
+		popup.find( ".test-notif" ).on( "click", function( e ) {
+			e.preventDefault();
+			if ( OSApp.Analog && typeof OSApp.Analog.testNotification === "function" ) {
+				OSApp.Analog.testNotification();
+			}
+		} );
 
 		popup.find( ".submit" ).on( "click", function() {
 			a = 0;

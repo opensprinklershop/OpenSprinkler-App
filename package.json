@@ -91,7 +91,9 @@
 			"cordova-plugin-transport-security": {},
 			"cordova-plugin-inappbrowser": {},
 			"cordova-custom-config": {},
-			"cordova-plugin-local-notification": {},
+			"cordova-plugin-local-notification": {
+				"ANDROIDX_CORE_VERSION": "1.12.0"
+			},
 			"cordova-plugin-device": {}
 		},
 		"platforms": [
