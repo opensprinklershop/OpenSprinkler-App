@@ -55,6 +55,13 @@ OSApp.About.displayPage = function() {
 						</p>
 					</li>
 				</ul>
+				<ul data-role="listview" data-inset="true">
+					<li>
+						<a href="#" class="test-notif-about" data-role="button" data-icon="bell" data-iconpos="left">
+							${OSApp.Language._("Test notification")}
+						</a>
+					</li>
+				</ul>
 				<p class="smaller">
 					${OSApp.Language._("App Version")}: ${OSApp.uiState.appVersion}
 					<br>
@@ -72,7 +79,7 @@ OSApp.About.displayPage = function() {
 		page.find( ".hardware" ).toggleClass( "hidden", showHardware ).text( OSApp.Firmware.getHWVersion() + OSApp.Firmware.getHWType() );
 		page.find( ".hardwareLabel" ).toggleClass( "hidden", showHardware );
 
-		page.find( ".firmware" ).text( OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion() + 
+		page.find( ".firmware" ).text( OSApp.Firmware.getOSVersion() + OSApp.Firmware.getOSMinorVersion() +
 		(  OSApp.currentSession.controller.options? (" - "+OSApp.currentSession.controller.options.feature) : "" ) );
 
 		page.one( "pagehide", function() {
@@ -91,6 +98,13 @@ OSApp.About.displayPage = function() {
 
 		$( "#about" ).remove();
 		$.mobile.pageContainer.append( page );
+
+		page.find( ".test-notif-about" ).on( "click", function( e ) {
+			e.preventDefault();
+			if ( OSApp.Analog && typeof OSApp.Analog.testNotification === "function" ) {
+				OSApp.Analog.testNotification();
+			}
+		} );
 	}
 
 	return begin();

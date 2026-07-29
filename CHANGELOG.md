@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.223] - in Entwicklung
+
+### Behoben
+
+- **Timer-Monitor-Zeitanzeige (Ticket 305)**: Uhrzeiten mit Minuten ≥ 50 (z. B. `16:59`) wurden im Monitor-Editor und in der Hauptseiten-Liste fälschlich mit aufgerundeter Stunde angezeigt (`17:59`), weil `Math.round(HHMM/100)` verwendet wurde; beim erneuten Speichern wurde der falsche Wert übernommen. Korrigiert auf `Math.floor`.
+
+### Hinzugefügt
+
+- **Monitor-Sichtbarkeit auf der Hauptseite (Ticket 305)**: Neue Checkbox „Auf Startseite anzeigen" im Monitor-Editor. Ausgeblendete Monitore (`show=0`) erscheinen nicht mehr in der überladenen Hauptseiten-Anzeige, bleiben aber aktiv. Standard: sichtbar.
+- **Mindest-Log-Intervall pro Sensor (Ticket 305)**: Neues Feld „Min. Log-Intervall (s, 0 = aus)" im Analog-Sensor-Editor begrenzt, wie oft ein Sensor Log-Einträge schreibt, um das Log-Volumen „lauter" Sensoren zu reduzieren.
+
 ## [2.4.199] - 2026-05-21
 
 Änderungen seit dem 3. Mai 2026.

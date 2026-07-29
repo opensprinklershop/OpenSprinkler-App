@@ -957,6 +957,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 						OSApp.Language._( "Select notification events. Applicable to all of MQTT, Email, and IFTTT. <b>NOTE</b>: enabling too many events or notification methods may cause delays, missed responses, or skipped short watering events." ) +
 						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
 				"</label><button data-mini='true' id='o49' class=" + (ifev == 0 ?  "''" : "'blue'") + " value='" + ifev + "'>" + OSApp.Language._( "Configure Events" ) + "</button></div>";
+
+			list += "<div class='ui-field-contain'><label for='test-notif-btn'>" + OSApp.Language._( "Notifications" ) +
+					"<button data-helptext='" +
+						OSApp.Language._( "Sends a test notification to this device to verify that system notifications are enabled and working." ) +
+						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+				"</label><button data-mini='true' id='test-notif-btn' type='button'>" + OSApp.Language._( "Test notification" ) + "</button></div>";
 		}
 
 		if ( typeof OSApp.currentSession.controller.settings.dname !== "undefined" ) {
@@ -1859,6 +1865,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 		if( page.find( "#wtkey" ).prop( "value" ) === "" ) page.find( "#wtkey" ).parent().addClass( "red" );
 	} );
 
+	page.find( "#test-notif-btn" ).on( "click", function() {
+		if ( OSApp.Analog && typeof OSApp.Analog.testNotification === "function" ) {
+			OSApp.Analog.testNotification();
+		}
+	} );
+
 	page.find( "#o49" ).on( "click", function() {
 		var events = {
 			program: OSApp.Language._( "Program Start" ),
@@ -1895,16 +1907,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 					"<div class='ui-bar ui-bar-a'>" + OSApp.Language._( "Select Notification Events" ) + "</div>" +
 						inputs +
 					"<input data-wrapper-class='attrib-submit' class='submit' data-theme='b' type='submit' value='" + OSApp.Language._( "Submit" ) + "' />" +
-					"<a href='#' class='test-notif ui-btn ui-btn-a ui-corner-all ui-mini' style='margin:6px 0 0;'>" + OSApp.Language._( "Test notification" ) + "</a>" +
 				"</div>" +
 			"</div>" );
-
-		popup.find( ".test-notif" ).on( "click", function( e ) {
-			e.preventDefault();
-			if ( OSApp.Analog && typeof OSApp.Analog.testNotification === "function" ) {
-				OSApp.Analog.testNotification();
-			}
-		} );
 
 		popup.find( ".submit" ).on( "click", function() {
 			a = 0;

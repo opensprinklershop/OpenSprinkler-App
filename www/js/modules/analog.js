@@ -439,9 +439,33 @@ OSApp.Analog.showNotifInfo = function(message) {
 	}
 };
 
-// Notification self-test: lets the user verify that OS-level notifications work
-// on this device (triggers the Android 13+ permission prompt on first use) and
-// always adds an entry to the in-app notification panel.
+// Popup shown when the OS notification permission is missing: offers to open the
+// app's system notification settings so the user can enable it.
+OSApp.Analog.showNotifPermissionHelp = function() {
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	var msg = OSApp.Language._("Notifications are not permitted for this app. Please enable them in the system settings.");
+	var popup = $(
+		"<div data-role='popup' data-theme='a' class='ui-content' style='max-width:340px;'>" +
+			"<p style='margin:2px 6px 12px;'>" + msg + "</p>" +
+			"<a href='#' class='open-notif-settings ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._("Open settings") + "</a>" +
+			"<a href='#' data-rel='back' class='ui-btn ui-corner-all'>" + OSApp.Language._("Cancel") + "</a>" +
+		"</div>");
+	popup.find(".open-notif-settings").on("click", function(e) {
+		e.preventDefault();
+		if (localNotification && typeof localNotification.openNotificationSettings === "function") {
+			localNotification.openNotificationSettings();
+		}
+		popup.popup("close");
+	});
+	if (OSApp.UIDom && typeof OSApp.UIDom.openPopup === "function") {
+		OSApp.UIDom.openPopup(popup);
+	}
+};
+
+// Notification self-test: verifies that OS-level notifications work on this
+// device. Requests the Android 13+ permission (via user gesture) and, if it is
+// denied, guides the user to the system notification settings. Always adds an
+// entry to the in-app notification panel as well.
 OSApp.Analog.testNotification = function() {
 	var dname = (OSApp.currentSession && OSApp.currentSession.controller &&
 		OSApp.currentSession.controller.settings &&
@@ -458,11 +482,7 @@ OSApp.Analog.testNotification = function() {
 		return;
 	}
 
-	OSApp.Analog.requestNotificationPermission(function(granted) {
-		if (!granted) {
-			OSApp.Analog.showNotifInfo(OSApp.Language._("Notifications are not permitted for this app. Please enable them in the system settings."));
-			return;
-		}
+	var fire = function() {
 		OSApp.Analog.showLocalNotification({
 			id: 999999,
 			prio: 2,
@@ -470,7 +490,19 @@ OSApp.Analog.testNotification = function() {
 			text: msg,
 			data: { test: true }
 		});
-	});
+	};
+
+	if (typeof localNotification.requestPermission === "function") {
+		localNotification.requestPermission(function(granted) {
+			if (granted) {
+				fire();
+			} else {
+				OSApp.Analog.showNotifPermissionHelp();
+			}
+		});
+	} else {
+		fire();
+	}
 };
 
 OSApp.Analog.checkMonitorAlerts = function() {
@@ -739,7 +771,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 	var structKey =
 		"pa:"   + orderedProgAdjusts.map(function(p) { return p.nr; }).join(",") +
 		"|cols:" + cols +
-		"|mon:" + orderedMonitors.filter(function(m) { return m.active; }).map(function(m) { return m.nr; }).join(",") +
+		"|mon:" + orderedMonitors.filter(function(m) { return m.active && m.show !== 0; }).map(function(m) { return m.nr; }).join(",") +
 		"|sen:" + orderedSensors.filter(function(s) { return s.show; }).map(function(s) { return s.nr; }).join(",") +
 		"|dark:" + isDark + "|col:" + isColorful;
 
@@ -761,7 +793,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 
 		for (i = 0; i < orderedMonitors.length; i++) {
 			var mon = orderedMonitors[i];
-			if (mon.active) {
+			if (mon.active && mon.show !== 0) {
 				var prio = Object.prototype.hasOwnProperty.call(mon, "prio") ? mon.prio : 0;
 				html += "<div id='monitor-" + mon.nr + "' class='ui-body ui-body-a center' style='background-color:" + theme.monitorBg[prio] + "'>";
 				html += "<label>" + mon.name + "</label>";
@@ -903,7 +935,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 	// Monitor divs
 	for (i = 0; i < orderedMonitors.length; i++) {
 		var monitor = orderedMonitors[i];
-		if (!monitor.active) continue;
+		if (!monitor.active || monitor.show === 0) continue;
 		var monDiv = showArea.find("#monitor-" + monitor.nr);
 		if (!monDiv.length) continue;
 		var monPrio = Object.prototype.hasOwnProperty.call(monitor, "prio") ? monitor.prio : 0;
@@ -1938,6 +1970,7 @@ OSApp.Analog.getMonitor = function(popup) {
 	OSApp.Analog.addToObjectInt(popup, "#om", result);
 	OSApp.Analog.addToObjectInt(popup, "#stt", result);
 	OSApp.Analog.addToObjectInt(popup, "#fsa", result);
+	OSApp.Analog.addToObjectChk(popup, "#show", result);
 
 	//Min+Max
 	OSApp.Analog.addToObjectFlt(popup, "#value1", result);
@@ -2149,6 +2182,11 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			"<option " + (monitor.fsa == 1 ? "selected" : "") + " value='1'>" + OSApp.Language._("On") + "</option>" +
 			"</select>";
 
+		//show on main page
+		if (typeof monitor.show === "undefined") { monitor.show = 1; }
+		list += "<label for='show'><input data-mini='true' id='show' type='checkbox' " + (monitor.show ? "checked='checked'" : "") + ">" +
+			OSApp.Language._("Show on Mainpage") + "</label>";
+
 		//typ = MIN+MAX
 		list +=	"<div id='type_minmax'>"+
 			"<label for='value1'>" +
@@ -2205,9 +2243,9 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 		//typ == TIME
 			"<div id='type_time'>"+
 			"<label for='from'>"+OSApp.Language._("From")+"</label>"+
-			"<input id='from' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.round(activeFrom / 100)) + ":" + OSApp.Utils.pad(activeFrom % 100) + "'>" +
+			"<input id='from' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.floor(activeFrom / 100)) + ":" + OSApp.Utils.pad(activeFrom % 100) + "'>" +
 			"<label for='to'>"+OSApp.Language._("To")+"</label>"+
-			"<input id='to' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.round(activeTo / 100)) + ":" + OSApp.Utils.pad(activeTo % 100) + "'>" +
+			"<input id='to' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.floor(activeTo / 100)) + ":" + OSApp.Utils.pad(activeTo % 100) + "'>" +
 			wdaysHtml +
 			"</div>"+
 
@@ -2547,6 +2585,7 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 	OSApp.Analog.addToObjectInt(popup, ".id", sensorOut);
 
 	OSApp.Analog.addToObjectInt(popup, ".ri", sensorOut);
+	OSApp.Analog.addToObjectInt(popup, ".li", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#factor", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#divider", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#offset", sensorOut);
@@ -3687,6 +3726,9 @@ list += "</select></div>" +
 
 "<div class='ri_label'><label for='sensor_ri'>" + OSApp.Language._("Read Interval (s)") + "</label>" +
 	"<input class='ri' id='sensor_ri' data-mini='true' type='number' inputmode='decimal' min='1' max='999999' value='" + sensor.ri + "'></div>" +
+
+"<div class='li_label'><label for='sensor_li'>" + OSApp.Language._("Min. log interval (s, 0 = off)") + "</label>" +
+	"<input class='li' id='sensor_li' data-mini='true' type='number' inputmode='decimal' min='0' max='999999' value='" + (typeof sensor.li === "number" ? sensor.li : 0) + "'></div>" +
 
 			"<label for='enable'><input data-mini='true' id='enable' type='checkbox' " + ((sensor.enable === 1) ? "checked='checked'" : "") + ">" +
 			OSApp.Language._("Sensor Enabled") + "</label>" +
@@ -6653,8 +6695,8 @@ OSApp.Analog.buildSensorConfig = function() {
 			if (item.type === OSApp.Analog.Constants.MONITOR_TIME) {
 				var activeFrom = (typeof item.from === "number" && !isNaN(item.from)) ? item.from : 0;
 				var activeTo = (typeof item.to === "number" && !isNaN(item.to)) ? item.to : 0;
-				val1Text = OSApp.Utils.pad(Math.round(activeFrom / 100)) + ":" + OSApp.Utils.pad(activeFrom % 100);
-				val2Text = OSApp.Utils.pad(Math.round(activeTo / 100)) + ":" + OSApp.Utils.pad(activeTo % 100);
+				val1Text = OSApp.Utils.pad(Math.floor(activeFrom / 100)) + ":" + OSApp.Utils.pad(activeFrom % 100);
+				val2Text = OSApp.Utils.pad(Math.floor(activeTo / 100)) + ":" + OSApp.Utils.pad(activeTo % 100);
 			} else {
 				val1Text = OSApp.Analog.formatValUnit(item.value1, unit);
 				val2Text = OSApp.Analog.formatValUnit(item.value2, unit);
