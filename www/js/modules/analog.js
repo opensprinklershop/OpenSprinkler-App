@@ -536,6 +536,12 @@ OSApp.Analog.setLastEventId = function(id) {
 	} catch (e) { void e; }
 };
 
+// Drop the stored watermark. Used when the firmware event log (an in-RAM ring
+// buffer) resets its ids after a controller reboot.
+OSApp.Analog.resetLastEventId = function() {
+	try { localStorage.removeItem(OSApp.Analog.eventIdStorageKey()); } catch (e) { void e; }
+};
+
 // Add an event to the in-app notification panel (badge + slide-out list). This
 // makes events visible in the UI on every platform, including the browser where
 // OS-level local notifications are not available.
@@ -628,6 +634,17 @@ OSApp.Analog.updateEventLog = function(callback) {
 	};
 
 	return OSApp.Firmware.sendToOS("/nl?after=" + lastId + "&pw=", "json", timeout).then(function (data) {
+		// The firmware event log lives in RAM and restarts its ids at 1 after a
+		// controller reboot. If the reported "last" id is below our stored watermark
+		// the log was reset: drop the stale watermark and re-baseline on the next
+		// poll, otherwise every new event (id 1,2,3…) would be filtered out forever.
+		if (data && typeof data.last === "number" && data.last < lastId) {
+			OSApp.Analog.resetLastEventId();
+			OSApp.Analog.eventBaselineDone = false;
+			OSApp.Analog.lastEventPoll = 0; // allow an immediate re-poll from id 0
+			done();
+			return;
+		}
 		if (data && Array.isArray(data.events)) {
 			if (baseline) {
 				// Populate the in-app panel with the most recent few events (no OS
