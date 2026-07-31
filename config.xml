@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget android-versionCode="220" version="2.4.220" versionCode="220" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="de.opensprinklershop.sprinklers" >
+<widget android-versionCode="221" version="2.4.221" versionCode="221" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0" id="de.opensprinklershop.sprinklers" >
   <name>OpenSprinklerASB</name>
   <description>
             Designed to allow intuitive control of the OpenSprinkler irrigation controller.
@@ -100,10 +100,14 @@
         <icon height="152" src="res/ios/icons/icon-76@2x.png" width="152" />
     </platform>
     <platform name="android">
-    	<edit-config file="AndroidManifest.xml" mode="merge" target="/manifest/application">
-    	        <application android:usesCleartextTraffic="true"
-    	                        android:networkSecurityConfig="@xml/network_security_config" />
-        </edit-config>
+        <!--
+            NOTE: android:usesCleartextTraffic and android:networkSecurityConfig are
+            applied to <application> by hooks/after_prepare/03-android-application-security-attrs.js.
+            A previous <edit-config mode="merge" target="/manifest/application"> was removed
+            because it rewrites <application> on every prepare and strips plugin-injected
+            children (local-notification receivers, background-mode ForegroundService),
+            which silently broke native notifications.
+        -->
         <!-- Fail-safe: avoid infinite logo/splash when deviceready or JS init stalls. -->
         <preference name="AutoHideSplashScreen" value="true" />
         <preference name="SplashScreenDelay" value="3000" />
@@ -126,7 +130,9 @@
         <preference name="Scheme" value="http" />
         <preference name="MixedContentMode" value="0" />
         <preference name="android-minSdkVersion" value="24" />
-        <preference name="android-targetSdkVersion" value="35" />
+        <preference name="android-targetSdkVersion" value="36" />
+        <!-- compileSdk 36 (Android 16) requires AGP >= 8.9.1; cordova-android 14 defaults to 8.7.3 -->
+        <preference name="AndroidGradlePluginVersion" value="8.9.1" />
         <preference name="android-theme" value="@android:style/Theme.Holo.Light.NoActionBar" />
         <preference name="AndroidWindowSplashScreenAnimatedIcon" value="res/android/screens/splash.png" />
         <preference name="AndroidWindowSplashScreenBackground" value="#1c1c1c" />
@@ -139,5 +145,7 @@
 
     <hook type="before_prepare" src="hooks/before_prepare/01-hide-android-res.js" />
     <hook type="after_prepare" src="hooks/after_prepare/01-restore-android-res.js" />
+    <hook type="after_prepare" src="hooks/patch-android-statusbar.js" />
+    <hook type="after_prepare" src="hooks/after_prepare/03-android-application-security-attrs.js" />
     <hook type="after_prepare" src="hooks/after_prepare.js" />
 </widget>

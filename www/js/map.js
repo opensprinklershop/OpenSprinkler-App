@@ -22,7 +22,7 @@ script.async = true;
 window.initMap = function() {
     var markers = { pws: [], origin: [] },
         stations = [],
-        priorIdle, map, infoWindow, droppedPin, start, current;
+        priorIdle, map, infoWindow, droppedPin, start, current, forceFetch = true;
 
     // Handle select button for weather station selection
     document.addEventListener( "click", function( e ) {
@@ -128,12 +128,15 @@ window.initMap = function() {
                 droppedPin = plotMarker( "origin", { message: "Selected Location" }, event.latLng.lat(), event.latLng.lng() );
             } );
 
-            // When the map center changes, update the weather stations shown
+            // When the map center changes, update the weather stations shown.
+            // Always fetch on the initial load and after an explicit jump (forceFetch),
+            // otherwise throttle to avoid excessive lookups on small pans.
             map.addListener( "idle", function() {
-                if ( getDistance( map.getCenter(), priorIdle ) < 15000 || map.getZoom() < 9 ) {
+                if ( !forceFetch && ( getDistance( map.getCenter(), priorIdle ) < 15000 || map.getZoom() < 9 ) ) {
                     return;
                 }
 
+                forceFetch = false;
                 priorIdle = map.getCenter();
                 removeAllMarkers();
                 window.top.postMessage( {
@@ -244,6 +247,9 @@ window.initMap = function() {
         if ( current.lat() !== -90 && current.lng() !== 81 ) {
             current = plotMarker( "origin", { message: "Current Location" }, current.lat(), current.lng() );
 
+            // Force a station lookup for the jumped-to location, even if it is
+            // within the throttle distance of the previous center.
+            forceFetch = true;
             map.setCenter( { lat: current.position.lat, lng: current.position.lng } );
             infoWindow.close();
             var clickEvent = new Event( "click" );

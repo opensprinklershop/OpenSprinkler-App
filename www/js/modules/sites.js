@@ -61,9 +61,15 @@ OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
 		return OSApp.Sites.getKnownFallbackVersion();
 	}
 
-	// 2.2.1 and below (fwv <= 221) should use 2.2.1 legacy
-	if (fwv <= 221) {
+	// 2.2.1 and below (fwv < 221) should use 2.2.1 legacy
+	if (fwv < 221) {
 		return "2.2.1";
+	}
+
+	// Firmware 2.2.1: dedizierter Build-Ordner (z.B. 2.2.1.5) falls vorhanden, sonst 2.2.1
+	if (fwv === 221) {
+		var fwm221 = (typeof fwm === "number" || (typeof fwm === "string" && fwm !== "")) ? ("2.2.1." + fwm) : "";
+		return (fwm221 && versions.indexOf(fwm221) !== -1) ? fwm221 : "2.2.1";
 	}
 
 	var major = Math.floor(fwv / 100);

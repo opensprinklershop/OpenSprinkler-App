@@ -53,7 +53,7 @@ index 68fdb47a..f1733a63 100755
          <preference name="Scheme" value="http" />
 +        <preference name="MixedContentMode" value="0" />
          <preference name="android-minSdkVersion" value="24" />
-         <preference name="android-targetSdkVersion" value="35" />
+         <preference name="android-targetSdkVersion" value="36" />
          <preference name="android-theme" value="@android:style/Theme.Holo.Light.NoActionBar" />
 diff --git a/network_security_config.xml b/network_security_config.xml
 index 66ab1caa..a323bced 100644

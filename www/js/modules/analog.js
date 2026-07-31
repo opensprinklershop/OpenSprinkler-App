@@ -5309,7 +5309,7 @@ list += "</select></div>" +
 					return OSApp.Analog.sendToOsObj("/sc?pw=", sensorOutNew).done(function (info) {
 						var result = info.result;
 						if (!result || result > 1)
-							OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
+							OSApp.Errors.showError(OSApp.Analog.saveResultError(result));
 						else if (sensorOutNew.enable)
 							OSApp.Firmware.sendToOS("/sr?pw=&nr=" + sensorOutNew.nr);
 						OSApp.Analog.updateAnalogSensor(callbackCancel);
