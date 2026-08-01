@@ -10,6 +10,9 @@ grunt makeFW
 
 # Stamp sw.js with build timestamp to bust Service Worker cache
 BUILD_TS=$(date +%Y%m%d%H%M%S)
+# Self-heal: normalize any frozen timestamp back to the placeholder first, so an
+# interrupted previous build can't permanently freeze the cache name.
+sed -i -E "s/OpenSprinkler-v[0-9]{14}/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.js
 sed -i "s/__BUILD_TIMESTAMP__/$BUILD_TS/g" www/sw.js
 
 # === Dynamically package UI versions inside mobile app ===
@@ -403,6 +406,26 @@ cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/ra
 mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
 cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
 
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
 # Sync www/ into Android platform assets before building
 cordova prepare android
 
@@ -416,7 +439,16 @@ cordova build browser --release
 
 # Build Android platform (release AAB + APK)
 cordova build android --release
-cordova run android --release -- --packageType=apk
+
+# Install the built APK to a connected device if one is present.
+# Uses adb install directly (not `cordova run`) so the build never hangs on the
+# post-install app launch, and a missing/locked device is tolerated.
+APK_OUT="platforms/android/app/build/outputs/apk/release/app-release.apk"
+if [ -f "$APK_OUT" ] && adb get-state 1>/dev/null 2>&1; then
+	timeout 120 adb install -r "$APK_OUT" || echo "adb install skipped/failed (continuing build)"
+else
+	echo "No connected device or APK missing; skipping device install."
+fi
 
 # Post-build cleanup
 chown stefan:www platforms/* -R

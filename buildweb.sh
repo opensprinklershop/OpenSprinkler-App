@@ -15,6 +15,9 @@ grunt makeFW
 
 # Stamp sw.js with build timestamp to bust Service Worker cache
 BUILD_TS=$(date +%Y%m%d%H%M%S)
+# Self-heal: normalize any frozen timestamp back to the placeholder first, so an
+# interrupted previous build can't permanently freeze the cache name.
+sed -i -E "s/OpenSprinkler-v[0-9]{14}/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.js
 sed -i "s/__BUILD_TIMESTAMP__/$BUILD_TS/g" www/sw.js
 
 #cd www/js

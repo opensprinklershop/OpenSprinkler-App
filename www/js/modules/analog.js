@@ -482,26 +482,57 @@ OSApp.Analog.testNotification = function() {
 		return;
 	}
 
-	var fire = function() {
-		OSApp.Analog.showLocalNotification({
-			id: 999999,
-			prio: 2,
-			title: dname,
-			text: msg,
-			data: { test: true }
-		});
+	// On-screen diagnostics so silent failures on restrictive OEMs (e.g. Huawei/EMUI)
+	// or missing permissions become visible without a USB/logcat session.
+	var diag = [];
+	var reported = false;
+	var report = function() {
+		if (reported) { return; }
+		reported = true;
+		OSApp.Analog.showNotifInfo("Notification-Diagnose:<br>" + diag.join("<br>"));
 	};
 
-	if (typeof localNotification.requestPermission === "function") {
-		localNotification.requestPermission(function(granted) {
-			if (granted) {
-				fire();
-			} else {
-				OSApp.Analog.showNotifPermissionHelp();
-			}
+	var verify = function() {
+		if (typeof localNotification.getIds === "function") {
+			localNotification.getIds(function(ids) {
+				diag.push("getIds: [" + (ids || []).join(",") + "]");
+				report();
+			});
+			setTimeout(report, 1500);
+		} else {
+			report();
+		}
+	};
+
+	var options = {
+		id: 999999,
+		androidChannelId: "os_high",
+		androidChannelImportance: "IMPORTANCE_HIGH",
+		title: dname,
+		text: msg,
+		androidColor: "#C62828",
+		androidLockscreen: true,
+		sound: "default",
+		data: { test: true }
+	};
+
+	var doSchedule = function() {
+		localNotification.schedule(options, function(result) {
+			diag.push("schedule cb: " + JSON.stringify(result));
+			verify();
+		});
+		setTimeout(verify, 2000);
+	};
+
+	diag.push("plugin: ok");
+	if (typeof localNotification.hasPermission === "function") {
+		localNotification.hasPermission(function(granted) {
+			diag.push("hasPermission: " + granted);
+			doSchedule();
 		});
 	} else {
-		fire();
+		diag.push("hasPermission: n/a");
+		doSchedule();
 	}
 };
 

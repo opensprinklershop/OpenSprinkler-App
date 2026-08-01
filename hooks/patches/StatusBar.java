@@ -224,10 +224,16 @@ public class StatusBar extends CordovaPlugin {
                     WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
             if (overlays) {
                 v.setPadding(0, 0, 0, 0);
-            } else {
-                v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+                // Edge-to-edge behind the bars: leave insets unconsumed so the WebView can
+                // handle them via CSS env(safe-area-inset-*).
+                return windowInsets;
             }
-            return windowInsets;
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            // Consume the insets so the child WebView does NOT apply them again. On Android 15+
+            // (API 35+) edge-to-edge is enforced and Chromium otherwise adds its own system-bar
+            // insets on top of this padding, producing doubled top/bottom margins. We have
+            // already accounted for them here. (No-op on older versions that didn't double.)
+            return WindowInsetsCompat.CONSUMED;
         });
     }
 
