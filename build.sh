@@ -426,6 +426,110 @@ cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/ra
 mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
 cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
 
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
 # Sync www/ into Android platform assets before building
 cordova prepare android
 
@@ -438,7 +542,11 @@ done
 cordova build browser --release
 
 # Build Android platform (release AAB + APK)
+# The plain `cordova build android --release` only produces the AAB (bundleRelease);
+# the APK task stays up-to-date/stale. Build the APK explicitly afterwards so
+# `adb install` below picks up an APK containing the freshly synced version folders.
 cordova build android --release
+cordova build android --release --buildConfig=build.json -- --packageType=apk
 
 # Install the built APK to a connected device if one is present.
 # Uses adb install directly (not `cordova run`) so the build never hangs on the

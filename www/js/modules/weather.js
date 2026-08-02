@@ -477,6 +477,39 @@ OSApp.Weather.validateWULocation = function( location, callback ) {
 	} );
 };
 
+// Looks up a Weather Underground PWS station and returns its coordinates
+// ( { lat, lon } ) via the callback, false if invalid, or true if the station
+// exists but exposes no coordinates.
+OSApp.Weather.getWUStationLocation = function( station, key, callback ) {
+	callback = callback || function() {};
+
+	if ( typeof key !== "string" || key === "" || typeof station !== "string" || station === "" ) {
+		callback( false );
+		return;
+	}
+
+	$.ajax( {
+		url: "https://api.weather.com/v2/pws/observations/current?stationId=" + encodeURIComponent( station ) +
+			"&format=json&units=e&apiKey=" + encodeURIComponent( key ),
+		cache: true
+	} ).done( function( data ) {
+		if ( !data || data.errors || !Array.isArray( data.observations ) || data.observations.length === 0 ) {
+			callback( false );
+			return;
+		}
+
+		var observation = data.observations[ 0 ];
+
+		if ( typeof observation.lat === "number" && typeof observation.lon === "number" ) {
+			callback( { lat: observation.lat, lon: observation.lon } );
+		} else {
+			callback( true );
+		}
+	} ).fail( function() {
+		callback( false );
+	} );
+};
+
 OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 	callback = callback || function() {};
 	$( ".ui-popup-active" ).find( "[data-role='popup']" ).popup( "close" );

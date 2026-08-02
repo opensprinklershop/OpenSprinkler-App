@@ -220,20 +220,14 @@ public class StatusBar extends CordovaPlugin {
             return;
         }
         ViewCompat.setOnApplyWindowInsetsListener(content, (v, windowInsets) -> {
-            Insets bars = windowInsets.getInsets(
-                    WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
-            if (overlays) {
-                v.setPadding(0, 0, 0, 0);
-                // Edge-to-edge behind the bars: leave insets unconsumed so the WebView can
-                // handle them via CSS env(safe-area-inset-*).
-                return windowInsets;
-            }
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom);
-            // Consume the insets so the child WebView does NOT apply them again. On Android 15+
-            // (API 35+) edge-to-edge is enforced and Chromium otherwise adds its own system-bar
-            // insets on top of this padding, producing doubled top/bottom margins. We have
-            // already accounted for them here. (No-op on older versions that didn't double.)
-            return WindowInsetsCompat.CONSUMED;
+            // The web layer sets <meta viewport-fit=cover>, so the Chromium WebView already
+            // applies the system-bar insets to its own viewport. Padding the content view
+            // here as well produced DOUBLED margins (confirmed: Android 12 -> top only, as it
+            // has gesture nav with a 0 bottom inset; Android 16 -> top+bottom with 3-button
+            // nav). Let the WebView be the single source of the inset: never pad the content
+            // view, and leave the insets unconsumed so the WebView still receives them.
+            v.setPadding(0, 0, 0, 0);
+            return windowInsets;
         });
     }
 

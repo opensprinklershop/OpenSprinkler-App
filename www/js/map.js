@@ -22,7 +22,7 @@ script.async = true;
 window.initMap = function() {
     var markers = { pws: [], origin: [] },
         stations = [],
-        priorIdle, map, infoWindow, droppedPin, start, current, forceFetch = true;
+        priorIdle, map, infoWindow, droppedPin, start, current, idleTimer, forceFetch = true;
 
     // Handle select button for weather station selection
     document.addEventListener( "click", function( e ) {
@@ -128,20 +128,36 @@ window.initMap = function() {
                 droppedPin = plotMarker( "origin", { message: "Selected Location" }, event.latLng.lat(), event.latLng.lng() );
             } );
 
-            // When the map center changes, update the weather stations shown.
-            // Always fetch on the initial load and after an explicit jump (forceFetch),
-            // otherwise throttle to avoid excessive lookups on small pans.
+            // When the visible area changes, reload the weather stations for the
+            // currently displayed region so markers always match the viewport.
+            // Fetch on the initial load / explicit jump (forceFetch); otherwise
+            // reload after any meaningful pan (small threshold) and debounce to
+            // avoid excessive lookups while the user is still moving the map.
             map.addListener( "idle", function() {
-                if ( !forceFetch && ( getDistance( map.getCenter(), priorIdle ) < 15000 || map.getZoom() < 9 ) ) {
+                if ( !forceFetch && ( map.getZoom() < 9 ||
+                        ( priorIdle && getDistance( map.getCenter(), priorIdle ) < 2000 ) ) ) {
                     return;
                 }
 
                 forceFetch = false;
                 priorIdle = map.getCenter();
-                removeAllMarkers();
-                window.top.postMessage( {
-                    location: [ map.getCenter().lat(), map.getCenter().lng() ]
-                }, "*" );
+
+                clearTimeout( idleTimer );
+                idleTimer = setTimeout( function() {
+                    var bounds = map.getBounds(),
+                        message = { location: [ map.getCenter().lat(), map.getCenter().lng() ] };
+
+                    // Include the visible bounds so the parent can request/limit
+                    // stations to the area the user is actually looking at.
+                    if ( bounds ) {
+                        var ne = bounds.getNorthEast(),
+                            sw = bounds.getSouthWest();
+                        message.bounds = [ sw.lat(), sw.lng(), ne.lat(), ne.lng() ];
+                    }
+
+                    removeAllMarkers();
+                    window.top.postMessage( message, "*" );
+                }, 300 );
             } );
 
             // If any stations are saved already, draw them on the map

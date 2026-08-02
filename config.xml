@@ -147,5 +147,6 @@
     <hook type="after_prepare" src="hooks/after_prepare/01-restore-android-res.js" />
     <hook type="after_prepare" src="hooks/patch-android-statusbar.js" />
     <hook type="after_prepare" src="hooks/after_prepare/03-android-application-security-attrs.js" />
+    <hook type="after_prepare" src="hooks/after_prepare/04-copy-cordova-into-version-bundles.js" />
     <hook type="after_prepare" src="hooks/after_prepare.js" />
 </widget>

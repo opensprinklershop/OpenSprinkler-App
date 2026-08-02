@@ -159,6 +159,37 @@ OSApp.Analog.requestNotificationPermission = function(callback) {
 	});
 };
 
+// Ensure the OS notification permission is granted so LIVE events (not just the
+// manual test) can post notifications. On Android 13+/MIUI the system dialog
+// fired silently at startup is often dismissed/blocked, leaving the permission
+// denied — then live events fail quietly and only the test button (with its
+// settings redirect) recovers it. This mirrors that recovery once per session.
+OSApp.Analog.ensureNotificationPermission = function() {
+	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
+	if (!localNotification) { return; }
+
+	var afterCheck = function(hasPerm) {
+		if (hasPerm) { return; }
+		OSApp.Analog.requestNotificationPermission(function(granted) {
+			if (granted) { return; }
+			// Still denied: guide the user to the system settings, but only once
+			// per app session so we don't nag on every launch.
+			if (OSApp.Analog._notifPermHelpShown) { return; }
+			OSApp.Analog._notifPermHelpShown = true;
+			if (typeof OSApp.Analog.showNotifPermissionHelp === "function") {
+				OSApp.Analog.showNotifPermissionHelp();
+			}
+		});
+	};
+
+	if (typeof localNotification.hasPermission === "function") {
+		localNotification.hasPermission(function(granted) { afterCheck(granted === true); });
+	} else {
+		afterCheck(false);
+	}
+};
+
+
 OSApp.Analog.syncChartOptionsFromController = function() {
 	// Chart display options are purely UI-side preferences stored in localStorage
 	try {
@@ -192,7 +223,7 @@ OSApp.Analog.asb_init = function() {
 	var backgroundMode = OSApp.Analog.getBackgroundModePlugin();
 
 	if (localNotification) {
-		OSApp.Analog.requestNotificationPermission();
+		OSApp.Analog.ensureNotificationPermission();
 	}
 
 	if (OSApp.currentDevice.isAndroid && localNotification && typeof localNotification.createChannel === "function") {

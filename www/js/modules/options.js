@@ -215,6 +215,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 						return true;
 					case "wtkey":
 						return true;
+					case "wtpws":
+						return true;
 					case "wto":
 						console.log( "DEBUG case wto: raw data (from #wto.val) =", JSON.stringify( data ) );
 						data = OSApp.Utils.escapeJSON( $.extend( {}, OSApp.Utils.unescapeJSON( data ), { key: page.find( "#wtkey" ).val() } ) );
@@ -758,6 +760,26 @@ OSApp.Options.showOptions = function( expandItem ) {
 						"</div>" +
 					"</td>" +
 					"<td><button class='noselect' data-mini='true' id='verify-api'>" + OSApp.Language._( "Verify" ) + "</button></td>" +
+				"</tr>" +
+			"</table></div>";
+
+			// Weather Underground station: lets the user enter a PWS station ID,
+			// look it up and (if available) adopt its GPS coordinates as location.
+			var isWUProvider = OSApp.Weather.getCurrentWeatherProvider().id === "WU";
+			list += "<div class='ui-field-contain pws-field" + ( isWUProvider ? "" : " hidden" ) + "'><label for='wtpws'>" + OSApp.Language._( "Weather Station ID" ) +
+				"<button data-helptext='" +
+				OSApp.Language._( "Enter a Weather Underground PWS station ID, then tap Fetch to verify it and use its location." ) +
+					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+			"</label>" +
+			"<table>" +
+				"<tr style='width:100%;vertical-align: top;'>" +
+					"<td style='width:100%'>" +
+						"<div class='ui-input-text controlgroup-textinput ui-btn ui-body-inherit ui-corner-all ui-mini ui-shadow-inset'>" +
+								"<input data-role='none' data-mini='true' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false' " +
+									"type='text' id='wtpws' value='" + OSApp.Utils.htmlEscape( OSApp.currentSession.controller.settings.wto.pws || "" ) + "'>" +
+						"</div>" +
+					"</td>" +
+					"<td><button class='noselect' data-mini='true' id='fetch-pws'>" + OSApp.Language._( "Fetch" ) + "</button></td>" +
 				"</tr>" +
 			"</table></div>";
 		}
@@ -1653,12 +1675,73 @@ OSApp.Options.showOptions = function( expandItem ) {
 		} );
 	} );
 
+	page.find( "#fetch-pws" ).on( "click", function() {
+		var button = $( this ),
+			pwsInput = page.find( "#wtpws" ),
+			station = ( pwsInput.val() || "" ).trim(),
+			key = page.find( "#wtkey" ).val();
+
+		if ( station === "" ) {
+			return;
+		}
+
+		button.prop( "disabled", true );
+
+		OSApp.Weather.getWUStationLocation( station, key, function( result ) {
+			if ( result ) {
+				pwsInput.parent().removeClass( "red" ).addClass( "green" );
+
+				// Persist the station ID in the weather adjustment options
+				var wtoButton = page.find( "#wto" );
+				if ( wtoButton.length && wtoButton.val() !== undefined ) {
+					wtoButton.val( OSApp.Utils.escapeJSON( $.extend( {}, OSApp.Utils.unescapeJSON( wtoButton.val() ), { pws: station } ) ) );
+				}
+
+				// Adopt the station's GPS coordinates as the controller location
+				if ( typeof result === "object" && typeof result.lat === "number" && typeof result.lon === "number" ) {
+					var lat = parseFloat( result.lat ).toFixed( 5 ),
+						lon = parseFloat( result.lon ).toFixed( 5 ),
+						loc = page.find( "#loc" );
+
+					loc.val( [ lat, lon ] ).addClass( "green" );
+					page.find( "#o1" ).selectmenu( "disable" );
+					OSApp.Options.coordsToLocation( lat, lon, function( name ) {
+						loc.find( "span" ).text( name );
+					} );
+				}
+
+				header.eq( 2 ).prop( "disabled", false );
+				page.find( ".submit" ).addClass( "hasChanges" );
+			} else {
+				pwsInput.parent().removeClass( "green" ).addClass( "red" );
+				OSApp.Errors.showError( OSApp.Language._( "The weather station could not be found." ) );
+			}
+
+			button.prop( "disabled", false );
+		} );
+	} );
+
+	page.find( "#wtpws" ).on( "change input", function() {
+		var station = ( $( this ).val() || "" ).trim(),
+			wtoButton = page.find( "#wto" );
+
+		$( this ).parent().removeClass( "red green" );
+
+		if ( wtoButton.length && wtoButton.val() !== undefined ) {
+			wtoButton.val( OSApp.Utils.escapeJSON( $.extend( {}, OSApp.Utils.unescapeJSON( wtoButton.val() ), { pws: station } ) ) );
+			header.eq( 2 ).prop( "disabled", false );
+			page.find( ".submit" ).addClass( "hasChanges" );
+		}
+	} );
+
 	page.find( "#weatherSelect" ).on( "change", function() {
 		//remove status from API key entry to prompt re-verify
 		page.find( "#wtkey" ).siblings( ".help-icon" ).hide();
 		page.find( "#wtkey" ).parent().removeClass( "red green" );
 		//make API key input appear if needed
 		page.find( "#wtkey" ).parents( ".ui-field-contain" ).toggleClass( "hidden", !(OSApp.Weather.getWeatherProviderById( this.value ).needsKey));
+		//show the PWS station lookup only for Weather Underground
+		page.find( ".pws-field" ).toggleClass( "hidden", this.value !== "WU" );
 		//change wto value based on new selection
 		let curr = OSApp.Utils.unescapeJSON(page.find( "#wto" ).val());
 		curr.provider = this.value;
@@ -2528,7 +2611,7 @@ OSApp.Options.overlayMap = function( callback ) {
 				//eslint-disable-next-line no-unused-vars
 			} catch ( err ) { exit( false ); }
 		},
-		updateMapStations = function( latitude, longitude ) {
+		updateMapStations = function( latitude, longitude, bounds ) {
 			var key = $( "#wtkey" ).val();
 			if ( key === "" ) {
 				return;
@@ -2549,6 +2632,21 @@ OSApp.Options.overlayMap = function( callback ) {
 						message: data.location.stationId[ index ]
 					} );
 				} );
+
+				// Limit to stations within the currently visible map area so the
+				// markers match the viewport the user is looking at. Fall back to
+				// the full nearest-station list if none fall inside the bounds
+				// (e.g. when zoomed in tightly on a sparsely covered region).
+				if ( Array.isArray( bounds ) && bounds.length === 4 ) {
+					var inView = sortedData.filter( function( station ) {
+						return station.lat >= bounds[ 0 ] && station.lat <= bounds[ 2 ] &&
+							station.lon >= bounds[ 1 ] && station.lon <= bounds[ 3 ];
+					} );
+
+					if ( inView.length > 0 ) {
+						sortedData = inView;
+					}
+				}
 
 				if ( sortedData.length > 0 ) {
 					sortedData = encodeURIComponent( JSON.stringify( sortedData ) );
@@ -2579,7 +2677,7 @@ OSApp.Options.overlayMap = function( callback ) {
 		} else if ( data.loaded === true ) {
 			$.mobile.loading( "hide" );
 		} else if ( typeof data.location === "object" ) {
-			updateMapStations( data.location[ 0 ], data.location[ 1 ] );
+			updateMapStations( data.location[ 0 ], data.location[ 1 ], data.bounds );
 		} else if ( data.dismissKeyboard === true ) {
 			document.activeElement.blur();
 		} else if ( data.getLocation === true ) {
