@@ -1,0 +1,418 @@
+/* global $, ApexCharts */
+
+/*!
+ * Analog Sensor API - GUI for OpenSprinkler App
+ * https://github.com/opensprinklershop/
+ * (c) 2023 OpenSprinklerShop
+ * Released under the MIT License
+ */
+
+// Configure module
+var OSApp = OSApp || {};
+
+OSApp.ProgramView = {
+	programCharts : [],
+	lastProgramRun : -2,
+	clickedOn : -1,
+	clickedMove : 0,
+	scrollY : 0,
+	touchStartX : 0,
+	touchStartY : 0,
+	touchMoved : 0,
+	showing : false,
+	lastWidth : 0,
+	Constants: {
+		SHOW_NONE : 0,
+		SHOW_ZONES : 1,
+		SHOW_PROGRAMS : 2,
+	},
+};
+
+OSApp.ProgramView.hashcode = function( str ) {
+	return Array.from(str).reduce( (s, c) => Math.imul(31, s) + c.charCodeAt(0) | 0, 0);
+};
+
+OSApp.ProgramView.updateProgramShowArea = function( page, visible ) {
+	if (!OSApp.Firmware.checkOSVersion( 210 ))
+		return;
+
+	var i, j, reset = false, width, enabledPrograms = 0, renderedCharts;
+
+	if (OSApp.ProgramView.lastProgramRun == -2) {
+		OSApp.ProgramView.lastProgramRun = localStorage.getItem("lastProgramRun");
+		if (OSApp.ProgramView.lastProgramRun === undefined || OSApp.ProgramView.lastProgramRun == -2) {
+			OSApp.ProgramView.lastProgramRun = -1;
+			reset = true;
+		}
+	}
+
+	// Sync lastProgramRun from firmware's nqpid (currently manually-running program id).
+	// This allows the correct program % to be displayed when a program is started
+	// externally (e.g. via Rainmaker, Matter, Zigbee) without the UI setting lastProgramRun.
+	var nqpid = parseInt( OSApp.currentSession.controller.settings.nqpid || 0 );
+	if ( nqpid > 0 ) {
+		var nqidx = nqpid - 1;  // convert to 0-based program index
+		if ( nqidx !== parseInt( OSApp.ProgramView.lastProgramRun ) ) {
+			OSApp.ProgramView.lastProgramRun = nqidx;
+			localStorage.setItem( "lastProgramRun", nqidx );
+		}
+	}
+
+	width = window.screen.width < 400? 150 : 200;
+	if (width != OSApp.ProgramView.lastWidth) {
+		OSApp.ProgramView.lastWidth = width;
+		reset = true;
+	}
+
+	if (OSApp.currentSession.controller.programs.pd.length != OSApp.ProgramView.programCharts.length) {
+		OSApp.ProgramView.programCharts.length = OSApp.currentSession.controller.programs.pd.length;
+		reset = true;
+	}
+
+	if (visible != OSApp.ProgramView.showing) {
+		OSApp.ProgramView.showing = visible;
+		reset = true;
+	}
+
+	if (!visible)
+	{
+		page.find("#os-program-show").html("");
+		return;
+	}
+
+	for (i = 0; i < OSApp.currentSession.controller.programs.pd.length; i++) {
+		if (OSApp.Programs.readProgram(OSApp.currentSession.controller.programs.pd[i]).en) {
+			enabledPrograms++;
+		}
+	}
+
+	// When the app returns from the background, the dashboard DOM can be recreated
+	// while the cached chart state still thinks everything is mounted.
+	renderedCharts = page.find("#os-program-show [id^='progChart-']").length;
+	if (renderedCharts !== enabledPrograms) {
+		reset = true;
+	}
+
+	var html = "<div class='ui-body ui-body-a center'><table border=1 frame=void rules=rows style='margin: 0px auto;'>";
+	for (i = 0; i < OSApp.currentSession.controller.programs.pd.length; i++) {
+
+		let prog = OSApp.Programs.readProgram(OSApp.currentSession.controller.programs.pd[i]);
+		var name = prog.name;
+		var sr = 0;
+
+		if (prog.en) {
+			html += "<tr>";
+			html += "<td><div id='progChart-" + i + "'></div></td>";
+			html += "<td><h2>"+name+"</h2>";
+			//html += "<p>"+(prog.en?"enabled":"")+" "+(prog.weather?"weather":"");
+
+			// Show station duration inputs
+			var runTimes = [];
+			var remainingTimes = [];
+			var timeSum = 0;
+			var remaining = 0;
+			for ( j = 0; j < OSApp.currentSession.controller.stations.snames.length; j++ ) {
+				if ( !OSApp.Stations.isMaster( j ) ) {
+					let time = prog.stations[ j ] || 0;
+					if (time > 0) {
+						runTimes[ j ] = time;
+
+						var stationPid = OSApp.Stations.getPID( j ) - 1;
+						var stationMatchesProgram = ( stationPid == i ) || ( stationPid == 253 && i == OSApp.ProgramView.lastProgramRun );
+						var stationIsRunning = OSApp.Stations.isRunning( j ) && stationMatchesProgram;
+						if (stationIsRunning)
+							sr += OSApp.ProgramView.hashcode( OSApp.currentSession.controller.stations.snames[ j ] );
+
+						html += "<button class='" +
+							(stationIsRunning ? "ui-btn-active " : "") +
+							"ui-shadow ui-btn-inline ui-btn ui-corner-all ui-btn-b ui-mini' id='progStation-"+i+"-"+j+"' value='"+i+"_"+j+"'>" +
+							OSApp.currentSession.controller.stations.snames[ j ]+" ["+OSApp.Dates.getDurationText( time )+"]</button>";
+
+						// Include both currently running AND queued (not yet started) stations
+						// for this program in remainingTimes, so calculateTotalRunningTime can
+						// apply the correct parallel/sequential/ginv logic to the full remaining
+						// program time — not just the currently active batch of stations.
+						// getRemainingRuntime returns the actual remaining seconds for running
+						// stations and the full programmed duration for queued stations.
+						if (stationMatchesProgram) {
+							let remainingStation = OSApp.Stations.getRemainingRuntime( j );
+							if (remainingStation > 0) {
+								remainingTimes[ j ] = remainingStation;
+							}
+						}
+					} else {
+						runTimes[ j ] = 0;
+						remainingTimes[ j ] = 0;
+					}
+				}
+			}
+			timeSum = OSApp.Groups.calculateTotalRunningTime( runTimes );
+			remaining = OSApp.Groups.calculateTotalRunningTime( remainingTimes );
+			html += "</td></tr>";
+		}
+
+		var programChart = OSApp.ProgramView.programCharts[i];
+		if (!programChart) {
+			programChart = {updated : 1, current : 0, remaining : 0, running : false, en : prog.en, stationsRunning : sr, name: name, chart: null};
+			OSApp.ProgramView.programCharts[i] = programChart;
+			reset = true; // New entry — force full HTML rebuild
+		}
+		else programChart.updated = 0;
+
+		if (programChart.en != prog.en) {
+			programChart.en = prog.en;
+			reset = true;
+		}
+		remaining = Math.round((remaining-1) / 5) * 5;
+		if (programChart.remaining != remaining) {
+			programChart.remaining = remaining;
+			programChart.updated++;
+		}
+		let running = remaining > 0.001;
+		if (programChart.running != running) {
+			programChart.running = running;
+			programChart.updated++;
+			if (!running && OSApp.ProgramView.lastProgramRun == i)
+				OSApp.ProgramView.lastProgramRun = -1;
+		}
+		let current = running ? (timeSum > 0 ? Math.round(remaining/timeSum * 100) : 0) : "Start";
+		if (programChart.current != current) {
+			programChart.current = current;
+			programChart.updated++;
+		}
+		name = remaining > 0.01 ? OSApp.Dates.sec2hms(remaining) : OSApp.Dates.sec2hms(timeSum);
+		if (programChart.name != name) {
+			programChart.name = name;
+			programChart.updated++;
+		}
+		if (programChart.stationsRunning != sr) {
+			programChart.stationsRunning = sr;
+			reset = true;
+		}
+		if (reset) {
+			programChart.chart = null;
+			programChart.updated++;
+		}
+
+		//prog.en
+		//prog.weather
+	}
+	if (reset) {
+		html += "</table></div>";
+		page.find("#os-program-show").html(html);
+
+		for (i = 0; i < OSApp.currentSession.controller.programs.pd.length; i++) {
+			for ( j = 0; j < OSApp.currentSession.controller.stations.snames.length; j++ ) {
+				if ( !OSApp.Stations.isMaster( j ) ) {
+					page.find("#progStation-"+i+"-"+j).on( "click", function() {
+						let value = $( this )[0].value.split("_");
+						let pid = Number(value[0]);
+						let sid = Number(value[1]);
+						let prog = OSApp.Programs.readProgram(OSApp.currentSession.controller.programs.pd[pid]);
+						if (OSApp.Stations.isRunning( sid )) {
+							OSApp.UIDom.areYouSure( OSApp.Language._( "Do you want to stop the selected station?" ), OSApp.Stations.getName( sid ), function() {
+								OSApp.Firmware.sendToOS( "/cm?sid=" + sid + "&en=0&pw=" ).done( function() {
+									OSApp.Stations.setPID( sid, 0 );
+									OSApp.Stations.setRemainingRuntime( sid, 0 );
+									OSApp.Stations.setStatus( sid, 0 );
+									// Remove any timer associated with the station
+									delete OSApp.uiState.timers[ "station-" + sid ];
+									OSApp.Status.refreshStatus();
+									OSApp.Errors.showError( OSApp.Language._( "Station has been stopped" ) );
+									remainingTimes[ sid ] = 0;
+								});
+							});
+						} else {
+							let duration = prog.stations[ sid ] || 0;
+							OSApp.Firmware.sendToOS( "/cm?sid=" + sid + "&en=1&t=" + duration + "&pw=", "json" ).done( function() {
+
+								// Update local state until next device refresh occurs
+								OSApp.Stations.setPID( sid, pid );
+								OSApp.Stations.setRemainingRuntime( sid, duration );
+
+								OSApp.Status.refreshStatus();
+								OSApp.Errors.showError( OSApp.Language._( "Station has been queued" ) );
+							} );
+						}
+						return false;
+					} );
+				}
+			}
+		}
+	}
+
+	for (i = 0; i < OSApp.ProgramView.programCharts.length; i++) {
+		let programChart = OSApp.ProgramView.programCharts[i];
+		if (!programChart.en) continue;
+		var chart = programChart.chart;
+		if (!chart || reset) {
+			let options = {
+				pid : i,
+				clicked : 0,
+				chart: {
+					width: width,
+					height: 200,
+					parentHeightOffset: 0,
+					type: "radialBar",
+					animations: {
+						enabled: true,
+						dynamicAnimation: {
+							enabled: true
+						}
+					},
+					events: {
+						//Avoid drag-click false clicking:
+						mouseMove: function(event, chartContext, opts) {
+							var top = $(document).scrollTop();
+							if (event.buttons && OSApp.ProgramView.clickedOn == -1) {
+								OSApp.ProgramView.clickedOn = opts.config.pid;
+								OSApp.ProgramView.scrollY = top;
+								OSApp.ProgramView.clickedMove = 0;
+							}
+							if (OSApp.ProgramView.clickedOn == opts.config.pid) {
+								OSApp.ProgramView.clickedMove += Math.abs(top-scrollY);
+								OSApp.ProgramView.scrollY = top;
+							}
+						},
+						click: function(event, chartContext, opts) {
+							var top = $(document).scrollTop();
+							let pid = opts.config.pid;
+							OSApp.ProgramView.clickedMove += Math.abs(top-scrollY);
+							OSApp.ProgramView.scrollY = top;
+							if (OSApp.ProgramView.clickedMove > 10 || OSApp.ProgramView.touchMoved > 10) {
+								OSApp.ProgramView.clickedOn = -1;
+								OSApp.ProgramView.clickedMove = 0;
+								OSApp.ProgramView.touchMoved = 0;
+								return;
+							}
+							OSApp.ProgramView.clickedOn = -1;
+							OSApp.ProgramView.clickedMove = 0;
+							OSApp.ProgramView.touchMoved = 0;
+
+							setTimeout(function() {
+								var name = OSApp.currentSession.controller.programs.pd[ pid ][ 5 ];
+
+								if (pid == OSApp.ProgramView.lastProgramRun) {
+									OSApp.Stations.stopAllStations( function() {
+										OSApp.ProgramView.lastProgramRun = -1;
+										localStorage.setItem("lastProgramRun", OSApp.ProgramView.lastProgramRun);
+									});
+								} else {
+									OSApp.UIDom.areYouSure( OSApp.Language._( "Are you sure you want to start") + " " + name + " " + OSApp.Language._("now?") , "", function() {
+										OSApp.ProgramView.lastProgramRun = -1;
+										OSApp.UIDom.areYouSure( OSApp.Language._( "Do you wish to apply the current watering level?" ), "", function() {
+											OSApp.ProgramView.lastProgramRun = pid;
+											localStorage.setItem("lastProgramRun", OSApp.ProgramView.lastProgramRun);
+											OSApp.Firmware.sendToOS( "/mp?pw=&pid="+pid+"&uwt=1");
+											OSApp.Errors.showError( OSApp.Language._( "Program started successfully" ) );
+											OSApp.Status.refreshStatus();
+
+										}, function() {
+											OSApp.ProgramView.lastProgramRun = pid;
+											localStorage.setItem("lastProgramRun", OSApp.ProgramView.lastProgramRun);
+											OSApp.Firmware.sendToOS( "/mp?pw=&pid="+pid+"&uwt=0");
+											OSApp.Errors.showError( OSApp.Language._( "Program started successfully" ) );
+											OSApp.Status.refreshStatus();
+										});
+									});
+								}
+							}, 100);
+						  }
+					}
+				},
+				series: [programChart.current],
+				plotOptions: {
+					radialBar: {
+						hollow: {
+							margin: 0,
+              				size: '60%',
+              				background: '#fff',
+							position: 'front',
+							dropShadow: {
+								enabled: true,
+								top: 3,
+								left: 0,
+								blur: 4,
+								opacity: 0.5
+							},
+						},
+						track: {
+							background: '#fff',
+              				strokeWidth: '67%',
+              				margin: 0, // margin is in pixels
+							dropShadow: {
+								enabled: true,
+								top: -3,
+								left: 0,
+								blur: 4,
+								opacity: 0.7
+							}
+						},
+						dataLabels: {
+							showOn: "always",
+							name: {
+								offsetY: -10,
+								show: true,
+								color: "#222",
+								fontSize: "13px"
+							},
+							value: {
+								offsetY: 1,
+								color: "#111",
+								fontSize: "30px",
+								show: true,
+								formatter: function (val) {
+									return typeof(val) === 'string'? val : OSApp.Analog.formatValUnit(val, "%");
+								}
+							}
+						}
+					}
+				},
+				fill: {
+					type: 'gradient',
+					gradient: {
+					  shade: 'dark',
+					  type: 'horizontal',
+					  shadeIntensity: 0.5,
+					  gradientToColors: ['#ABE5A1'],
+					  inverseColors: true,
+					  opacityFrom: 1,
+					  opacityTo: 1,
+					  stops: [0, 100]
+					}
+				  },
+				stroke: {
+					lineCap: "round",
+				},
+				labels: [programChart.name]
+			};
+
+			var sel = document.querySelector("#progChart-" + i);
+			if (sel) {
+				chart = new ApexCharts(sel, options);
+				chart.render();
+				// Track touch movement to prevent swipe-triggered program start
+				$(sel).on("touchstart", function(e) {
+					var t = e.originalEvent.touches[0];
+					OSApp.ProgramView.touchStartX = t.clientX;
+					OSApp.ProgramView.touchStartY = t.clientY;
+					OSApp.ProgramView.touchMoved = 0;
+				}).on("touchmove", function(e) {
+					var t = e.originalEvent.touches[0];
+					OSApp.ProgramView.touchMoved += Math.abs(t.clientX - OSApp.ProgramView.touchStartX) +
+						Math.abs(t.clientY - OSApp.ProgramView.touchStartY);
+					OSApp.ProgramView.touchStartX = t.clientX;
+					OSApp.ProgramView.touchStartY = t.clientY;
+				});
+				programChart.chart = chart;
+			}
+		} else {
+			if (programChart.updated) {
+				chart.updateOptions({
+					series: [programChart.current],
+					chart: {width: width},
+					labels: [programChart.name] });
+			}
+		}
+	}
+};

@@ -6855,6 +6855,16 @@ OSApp.ESP32Mode.restoreFromAppBackup = function( data, onDone, onFail ) {
 		} );
 	}
 
+	// Restore the monthly water usage history as part of the OTA/app backup.
+	if ( data.mwater ) {
+		restoreChain = restoreChain.then( function() {
+			return OSApp.Firmware.sendToOS(
+				"/jw?pw=&mwater=" + encodeURIComponent( JSON.stringify( data.mwater ) ),
+				"json"
+			);
+		} );
+	}
+
 	restoreChain.done( function() {
 		$.mobile.loading( "hide" );
 		localStorage.removeItem( OSApp.ESP32Mode.OTA_BACKUP_KEY );

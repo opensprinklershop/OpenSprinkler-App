@@ -1237,27 +1237,30 @@ OSApp.Analog.importConfigSensors = function(data, restore_type, callback) {
 					var progDeletes = OSApp.Analog.computeRestoreDeletes(restoreProg, OSApp.Analog.progAdjusts, progadjust);
 					var monitorDeletes = OSApp.Analog.computeRestoreDeletes(restoreMonitors, OSApp.Analog.monitors, monitors);
 
-					// Restore (add/overwrite) the backed-up items first, then purge
-					// the phantom leftovers. Doing the deletes last means an
-					// interrupted restore never removes data before its
-					// replacement has been written. Deleting a sensor via
-					// "type=0" also clears that sensor's logs on the firmware,
-					// which fixes the "phantom log data on a fresh sensor" issue.
-					OSApp.Analog.sendRestoreBatch("/sc?pw=", sensors)
-						.then(function () {
-							return OSApp.Analog.sendRestoreBatch("/sb?pw=", progadjust);
-						})
-						.then(function () {
-							return OSApp.Analog.sendRestoreBatch("/mc?pw=", monitors);
-						})
-						.then(function () {
-							return OSApp.Analog.sendRestoreBatch("/mc?pw=", monitorDeletes);
-						})
+					// Purge the phantom leftovers FIRST, then restore (add/
+					// overwrite) the backed-up items. The phantoms are device
+					// items that are NOT in the backup, so they have no
+					// replacement and deleting them up front is safe — it also
+					// frees config/log space on a nearly-full device before the
+					// new sensors are created, which is exactly the case where a
+					// full restore otherwise fails with "not enough space".
+					// Deleting a monitor/adjustment before its referenced sensor
+					// avoids dangling references mid-restore.
+					OSApp.Analog.sendRestoreBatch("/mc?pw=", monitorDeletes)
 						.then(function () {
 							return OSApp.Analog.sendRestoreBatch("/sb?pw=", progDeletes);
 						})
 						.then(function () {
 							return OSApp.Analog.sendRestoreBatch("/sc?pw=", sensorDeletes);
+						})
+						.then(function () {
+							return OSApp.Analog.sendRestoreBatch("/sc?pw=", sensors);
+						})
+						.then(function () {
+							return OSApp.Analog.sendRestoreBatch("/sb?pw=", progadjust);
+						})
+						.then(function () {
+							return OSApp.Analog.sendRestoreBatch("/mc?pw=", monitors);
 						})
 						.done(function () {
 							OSApp.Analog.expandItem.add("progadjust");

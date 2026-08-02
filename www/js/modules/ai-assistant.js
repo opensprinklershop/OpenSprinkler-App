@@ -739,10 +739,20 @@ OSApp.AIAssistant.isEnabled = function() {
 
 OSApp.AIAssistant.setEnabled = function( on ) {
 	localStorage.setItem( OSApp.AIAssistant.ENABLED_KEY, on ? "1" : "0" );
+	OSApp.AIAssistant.applyMenuVisibility();
 	OSApp.AIAssistant.applyFabVisibility();
 	if ( !on ) {
 		OSApp.AIAssistant.closeDialog();
 	}
+};
+
+// Keep the left-menu entry in sync with the assistant enable flag.
+OSApp.AIAssistant.applyMenuVisibility = function() {
+	var item = $( ".ai-assistant-menu" );
+	if ( !item.length ) {
+		return;
+	}
+	item.toggleClass( "hidden", !OSApp.AIAssistant.isEnabled() );
 };
 
 // Zeigt/versteckt den schwebenden Button je nach Aktivierung und aktueller Seite.
@@ -770,6 +780,7 @@ OSApp.AIAssistant.initFab = function() {
 		OSApp.AIAssistant.openDialog();
 	} );
 	OSApp.AIAssistant.applyFabVisibility();
+	OSApp.AIAssistant.applyMenuVisibility();
 };
 
 /* ──────────────────────────────────────────────────────────────────────────
