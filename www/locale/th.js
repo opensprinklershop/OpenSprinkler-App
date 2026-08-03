@@ -1588,6 +1588,12 @@
       "water meter (optional)": "มิเตอร์น้ำ (ไม่จำเป็น)",
       "year": "ปี",
       "years": "ปี",
-      "°C/°F or L/m³ (optional)": "°C/°F หรือ L/m³ (อุปกรณ์เสริม)"
+      "°C/°F or L/m³ (optional)": "°C/°F หรือ L/m³ (อุปกรณ์เสริม)",
+      "Clear chat": "Clear chat",
+      "Voice input": "Voice input",
+      "Type your message...": "Type your message...",
+      "The assistant service timed out after 35 seconds.": "The assistant service timed out after 35 seconds.",
+      "The assistant service is not authorized. Please check the service configuration.": "The assistant service is not authorized. Please check the service configuration.",
+      "Could not apply the changes.": "Could not apply the changes."
    }
 }

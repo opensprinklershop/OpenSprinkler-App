@@ -42,7 +42,7 @@ OSApp.Sites.getCurrentBundleVersion = function() {
 	return m ? m[1] : null;
 };
 
-OSApp.Sites.getKnownFallbackVersion = function() {
+OSApp.Sites.getKnownFallbackVersion = function(versions) {
 	var fromPath = OSApp.Sites.getCurrentBundleVersion();
 	if ( fromPath ) {
 		return fromPath;
@@ -53,12 +53,21 @@ OSApp.Sites.getKnownFallbackVersion = function() {
 		return cached;
 	}
 
-	return "2.4.0.215";
+	if ( Array.isArray( versions ) ) {
+		var releaseVersions = versions.filter(function(v) {
+			return typeof v === "string" && v !== "dev";
+		});
+		if ( releaseVersions.length > 0 ) {
+			return releaseVersions[0];
+		}
+	}
+
+	return "2.4.0.224";
 };
 
 OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
 	if (!fwv) {
-		return OSApp.Sites.getKnownFallbackVersion();
+		return OSApp.Sites.getKnownFallbackVersion(versions);
 	}
 
 	// 2.2.1 and below (fwv < 221) should use 2.2.1 legacy
@@ -100,7 +109,7 @@ OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
 		}
 	}
 
-	return OSApp.Sites.getKnownFallbackVersion();
+	return OSApp.Sites.getKnownFallbackVersion(versions);
 };
 
 OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
@@ -1482,6 +1491,15 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 OSApp.Sites.updateController = function( callback, fail ) {
 	callback = callback || function() {};
 	fail = fail || function() {};
+	var loadControllerLegacy = function() {
+		return $.when(
+			OSApp.Sites.updateControllerPrograms(),
+			OSApp.Sites.updateControllerStations(),
+			OSApp.Sites.updateControllerOptions(),
+			OSApp.Sites.updateControllerStatus(),
+			OSApp.Sites.updateControllerSettings()
+		);
+	};
 	var finish = function() {
 		$( "html" ).trigger( "datarefresh" );
 		OSApp.Status.checkStatus();
@@ -1495,7 +1513,7 @@ OSApp.Sites.updateController = function( callback, fail ) {
 		OSApp.Firmware.sendToOS( "/ja?pw=", "json" ).then( function( data ) {
 
 			if ( typeof data === "undefined" || $.isEmptyObject( data ) ) {
-				fail();
+				loadControllerLegacy().then( finish, fail );
 				return;
 			}
 
@@ -1527,15 +1545,18 @@ OSApp.Sites.updateController = function( callback, fail ) {
 				OSApp.currentSession.controller.special = {};
 				finish();
 			}
-		}, fail );
+		}, function( error ) {
+			if ( error && error.status === 401 ) {
+				fail( error );
+				return;
+			}
+
+			// Some firmwares may temporarily return malformed /ja data. Fall back
+			// to split endpoint loading instead of dropping the whole connection.
+			loadControllerLegacy().then( finish, fail );
+		} );
 	} else {
-		$.when(
-			OSApp.Sites.updateControllerPrograms(),
-			OSApp.Sites.updateControllerStations(),
-			OSApp.Sites.updateControllerOptions(),
-			OSApp.Sites.updateControllerStatus(),
-			OSApp.Sites.updateControllerSettings()
-		).then( finish, fail );
+		loadControllerLegacy().then( finish, fail );
 	}
 };
 
@@ -1582,6 +1603,38 @@ OSApp.Sites.updateControllerPrograms = function( callback ) {
 
 OSApp.Sites.updateControllerStations = function( callback ) {
 	callback = callback || function() {};
+	var buildFallbackStations = function() {
+		var options = OSApp.currentSession.controller.options || {},
+			boardCount = ( typeof options.ext === "number" && options.ext >= 0 ) ? ( options.ext + 1 ) : 1,
+			stationCount = boardCount * 8,
+			i,
+			snames = [],
+			stnGrp = [],
+			stnFas = [],
+			stnFavg = [];
+
+		for ( i = 0; i < stationCount; i++ ) {
+			snames.push( "S" + ( i + 1 ) );
+			stnGrp.push( 0 );
+			stnFas.push( 0 );
+			stnFavg.push( 0 );
+		}
+
+		return {
+			masop: Array( boardCount ).fill( 255 ),
+			masop2: Array( boardCount ).fill( 0 ),
+			ignore_rain: Array( boardCount ).fill( 0 ),
+			ignore_sn1: Array( boardCount ).fill( 0 ),
+			ignore_sn2: Array( boardCount ).fill( 0 ),
+			stn_dis: Array( boardCount ).fill( 0 ),
+			stn_spe: Array( boardCount ).fill( 0 ),
+			stn_grp: stnGrp,
+			stn_fas: stnFas,
+			stn_favg: stnFavg,
+			snames: snames,
+			maxlen: 32
+		};
+	};
 	if ( OSApp.currentSession.fw183 === true ) {
 
 		// If the controller is using firmware 1.8.3, then parse the script tag for variables
@@ -1606,10 +1659,20 @@ OSApp.Sites.updateControllerStations = function( callback ) {
 			callback();
 		} );
 	} else {
-		return OSApp.Firmware.sendToOS( "/jn?pw=", "json" ).done( function( stations ) {
-			OSApp.currentSession.controller.stations = stations;
-			callback();
-		} );
+		return OSApp.Firmware.sendToOS( "/jn?pw=", "json" ).then(
+			function( stations ) {
+				OSApp.currentSession.controller.stations = stations;
+				callback();
+				return stations;
+			},
+			function() {
+				// If station JSON is malformed, keep the UI online with safe defaults
+				// so users can reconnect and correct station names.
+				OSApp.currentSession.controller.stations = buildFallbackStations();
+				callback();
+				return OSApp.currentSession.controller.stations;
+			}
+		);
 	}
 };
 

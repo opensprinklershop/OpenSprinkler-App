@@ -1601,6 +1601,12 @@
       "water meter (optional)": "watermeter (optioneel)",
       "year": "jaar",
       "years": "jaar",
-      "°C/°F or L/m³ (optional)": "°C/°F of L/m³ (optioneel)"
+      "°C/°F or L/m³ (optional)": "°C/°F of L/m³ (optioneel)",
+      "Clear chat": "Chat wissen",
+      "Voice input": "Spraakinvoer",
+      "Type your message...": "Typ je bericht…",
+      "The assistant service timed out after 35 seconds.": "De assistentenservice liep na 35 seconden vast.",
+      "The assistant service is not authorized. Please check the service configuration.": "De assistentenservice is niet geautoriseerd. Controleer de serviceconfiguratie.",
+      "Could not apply the changes.": "De wijzigingen konden niet worden toegepast."
    }
 }

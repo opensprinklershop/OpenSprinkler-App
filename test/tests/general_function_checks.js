@@ -53,6 +53,24 @@ describe("General Function Checks", function () {
 		assert.equal("999", OSApp.Utils.pad(999));
 	});
 
+	it("OSApp.Utils.parseNumber should respect locale-specific decimal separators", function () {
+		OSApp.currentSession.lang = "de";
+		assert.equal(12.5, OSApp.Utils.parseNumber("12,5"));
+		assert.equal(1200, OSApp.Utils.parseNumber("1.200"));
+		assert.equal(12.34, OSApp.Utils.parseNumber("12,34"));
+		OSApp.currentSession.lang = "en";
+	});
+
+	it("OSApp.Language.getLocaleFileUrl should resolve shared locale files for versioned bundles", function () {
+		assert.equal("/2.4.0.224/locale/de.js", OSApp.Language.getLocaleFileUrl("de", "/2.4.0.224/"));
+		assert.equal("/locale/de.js", OSApp.Language.getLocaleFileUrl("de", "/"));
+	});
+
+	it("OSApp.Sites.getKnownFallbackVersion should prefer the latest catalog release when no bundle is pinned", function () {
+		localStorage.removeItem("last_ui_version");
+		assert.equal("2.4.0.224", OSApp.Sites.getKnownFallbackVersion(["dev", "2.4.0.224", "2.4.0.223"]));
+	});
+
 	it("OSApp.Weather.getCurrentAdjustmentMethodId() should return the adjustment method ID", function () {
 		// FIXME: this test was failing after test refactoring due to uwt undefined. Resolved with elvis operator
 		assert.equal(0, OSApp.Weather.getCurrentAdjustmentMethodId());

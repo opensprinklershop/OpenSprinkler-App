@@ -1587,6 +1587,12 @@
       "water meter (optional)": "veearvesti (valikuline)",
       "year": "aastal",
       "years": "aastat",
-      "°C/°F or L/m³ (optional)": "°C/°F või L/m³ (valikuline)"
+      "°C/°F or L/m³ (optional)": "°C/°F või L/m³ (valikuline)",
+      "Clear chat": "Tühjenda vestlus",
+      "Voice input": "Häälsisend",
+      "Type your message...": "Sisesta oma sõnum…",
+      "The assistant service timed out after 35 seconds.": "Assistendi teenus aegus 35 sekundi pärast.",
+      "The assistant service is not authorized. Please check the service configuration.": "Assistendi teenus pole autoriseeritud. Kontrollige teenuse konfiguratsiooni.",
+      "Could not apply the changes.": "Muutusi ei saanud rakendada."
    }
 }

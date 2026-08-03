@@ -164,6 +164,84 @@ OSApp.Utils.parseIntArray = function( arr ) {
 	return arr;
 };
 
+OSApp.Utils.getNumberLocale = function() {
+	var lang = "en";
+
+	if ( OSApp.currentSession && OSApp.currentSession.lang ) {
+		lang = OSApp.currentSession.lang;
+	} else if ( typeof navigator !== "undefined" && navigator.language ) {
+		lang = navigator.language;
+	}
+
+	if ( typeof lang === "string" && lang.length > 2 ) {
+		lang = lang.substring( 0, 2 );
+	}
+
+	return lang || "en";
+};
+
+OSApp.Utils.formatNumber = function( value, options ) {
+	var locale = OSApp.Utils.getNumberLocale(),
+		formatOptions = $.extend( { useGrouping: false }, options || {} ),
+		number;
+
+	if ( typeof value === "undefined" || value === null || value === "" ) {
+		return "";
+	}
+
+	number = typeof value === "number" ? value : Number( value );
+	if ( isNaN( number ) ) {
+		return "";
+	}
+
+	return new Intl.NumberFormat( locale, formatOptions ).format( number );
+};
+
+OSApp.Utils.parseNumber = function( value ) {
+	var locale = OSApp.Utils.getNumberLocale(),
+		decimalSeparator = ( locale === "de" || locale === "fr" || locale === "es" || locale === "it" || locale === "nl" || locale === "pt" || locale === "pl" || locale === "cs" || locale === "sk" || locale === "sv" || locale === "ru" || locale === "tr" || locale === "sl" || locale === "hr" || locale === "ro" || locale === "hu" || locale === "fi" || locale === "no" ) ? "," : ".",
+		otherSeparator = decimalSeparator === "," ? "." : ",",
+		normalized,
+		sanitized;
+
+	if ( value === null || typeof value === "undefined" ) {
+		return NaN;
+	}
+
+	if ( typeof value === "number" ) {
+		return value;
+	}
+
+	normalized = String( value ).trim().replace( /\s/g, "" );
+	if ( normalized === "" ) {
+		return NaN;
+	}
+
+	var hasDecimal = normalized.lastIndexOf( decimalSeparator ) > -1,
+		hasOther = normalized.lastIndexOf( otherSeparator ) > -1;
+
+	if ( hasDecimal && hasOther ) {
+		if ( normalized.lastIndexOf( decimalSeparator ) > normalized.lastIndexOf( otherSeparator ) ) {
+			normalized = normalized.replace( new RegExp( "\\" + otherSeparator, "g" ), "" );
+			normalized = normalized.replace( decimalSeparator, "." );
+		} else {
+			normalized = normalized.replace( new RegExp( "\\" + decimalSeparator, "g" ), "" );
+			normalized = normalized.replace( otherSeparator, "." );
+		}
+	} else if ( hasDecimal ) {
+		normalized = normalized.replace( new RegExp( "\\" + decimalSeparator, "g" ), "." );
+	} else if ( hasOther ) {
+		normalized = normalized.replace( new RegExp( "\\" + otherSeparator, "g" ), "" );
+	}
+
+	sanitized = normalized.replace( /[^0-9\-+.]/g, "" );
+	if ( sanitized === "" || sanitized === "-" || sanitized === "+" ) {
+		return NaN;
+	}
+
+	return parseFloat( sanitized );
+};
+
 OSApp.Utils.isValidOTC = function( token ) {
 	return /^OT[a-f0-9]{30}$/i.test( token );
 };

@@ -92,6 +92,7 @@ OSApp.AIAssistant.I18N = {
 		"The assistant could not process this request.": "Der Assistent konnte diese Anfrage nicht verarbeiten.",
 		"This request is outside the allowed topic (OpenSprinkler / irrigation only).": "Diese Anfrage liegt ausserhalb des erlaubten Themas (nur OpenSprinkler / Bewaesserung).",
 		"Could not reach the assistant service.": "Der Assistenten-Dienst ist nicht erreichbar.",
+		"The assistant service is not authorized. Please check the service configuration.": "Der Assistenten-Dienst ist nicht autorisiert. Bitte die Dienstkonfiguration pruefen.",
 		"The assistant service timed out after 35 seconds.": "Der Assistenten-Dienst hat nach 35 Sekunden keine Antwort geliefert.",
 		"Too many requests. Please try again later.": "Zu viele Anfragen. Bitte später erneut versuchen.",
 		"The proposed configuration is not API compliant and was not applied.": "Die vorgeschlagene Konfiguration ist nicht API-konform und wurde nicht angewendet.",
@@ -140,6 +141,26 @@ OSApp.AIAssistant.SECRET_KEY_REGEX = /(^pw$|pass|passwd|password|pwd|psk|secret|
 OSApp.AIAssistant.getServiceUrl = function() {
 	var u = localStorage.getItem( "osai_service_url" );
 	return ( u && u.length ) ? u : OSApp.AIAssistant.DEFAULT_SERVICE;
+};
+
+OSApp.AIAssistant.getServiceErrorMessage = function( xhr, textStatus ) {
+	var response = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+	if ( response && response.error_code === "api_http_401" ) {
+		return OSApp.AIAssistant.t( "The assistant service is not authorized. Please check the service configuration." );
+	}
+	if ( xhr && xhr.status === 401 ) {
+		return OSApp.AIAssistant.t( "The assistant service is not authorized. Please check the service configuration." );
+	}
+	if ( response && response.message ) {
+		return response.message;
+	}
+	if ( textStatus === "timeout" ) {
+		return OSApp.AIAssistant.t( "The assistant service timed out after 35 seconds." );
+	}
+	if ( xhr && xhr.status === 429 ) {
+		return OSApp.Language._( "Too many requests. Please try again later." );
+	}
+	return OSApp.Language._( "Could not reach the assistant service." );
 };
 
 OSApp.AIAssistant.getAutoApply = function() {
@@ -440,15 +461,7 @@ OSApp.AIAssistant.displayPage = function() {
 			page.find( "#osai-status" ).addClass( "hidden" );
 			showResult( res );
 		} ).fail( function( xhr, textStatus ) {
-			var msg = OSApp.Language._( "Could not reach the assistant service." );
-			if ( xhr && xhr.responseJSON && xhr.responseJSON.message ) {
-				msg = xhr.responseJSON.message;
-			} else if ( textStatus === "timeout" ) {
-				msg = OSApp.AIAssistant.t( "The assistant service timed out after 35 seconds." );
-			} else if ( xhr && xhr.status === 429 ) {
-				msg = OSApp.Language._( "Too many requests. Please try again later." );
-			}
-			setStatus( msg, true );
+			setStatus( OSApp.AIAssistant.getServiceErrorMessage( xhr, textStatus ), true );
 		} );
 	}
 
@@ -2385,12 +2398,7 @@ OSApp.AIAssistant.openDialog = function() {
 				fail: function( xhr ) {
 					typing.remove();
 					sendBtn.prop( "disabled", false );
-					var msg = L( "Could not reach the assistant service." );
-					if ( xhr && xhr.responseJSON && xhr.responseJSON.message ) {
-						msg = xhr.responseJSON.message;
-					} else if ( xhr && xhr.status === 429 ) {
-						msg = L( "Too many requests. Please try again later." );
-					}
+					var msg = OSApp.AIAssistant.getServiceErrorMessage( xhr );
 					addMessage( "bot", msg, "ai-error" );
 					OSApp.AIAssistant.pushHistory( "bot", msg, "ai-error" );
 				}

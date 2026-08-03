@@ -1588,6 +1588,12 @@
       "water meter (optional)": "vatnsmælir (valfrjálst)",
       "year": "ári",
       "years": "ár",
-      "°C/°F or L/m³ (optional)": "°C/°F eða L/m³ (valfrjálst)"
+      "°C/°F or L/m³ (optional)": "°C/°F eða L/m³ (valfrjálst)",
+      "Clear chat": "Clear chat",
+      "Voice input": "Voice input",
+      "Type your message...": "Type your message...",
+      "The assistant service timed out after 35 seconds.": "The assistant service timed out after 35 seconds.",
+      "The assistant service is not authorized. Please check the service configuration.": "The assistant service is not authorized. Please check the service configuration.",
+      "Could not apply the changes.": "Could not apply the changes."
    }
 }

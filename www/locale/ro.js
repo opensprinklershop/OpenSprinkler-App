@@ -1588,6 +1588,12 @@
       "water meter (optional)": "apometru (optional)",
       "year": "an",
       "years": "ani",
-      "°C/°F or L/m³ (optional)": "°C/°F sau L/m³ (opțional)"
+      "°C/°F or L/m³ (optional)": "°C/°F sau L/m³ (opțional)",
+      "Clear chat": "Șterge conversația",
+      "Voice input": "Intrare vocală",
+      "Type your message...": "Scrieți mesajul…",
+      "The assistant service timed out after 35 seconds.": "Serviciul asistentului a expirat după 35 de secunde.",
+      "The assistant service is not authorized. Please check the service configuration.": "Serviciul asistentului nu este autorizat. Vă rugăm să verificați configurația serviciului.",
+      "Could not apply the changes.": "Modificările nu au putut fi aplicate."
    }
 }

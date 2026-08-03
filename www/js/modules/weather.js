@@ -93,19 +93,19 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 						"<label class='center'>" +
 							OSApp.Language._( "Temp" ) + ( OSApp.currentDevice.isMetric ? " &#176;C" : " &#176;F" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='bt' type='number' " + ( OSApp.currentDevice.isMetric ? "min='-20' max='50'" : "min='0' max='120'" ) + " value='" + options.bt + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
+						"<input data-wrapper-class='pad_buttons' class='bt' type='number' " + ( OSApp.currentDevice.isMetric ? "min='-20' max='50'" : "min='0' max='120'" ) + " value='" + OSApp.Utils.formatNumber( options.bt, { useGrouping: false } ) + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
 					"</div>" +
 					"<div class='ui-block-b'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Rain" ) + ( OSApp.currentDevice.isMetric ? " mm" : " \"" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='br' type='number' " + ( OSApp.currentDevice.isMetric ? "min='0' max='25' step='0.1'" : "min='0' max='1' step='0.01'" ) + " value='" + options.br + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
+						"<input data-wrapper-class='pad_buttons' class='br' type='number' " + ( OSApp.currentDevice.isMetric ? "min='0' max='25' step='0.1'" : "min='0' max='1' step='0.01'" ) + " value='" + OSApp.Utils.formatNumber( options.br, { useGrouping: false } ) + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
 					"</div>" +
 					"<div class='ui-block-c'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Humidity" ) + " %" +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='bh' type='number'  min='0' max='100' value='" + options.bh + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
+						"<input data-wrapper-class='pad_buttons' class='bh' type='number'  min='0' max='100' value='" + OSApp.Utils.formatNumber( options.bh, { useGrouping: false } ) + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
 					"</div>" +
 				"</div>" +
 				"<p class='rain-desc center smaller'>" +
@@ -125,13 +125,13 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 					"</fieldset>" +
 					"<div class='ui-grid-b inputs'>" +
 						"<div class='ui-block-a'>" +
-							"<input data-wrapper-class='pad_buttons' class='t' type='number' min='0' max='250' value='" + options.t + "'>" +
+							"<input data-wrapper-class='pad_buttons' class='t' type='number' min='0' max='250' value='" + OSApp.Utils.formatNumber( options.t, { useGrouping: false } ) + "'>" +
 						"</div>" +
 						"<div class='ui-block-b'>" +
-							"<input data-wrapper-class='pad_buttons' class='r' type='number'  min='0' max='250' value='" + options.r + "'>" +
+							"<input data-wrapper-class='pad_buttons' class='r' type='number'  min='0' max='250' value='" + OSApp.Utils.formatNumber( options.r, { useGrouping: false } ) + "'>" +
 						"</div>" +
 						"<div class='ui-block-c'>" +
-							"<input data-wrapper-class='pad_buttons' class='h' type='number'  min='0' max='250' value='" + options.h + "'>" +
+							"<input data-wrapper-class='pad_buttons' class='h' type='number'  min='0' max='250' value='" + OSApp.Utils.formatNumber( options.h, { useGrouping: false } ) + "'>" +
 						"</div>" +
 					"</div>" +
 					"<fieldset class='ui-grid-b decr'>" +
@@ -151,7 +151,7 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 		"</div>" ),
 		changeValue = function( pos, dir ) {
 			var input = popup.find( ".inputs input" ).eq( pos ),
-				val = parseInt( input.val() );
+				val = Math.round( OSApp.Utils.parseNumber( input.val() ) );
 
 			if ( ( dir === -1 && val === 0 ) || ( dir === 1 && val === 250 ) ) {
 				return;
@@ -162,16 +162,16 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 
 	popup.find( ".submit" ).on( "click", function() {
 		var options = {
-			h: parseInt( popup.find( ".h" ).val() ),
-			t: parseInt( popup.find( ".t" ).val() ),
-			r: parseInt( popup.find( ".r" ).val() )
+			h: Math.round( OSApp.Utils.parseNumber( popup.find( ".h" ).val() ) ),
+			t: Math.round( OSApp.Utils.parseNumber( popup.find( ".t" ).val() ) ),
+			r: Math.round( OSApp.Utils.parseNumber( popup.find( ".r" ).val() ) )
 		};
 
 		if ( hasBaseline ) {
 			$.extend( options, {
-				bh: parseInt( popup.find( ".bh" ).val() ),
-				bt: parseFloat( popup.find( ".bt" ).val() ),
-				br: parseFloat( popup.find( ".br" ).val() )
+				bh: Math.round( OSApp.Utils.parseNumber( popup.find( ".bh" ).val() ) ),
+				bt: OSApp.Utils.parseNumber( popup.find( ".bt" ).val() ),
+				br: OSApp.Utils.parseNumber( popup.find( ".br" ).val() )
 			} );
 
 			// OSPi stores in imperial so onvert metric at higher precision so we dont lose accuracy
@@ -197,14 +197,16 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 
 		// Generic min/max checker for Temp/Rain/Hum baseline as well as 0-100%
 		var min = parseFloat( this.min ),
-			max = parseFloat( this.max );
+			max = parseFloat( this.max ),
+			value = OSApp.Utils.parseNumber( this.value );
 
-		if ( this.value === "" ) {
-			this.value = "0";
+		if ( isNaN( value ) ) {
+			value = 0;
 		}
-		if ( this.value < min || this.value > max ) {
-			this.value = this.value < min ? min : max;
+		if ( value < min || value > max ) {
+			value = value < min ? min : max;
 		}
+		this.value = OSApp.Utils.formatNumber( value, { useGrouping: false } );
 	} );
 
 	OSApp.UIDom.holdButton( popup.find( ".incr" ).children(), function( e ) {
@@ -243,7 +245,7 @@ OSApp.Weather.showAutoRainDelayAdjustmentOptions = function( button, callback ) 
 				"<label class='center' for='delay_duration'>" + OSApp.Language._( "Delay Duration (hours)" ) + "</label>" +
 				"<div class='input_with_buttons'>" +
 					"<button id='decr1' class='decr ui-btn ui-btn-icon-notext ui-icon-carat-l btn-no-border'></button>" +
-					"<input id='delay_duration' type='number' pattern='[0-9]*' value='" + options.d + "'>" +
+					"<input id='delay_duration' type='number' pattern='[0-9]*' value='" + OSApp.Utils.formatNumber( options.d, { useGrouping: false } ) + "'>" +
 					"<button id='incr1' class='incr ui-btn ui-btn-icon-notext ui-icon-carat-r btn-no-border'></button>" +
 				"</div>" +
 			 "<button class='submit' data-theme='b'>" + OSApp.Language._( "Submit" ) + "</button>" +
@@ -254,21 +256,21 @@ OSApp.Weather.showAutoRainDelayAdjustmentOptions = function( button, callback ) 
 
 	OSApp.UIDom.holdButton( popup.find( "#incr1" ), function() {
 		const input  = popup.find("#delay_duration"),
-			value = parseInt( input.val() ) + 1;
+			value = Math.round( OSApp.Utils.parseNumber( input.val() ) ) + 1;
 		if (value > 8760) return;
 		input.val( value );
 		return false;
 	} );
 	OSApp.UIDom.holdButton( popup.find( "#decr1" ), function() {
 		const input  = popup.find("#delay_duration"),
-			value = parseInt( input.val() ) - 1;
+			value = Math.round( OSApp.Utils.parseNumber( input.val() ) ) - 1;
 		if (value < 0) return;
 		input.val( value );
 		return false;
 	} );
 
 	popup.find( ".submit" ).on( "click", function() {
-		options = { d: parseInt( popup.find( "#delay_duration" ).val() ) };
+		options = { d: Math.round( OSApp.Utils.parseNumber( popup.find( "#delay_duration" ).val() ) ) };
 
 		if ( button ) {
 			button.value = OSApp.Utils.escapeJSON( options );
@@ -283,9 +285,11 @@ OSApp.Weather.showAutoRainDelayAdjustmentOptions = function( button, callback ) 
 	popup.on( "focus", "input[type='number']", function() {
 		this.select();
 	} ).on( "blur", "input[type='number']", function() {
-		if ( this.value === "" || parseInt( this.value ) < 0 ) {
-			this.value = "0";
+		var value = OSApp.Utils.parseNumber( this.value );
+		if ( isNaN( value ) || value < 0 ) {
+			value = 0;
 		}
+		this.value = OSApp.Utils.formatNumber( value, { useGrouping: false } );
 	} );
 
 	$( "#adjustmentOptions" ).remove();
@@ -314,25 +318,25 @@ OSApp.Weather.showMonthlyAdjustmentOptions = function( button, callback ) {
 						"<label class='center'>" +
 							OSApp.Language._( "Jan" )  +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc0' type='number' min=0 max=250 value=" + options.scales[ 0 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc0' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 0 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-b'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Feb" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc1' type='number' min=0 max=250 value=" + options.scales[ 1 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc1' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 1 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-c'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Mar" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc2' type='number' min=0 max=250 value=" + options.scales[ 2 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc2' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 2 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-d'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Apr" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc3' type='number' min=0 max=250 value=" + options.scales[ 3 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc3' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 3 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 				"</div>" +
 				"<div class='ui-grid-c'>" +
@@ -340,25 +344,25 @@ OSApp.Weather.showMonthlyAdjustmentOptions = function( button, callback ) {
 						"<label class='center'>" +
 							OSApp.Language._( "May" )  +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc4' type='number' min=0 max=250 value=" + options.scales[ 4 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc4' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 4 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-b'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Jun" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc5' type='number' min=0 max=250 value=" + options.scales[ 5 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc5' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 5 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-c'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Jul" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc6' type='number' min=0 max=250 value=" + options.scales[ 6 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc6' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 6 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-d'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Aug" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc7' type='number' min=0 max=250 value=" + options.scales[ 7 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc7' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 7 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 				"</div>" +
 				"<div class='ui-grid-c'>" +
@@ -366,25 +370,25 @@ OSApp.Weather.showMonthlyAdjustmentOptions = function( button, callback ) {
 						"<label class='center'>" +
 							OSApp.Language._( "Sep" )  +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc8' type='number' min=0 max=250 value=" + options.scales[ 8 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc8' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 8 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-b'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Oct" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc9' type='number' min=0 max=250 value=" + options.scales[ 9 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc9' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 9 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-c'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Nov" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc10' type='number' min=0 max=250 value=" + options.scales[ 10 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc10' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 10 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-d'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Dec" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='sc11' type='number' min=0 max=250 value=" + options.scales[ 11 ] + ">" +
+						"<input data-wrapper-class='pad_buttons' class='sc11' type='number' min=0 max=250 value='" + OSApp.Utils.formatNumber( options.scales[ 11 ], { useGrouping: false } ) + "'>" +
 					"</div>" +
 				"</div>" +
 				"<button class='submit' data-theme='b'>" + OSApp.Language._( "Submit" ) + "</button>" +
@@ -394,7 +398,7 @@ OSApp.Weather.showMonthlyAdjustmentOptions = function( button, callback ) {
 	popup.find( ".submit" ).on( "click", function() {
 		var _scales = [];
 		for ( var i = 0; i < 12; i++ ) {
-			_scales[ i ] = parseInt( popup.find( ".sc" + i ).val() );
+			_scales[ i ] = Math.round( OSApp.Utils.parseNumber( popup.find( ".sc" + i ).val() ) );
 			if ( _scales[ i ] < 0 ) { _scales[ i ] = 0; }
 			if ( _scales[ i ] > 250 ) { _scales[ i ] = 250; }
 		}
@@ -412,9 +416,11 @@ OSApp.Weather.showMonthlyAdjustmentOptions = function( button, callback ) {
 	popup.on( "focus", "input[type='number']", function() {
 		this.select();
 	} ).on( "blur", "input[type='number']", function() {
-		if ( this.value === "" || parseInt( this.value ) < 0 ) {
-			this.value = "0";
+		var value = OSApp.Utils.parseNumber( this.value );
+		if ( isNaN( value ) || value < 0 ) {
+			value = 0;
 		}
+		this.value = OSApp.Utils.formatNumber( value, { useGrouping: false } );
 	} );
 
 	$( "#adjustmentOptions" ).remove();
@@ -555,8 +561,8 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 
 	popup.find( ".submit" ).on( "click", function() {
 		options = {
-			baseETo: parseFloat( popup.find( ".baseline-ETo" ).val() ),
-			elevation: parseInt( popup.find( ".elevation" ).val() )
+			baseETo: OSApp.Utils.parseNumber( popup.find( ".baseline-ETo" ).val() ),
+			elevation: Math.round( OSApp.Utils.parseNumber( popup.find( ".elevation" ).val() ) )
 		};
 
 		// Convert to imperial before storing.
@@ -620,14 +626,16 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 
 		// Generic min/max checker for each option.
 		var min = parseFloat( this.min ),
-			max = parseFloat( this.max );
+			max = parseFloat( this.max ),
+			value = OSApp.Utils.parseNumber( this.value );
 
-		if ( this.value === "" ) {
-			this.value = "0";
+		if ( isNaN( value ) ) {
+			value = 0;
 		}
-		if ( this.value < min || this.value > max ) {
-			this.value = this.value < min ? min : max;
+		if ( value < min || value > max ) {
+			value = value < min ? min : max;
 		}
+		this.value = OSApp.Utils.formatNumber( value, { useGrouping: false } );
 	} );
 
 	$( "#adjustmentOptions" ).remove();

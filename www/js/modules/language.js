@@ -54,6 +54,24 @@ OSApp.Language.Constants = {
 };
 
 //Localization functions
+OSApp.Language.getLocaleFileUrl = function( lang, appBasePath ) {
+	appBasePath = appBasePath || OSApp.UIDom.getAppURLPath() || "";
+
+	if ( !lang ) {
+		return "";
+	}
+
+	if ( !appBasePath || appBasePath === "/" ) {
+		return "/locale/" + lang + ".js";
+	}
+
+	if ( appBasePath.charAt( appBasePath.length - 1 ) !== "/" ) {
+		appBasePath += "/";
+	}
+
+	return appBasePath + "locale/" + lang + ".js";
+};
+
 OSApp.Language._ = function( key ) {
 
 	//Translate item (key) based on currently defined language
@@ -144,25 +162,46 @@ OSApp.Language.updateLang = function( lang ) {
 		return;
 	}
 
-	var langURL = OSApp.UIDom.getAppURLPath() + "locale/" + lang + ".js";
-	console.log( "Loading language file: " + langURL );
+	var langURL = OSApp.Language.getLocaleFileUrl( lang );
+	var fallbackURL = "/locale/" + lang + ".js";
+	var attempts = [ langURL ];
 
-	$.getJSON( langURL, function( store ) {
-		console.log( "Language file loaded successfully", store );
-		if ( store && store.messages ) {
-			OSApp.uiState.language = store.messages;
+	if ( langURL !== fallbackURL ) {
+		attempts.push( fallbackURL );
+	}
+
+	var tryLoad = function( index ) {
+		if ( index >= attempts.length ) {
+			console.error( "Failed to load language file for all candidates" );
 			OSApp.Language.setLang();
-		} else {
-			console.error( "Language file format error: missing 'messages' object" );
-			OSApp.Language.setLang();
+			return;
 		}
-	} ).fail( function( jqxhr, textStatus, errorThrown ) {
-		console.error( "Failed to load language file: " + textStatus + " - " + errorThrown );
-		console.error( "Tried URL: " + langURL );
-		console.error( "Response status: " + jqxhr.status );
-		alert( "Error loading language file: " + textStatus + "\nURL: " + langURL );
-		OSApp.Language.setLang();
-	} );
+
+		var currentURL = attempts[ index ];
+		console.log( "Loading language file: " + currentURL );
+
+		$.getJSON( currentURL ).done( function( store ) {
+			console.log( "Language file loaded successfully", store );
+			if ( store && store.messages ) {
+				OSApp.uiState.language = store.messages;
+				OSApp.Language.setLang();
+			} else {
+				console.error( "Language file format error: missing 'messages' object" );
+				OSApp.Language.setLang();
+			}
+		} ).fail( function( jqxhr, textStatus, errorThrown ) {
+			console.warn( "Language file load failed for " + currentURL + ": " + textStatus + " - " + errorThrown );
+			if ( index + 1 < attempts.length ) {
+				tryLoad( index + 1 );
+			} else {
+				console.error( "Response status: " + jqxhr.status );
+				alert( "Error loading language file: " + textStatus + "\nURL: " + currentURL );
+				OSApp.Language.setLang();
+			}
+		} );
+	};
+
+	tryLoad( 0 );
 };
 
 OSApp.Language.languageSelect = function() {

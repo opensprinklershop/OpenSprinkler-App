@@ -1588,6 +1588,12 @@
       "water meter (optional)": "su sayacı (isteğe bağlı)",
       "year": "yıl",
       "years": "yıllar",
-      "°C/°F or L/m³ (optional)": "°C/°F veya L/m³ (isteğe bağlı)"
+      "°C/°F or L/m³ (optional)": "°C/°F veya L/m³ (isteğe bağlı)",
+      "Clear chat": "Sohbeti temizle",
+      "Voice input": "Ses girişi",
+      "Type your message...": "Mesajınızı yazın…",
+      "The assistant service timed out after 35 seconds.": "Asistan hizmeti 35 saniye sonra zaman aşımına uğradı.",
+      "The assistant service is not authorized. Please check the service configuration.": "Asistan hizmeti yetkilendirilmedi. Lütfen hizmet yapılandırmasını kontrol edin.",
+      "Could not apply the changes.": "Değişiklikler uygulanamadı."
    }
 }

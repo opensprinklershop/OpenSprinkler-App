@@ -1588,6 +1588,12 @@
       "water meter (optional)": "vattenmätare (valfritt)",
       "year": "år",
       "years": "år",
-      "°C/°F or L/m³ (optional)": "°C/°F eller L/m³ (valfritt)"
+      "°C/°F or L/m³ (optional)": "°C/°F eller L/m³ (valfritt)",
+      "Clear chat": "Rensa chatt",
+      "Voice input": "Röstinmatning",
+      "Type your message...": "Skriv ditt meddelande…",
+      "The assistant service timed out after 35 seconds.": "Assistansservice tog timeout efter 35 sekunder.",
+      "The assistant service is not authorized. Please check the service configuration.": "Assistansservicen är inte auktoriserad. Kontrollera tjänstekonfigurationen.",
+      "Could not apply the changes.": "Det gick inte att tillämpa ändringarna."
    }
 }

@@ -1598,6 +1598,12 @@
       "water meter (optional)": "水表（可选）",
       "year": "年",
       "years": "年",
-      "°C/°F or L/m³ (optional)": "°C/°F 或 L/m³（可选）"
+      "°C/°F or L/m³ (optional)": "°C/°F 或 L/m³（可选）",
+      "Clear chat": "清空聊天",
+      "Voice input": "语音输入",
+      "Type your message...": "输入你的消息…",
+      "The assistant service timed out after 35 seconds.": "助手服务在 35 秒后超时。",
+      "The assistant service is not authorized. Please check the service configuration.": "助手服务未授权。请检查服务配置。",
+      "Could not apply the changes.": "无法应用更改。"
    }
 }

@@ -1588,6 +1588,12 @@
       "water meter (optional)": "μετρητής νερού (προαιρετικό)",
       "year": "έτος",
       "years": "χρόνια",
-      "°C/°F or L/m³ (optional)": "°C/°F ή L/m³ (προαιρετικό)"
+      "°C/°F or L/m³ (optional)": "°C/°F ή L/m³ (προαιρετικό)",
+      "Clear chat": "Εκκαθάριση συνομιλίας",
+      "Voice input": "Φωνητική εισαγωγή",
+      "Type your message...": "Πληκτρολογήστε το μήνυμά σας…",
+      "The assistant service timed out after 35 seconds.": "Η υπηρεσία βοηθού έληξε μετά από 35 δευτερόλεπτα.",
+      "The assistant service is not authorized. Please check the service configuration.": "Η υπηρεσία βοηθού δεν είναι εξουσιοδοτημένη. Ελέγξτε τη διαμόρφωση της υπηρεσίας.",
+      "Could not apply the changes.": "Δεν ήταν δυνατή η εφαρμογή των αλλαγών."
    }
 }

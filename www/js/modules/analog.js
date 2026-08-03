@@ -1254,7 +1254,7 @@ OSApp.Analog.importConfigSensors = function(data, restore_type, callback) {
 							return OSApp.Analog.sendRestoreBatch("/sc?pw=", sensorDeletes);
 						})
 						.then(function () {
-							return OSApp.Analog.sendRestoreBatch("/sc?pw=", sensors);
+							return OSApp.Analog.sendRestoreBatch("/sc?pw=&restore=1", sensors);
 						})
 						.then(function () {
 							return OSApp.Analog.sendRestoreBatch("/sb?pw=", progadjust);
@@ -1628,12 +1628,12 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"<label>" +
 			OSApp.Language._("Factor 1 in % (adjustment for min)") +
 			"</label>" +
-			"<input class='factor1' type='number' inputmode='decimal' value='" + Math.round(progAdjust.factor1 * 100) + "'>" +
+			"<input class='factor1' type='number' inputmode='decimal' value='" + OSApp.Utils.formatNumber( Math.round( progAdjust.factor1 * 100 ), { useGrouping: false } ) + "'>" +
 
 			"<label>" +
 			OSApp.Language._("Factor 2 in % (adjustment for max)") +
 			"</label>" +
-			"<input class='factor2' type='number' inputmode='decimal' value='" + Math.round(progAdjust.factor2 * 100) + "'>" +
+			"<input class='factor2' type='number' inputmode='decimal' value='" + OSApp.Utils.formatNumber( Math.round( progAdjust.factor2 * 100 ), { useGrouping: false } ) + "'>" +
 
 			"<button type='button' class='link-irrigationdb-adjustment' data-theme='c' data-mini='true' data-icon='search'>" +
 			OSApp.Language._("Link Irrigation Database") + "</button>" +
@@ -1641,17 +1641,17 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"<label>" +
 			OSApp.Language._("Min sensor value") +
 			"</label>" +
-			"<input class='min' type='number' value='" + progAdjust.min + "'>" +
+			"<input class='min' type='number' value='" + OSApp.Utils.formatNumber( progAdjust.min, { useGrouping: false } ) + "'>" +
 
 			"<label>" +
 			OSApp.Language._("Max sensor value") +
 			"</label>" +
-			"<input class='max' type='number' inputmode='decimal' value='" + progAdjust.max + "'>" +
+			"<input class='max' type='number' inputmode='decimal' value='" + OSApp.Utils.formatNumber( progAdjust.max, { useGrouping: false } ) + "'>" +
 
 			"<label>" +
 			OSApp.Language._("Stale timeout in minutes") +
 			"</label>" +
-			"<input class='stale-timeout' type='number' inputmode='decimal' min='0' value='" + Math.round(progAdjust.stale_timeout / 60) + "'>" +
+			"<input class='stale-timeout' type='number' inputmode='decimal' min='0' value='" + OSApp.Utils.formatNumber( Math.round( progAdjust.stale_timeout / 60 ), { useGrouping: false } ) + "'>" +
 
 			"<label for='stale-policy' class='select'>" +
 			OSApp.Language._("When sensor value is stale") +
@@ -1664,7 +1664,7 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"<label>" +
 			OSApp.Language._("Fallback adjustment in %") +
 			"</label>" +
-			"<input class='stale-fallback' type='number' inputmode='decimal' min='0' max='200' value='" + Math.round(progAdjust.stale_fallback * 100) + "'>" +
+			"<input class='stale-fallback' type='number' inputmode='decimal' min='0' max='200' value='" + OSApp.Utils.formatNumber( Math.round( progAdjust.stale_fallback * 100 ), { useGrouping: false } ) + "'>" +
 
 			"</div>" +
 			"<div id='adjchart'></div>" +
@@ -1795,13 +1795,13 @@ OSApp.Analog.getProgAdjust = function(popup) {
 		type: parseInt(popup.find("#type").val()),
 		sensor: parseInt(popup.find("#sensor").val()),
 		prog: parseInt(popup.find("#prog").val()),
-		factor1: parseFloat(popup.find(".factor1").val() / 100),
-		factor2: parseFloat(popup.find(".factor2").val() / 100),
-		min: parseFloat(popup.find(".min").val()),
-		max: parseFloat(popup.find(".max").val()),
+		factor1: OSApp.Utils.parseNumber(popup.find(".factor1").val()) / 100,
+		factor2: OSApp.Utils.parseNumber(popup.find(".factor2").val()) / 100,
+		min: OSApp.Utils.parseNumber(popup.find(".min").val()),
+		max: OSApp.Utils.parseNumber(popup.find(".max").val()),
 		stale_timeout: Math.max(0, parseInt(popup.find(".stale-timeout").val(), 10) || 0) * 60,
 		stale_policy: parseInt(popup.find("#stale-policy").val(), 10),
-		stale_fallback: Math.max(0, Math.min(200, parseFloat(popup.find(".stale-fallback").val()) || 0)) / 100
+		stale_fallback: Math.max(0, Math.min(200, OSApp.Utils.parseNumber(popup.find(".stale-fallback").val()) || 0)) / 100
 	};
 };
 
@@ -1809,10 +1809,10 @@ OSApp.Analog.getProgAdjustForCalc = function(popup) {
 	return {
 		type: parseInt(popup.find("#type").val()),
 		sensor: parseInt(popup.find("#sensor").val()),
-		factor1: parseFloat(popup.find(".factor1").val() / 100),
-		factor2: parseFloat(popup.find(".factor2").val() / 100),
-		min: parseFloat(popup.find(".min").val()),
-		max: parseFloat(popup.find(".max").val())
+		factor1: OSApp.Utils.parseNumber(popup.find(".factor1").val()) / 100,
+		factor2: OSApp.Utils.parseNumber(popup.find(".factor2").val()) / 100,
+		min: OSApp.Utils.parseNumber(popup.find(".min").val()),
+		max: OSApp.Utils.parseNumber(popup.find(".max").val())
 	};
 };
 

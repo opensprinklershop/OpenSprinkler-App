@@ -1598,6 +1598,12 @@
       "water meter (optional)": "счетчик воды (опционально)",
       "year": "Год",
       "years": "Лет",
-      "°C/°F or L/m³ (optional)": "°C/°F или л/м³ (опционально)"
+      "°C/°F or L/m³ (optional)": "°C/°F или л/м³ (опционально)",
+      "Clear chat": "Очистить чат",
+      "Voice input": "Голосовой ввод",
+      "Type your message...": "Введите сообщение…",
+      "The assistant service timed out after 35 seconds.": "Сервис помощника превысил время ожидания через 35 секунд.",
+      "The assistant service is not authorized. Please check the service configuration.": "Сервис помощника не авторизован. Проверьте конфигурацию сервиса.",
+      "Could not apply the changes.": "Не удалось применить изменения."
    }
 }

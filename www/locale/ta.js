@@ -1588,6 +1588,12 @@
       "water meter (optional)": "தண்ணீர் மீட்டர் (விரும்பினால்)",
       "year": "ஆண்டு",
       "years": "ஆண்டுகள்",
-      "°C/°F or L/m³ (optional)": "°C/°F அல்லது L/m³ (விரும்பினால்)"
+      "°C/°F or L/m³ (optional)": "°C/°F அல்லது L/m³ (விரும்பினால்)",
+      "Clear chat": "Clear chat",
+      "Voice input": "Voice input",
+      "Type your message...": "Type your message...",
+      "The assistant service timed out after 35 seconds.": "The assistant service timed out after 35 seconds.",
+      "The assistant service is not authorized. Please check the service configuration.": "The assistant service is not authorized. Please check the service configuration.",
+      "Could not apply the changes.": "Could not apply the changes."
    }
 }

@@ -86,7 +86,7 @@ OSApp.currentDevice.isFileCapable = !OSApp.currentDevice.isiOS && !OSApp.current
 
 // UI state
 OSApp.uiState = {
-	appVersion: '2.4.212', // This is replaced at build time by a github workflow step
+	appVersion: '0.0.0', // Replaced by build scripts from config.xml or the release workflow
 	errorTimeout: undefined,
 	goingBack: false,
 	is24Hour: false,

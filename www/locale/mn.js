@@ -1588,6 +1588,12 @@
       "water meter (optional)": "усны тоолуур (заавал биш)",
       "year": "жил",
       "years": "жил",
-      "°C/°F or L/m³ (optional)": "°C/°F эсвэл L/m³ (заавал биш)"
+      "°C/°F or L/m³ (optional)": "°C/°F эсвэл L/m³ (заавал биш)",
+      "Clear chat": "Clear chat",
+      "Voice input": "Voice input",
+      "Type your message...": "Type your message...",
+      "The assistant service timed out after 35 seconds.": "The assistant service timed out after 35 seconds.",
+      "The assistant service is not authorized. Please check the service configuration.": "The assistant service is not authorized. Please check the service configuration.",
+      "Could not apply the changes.": "Could not apply the changes."
    }
 }

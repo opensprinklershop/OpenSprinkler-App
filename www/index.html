@@ -150,9 +150,18 @@
 
 								var handleRedirect = function(fwv, fwm) {
 									whenVersions(function(vData) {
-										var targetVersion = "2.4.0.215";
+										var targetVersion = "2.4.0.224";
 										try {
 											var versions = (vData && vData.versions) || [];
+											var preferredFromCatalog = null;
+											if (Array.isArray(versions)) {
+												preferredFromCatalog = versions.find(function(v) {
+													return typeof v === "string" && v !== "dev";
+												});
+											}
+											if (preferredFromCatalog) {
+												targetVersion = preferredFromCatalog;
+											}
 
 											if (!fwv || fwv < 221) {
 												targetVersion = "2.2.1";
@@ -310,7 +319,7 @@
 		<script src="js/modules/esp32mode.js"></script>
 		<script src="js/modules/network.js"></script>
 		<script src="js/modules/notifications.js"></script>
-		<script src="js/modules/options.js?v=3"></script>
+		<script src="js/modules/options.js?v=4"></script>
 		<script src="js/modules/programs.js?v=1"></script>
 		<script src="js/modules/sites.js?v=osai2"></script>
 		<script src="js/modules/sites-otc.js"></script>

@@ -301,7 +301,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 						localStorage.setItem( "displayOption", data );
 						return true;
 					case "tpdv":
-						var v = parseFloat( data );
+						var v = OSApp.Utils.parseNumber( data );
 						if ( isNaN( v ) ) {
 								v = 0;
 						}
@@ -774,9 +774,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"<table>" +
 				"<tr style='width:100%;vertical-align: top;'>" +
 					"<td style='width:100%'>" +
-						"<div class='ui-input-text controlgroup-textinput ui-btn ui-body-inherit ui-corner-all ui-mini ui-shadow-inset'>" +
+						"<div class='ui-input-text controlgroup-textinput ui-btn ui-body-inherit ui-corner-all ui-mini ui-shadow-inset ui-input-has-clear'>" +
 								"<input data-role='none' data-mini='true' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false' " +
 									"type='text' id='wtpws' value='" + OSApp.Utils.htmlEscape( OSApp.currentSession.controller.settings.wto.pws || "" ) + "'>" +
+								"<a href='#' tabindex='-1' aria-hidden='true' data-helptext='" + OSApp.Language._( "The weather station could not be found." ) +
+									"' class='hidden help-icon ui-input-clear ui-btn ui-icon-alert ui-btn-icon-notext ui-corner-all'>" +
+								"</a>" +
 						"</div>" +
 					"</td>" +
 					"<td><button class='noselect' data-mini='true' id='fetch-pws'>" + OSApp.Language._( "Fetch" ) + "</button></td>" +
@@ -1689,6 +1692,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 		OSApp.Weather.getWUStationLocation( station, key, function( result ) {
 			if ( result ) {
+				pwsInput.parent().find( ".ui-icon-alert" ).hide();
 				pwsInput.parent().removeClass( "red" ).addClass( "green" );
 
 				// Persist the station ID in the weather adjustment options
@@ -1713,6 +1717,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 				header.eq( 2 ).prop( "disabled", false );
 				page.find( ".submit" ).addClass( "hasChanges" );
 			} else {
+				pwsInput.parent().find( ".ui-icon-alert" ).removeClass( "hidden" ).show();
 				pwsInput.parent().removeClass( "green" ).addClass( "red" );
 				OSApp.Errors.showError( OSApp.Language._( "The weather station could not be found." ) );
 			}
@@ -1725,6 +1730,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 		var station = ( $( this ).val() || "" ).trim(),
 			wtoButton = page.find( "#wto" );
 
+		$( this ).parent().find( ".ui-icon-alert" ).hide();
 		$( this ).parent().removeClass( "red green" );
 
 		if ( wtoButton.length && wtoButton.val() !== undefined ) {

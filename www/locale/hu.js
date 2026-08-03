@@ -1588,6 +1588,12 @@
       "water meter (optional)": "vízóra (opcionális)",
       "year": "év",
       "years": "évek",
-      "°C/°F or L/m³ (optional)": "°C/°F vagy L/m³ (opcionális)"
+      "°C/°F or L/m³ (optional)": "°C/°F vagy L/m³ (opcionális)",
+      "Clear chat": "Chat törlése",
+      "Voice input": "Hangbemenet",
+      "Type your message...": "Írd be az üzeneted…",
+      "The assistant service timed out after 35 seconds.": "Az asszisztens szolgáltatás 35 másodperc után időtúllépésbe került.",
+      "The assistant service is not authorized. Please check the service configuration.": "Az asszisztens szolgáltatás nincs engedélyezve. Kérjük, ellenőrizd a szolgáltatás beállításait.",
+      "Could not apply the changes.": "A változtatásokat nem lehetett alkalmazni."
    }
 }

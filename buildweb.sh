@@ -9,7 +9,7 @@ rm ./www/*~ 2>/dev/null
 
 # Temporary replacement of App Version from config.xml
 APP_VERSION=$(node -p "require('fs').readFileSync('config.xml', 'utf8').match(/version=\"([^\"]+)\"/)[1]")
-sed -i "s/appVersion: '0.0.0'/appVersion: '$APP_VERSION'/g" www/js/main.js
+sed -i -E "s/appVersion: '[^']*'/appVersion: '$APP_VERSION'/g" www/js/main.js
 
 grunt makeFW
 

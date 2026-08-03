@@ -1588,6 +1588,12 @@
       "water meter (optional)": "ūdens skaitītājs (pēc izvēles)",
       "year": "gadā",
       "years": "gadiem",
-      "°C/°F or L/m³ (optional)": "°C/°F vai L/m³ (pēc izvēles)"
+      "°C/°F or L/m³ (optional)": "°C/°F vai L/m³ (pēc izvēles)",
+      "Clear chat": "Notīrīt tērzēšanu",
+      "Voice input": "Balss ievade",
+      "Type your message...": "Ierakstiet savu ziņojumu…",
+      "The assistant service timed out after 35 seconds.": "Asistenta pakalpojums beidzās pēc 35 sekundēm.",
+      "The assistant service is not authorized. Please check the service configuration.": "Asistenta pakalpojums nav autorizēts. Lūdzu, pārbaudiet pakalpojuma konfigurāciju.",
+      "Could not apply the changes.": "Izmaiņas nevarēja piemērot."
    }
 }

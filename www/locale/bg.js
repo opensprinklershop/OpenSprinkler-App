@@ -1588,6 +1588,12 @@
       "water meter (optional)": "водомер (опция)",
       "year": "година",
       "years": "години",
-      "°C/°F or L/m³ (optional)": "°C/°F или L/m³ (по избор)"
+      "°C/°F or L/m³ (optional)": "°C/°F или L/m³ (по избор)",
+      "Clear chat": "Изчисти чата",
+      "Voice input": "Гласов вход",
+      "Type your message...": "Въведете съобщението си…",
+      "The assistant service timed out after 35 seconds.": "Услугата на асистента изтече след 35 секунди.",
+      "The assistant service is not authorized. Please check the service configuration.": "Услугата на асистента не е упълномощена. Моля, проверете конфигурацията на услугата.",
+      "Could not apply the changes.": "Промените не можаха да бъдат приложени."
    }
 }

@@ -1588,6 +1588,12 @@
       "water meter (optional)": "vodomer (voliteľné)",
       "year": "rok",
       "years": "roky(ov)",
-      "°C/°F or L/m³ (optional)": "°C/°F alebo L/m³ (voliteľné)"
+      "°C/°F or L/m³ (optional)": "°C/°F alebo L/m³ (voliteľné)",
+      "Clear chat": "Vymazať chat",
+      "Voice input": "Hlasový vstup",
+      "Type your message...": "Napíšte svoju správu…",
+      "The assistant service timed out after 35 seconds.": "Služba asistenta vypršala po 35 sekundách.",
+      "The assistant service is not authorized. Please check the service configuration.": "Služba asistenta nie je autorizovaná. Skontrolujte konfiguráciu služby.",
+      "Could not apply the changes.": "Zmeny sa nepodarilo použiť."
    }
 }

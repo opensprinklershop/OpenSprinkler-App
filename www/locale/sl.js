@@ -1588,6 +1588,12 @@
       "water meter (optional)": "vodomer (neobvezno)",
       "year": "leto",
       "years": "leta",
-      "°C/°F or L/m³ (optional)": "°C/°F ali L/m³ (izbirno)"
+      "°C/°F or L/m³ (optional)": "°C/°F ali L/m³ (izbirno)",
+      "Clear chat": "Počisti klepet",
+      "Voice input": "Glasovni vnos",
+      "Type your message...": "Vnesite svoje sporočilo…",
+      "The assistant service timed out after 35 seconds.": "Storitev pomočnika je potekla po 35 sekundah.",
+      "The assistant service is not authorized. Please check the service configuration.": "Storitev pomočnika ni avtorizirana. Preverite konfiguracijo storitve.",
+      "Could not apply the changes.": "Sprememb ni bilo mogoče uveljaviti."
    }
 }

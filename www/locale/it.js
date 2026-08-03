@@ -1601,6 +1601,12 @@
       "water meter (optional)": "contatore dell'acqua (opzionale)",
       "year": "anno",
       "years": "anni",
-      "°C/°F or L/m³ (optional)": "°C/°F o L/m³ (opzionale)"
+      "°C/°F or L/m³ (optional)": "°C/°F o L/m³ (opzionale)",
+      "Clear chat": "Cancella chat",
+      "Voice input": "Input vocale",
+      "Type your message...": "Scrivi il tuo messaggio…",
+      "The assistant service timed out after 35 seconds.": "Il servizio assistente ha superato il timeout dopo 35 secondi.",
+      "The assistant service is not authorized. Please check the service configuration.": "Il servizio assistente non è autorizzato. Controlla la configurazione del servizio.",
+      "Could not apply the changes.": "Impossibile applicare le modifiche."
    }
 }
