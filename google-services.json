@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "558029754966",
+    "project_id": "opensprinkler-notify",
+    "storage_bucket": "opensprinkler-notify.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:558029754966:android:2f8c6759712ed3e6b821f7",
+        "android_client_info": {
+          "package_name": "de.opensprinklershop.sprinklers"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvhJQvOBCYe5VVeFsHiFYBXPhd1AXendE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

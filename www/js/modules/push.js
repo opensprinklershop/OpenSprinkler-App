@@ -11,8 +11,8 @@
  * - Feature-detects an FCM cordova plugin at runtime (firebasex or havesource
  *   push). Without a plugin (e.g. browser, or a build without FCM) every call
  *   gracefully no-ops so existing builds keep working.
- * - Registration requires an OTC site (currentSession.token) because the
- *   forwarder polls the device through OTC forwarding.
+ * - Registration uses the controller MAC (device_key) + password hash. The
+ *   firmware itself pushes events to the forwarder, so no cloud/OTC is needed.
  * - Endpoint + API key are configuration, resolved from localStorage overrides
  *   so they can be provisioned without a rebuild.
  */
@@ -98,7 +98,35 @@ OSApp.Push.getPlatform = function() {
 OSApp.Push.getFcmToken = function( callback ) {
 	callback = callback || function() {};
 
-	// cordova-plugin-firebasex
+	// cordova-plugin-firebasex-messaging (modular v2, global FirebasexMessaging)
+	if ( window.FirebasexMessaging && typeof window.FirebasexMessaging.getToken === "function" ) {
+		var fxProceed = function() {
+			window.FirebasexMessaging.getToken( function( token ) {
+				callback( token || null );
+			}, function() {
+				callback( null );
+			} );
+		};
+		// Request notification permission first (Android 13+ POST_NOTIFICATIONS,
+		// iOS system dialog). An error means it was already granted -> proceed.
+		if ( typeof window.FirebasexMessaging.grantPermission === "function" ) {
+			window.FirebasexMessaging.grantPermission( function() { fxProceed(); }, function() { fxProceed(); } );
+		} else {
+			fxProceed();
+		}
+		if ( typeof window.FirebasexMessaging.onTokenRefresh === "function" && !OSApp.Push._refreshHooked ) {
+			OSApp.Push._refreshHooked = true;
+			window.FirebasexMessaging.onTokenRefresh( function( token ) {
+				if ( token ) {
+					OSApp.Push._registeredToken = null;
+					OSApp.Push.syncPushRegistration();
+				}
+			}, function() {} );
+		}
+		return;
+	}
+
+	// cordova-plugin-firebasex (classic, global FirebasePlugin)
 	if ( window.FirebasePlugin && typeof window.FirebasePlugin.getToken === "function" ) {
 		var proceed = function() {
 			window.FirebasePlugin.getToken( function( token ) {
@@ -147,7 +175,8 @@ OSApp.Push.getFcmToken = function( callback ) {
 };
 
 OSApp.Push.isFcmAvailable = function() {
-	return !!( ( window.FirebasePlugin && typeof window.FirebasePlugin.getToken === "function" ) ||
+	return !!( ( window.FirebasexMessaging && typeof window.FirebasexMessaging.getToken === "function" ) ||
+		( window.FirebasePlugin && typeof window.FirebasePlugin.getToken === "function" ) ||
 		( typeof window.PushNotification === "object" && typeof window.PushNotification.init === "function" ) );
 };
 
@@ -173,8 +202,10 @@ OSApp.Push._request = function( method, path, body ) {
 	} );
 };
 
-// Register the FCM token as a subscriber for the current OTC device using the
-// keyless /subscribe endpoint (ownership proven by OTC token + password hash).
+// Register the FCM token as a subscriber for the current device using the
+// keyless /subscribe endpoint. Ownership is proven by the controller MAC
+// (device_key) + password hash; the firmware pushes events to the forwarder
+// itself, so this works on the local network and without any cloud service.
 OSApp.Push.registerForPush = function() {
 	if ( !OSApp.currentDevice || ( !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS ) ) {
 		return;
@@ -182,10 +213,13 @@ OSApp.Push.registerForPush = function() {
 	if ( !OSApp.Push.isConfigured() || !OSApp.Push.isFcmAvailable() ) {
 		return;
 	}
-	var otcToken = OSApp.currentSession && OSApp.currentSession.token;
 	var pw = OSApp.currentSession && OSApp.currentSession.pass;
-	if ( !otcToken || !pw ) {
-		return; // Only OTC sites can be reached by the forwarder.
+	if ( !pw ) {
+		return;
+	}
+	var deviceKey = OSApp.Push._deviceKey();
+	if ( !deviceKey ) {
+		return; // No controller MAC available yet.
 	}
 
 	var label = "OpenSprinkler";
@@ -203,7 +237,7 @@ OSApp.Push.registerForPush = function() {
 			return; // Already registered this token for this session.
 		}
 		OSApp.Push._request( "POST", "/subscribe", {
-			otc_token: otcToken,
+			device_key: deviceKey,
 			pw_hash: pw,
 			user_key: OSApp.Push.getUserKey(),
 			platform: OSApp.Push.getPlatform(),
@@ -217,13 +251,27 @@ OSApp.Push.registerForPush = function() {
 	} );
 };
 
+// Resolve the controller MAC (device_key) as 12 uppercase hex chars, matching
+// the firmware's device_key and the "mac" field in /jc.
+OSApp.Push._deviceKey = function() {
+	var mac = OSApp.currentSession && OSApp.currentSession.controller &&
+		OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.mac;
+	if ( typeof mac === "string" ) {
+		var key = mac.replace( /[^0-9A-Fa-f]/g, "" ).toUpperCase();
+		if ( /^[0-9A-F]{12}$/.test( key ) ) {
+			return key;
+		}
+	}
+	return null;
+};
+
 // Remove the current FCM token subscription (used when mode is set to Off).
 OSApp.Push.unregisterFromPush = function() {
 	if ( !OSApp.Push.isConfigured() ) {
 		return;
 	}
-	var otcToken = OSApp.currentSession && OSApp.currentSession.token;
-	if ( !otcToken ) {
+	var deviceKey = OSApp.Push._deviceKey();
+	if ( !deviceKey ) {
 		return;
 	}
 	OSApp.Push.getFcmToken( function( fcmToken ) {
@@ -231,7 +279,7 @@ OSApp.Push.unregisterFromPush = function() {
 			return;
 		}
 		OSApp.Push._request( "DELETE", "/subscribe", {
-			otc_token: otcToken,
+			device_key: deviceKey,
 			fcm_token: fcmToken
 		} ).always( function() {
 			OSApp.Push._registeredToken = null;
@@ -239,13 +287,26 @@ OSApp.Push.unregisterFromPush = function() {
 	} );
 };
 
-// Reconcile registration state with the current push notification mode.
+// True when the controller itself is configured to push events to the forwarder
+// (SOPT_PUSH_OPTS en=1). In that case an FCM subscription is required even if the
+// app's background mode is not "Always", because delivery does not rely on the
+// app polling in the background.
+OSApp.Push._controllerPushEnabled = function() {
+	var s = OSApp.currentSession && OSApp.currentSession.controller &&
+		OSApp.currentSession.controller.settings;
+	return !!( s && s.push && s.push.en );
+};
+
+// Reconcile registration state with the current push notification mode and the
+// controller push-out setting.
 OSApp.Push.syncPushRegistration = function() {
 	if ( !OSApp.Analog || typeof OSApp.Analog.getPushNotificationMode !== "function" ) {
 		return;
 	}
 	var mode = OSApp.Analog.getPushNotificationMode();
-	if ( mode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS ) {
+	var register = ( mode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS ) ||
+		( OSApp.Push._controllerPushEnabled() && mode !== OSApp.Analog.Constants.PUSH_MODE_OFF );
+	if ( register ) {
 		OSApp.Push.registerForPush();
 	} else {
 		OSApp.Push.unregisterFromPush();

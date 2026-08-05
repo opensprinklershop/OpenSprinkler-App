@@ -1020,6 +1020,17 @@ OSApp.Options.showOptions = function( expandItem ) {
 				"<option value='2'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS ? " selected" : "" ) + ">" + OSApp.Language._( "Always" ) + "</option>" +
 			"</select></div>";
 
+		if ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings &&
+			typeof OSApp.currentSession.controller.settings.push !== "undefined" ) {
+			var ctrlPushObj = OSApp.currentSession.controller.settings.push;
+			var ctrlPushEn = ctrlPushObj && ctrlPushObj.en ? true : false;
+			list += "<div class='ui-field-contain'><label for='ctrl-push-en'>" + OSApp.Language._( "Controller Push" ) +
+					"<button data-helptext='" +
+						OSApp.Language._( "Let the controller send notifications to the push service itself, so push works even when the app is closed (e.g. on the same network or after a reboot). Requires the controller to have internet access." ) +
+						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+				"</label><input type='checkbox' data-mini='true' id='ctrl-push-en'" + ( ctrlPushEn ? " checked" : "" ) + "></div>";
+		}
+
 		if ( OSApp.Push && typeof OSApp.Push.getBaseUrl === "function" &&
 			typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) {
 			var pushEndpoint = OSApp.Push.getBaseUrl();
@@ -2014,6 +2025,21 @@ OSApp.Options.showOptions = function( expandItem ) {
 		if ( OSApp.Push && typeof OSApp.Push.configure === "function" ) {
 			OSApp.Push.configure( ( $( this ).val() || "" ).trim() );
 		}
+	} );
+
+	page.find( "#ctrl-push-en" ).on( "change", function() {
+		var en = $( this ).is( ":checked" ) ? 1 : 0;
+		var encoded = encodeURIComponent( JSON.stringify( { en: en } ).slice( 1, -1 ) );
+		OSApp.Firmware.sendToOS( "/co?pw=&push=" + encoded ).done( function() {
+			if ( !OSApp.currentSession.controller.settings.push ||
+				typeof OSApp.currentSession.controller.settings.push !== "object" ) {
+				OSApp.currentSession.controller.settings.push = {};
+			}
+			OSApp.currentSession.controller.settings.push.en = en;
+			if ( OSApp.Push && typeof OSApp.Push.syncPushRegistration === "function" ) {
+				OSApp.Push.syncPushRegistration();
+			}
+		} );
 	} );
 
 	page.find( "#o49" ).on( "click", function() {

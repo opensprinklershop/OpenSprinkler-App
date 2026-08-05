@@ -29,6 +29,7 @@
 		"package.json": "sort-package-json"
 	},
 	"dependencies": {
+		"cordova-plugin-firebasex-messaging": "2.0.1",
 		"grunt-blanket-mocha": "^1.0.0",
 		"grunt-contrib-clean": "^2.0.1",
 		"grunt-contrib-cssmin": "^5.0.0",
@@ -94,7 +95,16 @@
 			"cordova-plugin-local-notification": {
 				"ANDROIDX_CORE_VERSION": "1.12.0"
 			},
-			"cordova-plugin-device": {}
+			"cordova-plugin-device": {},
+			"cordova-plugin-firebasex-messaging": {
+				"FIREBASE_FCM_AUTOINIT_ENABLED": "true",
+				"FIREBASE_MESSAGING_IMMEDIATE_PAYLOAD_DELIVERY": "false",
+				"IOS_FCM_ENABLED": "true",
+				"IOS_ENABLE_CRITICAL_ALERTS_ENABLED": "false",
+				"ANDROID_ICON_ACCENT": "#FFFFFF",
+				"ANDROID_FIREBASE_MESSAGING_VERSION": "25.0.2",
+				"IOS_FIREBASE_SDK_VERSION": "12.14.0"
+			}
 		},
 		"platforms": [
 			"ios",

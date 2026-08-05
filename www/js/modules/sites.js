@@ -1819,6 +1819,12 @@ OSApp.Sites.updateControllerSettings = function( callback ) {
 				}
 
 				OSApp.currentSession.controller.settings = settings;
+
+				// Controller settings (incl. push opt-in + MAC) are now available,
+				// so reconcile the FCM push subscription with the current state.
+				if ( OSApp.Push && typeof OSApp.Push.syncPushRegistration === "function" ) {
+					OSApp.Push.syncPushRegistration();
+				}
 				callback();
 			},
 			function() {
