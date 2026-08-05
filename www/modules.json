@@ -17,7 +17,6 @@
   "esp32mode.js",
   "network.js",
   "notifications.js",
-  "push.js",
   "options.js",
   "preview.js",
   "programs.js",

@@ -3,7 +3,16 @@ rm ./www/js/*~
 rm ./www/js/DEADJOE
 rm ./www/locale/*~
 
-export JAVA_HOME=/usr/lib64/jvm/jre-20-openjdk/
+# Force a JDK with javac (cordova-android 15 needs JDK 17; jre-* has no compiler).
+# Mirrors the selection in build.sh.
+for jdk in /usr/lib64/jvm/java-17-openjdk /usr/lib/jvm/java-17-openjdk /usr/lib64/jvm/java-21-openjdk /usr/lib/jvm/java-21-openjdk; do
+	if [ -x "$jdk/bin/javac" ]; then
+		export JAVA_HOME="$jdk"
+		export PATH="$JAVA_HOME/bin:$PATH"
+		break
+	fi
+done
+echo "Using JAVA_HOME=${JAVA_HOME}"
 grunt buildFW
 
 # Stamp sw.js with build timestamp to bust Service Worker cache

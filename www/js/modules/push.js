@@ -33,7 +33,8 @@ OSApp.Push.getBaseUrl = function() {
 	return "";
 };
 
-// Resolve the forwarder API key (X-OSPF-Key).
+// Resolve the forwarder API key (X-OSPF-Key). Only needed for the legacy
+// admin endpoints; the app uses the keyless /subscribe path by default.
 OSApp.Push.getApiKey = function() {
 	try {
 		var v = localStorage.getItem( "OSApp.Push.apiKey" );
@@ -44,7 +45,7 @@ OSApp.Push.getApiKey = function() {
 	return "";
 };
 
-// Provision endpoint + key at runtime (e.g. from a settings screen or a QR code).
+// Provision endpoint (+ optional key) at runtime, e.g. from a settings field.
 OSApp.Push.configure = function( baseUrl, apiKey ) {
 	try {
 		if ( typeof baseUrl === "string" ) {
@@ -57,8 +58,9 @@ OSApp.Push.configure = function( baseUrl, apiKey ) {
 	OSApp.Push.syncPushRegistration();
 };
 
+// The keyless subscribe path only needs the endpoint URL.
 OSApp.Push.isConfigured = function() {
-	return OSApp.Push.getBaseUrl() !== "" && OSApp.Push.getApiKey() !== "";
+	return OSApp.Push.getBaseUrl() !== "";
 };
 
 // A stable per-install identifier so re-registrations update the same row.
@@ -143,42 +145,28 @@ OSApp.Push.isFcmAvailable = function() {
 
 OSApp.Push._request = function( method, path, body ) {
 	var base = OSApp.Push.getBaseUrl();
-	var key = OSApp.Push.getApiKey();
-	if ( base === "" || key === "" ) {
+	if ( base === "" ) {
 		return $.Deferred().reject( { reason: "not_configured" } ).promise();
+	}
+	var headers = {};
+	// The keyless /subscribe path needs no key; admin paths still accept one.
+	var apiKey = OSApp.Push.getApiKey();
+	if ( apiKey !== "" ) {
+		headers[ "X-OSPF-Key" ] = apiKey;
 	}
 	return $.ajax( {
 		url: base + path,
 		method: method,
 		contentType: "application/json",
 		dataType: "json",
-		timeout: 15000,
-		headers: { "X-OSPF-Key": key },
+		timeout: 20000,
+		headers: headers,
 		data: body ? JSON.stringify( body ) : undefined
 	} );
 };
 
-// Ensure the device row exists on the forwarder for the current OTC site.
-OSApp.Push._registerDevice = function() {
-	var token = OSApp.currentSession && OSApp.currentSession.token;
-	var pw = OSApp.currentSession && OSApp.currentSession.pass;
-	if ( !token || !pw ) {
-		return $.Deferred().reject( { reason: "no_otc" } ).promise();
-	}
-	var label = "OpenSprinkler";
-	if ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings &&
-		typeof OSApp.currentSession.controller.settings.dname === "string" &&
-		OSApp.currentSession.controller.settings.dname !== "" ) {
-		label = OSApp.currentSession.controller.settings.dname;
-	}
-	return OSApp.Push._request( "POST", "/device", {
-		label: label,
-		otc_token: token,
-		pw_hash: pw
-	} );
-};
-
-// Register the FCM token as a subscriber for the current OTC device.
+// Register the FCM token as a subscriber for the current OTC device using the
+// keyless /subscribe endpoint (ownership proven by OTC token + password hash).
 OSApp.Push.registerForPush = function() {
 	if ( !OSApp.currentDevice || ( !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS ) ) {
 		return;
@@ -187,8 +175,16 @@ OSApp.Push.registerForPush = function() {
 		return;
 	}
 	var otcToken = OSApp.currentSession && OSApp.currentSession.token;
-	if ( !otcToken ) {
+	var pw = OSApp.currentSession && OSApp.currentSession.pass;
+	if ( !otcToken || !pw ) {
 		return; // Only OTC sites can be reached by the forwarder.
+	}
+
+	var label = "OpenSprinkler";
+	if ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings &&
+		typeof OSApp.currentSession.controller.settings.dname === "string" &&
+		OSApp.currentSession.controller.settings.dname !== "" ) {
+		label = OSApp.currentSession.controller.settings.dname;
 	}
 
 	OSApp.Push.getFcmToken( function( fcmToken ) {
@@ -198,13 +194,13 @@ OSApp.Push.registerForPush = function() {
 		if ( OSApp.Push._registeredToken === fcmToken ) {
 			return; // Already registered this token for this session.
 		}
-		OSApp.Push._registerDevice().then( function() {
-			return OSApp.Push._request( "POST", "/token", {
-				otc_token: otcToken,
-				user_key: OSApp.Push.getUserKey(),
-				platform: OSApp.Push.getPlatform(),
-				fcm_token: fcmToken
-			} );
+		OSApp.Push._request( "POST", "/subscribe", {
+			otc_token: otcToken,
+			pw_hash: pw,
+			user_key: OSApp.Push.getUserKey(),
+			platform: OSApp.Push.getPlatform(),
+			fcm_token: fcmToken,
+			label: label
 		} ).then( function() {
 			OSApp.Push._registeredToken = fcmToken;
 		}, function() {
@@ -226,7 +222,7 @@ OSApp.Push.unregisterFromPush = function() {
 		if ( !fcmToken ) {
 			return;
 		}
-		OSApp.Push._request( "DELETE", "/token", {
+		OSApp.Push._request( "DELETE", "/subscribe", {
 			otc_token: otcToken,
 			fcm_token: fcmToken
 		} ).always( function() {

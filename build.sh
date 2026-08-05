@@ -89,7 +89,7 @@ cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/ra
 
 # Force a JDK version compatible with Android lint (Java 25 currently breaks lint).
 for jdk in /usr/lib64/jvm/java-17-openjdk /usr/lib/jvm/java-17-openjdk /usr/lib64/jvm/java-21-openjdk /usr/lib/jvm/java-21-openjdk; do
-	if [ -x "$jdk/bin/java" ]; then
+	if [ -x "$jdk/bin/javac" ]; then
 		export JAVA_HOME="$jdk"
 		export PATH="$JAVA_HOME/bin:$PATH"
 		break
@@ -101,6 +101,26 @@ echo "Using JAVA_HOME=${JAVA_HOME}"
 if [ -x "platforms/android/gradlew" ]; then
 	(cd platforms/android && ./gradlew --stop >/dev/null 2>&1 || true)
 fi
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
 
 # Copy server certificate to Android raw resources for trust-anchors
 mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/

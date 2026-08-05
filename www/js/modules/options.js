@@ -988,28 +988,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 						OSApp.Language._( "Select notification events. Applicable to all of MQTT, Email, and IFTTT. <b>NOTE</b>: enabling too many events or notification methods may cause delays, missed responses, or skipped short watering events." ) +
 						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
 				"</label><button data-mini='true' id='o49' class=" + (ifev == 0 ?  "''" : "'blue'") + " value='" + ifev + "'>" + OSApp.Language._( "Configure Events" ) + "</button></div>";
-
-			if ( OSApp.Analog && typeof OSApp.Analog.getPushNotificationMode === "function" ) {
-				var pushMode = OSApp.Analog.getPushNotificationMode();
-				list += "<div class='ui-field-contain'><label for='native-notif-mode'>" + OSApp.Language._( "Native Notifications" ) +
-						"<button data-helptext='" +
-							OSApp.Language._( "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode." ) +
-							"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-					"</label>" +
-					"<select data-mini='true' id='native-notif-mode'>" +
-						"<option value='0'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_OFF ? " selected" : "" ) + ">" + OSApp.Language._( "Off" ) + "</option>" +
-						"<option value='1'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_OPEN ? " selected" : "" ) + ">" + OSApp.Language._( "Only when app is open" ) + "</option>" +
-						"<option value='2'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS ? " selected" : "" ) + ">" + OSApp.Language._( "Always" ) + "</option>" +
-					"</select></div>";
-			}
-
-			if ( OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) {
-				list += "<div class='ui-field-contain'><label for='test-notif-btn'>" + OSApp.Language._( "Notifications" ) +
-						"<button data-helptext='" +
-							OSApp.Language._( "Sends a test notification to this device to verify that system notifications are enabled and working." ) +
-							"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-					"</label><button data-mini='true' id='test-notif-btn' type='button'>" + OSApp.Language._( "Test notification" ) + "</button></div>";
-			}
 		}
 
 		if ( typeof OSApp.currentSession.controller.settings.dname !== "undefined" ) {
@@ -1020,6 +998,47 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"</label><input autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false' data-mini='true' type='text' id='dname' value=\"" + OSApp.currentSession.controller.settings.dname + "\">" +
 			"</div>";
 		}
+	}
+
+	// Notifications: client-side native push mode + optional server push. Rendered
+	// independently of controller integrations so it is always available in the app.
+	// An empty fieldset (no push functions) is auto-removed by the cleanup below.
+	list += "</fieldset><fieldset data-role='collapsible'" +
+		( typeof expandItem === "string" && expandItem === "notifications" ? " data-collapsed='false'" : "" ) + ">" +
+		"<legend>" + OSApp.Language._( "Notifications" ) + "</legend>";
+
+	if ( OSApp.Analog && typeof OSApp.Analog.getPushNotificationMode === "function" ) {
+		var pushMode = OSApp.Analog.getPushNotificationMode();
+		list += "<div class='ui-field-contain'><label for='native-notif-mode'>" + OSApp.Language._( "Native Notifications" ) +
+				"<button data-helptext='" +
+					OSApp.Language._( "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode." ) +
+					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+			"</label>" +
+			"<select data-mini='true' id='native-notif-mode'>" +
+				"<option value='0'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_OFF ? " selected" : "" ) + ">" + OSApp.Language._( "Off" ) + "</option>" +
+				"<option value='1'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_OPEN ? " selected" : "" ) + ">" + OSApp.Language._( "Only when app is open" ) + "</option>" +
+				"<option value='2'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS ? " selected" : "" ) + ">" + OSApp.Language._( "Always" ) + "</option>" +
+			"</select></div>";
+
+		if ( OSApp.Push && typeof OSApp.Push.getBaseUrl === "function" &&
+			typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) {
+			var pushEndpoint = OSApp.Push.getBaseUrl();
+			list += "<div class='ui-field-contain'><label for='push-endpoint'>" + OSApp.Language._( "Push Service URL" ) +
+					"<button data-helptext='" +
+						OSApp.Language._( "Optional. URL of the OpenSprinkler push forwarder used to deliver notifications when the app is closed. Leave empty to disable server push." ) +
+						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+				"</label>" +
+				"<input autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false' data-mini='true' type='url' id='push-endpoint' placeholder='https://…/wp-json/ospf/v1' value='" + OSApp.Utils.htmlEscape( pushEndpoint ) + "'>" +
+				"</div>";
+		}
+	}
+
+	if ( OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) {
+		list += "<div class='ui-field-contain'><label for='test-notif-btn'>" + OSApp.Language._( "Test notification" ) +
+				"<button data-helptext='" +
+					OSApp.Language._( "Sends a test notification to this device to verify that system notifications are enabled and working." ) +
+					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+			"</label><button data-mini='true' id='test-notif-btn' type='button'>" + OSApp.Language._( "Test notification" ) + "</button></div>";
 	}
 
 	list += "</fieldset><fieldset class='full-width-slider' data-role='collapsible'" +
@@ -1988,6 +2007,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 	page.find( "#native-notif-mode" ).on( "change", function() {
 		if ( OSApp.Analog && typeof OSApp.Analog.setPushNotificationMode === "function" ) {
 			OSApp.Analog.setPushNotificationMode( parseInt( $( this ).val(), 10 ) );
+		}
+	} );
+
+	page.find( "#push-endpoint" ).on( "change blur", function() {
+		if ( OSApp.Push && typeof OSApp.Push.configure === "function" ) {
+			OSApp.Push.configure( ( $( this ).val() || "" ).trim() );
 		}
 	} );
 

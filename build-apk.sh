@@ -1,5 +1,14 @@
 #!/bin/sh
-export JAVA_HOME=/usr/lib64/jvm/java-11-openjdk
+# Force a JDK with javac (cordova-android 15 needs JDK 17; java-11 is broken and
+# jre-* has no compiler). Mirrors the selection in build.sh.
+for jdk in /usr/lib64/jvm/java-17-openjdk /usr/lib/jvm/java-17-openjdk /usr/lib64/jvm/java-21-openjdk /usr/lib/jvm/java-21-openjdk; do
+	if [ -x "$jdk/bin/javac" ]; then
+		export JAVA_HOME="$jdk"
+		export PATH="$JAVA_HOME/bin:$PATH"
+		break
+	fi
+done
+echo "Using JAVA_HOME=${JAVA_HOME}"
 
 # Stamp sw.js with build timestamp to bust Service Worker cache
 BUILD_TS=$(date +%Y%m%d%H%M%S)

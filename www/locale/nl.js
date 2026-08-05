@@ -1611,6 +1611,8 @@
       "Native Notifications": "Native meldingen",
       "Only when app is open": "Alleen wanneer app open is",
       "Always": "Altijd",
-      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Bepaalt of native pushmeldingen zijn uitgeschakeld, alleen worden getoond wanneer de app open is, of ook actief blijven in de achtergrondmodus."
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Bepaalt of native pushmeldingen zijn uitgeschakeld, alleen worden getoond wanneer de app open is, of ook actief blijven in de achtergrondmodus.",
+      "Push Service URL": "Push-service-URL",
+      "Optional. URL of the OpenSprinkler push forwarder used to deliver notifications when the app is closed. Leave empty to disable server push.": "Optioneel. URL van de OpenSprinkler push-forwarder die meldingen levert wanneer de app gesloten is. Laat leeg om serverpush uit te schakelen."
    }
 }
