@@ -22,10 +22,18 @@ OSApp.Push = OSApp.Push || {};
 
 OSApp.Push._registeredToken = null;
 
+// Default forwarder endpoint used when the user has not set a custom one.
+OSApp.Push.DEFAULT_BASE_URL = "https://opensprinklershop.de/wp-json/ospf/v1";
+
 // Resolve the forwarder base URL, e.g. "https://example.com/wp-json/ospf/v1".
+// Unset (null) falls back to the default; an explicitly stored empty string
+// means the user disabled server push.
 OSApp.Push.getBaseUrl = function() {
 	try {
 		var v = localStorage.getItem( "OSApp.Push.baseUrl" );
+		if ( v === null ) {
+			return OSApp.Push.DEFAULT_BASE_URL;
+		}
 		if ( typeof v === "string" && v !== "" ) {
 			return v.replace( /\/+$/, "" );
 		}
