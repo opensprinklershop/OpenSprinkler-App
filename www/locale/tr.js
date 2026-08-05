@@ -1594,6 +1594,10 @@
       "Type your message...": "Mesajınızı yazın…",
       "The assistant service timed out after 35 seconds.": "Asistan hizmeti 35 saniye sonra zaman aşımına uğradı.",
       "The assistant service is not authorized. Please check the service configuration.": "Asistan hizmeti yetkilendirilmedi. Lütfen hizmet yapılandırmasını kontrol edin.",
-      "Could not apply the changes.": "Değişiklikler uygulanamadı."
+      "Could not apply the changes.": "Değişiklikler uygulanamadı.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

@@ -1594,6 +1594,10 @@
       "Type your message...": "Írd be az üzeneted…",
       "The assistant service timed out after 35 seconds.": "Az asszisztens szolgáltatás 35 másodperc után időtúllépésbe került.",
       "The assistant service is not authorized. Please check the service configuration.": "Az asszisztens szolgáltatás nincs engedélyezve. Kérjük, ellenőrizd a szolgáltatás beállításait.",
-      "Could not apply the changes.": "A változtatásokat nem lehetett alkalmazni."
+      "Could not apply the changes.": "A változtatásokat nem lehetett alkalmazni.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

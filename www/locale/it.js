@@ -1607,6 +1607,10 @@
       "Type your message...": "Scrivi il tuo messaggio…",
       "The assistant service timed out after 35 seconds.": "Il servizio assistente ha superato il timeout dopo 35 secondi.",
       "The assistant service is not authorized. Please check the service configuration.": "Il servizio assistente non è autorizzato. Controlla la configurazione del servizio.",
-      "Could not apply the changes.": "Impossibile applicare le modifiche."
+      "Could not apply the changes.": "Impossibile applicare le modifiche.",
+      "Native Notifications": "Notifiche native",
+      "Only when app is open": "Solo quando l'app è aperta",
+      "Always": "Sempre",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controlla se le notifiche push native sono disattivate, mostrate solo quando l'app è aperta o mantenute attive anche in background."
    }
 }

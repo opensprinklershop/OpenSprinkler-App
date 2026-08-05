@@ -711,6 +711,16 @@ OSApp.UIDom.bindPanel = function() {
 
 	panel.enhanceWithin().panel().removeClass( "hidden" ).panel( "option", "classes.modal", "needsclick ui-panel-dismiss" );
 
+	// Keep the AI assistant menu entry in sync with its enabled flag: apply now
+	// (initial state) and again every time the panel opens so a disabled
+	// assistant never leaves a dead menu item behind.
+	if ( OSApp.AIAssistant && OSApp.AIAssistant.applyMenuVisibility ) {
+		OSApp.AIAssistant.applyMenuVisibility();
+		panel.on( "panelbeforeopen", function() {
+			OSApp.AIAssistant.applyMenuVisibility();
+		} );
+	}
+
 	panel.find( "a[href='#site-control']" ).on( "click", function() {
 		OSApp.UIDom.changePage( "#site-control" );
 		return false;
@@ -722,6 +732,9 @@ OSApp.UIDom.bindPanel = function() {
 	} );
 
 	panel.find( "a[href='#ai-assistant']" ).on( "click", function() {
+		if ( OSApp.AIAssistant && OSApp.AIAssistant.isEnabled && !OSApp.AIAssistant.isEnabled() ) {
+			return false;
+		}
 		OSApp.UIDom.closePanel( function() {
 			OSApp.UIDom.ensureAIAssistant( function() {
 				if ( OSApp.AIAssistant && OSApp.AIAssistant.openDialog ) {

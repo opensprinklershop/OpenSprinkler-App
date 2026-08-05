@@ -1594,6 +1594,10 @@
       "Type your message...": "Ierakstiet savu ziņojumu…",
       "The assistant service timed out after 35 seconds.": "Asistenta pakalpojums beidzās pēc 35 sekundēm.",
       "The assistant service is not authorized. Please check the service configuration.": "Asistenta pakalpojums nav autorizēts. Lūdzu, pārbaudiet pakalpojuma konfigurāciju.",
-      "Could not apply the changes.": "Izmaiņas nevarēja piemērot."
+      "Could not apply the changes.": "Izmaiņas nevarēja piemērot.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

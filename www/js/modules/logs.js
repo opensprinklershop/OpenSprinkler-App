@@ -203,16 +203,19 @@ OSApp.Logs.displayPage = function() {
 				totals[ volume.unit ] = ( totals[ volume.unit ] || 0 ) + volume.value;
 				return totals;
 			};
+			var formatVolumeNumber = function( value, precision ) {
+				return OSApp.Utils.formatNumber( parseFloat( value.toFixed( precision ) ), { maximumFractionDigits: precision } );
+			};
 			var formatVolume = function( volume ) {
 				var precision = ( volume.unit === "L" ) ? OSApp.Utils.getFlowPrecision() : 2;
-				return parseFloat( volume.value.toFixed( precision ) ) + " " + volume.unit;
+				return formatVolumeNumber( volume.value, precision ) + " " + volume.unit;
 			};
 			var formatTotals = function( totals ) {
 				var parts = [];
 				Object.keys( totals || {} ).forEach( function( unit ) {
 					if ( totals[ unit ] > 0 ) {
 						var precision = ( unit === "L" ) ? OSApp.Utils.getFlowPrecision() : 2;
-						parts.push( parseFloat( totals[ unit ].toFixed( precision ) ) + " " + unit );
+						parts.push( formatVolumeNumber( totals[ unit ], precision ) + " " + unit );
 					}
 				} );
 				return parts.join( " / " );
@@ -339,6 +342,9 @@ OSApp.Logs.displayPage = function() {
 				var flowToVolume = function( count ) {
 					return parseFloat( ( count * pulseRate / ( 100 * pulseDiv ) ).toFixed( getLocalFlowPrecision() ) );
 				};
+				var flowToVolumeText = function( count ) {
+					return OSApp.Utils.formatNumber( flowToVolume( count ), { maximumFractionDigits: getLocalFlowPrecision() } );
+				};
 
 				// Current month (skip if timestamp is invalid, e.g. Jan 1970 = epoch 0)
 				if ( curr.ym && Math.floor( curr.ym / 12 ) >= 2000 ) {
@@ -348,7 +354,7 @@ OSApp.Logs.displayPage = function() {
 
 					if ( pulseRate > 0 ) {
 						html += "<div><span class='bold'>" + OSApp.Language._( "Volume" ) + "</span>: " +
-							flowToVolume( curr.flow ) + " L</div>";
+							flowToVolumeText( curr.flow ) + " L</div>";
 					}
 
 					html += "</div>";
@@ -374,7 +380,7 @@ OSApp.Logs.displayPage = function() {
 							"<td>" + rec.flow + "</td>";
 
 						if ( pulseRate > 0 ) {
-							html += "<td>" + flowToVolume( rec.flow ) + "</td>";
+							html += "<td>" + flowToVolumeText( rec.flow ) + "</td>";
 						}
 
 						html += "</tr>";
@@ -557,7 +563,7 @@ OSApp.Logs.displayPage = function() {
 						groupArray[ i ] += "<span style='border:none' class='ui-body ui-body-a'>" +
 							OSApp.Language._( "Total Water Used" ) + ": " + Object.keys( flSorted[ group ] ).map( function( unit ) {
 								var precision = ( unit === "L" ) ? OSApp.Utils.getFlowPrecision() : 2;
-								return parseFloat( flSorted[ group ][ unit ].toFixed( precision ) ) + " " + unit;
+								return OSApp.Utils.formatNumber( parseFloat( flSorted[ group ][ unit ].toFixed( precision ) ), { maximumFractionDigits: precision } ) + " " + unit;
 							} ).join( " / " ) +
 							"</span>";
 					}

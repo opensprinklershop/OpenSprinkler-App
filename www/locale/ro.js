@@ -1594,6 +1594,10 @@
       "Type your message...": "Scrieți mesajul…",
       "The assistant service timed out after 35 seconds.": "Serviciul asistentului a expirat după 35 de secunde.",
       "The assistant service is not authorized. Please check the service configuration.": "Serviciul asistentului nu este autorizat. Vă rugăm să verificați configurația serviciului.",
-      "Could not apply the changes.": "Modificările nu au putut fi aplicate."
+      "Could not apply the changes.": "Modificările nu au putut fi aplicate.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

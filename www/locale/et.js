@@ -1593,6 +1593,10 @@
       "Type your message...": "Sisesta oma sõnum…",
       "The assistant service timed out after 35 seconds.": "Assistendi teenus aegus 35 sekundi pärast.",
       "The assistant service is not authorized. Please check the service configuration.": "Assistendi teenus pole autoriseeritud. Kontrollige teenuse konfiguratsiooni.",
-      "Could not apply the changes.": "Muutusi ei saanud rakendada."
+      "Could not apply the changes.": "Muutusi ei saanud rakendada.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

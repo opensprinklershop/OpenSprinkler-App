@@ -1604,6 +1604,10 @@
       "Type your message...": "输入你的消息…",
       "The assistant service timed out after 35 seconds.": "助手服务在 35 秒后超时。",
       "The assistant service is not authorized. Please check the service configuration.": "助手服务未授权。请检查服务配置。",
-      "Could not apply the changes.": "无法应用更改。"
+      "Could not apply the changes.": "无法应用更改。",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

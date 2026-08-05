@@ -752,6 +752,9 @@ OSApp.AIAssistant.isEnabled = function() {
 
 OSApp.AIAssistant.setEnabled = function( on ) {
 	localStorage.setItem( OSApp.AIAssistant.ENABLED_KEY, on ? "1" : "0" );
+	if ( OSApp.DeviceConfig && OSApp.DeviceConfig.saveSetting ) {
+		OSApp.DeviceConfig.saveSetting( "osai_enabled", on ? 1 : 0 );
+	}
 	OSApp.AIAssistant.applyMenuVisibility();
 	OSApp.AIAssistant.applyFabVisibility();
 	if ( !on ) {
@@ -765,7 +768,11 @@ OSApp.AIAssistant.applyMenuVisibility = function() {
 	if ( !item.length ) {
 		return;
 	}
-	item.toggleClass( "hidden", !OSApp.AIAssistant.isEnabled() );
+	var enabled = OSApp.AIAssistant.isEnabled();
+	item.toggleClass( "hidden", !enabled );
+	// Guard the entry so a disabled assistant can never be opened, even if a
+	// stale/enhanced list item slips through.
+	item.attr( "aria-hidden", enabled ? "false" : "true" );
 };
 
 // Zeigt/versteckt den schwebenden Button je nach Aktivierung und aktueller Seite.

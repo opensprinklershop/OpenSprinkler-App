@@ -132,9 +132,72 @@ OSApp.Analog = {
 OSApp.Analog.success_callback = function() {
 };
 
+OSApp.Analog.Constants.PUSH_MODE_OFF = 0;
+OSApp.Analog.Constants.PUSH_MODE_OPEN = 1;
+OSApp.Analog.Constants.PUSH_MODE_ALWAYS = 2;
+
+OSApp.Analog.getPushModeStorageKey = function() {
+	return "OSApp.Analog.pushNotificationMode";
+};
+
+OSApp.Analog.getPushNotificationMode = function() {
+	var mode = OSApp.Analog.Constants.PUSH_MODE_OPEN;
+	try {
+		var raw = localStorage.getItem(OSApp.Analog.getPushModeStorageKey());
+		if (raw !== null && raw !== undefined) {
+			var parsed = parseInt(raw, 10);
+			if (!isNaN(parsed) && parsed >= OSApp.Analog.Constants.PUSH_MODE_OFF && parsed <= OSApp.Analog.Constants.PUSH_MODE_ALWAYS) {
+				mode = parsed;
+			}
+		}
+	} catch (e) { void e; }
+	return mode;
+};
+
+OSApp.Analog.setPushNotificationMode = function(mode) {
+	var parsed = parseInt(mode, 10);
+	if (isNaN(parsed) || parsed < OSApp.Analog.Constants.PUSH_MODE_OFF || parsed > OSApp.Analog.Constants.PUSH_MODE_ALWAYS) {
+		parsed = OSApp.Analog.Constants.PUSH_MODE_OPEN;
+	}
+	try {
+		localStorage.setItem(OSApp.Analog.getPushModeStorageKey(), String(parsed));
+	} catch (e) { void e; }
+	if (OSApp.DeviceConfig && OSApp.DeviceConfig.saveSetting) {
+		OSApp.DeviceConfig.saveSetting("pushMode", parsed);
+	}
+	if (parsed !== OSApp.Analog.Constants.PUSH_MODE_OFF) {
+		OSApp.Analog.ensureNotificationPermission();
+	}
+	OSApp.Analog.checkBackgroundMode();
+	if (OSApp.Push && typeof OSApp.Push.syncPushRegistration === "function") {
+		OSApp.Push.syncPushRegistration();
+	}
+	return parsed;
+};
+
+OSApp.Analog.isPushNotificationAllowedNow = function() {
+	var mode = OSApp.Analog.getPushNotificationMode();
+	if (mode === OSApp.Analog.Constants.PUSH_MODE_OFF) {
+		return false;
+	}
+	if (mode === OSApp.Analog.Constants.PUSH_MODE_OPEN) {
+		// Foreground-only mode: allow local notifications only while app is visible.
+		if (typeof document !== "undefined" && document.hidden === true) {
+			return false;
+		}
+	}
+	return true;
+};
+
 OSApp.Analog.getLocalNotificationPlugin = function() {
 	if (!window.cordova || !window.cordova.plugins || !window.cordova.plugins.notification) return null;
 	return window.cordova.plugins.notification.local || null;
+};
+
+// Native OS notifications are only available in the installed app with the
+// cordova-plugin-local-notification present (not in the browser).
+OSApp.Analog.isNativeNotificationAvailable = function() {
+	return OSApp.Analog.getLocalNotificationPlugin() !== null;
 };
 
 OSApp.Analog.getBackgroundModePlugin = function() {
@@ -207,12 +270,16 @@ OSApp.Analog.syncChartOptionsFromController = function() {
 };
 
 OSApp.Analog.saveChartOptions = function() {
+	var opts = {
+		tmpCo: OSApp.Analog.chartConvertTemp,
+		comb: OSApp.Analog.chartCombineMoistTemp ? 1 : 0
+	};
 	try {
-		localStorage.setItem("OSApp.Analog.chartOptions", JSON.stringify({
-			tmpCo: OSApp.Analog.chartConvertTemp,
-			comb: OSApp.Analog.chartCombineMoistTemp ? 1 : 0
-		}));
+		localStorage.setItem("OSApp.Analog.chartOptions", JSON.stringify(opts));
 	} catch (e) { void e; }
+	if (OSApp.DeviceConfig && OSApp.DeviceConfig.saveSetting) {
+		OSApp.DeviceConfig.saveSetting("chartOptions", opts);
+	}
 };
 
 
@@ -222,7 +289,7 @@ OSApp.Analog.asb_init = function() {
 	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
 	var backgroundMode = OSApp.Analog.getBackgroundModePlugin();
 
-	if (localNotification) {
+	if (localNotification && OSApp.Analog.getPushNotificationMode() !== OSApp.Analog.Constants.PUSH_MODE_OFF) {
 		OSApp.Analog.ensureNotificationPermission();
 	}
 
@@ -278,6 +345,10 @@ OSApp.Analog.asb_init = function() {
 		var BackgroundFetch = window.BackgroundFetch;
 		var fetchCallback = function(taskId) {
 			console.log('[js] BackgroundFetch event received: ', taskId);
+			if (OSApp.Analog.getPushNotificationMode() !== OSApp.Analog.Constants.PUSH_MODE_ALWAYS) {
+				BackgroundFetch.finish(taskId);
+				return;
+			}
 			OSApp.Analog.updateAnalogSensor( function() {
 				OSApp.Analog.updateMonitors( function() {
 					BackgroundFetch.finish(taskId);
@@ -294,6 +365,10 @@ OSApp.Analog.asb_init = function() {
 			minimumFetchInterval: 15,
 			requiredNetworkType: BackgroundFetch.NETWORK_TYPE_ANY
 		}, fetchCallback, failureCallback);
+	}
+
+	if (window.OSApp && OSApp.Push && typeof OSApp.Push.init === "function") {
+		OSApp.Push.init();
 	}
 };
 
@@ -369,8 +444,10 @@ OSApp.Analog.checkBackgroundMode = function() {
 	if (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS) return;
 	var backgroundMode = OSApp.Analog.getBackgroundModePlugin();
 	if (!backgroundMode || typeof backgroundMode.isActive !== "function" || typeof backgroundMode.isEnabled !== "function" || typeof backgroundMode.setEnabled !== "function") return;
-	//Enable background mode only if we have a monitor configured:
-	if (OSApp.Analog.monitors && OSApp.Analog.monitors.length > 0) {
+	var mode = OSApp.Analog.getPushNotificationMode();
+	var keepBackgroundEnabled = (mode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS) && (OSApp.Analog.monitors && OSApp.Analog.monitors.length > 0);
+	// Enable background mode only in "Always" mode and only when monitors exist.
+	if (keepBackgroundEnabled) {
 		if (!backgroundMode.isActive() && !backgroundMode.isEnabled())
 			backgroundMode.setEnabled(true);
 	} else if (backgroundMode.isEnabled()) {
@@ -429,6 +506,10 @@ OSApp.Analog.notification_action_callback = function() {
 // cordova-plugin-local-notification. Used for both monitor alerts and the
 // configured notification events polled from the firmware /nl endpoint.
 OSApp.Analog.showLocalNotification = function(opts) {
+	if (!OSApp.Analog.isPushNotificationAllowedNow()) {
+		return;
+	}
+
 	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
 	if (!localNotification || typeof localNotification.schedule !== "function") {
 		return;
@@ -1251,7 +1332,9 @@ OSApp.Analog.importConfigSensors = function(data, restore_type, callback) {
 							return OSApp.Analog.sendRestoreBatch("/sb?pw=", progDeletes);
 						})
 						.then(function () {
-							return OSApp.Analog.sendRestoreBatch("/sc?pw=", sensorDeletes);
+							// Mark delete calls as restore traffic so firmware can batch-save
+							// instead of forcing a full sensor file rewrite per entry.
+							return OSApp.Analog.sendRestoreBatch("/sc?pw=&restore=1", sensorDeletes);
 						})
 						.then(function () {
 							return OSApp.Analog.sendRestoreBatch("/sc?pw=&restore=1", sensors);
@@ -1264,6 +1347,13 @@ OSApp.Analog.importConfigSensors = function(data, restore_type, callback) {
 						})
 						.done(function () {
 							OSApp.Analog.expandItem.add("progadjust");
+							// Re-assert the display order from the backup so the
+							// device `order` fields are set even if an individual
+							// create dropped it. Keeps the user's sort after a
+							// full restore (ticket: sort lost after restore).
+							OSApp.Analog.persistBackupOrder("sensors", sensors);
+							OSApp.Analog.persistBackupOrder("progadjust", progadjust);
+							OSApp.Analog.persistBackupOrder("monitors", monitors);
 							OSApp.Analog.updateProgramAdjustments(function () {
 								OSApp.Analog.updateMonitors(function () {
 									OSApp.Analog.updateAnalogSensor(function () {
@@ -1334,11 +1424,18 @@ OSApp.Analog.sendRestoreBatch = function(endpoint, entries) {
 
 		OSApp.Analog.sendToOsObj(endpoint, entries[idx])
 			.done(function(info) {
-				// Stop early with a clear reason if the device ran out of space
-				// while restoring (HTML_NOT_ENOUGH_SPACE = 65) instead of
-				// silently dropping the remaining entries (#295).
-				if (info && info.result === 65) {
-					dfd.reject(OSApp.Analog.saveResultError(65));
+				// Abort on any non-success result so partial restores never end
+				// with a false "Backup restored" message.
+				var result = info && info.result;
+				if (result !== undefined && result !== null) {
+					result = parseInt(result, 10);
+				}
+				if (!info || isNaN(result)) {
+					dfd.reject(OSApp.Language._("Restore failed") + ": invalid device response");
+					return;
+				}
+				if (result > 1) {
+					dfd.reject(OSApp.Analog.saveResultError(result));
 					return;
 				}
 				idx++;
@@ -1985,26 +2082,54 @@ OSApp.Analog.addToObjectStr = function(popup, fieldId, obj) {
 	}
 };
 
+OSApp.Analog.parseClockToHHMM = function(raw) {
+	if (raw === undefined || raw === null) return null;
+	var text = String(raw).trim();
+	if (!text) return null;
+
+	// Accept common separators used on mobile keyboards/locales.
+	var m = text.match(/^(\d{1,2})\s*[:;.,]\s*(\d{1,2})$/);
+	var hours;
+	var minutes;
+	if (m) {
+		hours = parseInt(m[1], 10);
+		minutes = parseInt(m[2], 10);
+	} else if (/^\d{3,4}$/.test(text)) {
+		var numeric = parseInt(text, 10);
+		hours = Math.floor(numeric / 100);
+		minutes = numeric % 100;
+	} else {
+		return null;
+	}
+
+	if (isNaN(hours) || isNaN(minutes)) return null;
+	if (hours === 24 && minutes === 0) return 2400;
+	if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+	return (hours * 100) + minutes;
+};
+
+OSApp.Analog.hhmmToClockText = function(hhmm, fallback) {
+	var safeFallback = fallback || "00:00";
+	if (typeof hhmm !== "number" || isNaN(hhmm)) return safeFallback;
+	var value = Math.max(0, Math.min(2400, Math.floor(hhmm)));
+	var hours = Math.floor(value / 100);
+	var minutes = value % 100;
+	if (hours === 24 && minutes === 0) return "24:00";
+	if (hours > 23 || minutes > 59) return safeFallback;
+	return OSApp.Utils.pad(hours) + ":" + OSApp.Utils.pad(minutes);
+};
+
 OSApp.Analog.addToObjectTime = function(popup, fieldId, obj) {
 	let field = popup.find(fieldId);
 	if (field) {
 		let property = fieldId.substring(1);
-		let time = field.val();
-		if (time) {
-			let timeParts = time.split(":");
-			if (timeParts.length === 2) {
-				let hours = parseInt(timeParts[0]);
-				let minutes = parseInt(timeParts[1]);
-				if (!isNaN(hours) && !isNaN(minutes)) {
-					obj[property] = (hours * 100) + minutes;
-				} else {
-					obj[property] = 0;
-				}
-			} else {
-				obj[property] = 0;
-			}
-		} else {
+		var parsed = OSApp.Analog.parseClockToHHMM(field.val());
+		if (parsed === null) {
 			obj[property] = 0;
+		} else {
+			obj[property] = parsed;
+			// Normalize formatting immediately so the user sees what will be saved.
+			field.val(OSApp.Analog.hhmmToClockText(parsed, "00:00"));
 		}
 		OSApp.Analog.requiredCheck(field, obj, property);
 	}
@@ -2308,9 +2433,9 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 		//typ == TIME
 			"<div id='type_time'>"+
 			"<label for='from'>"+OSApp.Language._("From")+"</label>"+
-			"<input id='from' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.floor(activeFrom / 100)) + ":" + OSApp.Utils.pad(activeFrom % 100) + "'>" +
+			"<input id='from' type='text' maxlength='5' value='" + OSApp.Analog.hhmmToClockText(activeFrom, "00:00") + "'>" +
 			"<label for='to'>"+OSApp.Language._("To")+"</label>"+
-			"<input id='to' type='text' maxlength='5' value='" + OSApp.Utils.pad(Math.floor(activeTo / 100)) + ":" + OSApp.Utils.pad(activeTo % 100) + "'>" +
+			"<input id='to' type='text' maxlength='5' value='" + OSApp.Analog.hhmmToClockText(activeTo, "24:00") + "'>" +
 			wdaysHtml +
 			"</div>"+
 
@@ -5472,6 +5597,15 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			page.detach();
 		});
 
+	function refreshMonitorSection(callback) {
+		// Monitor edits/additions do not require full sensor+adjustment reload.
+		// Reload only monitors to keep the UI responsive on large/slow setups.
+		OSApp.Analog.updateMonitors(function() {
+			updateSensorContent();
+			if (typeof callback === "function") callback();
+		});
+	}
+
 	function updateSensorContent() {
 		OSApp.Analog.syncChartOptionsFromController();
 		var list = $(OSApp.Analog.buildSensorConfig());
@@ -5649,11 +5783,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 							OSApp.Errors.showError(OSApp.Language._("Error calling rest service: ") + " " + result);
 						} else {
 							OSApp.Analog.monitors[row] = monitorOut;
-							OSApp.Analog.updateMonitors(function() {
-								OSApp.Analog.updateAnalogSensor(function() {
-									OSApp.Analog.updateProgramAdjustments(updateSensorContent);
-								});
-							});
+								refreshMonitorSection();
 						}
 					});
 				}, updateSensorContent);
@@ -5683,11 +5813,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 							OSApp.Errors.showError(OSApp.Analog.saveResultError(result));
 						} else {
 							OSApp.Analog.monitors.push(monitorOut);
-							OSApp.Analog.updateMonitors(function() {
-								OSApp.Analog.updateAnalogSensor(function() {
-									OSApp.Analog.updateProgramAdjustments(updateSensorContent);
-								});
-							});
+								refreshMonitorSection();
 						}
 					});
 				}, updateSensorContent);
@@ -6217,6 +6343,31 @@ OSApp.Analog.persistRowOrderToDevice = function(sectionId, order) {
 	}
 
 	OSApp.Firmware.sendToOS("/od?pw=&t=" + t + "&o=" + order.join(","), "json");
+};
+
+// Re-assert a section's display order on the device from a backup array. Sorts
+// the backup items by their persisted `order` (falling back to nr) and pushes
+// the resulting nr list via /od. No-op when the backup carries no order info.
+OSApp.Analog.persistBackupOrder = function(sectionId, items) {
+	if (!Array.isArray(items) || !items.length) {
+		return;
+	}
+	var hasOrder = items.some(function(e) { return e && typeof e.order === "number" && e.order > 0; });
+	if (!hasOrder) {
+		return;
+	}
+	var sorted = items.slice().sort(function(a, b) {
+		var oa = (a && a.order > 0) ? a.order : Number.POSITIVE_INFINITY;
+		var ob = (b && b.order > 0) ? b.order : Number.POSITIVE_INFINITY;
+		return oa === ob ? ((a && a.nr) || 0) - ((b && b.nr) || 0) : oa - ob;
+	});
+	var order = [];
+	for (var i = 0; i < sorted.length; i++) {
+		if (sorted[i] && sorted[i].nr) {
+			order.push(sorted[i].nr);
+		}
+	}
+	OSApp.Analog.persistRowOrderToDevice(sectionId, order);
 };
 
 // Reorder in-memory data arrays according to saved order

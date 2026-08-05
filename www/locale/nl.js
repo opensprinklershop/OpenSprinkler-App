@@ -1607,6 +1607,10 @@
       "Type your message...": "Typ je bericht…",
       "The assistant service timed out after 35 seconds.": "De assistentenservice liep na 35 seconden vast.",
       "The assistant service is not authorized. Please check the service configuration.": "De assistentenservice is niet geautoriseerd. Controleer de serviceconfiguratie.",
-      "Could not apply the changes.": "De wijzigingen konden niet worden toegepast."
+      "Could not apply the changes.": "De wijzigingen konden niet worden toegepast.",
+      "Native Notifications": "Native meldingen",
+      "Only when app is open": "Alleen wanneer app open is",
+      "Always": "Altijd",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Bepaalt of native pushmeldingen zijn uitgeschakeld, alleen worden getoond wanneer de app open is, of ook actief blijven in de achtergrondmodus."
    }
 }

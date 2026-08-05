@@ -1594,6 +1594,10 @@
       "Type your message...": "Πληκτρολογήστε το μήνυμά σας…",
       "The assistant service timed out after 35 seconds.": "Η υπηρεσία βοηθού έληξε μετά από 35 δευτερόλεπτα.",
       "The assistant service is not authorized. Please check the service configuration.": "Η υπηρεσία βοηθού δεν είναι εξουσιοδοτημένη. Ελέγξτε τη διαμόρφωση της υπηρεσίας.",
-      "Could not apply the changes.": "Δεν ήταν δυνατή η εφαρμογή των αλλαγών."
+      "Could not apply the changes.": "Δεν ήταν δυνατή η εφαρμογή των αλλαγών.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

@@ -1594,6 +1594,10 @@
       "Type your message...": "Napište svou zprávu…",
       "The assistant service timed out after 35 seconds.": "Služba asistenta vypršela po 35 sekundách.",
       "The assistant service is not authorized. Please check the service configuration.": "Služba asistenta není autorizována. Zkontrolujte konfiguraci služby.",
-      "Could not apply the changes.": "Změny nelze použít."
+      "Could not apply the changes.": "Změny nelze použít.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

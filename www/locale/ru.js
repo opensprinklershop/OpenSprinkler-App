@@ -1604,6 +1604,10 @@
       "Type your message...": "Введите сообщение…",
       "The assistant service timed out after 35 seconds.": "Сервис помощника превысил время ожидания через 35 секунд.",
       "The assistant service is not authorized. Please check the service configuration.": "Сервис помощника не авторизован. Проверьте конфигурацию сервиса.",
-      "Could not apply the changes.": "Не удалось применить изменения."
+      "Could not apply the changes.": "Не удалось применить изменения.",
+      "Native Notifications": "Нативные уведомления",
+      "Only when app is open": "Только когда приложение открыто",
+      "Always": "Всегда",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Определяет, отключены ли нативные push-уведомления, показываются только при открытом приложении или остаются активными в фоновом режиме."
    }
 }

@@ -122,6 +122,7 @@
         </config-file>
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
         </config-file>
         <!--
         <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">

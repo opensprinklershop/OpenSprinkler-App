@@ -1594,6 +1594,10 @@
       "Type your message...": "Vnesite svoje sporočilo…",
       "The assistant service timed out after 35 seconds.": "Storitev pomočnika je potekla po 35 sekundah.",
       "The assistant service is not authorized. Please check the service configuration.": "Storitev pomočnika ni avtorizirana. Preverite konfiguracijo storitve.",
-      "Could not apply the changes.": "Sprememb ni bilo mogoče uveljaviti."
+      "Could not apply the changes.": "Sprememb ni bilo mogoče uveljaviti.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

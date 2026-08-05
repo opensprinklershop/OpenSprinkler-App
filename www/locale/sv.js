@@ -1594,6 +1594,10 @@
       "Type your message...": "Skriv ditt meddelande…",
       "The assistant service timed out after 35 seconds.": "Assistansservice tog timeout efter 35 sekunder.",
       "The assistant service is not authorized. Please check the service configuration.": "Assistansservicen är inte auktoriserad. Kontrollera tjänstekonfigurationen.",
-      "Could not apply the changes.": "Det gick inte att tillämpa ändringarna."
+      "Could not apply the changes.": "Det gick inte att tillämpa ändringarna.",
+      "Native Notifications": "Native Notifications",
+      "Only when app is open": "Only when app is open",
+      "Always": "Always",
+      "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode."
    }
 }

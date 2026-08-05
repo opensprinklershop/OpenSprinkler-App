@@ -1714,6 +1714,11 @@ OSApp.Sites.updateControllerOptions = function( callback ) {
 	} else {
 		return OSApp.Firmware.sendToOS( "/jo?pw=", "json" ).done( function( options ) {
 			OSApp.currentSession.controller.options = options;
+			// Once connected, reconcile shared UI prefs with the device store.
+			if ( OSApp.DeviceConfig && OSApp.DeviceConfig.syncAppSettings &&
+				OSApp.currentSession.isControllerConnected() ) {
+				OSApp.DeviceConfig.syncAppSettings();
+			}
 			callback();
 		} );
 	}
