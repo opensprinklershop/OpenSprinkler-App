@@ -1515,12 +1515,12 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"<label>" +
 			OSApp.Language._("Min sensor value") +
 			"</label>" +
-			"<input class='min' type='number' value='" + OSApp.Utils.formatNumber( progAdjust.min, { useGrouping: false } ) + "'>" +
+			"<input class='min' type='text' inputmode='decimal' value='" + OSApp.Utils.formatNumber( progAdjust.min, { useGrouping: false } ) + "'>" +
 
 			"<label>" +
 			OSApp.Language._("Max sensor value") +
 			"</label>" +
-			"<input class='max' type='number' inputmode='decimal' value='" + OSApp.Utils.formatNumber( progAdjust.max, { useGrouping: false } ) + "'>" +
+			"<input class='max' type='text' inputmode='decimal' value='" + OSApp.Utils.formatNumber( progAdjust.max, { useGrouping: false } ) + "'>" +
 
 			"<label>" +
 			OSApp.Language._("Stale timeout in minutes") +

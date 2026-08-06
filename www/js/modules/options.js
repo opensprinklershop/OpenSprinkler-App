@@ -307,7 +307,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 						}
 						return true;
 					case "tpdv":
-						var v = OSApp.Utils.parseNumber( data );
+						// Value comes from a type=range slider, whose .val() is always
+						// locale-independent (period), so parse it as a plain float.
+						var v = parseFloat( data );
 						if ( isNaN( v ) ) {
 								v = 0;
 						}

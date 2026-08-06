@@ -93,13 +93,13 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 						"<label class='center'>" +
 							OSApp.Language._( "Temp" ) + ( OSApp.currentDevice.isMetric ? " &#176;C" : " &#176;F" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='bt' type='number' " + ( OSApp.currentDevice.isMetric ? "min='-20' max='50'" : "min='0' max='120'" ) + " value='" + OSApp.Utils.formatNumber( options.bt, { useGrouping: false } ) + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
+						"<input data-wrapper-class='pad_buttons' class='bt' type='text' inputmode='decimal' " + ( OSApp.currentDevice.isMetric ? "min='-20' max='50'" : "min='0' max='120'" ) + " value='" + OSApp.Utils.formatNumber( options.bt, { useGrouping: false } ) + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
 					"</div>" +
 					"<div class='ui-block-b'>" +
 						"<label class='center'>" +
 							OSApp.Language._( "Rain" ) + ( OSApp.currentDevice.isMetric ? " mm" : " \"" ) +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='br' type='number' " + ( OSApp.currentDevice.isMetric ? "min='0' max='25' step='0.1'" : "min='0' max='1' step='0.01'" ) + " value='" + OSApp.Utils.formatNumber( options.br, { useGrouping: false } ) + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
+						"<input data-wrapper-class='pad_buttons' class='br' type='text' inputmode='decimal' " + ( OSApp.currentDevice.isMetric ? "min='0' max='25' step='0.1'" : "min='0' max='1' step='0.01'" ) + " value='" + OSApp.Utils.formatNumber( options.br, { useGrouping: false } ) + ( hasBaseline ? "'>" : "' disabled='disabled'>" ) +
 					"</div>" +
 					"<div class='ui-block-c'>" +
 						"<label class='center'>" +
@@ -191,13 +191,15 @@ OSApp.Weather.showZimmermanAdjustmentOptions = function( button, callback ) {
 		return false;
 	} );
 
-	popup.on( "focus", "input[type='number']", function() {
+	popup.on( "focus", "input[type='number'], input[inputmode='decimal']", function() {
 		this.select();
-	} ).on( "blur", "input[type='number']", function() {
+	} ).on( "blur", "input[type='number'], input[inputmode='decimal']", function() {
 
-		// Generic min/max checker for Temp/Rain/Hum baseline as well as 0-100%
-		var min = parseFloat( this.min ),
-			max = parseFloat( this.max ),
+		// Generic min/max checker for Temp/Rain/Hum baseline as well as 0-100%.
+		// Read min/max via attributes so it also works on the text-typed decimal
+		// fields (this.min/this.max are only reflected for type=number).
+		var min = parseFloat( this.getAttribute( "min" ) ),
+			max = parseFloat( this.getAttribute( "max" ) ),
 			value = OSApp.Utils.parseNumber( this.value );
 
 		if ( isNaN( value ) ) {
@@ -544,7 +546,7 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 						"<label class='center'>" +
 							OSApp.Language._( "Baseline ETo" ) + ( OSApp.currentDevice.isMetric ? " (mm" : "(in" ) + "/day)" +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='baseline-ETo' type='number' min='0' " + ( OSApp.currentDevice.isMetric ? "max='25' step='0.01'" : "max='1' step='0.01'" ) + " value='" + options.baseETo + "'>" +
+						"<input data-wrapper-class='pad_buttons' class='baseline-ETo' type='text' inputmode='decimal' min='0' " + ( OSApp.currentDevice.isMetric ? "max='25' step='0.01'" : "max='1' step='0.01'" ) + " value='" + options.baseETo + "'>" +
 					"</div>" +
 					"<div class='ui-block-b'>" +
 						"<label class='center'>" +
@@ -620,13 +622,15 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 		return false;
 	} );
 
-	popup.on( "focus", "input[type='number']", function() {
+	popup.on( "focus", "input[type='number'], input[inputmode='decimal']", function() {
 		this.select();
-	} ).on( "blur", "input[type='number']", function() {
+	} ).on( "blur", "input[type='number'], input[inputmode='decimal']", function() {
 
-		// Generic min/max checker for each option.
-		var min = parseFloat( this.min ),
-			max = parseFloat( this.max ),
+		// Generic min/max checker for each option. Read min/max via attributes so
+		// it also works on the text-typed decimal fields (this.min/this.max are
+		// only reflected for type=number).
+		var min = parseFloat( this.getAttribute( "min" ) ),
+			max = parseFloat( this.getAttribute( "max" ) ),
 			value = OSApp.Utils.parseNumber( this.value );
 
 		if ( isNaN( value ) ) {

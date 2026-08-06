@@ -21,8 +21,10 @@ OSApp.DeviceConfig._cache = null;
 OSApp.DeviceConfig.MIN_FW_MINOR = 224;
 
 OSApp.DeviceConfig.isSupported = function() {
+	// A 4-digit check encodes fwv*10+fwm, so this gates on 2.4.0 build >= 224
+	// (the first firmware that ships the /ap and /au endpoints).
 	return typeof OSApp.Firmware.checkOSVersion !== "function" ||
-		OSApp.Firmware.checkOSVersion( 240 );
+		OSApp.Firmware.checkOSVersion( 2400 + OSApp.DeviceConfig.MIN_FW_MINOR );
 };
 
 // Load the whole store from the device. Resolves with the config object.
