@@ -909,8 +909,12 @@ OSApp.Options.showOptions = function( expandItem ) {
 		"</label>";
 	}
 
+	// Open the Integrations section when any integration exists or when native
+	// push is available, so the single push-notifications checkbox can live at
+	// the bottom of it.
+	var nativePushAvail = OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable();
 	if ( typeof OSApp.currentSession.controller.settings.ifkey !== "undefined" || typeof OSApp.currentSession.controller.settings.mqtt !== "undefined" ||
-		typeof OSApp.currentSession.controller.settings.otc !== "undefined" || typeof OSApp.currentSession.controller.settings.influxdb !== "undefined") {
+		typeof OSApp.currentSession.controller.settings.otc !== "undefined" || typeof OSApp.currentSession.controller.settings.influxdb !== "undefined" || nativePushAvail ) {
 		list += "</fieldset><fieldset data-role='collapsible'" +
 			( typeof expandItem === "string" && expandItem === "integrations" ? " data-collapsed='false'" : "" ) + ">" +
 			"<legend>" + OSApp.Language._( "Integrations" ) + "</legend>";
@@ -1000,39 +1004,19 @@ OSApp.Options.showOptions = function( expandItem ) {
 		}
 	}
 
-	// Notifications: client-side native push mode + optional server push. Rendered
-	// independently of controller integrations so it is always available in the app.
-	// An empty fieldset (no push functions) is auto-removed by the cleanup below.
-	list += "</fieldset><fieldset data-role='collapsible'" +
-		( typeof expandItem === "string" && expandItem === "notifications" ? " data-collapsed='false'" : "" ) + ">" +
-		"<legend>" + OSApp.Language._( "Notifications" ) + "</legend>";
-
-	if ( OSApp.Analog && typeof OSApp.Analog.getPushNotificationMode === "function" ) {
-		var pushMode = OSApp.Analog.getPushNotificationMode();
-		list += "<div class='ui-field-contain'><label for='native-notif-mode'>" + OSApp.Language._( "Native Notifications" ) +
+	// Push notifications: a single checkbox shown at the bottom of the
+	// Integrations section (native push delivered via the forwarder).
+	if ( OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) {
+		var pushOn = ( typeof OSApp.Analog.isPushEnabled === "function" && OSApp.Analog.isPushEnabled() ) ||
+			( OSApp.currentSession.controller && OSApp.currentSession.controller.settings &&
+			  OSApp.currentSession.controller.settings.push && OSApp.currentSession.controller.settings.push.en ? true : false );
+		list += "<div class='ui-field-contain'><label for='push-en'>" + OSApp.Language._( "Push notifications" ) +
 				"<button data-helptext='" +
-					OSApp.Language._( "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode." ) +
+					OSApp.Language._( "Deliver notifications to this device as push, even when the app is closed. The controller sends events to the push service itself; this requires the controller to have internet access." ) +
 					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-			"</label>" +
-			"<select data-mini='true' id='native-notif-mode'>" +
-				"<option value='0'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_OFF ? " selected" : "" ) + ">" + OSApp.Language._( "Off" ) + "</option>" +
-				"<option value='1'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_OPEN ? " selected" : "" ) + ">" + OSApp.Language._( "Only when app is open" ) + "</option>" +
-				"<option value='2'" + ( pushMode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS ? " selected" : "" ) + ">" + OSApp.Language._( "Always" ) + "</option>" +
-			"</select></div>";
+			"</label><input type='checkbox' data-mini='true' id='push-en'" + ( pushOn ? " checked" : "" ) + "></div>";
 
-		if ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings &&
-			typeof OSApp.currentSession.controller.settings.push !== "undefined" ) {
-			var ctrlPushObj = OSApp.currentSession.controller.settings.push;
-			var ctrlPushEn = ctrlPushObj && ctrlPushObj.en ? true : false;
-			list += "<div class='ui-field-contain'><label for='ctrl-push-en'>" + OSApp.Language._( "Controller Push" ) +
-					"<button data-helptext='" +
-						OSApp.Language._( "Let the controller send notifications to the push service itself, so push works even when the app is closed (e.g. on the same network or after a reboot). Requires the controller to have internet access." ) +
-						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-				"</label><input type='checkbox' data-mini='true' id='ctrl-push-en'" + ( ctrlPushEn ? " checked" : "" ) + "></div>";
-		}
-
-		if ( OSApp.Push && typeof OSApp.Push.getBaseUrl === "function" &&
-			typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) {
+		if ( OSApp.Push && typeof OSApp.Push.getBaseUrl === "function" ) {
 			var pushEndpoint = OSApp.Push.getBaseUrl();
 			list += "<div class='ui-field-contain'><label for='push-endpoint'>" + OSApp.Language._( "Push Service URL" ) +
 					"<button data-helptext='" +
@@ -1042,14 +1026,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 				"<input autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false' data-mini='true' type='url' id='push-endpoint' placeholder='https://…/wp-json/ospf/v1' value='" + OSApp.Utils.htmlEscape( pushEndpoint ) + "'>" +
 				"</div>";
 		}
-	}
-
-	if ( OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) {
-		list += "<div class='ui-field-contain'><label for='test-notif-btn'>" + OSApp.Language._( "Test notification" ) +
-				"<button data-helptext='" +
-					OSApp.Language._( "Sends a test notification to this device to verify that system notifications are enabled and working." ) +
-					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-			"</label><button data-mini='true' id='test-notif-btn' type='button'>" + OSApp.Language._( "Test notification" ) + "</button></div>";
 	}
 
 	list += "</fieldset><fieldset class='full-width-slider' data-role='collapsible'" +
@@ -2009,37 +1985,30 @@ OSApp.Options.showOptions = function( expandItem ) {
 		if( page.find( "#wtkey" ).prop( "value" ) === "" ) page.find( "#wtkey" ).parent().addClass( "red" );
 	} );
 
-	page.find( "#test-notif-btn" ).on( "click", function() {
-		if ( OSApp.Analog && typeof OSApp.Analog.testNotification === "function" ) {
-			OSApp.Analog.testNotification();
-		}
-	} );
-
-	page.find( "#native-notif-mode" ).on( "change", function() {
-		if ( OSApp.Analog && typeof OSApp.Analog.setPushNotificationMode === "function" ) {
-			OSApp.Analog.setPushNotificationMode( parseInt( $( this ).val(), 10 ) );
-		}
-	} );
-
 	page.find( "#push-endpoint" ).on( "change blur", function() {
 		if ( OSApp.Push && typeof OSApp.Push.configure === "function" ) {
 			OSApp.Push.configure( ( $( this ).val() || "" ).trim() );
 		}
 	} );
 
-	page.find( "#ctrl-push-en" ).on( "change", function() {
-		var en = $( this ).is( ":checked" ) ? 1 : 0;
+	page.find( "#push-en" ).on( "change", function() {
+		var enabled = $( this ).is( ":checked" );
+		var en = enabled ? 1 : 0;
+		// Enable/disable the controller's own push-out (SOPT_PUSH_OPTS).
 		var encoded = encodeURIComponent( JSON.stringify( { en: en } ).slice( 1, -1 ) );
-		OSApp.Firmware.sendToOS( "/co?pw=&push=" + encoded ).done( function() {
-			if ( !OSApp.currentSession.controller.settings.push ||
-				typeof OSApp.currentSession.controller.settings.push !== "object" ) {
-				OSApp.currentSession.controller.settings.push = {};
-			}
-			OSApp.currentSession.controller.settings.push.en = en;
-			if ( OSApp.Push && typeof OSApp.Push.syncPushRegistration === "function" ) {
-				OSApp.Push.syncPushRegistration();
+		OSApp.Firmware.sendToOS( "/co?pw=&push=" + encoded ).always( function() {
+			if ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings ) {
+				if ( !OSApp.currentSession.controller.settings.push ||
+					typeof OSApp.currentSession.controller.settings.push !== "object" ) {
+					OSApp.currentSession.controller.settings.push = {};
+				}
+				OSApp.currentSession.controller.settings.push.en = en;
 			}
 		} );
+		// Enable/disable this install's FCM registration.
+		if ( OSApp.Analog && typeof OSApp.Analog.setPushEnabled === "function" ) {
+			OSApp.Analog.setPushEnabled( enabled );
+		}
 	} );
 
 	page.find( "#o49" ).on( "click", function() {

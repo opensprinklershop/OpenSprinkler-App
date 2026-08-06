@@ -287,26 +287,9 @@ OSApp.Push.unregisterFromPush = function() {
 	} );
 };
 
-// True when the controller itself is configured to push events to the forwarder
-// (SOPT_PUSH_OPTS en=1). In that case an FCM subscription is required even if the
-// app's background mode is not "Always", because delivery does not rely on the
-// app polling in the background.
-OSApp.Push._controllerPushEnabled = function() {
-	var s = OSApp.currentSession && OSApp.currentSession.controller &&
-		OSApp.currentSession.controller.settings;
-	return !!( s && s.push && s.push.en );
-};
-
-// Reconcile registration state with the current push notification mode and the
-// controller push-out setting.
+// Reconcile FCM subscription state with the single push-notifications setting.
 OSApp.Push.syncPushRegistration = function() {
-	if ( !OSApp.Analog || typeof OSApp.Analog.getPushNotificationMode !== "function" ) {
-		return;
-	}
-	var mode = OSApp.Analog.getPushNotificationMode();
-	var register = ( mode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS ) ||
-		( OSApp.Push._controllerPushEnabled() && mode !== OSApp.Analog.Constants.PUSH_MODE_OFF );
-	if ( register ) {
+	if ( OSApp.Analog && typeof OSApp.Analog.isPushEnabled === "function" && OSApp.Analog.isPushEnabled() ) {
 		OSApp.Push.registerForPush();
 	} else {
 		OSApp.Push.unregisterFromPush();

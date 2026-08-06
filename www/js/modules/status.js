@@ -32,13 +32,6 @@ OSApp.Status.refreshStatus = function( callback, fail ) {
 		$( "html" ).trigger( "datarefresh" );
 		OSApp.Status.checkStatus();
 
-		// Poll the firmware notification event log so configured events
-		// (station/program/flow/monitor …) surface in the in-app notification
-		// panel and as OS-level local notifications. Throttled internally.
-		if ( OSApp.Analog && typeof OSApp.Analog.updateEventLog === "function" ) {
-			OSApp.Analog.updateEventLog();
-		}
-
 		callback();
 	};
 

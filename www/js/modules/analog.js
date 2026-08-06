@@ -140,53 +140,45 @@ OSApp.Analog.getPushModeStorageKey = function() {
 	return "OSApp.Analog.pushNotificationMode";
 };
 
-OSApp.Analog.getPushNotificationMode = function() {
-	var mode = OSApp.Analog.Constants.PUSH_MODE_OPEN;
+// Push notifications are a single on/off setting now (native push via the
+// forwarder). Stored as PUSH_MODE_ALWAYS (on) / PUSH_MODE_OFF (off) under the
+// legacy key so device-config sync keeps working.
+OSApp.Analog.isPushEnabled = function() {
 	try {
-		var raw = localStorage.getItem(OSApp.Analog.getPushModeStorageKey());
-		if (raw !== null && raw !== undefined) {
-			var parsed = parseInt(raw, 10);
-			if (!isNaN(parsed) && parsed >= OSApp.Analog.Constants.PUSH_MODE_OFF && parsed <= OSApp.Analog.Constants.PUSH_MODE_ALWAYS) {
-				mode = parsed;
-			}
-		}
-	} catch (e) { void e; }
-	return mode;
+		var raw = parseInt(localStorage.getItem(OSApp.Analog.getPushModeStorageKey()), 10);
+		return raw === OSApp.Analog.Constants.PUSH_MODE_ALWAYS;
+	} catch (e) { void e; return false; }
 };
 
-OSApp.Analog.setPushNotificationMode = function(mode) {
-	var parsed = parseInt(mode, 10);
-	if (isNaN(parsed) || parsed < OSApp.Analog.Constants.PUSH_MODE_OFF || parsed > OSApp.Analog.Constants.PUSH_MODE_ALWAYS) {
-		parsed = OSApp.Analog.Constants.PUSH_MODE_OPEN;
-	}
+OSApp.Analog.setPushEnabled = function(enabled) {
+	var val = enabled ? OSApp.Analog.Constants.PUSH_MODE_ALWAYS : OSApp.Analog.Constants.PUSH_MODE_OFF;
 	try {
-		localStorage.setItem(OSApp.Analog.getPushModeStorageKey(), String(parsed));
+		localStorage.setItem(OSApp.Analog.getPushModeStorageKey(), String(val));
 	} catch (e) { void e; }
 	if (OSApp.DeviceConfig && OSApp.DeviceConfig.saveSetting) {
-		OSApp.DeviceConfig.saveSetting("pushMode", parsed);
+		OSApp.DeviceConfig.saveSetting("pushMode", val);
 	}
-	if (parsed !== OSApp.Analog.Constants.PUSH_MODE_OFF) {
+	if (enabled) {
 		OSApp.Analog.ensureNotificationPermission();
 	}
-	OSApp.Analog.checkBackgroundMode();
 	if (OSApp.Push && typeof OSApp.Push.syncPushRegistration === "function") {
 		OSApp.Push.syncPushRegistration();
 	}
-	return parsed;
+	return val;
+};
+
+// Backwards-compatible shims: push.js and stored device config still speak in
+// terms of a "mode", now reduced to Off/Always.
+OSApp.Analog.getPushNotificationMode = function() {
+	return OSApp.Analog.isPushEnabled() ? OSApp.Analog.Constants.PUSH_MODE_ALWAYS : OSApp.Analog.Constants.PUSH_MODE_OFF;
+};
+
+OSApp.Analog.setPushNotificationMode = function(mode) {
+	return OSApp.Analog.setPushEnabled(parseInt(mode, 10) === OSApp.Analog.Constants.PUSH_MODE_ALWAYS);
 };
 
 OSApp.Analog.isPushNotificationAllowedNow = function() {
-	var mode = OSApp.Analog.getPushNotificationMode();
-	if (mode === OSApp.Analog.Constants.PUSH_MODE_OFF) {
-		return false;
-	}
-	if (mode === OSApp.Analog.Constants.PUSH_MODE_OPEN) {
-		// Foreground-only mode: allow local notifications only while app is visible.
-		if (typeof document !== "undefined" && document.hidden === true) {
-			return false;
-		}
-	}
-	return true;
+	return OSApp.Analog.isPushEnabled();
 };
 
 OSApp.Analog.getLocalNotificationPlugin = function() {
@@ -341,32 +333,6 @@ OSApp.Analog.asb_init = function() {
 			visibility: "public",
 		});
 	}
-	if (window.cordova && window.BackgroundFetch) {
-		var BackgroundFetch = window.BackgroundFetch;
-		var fetchCallback = function(taskId) {
-			console.log('[js] BackgroundFetch event received: ', taskId);
-			if (OSApp.Analog.getPushNotificationMode() !== OSApp.Analog.Constants.PUSH_MODE_ALWAYS) {
-				BackgroundFetch.finish(taskId);
-				return;
-			}
-			OSApp.Analog.updateAnalogSensor( function() {
-				OSApp.Analog.updateMonitors( function() {
-					BackgroundFetch.finish(taskId);
-				});
-			});
-		};
-
-		var failureCallback = function(taskId) {
-			console.log('- BackgroundFetch failed');
-			BackgroundFetch.finish(taskId);
-		};
-
-		BackgroundFetch.configure({
-			minimumFetchInterval: 15,
-			requiredNetworkType: BackgroundFetch.NETWORK_TYPE_ANY
-		}, fetchCallback, failureCallback);
-	}
-
 	if (window.OSApp && OSApp.Push && typeof OSApp.Push.init === "function") {
 		OSApp.Push.init();
 	}
@@ -443,22 +409,16 @@ OSApp.Analog.updateProgramAdjustments = function( callback ) {
 OSApp.Analog.checkBackgroundMode = function() {
 	if (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS) return;
 	var backgroundMode = OSApp.Analog.getBackgroundModePlugin();
-	if (!backgroundMode || typeof backgroundMode.isActive !== "function" || typeof backgroundMode.isEnabled !== "function" || typeof backgroundMode.setEnabled !== "function") return;
-	var mode = OSApp.Analog.getPushNotificationMode();
-	var keepBackgroundEnabled = (mode === OSApp.Analog.Constants.PUSH_MODE_ALWAYS) && (OSApp.Analog.monitors && OSApp.Analog.monitors.length > 0);
-	// Enable background mode only in "Always" mode and only when monitors exist.
-	if (keepBackgroundEnabled) {
-		if (!backgroundMode.isActive() && !backgroundMode.isEnabled())
-			backgroundMode.setEnabled(true);
-	} else if (backgroundMode.isEnabled()) {
+	if (!backgroundMode || typeof backgroundMode.isEnabled !== "function" || typeof backgroundMode.setEnabled !== "function") return;
+	// Background polling was removed (events arrive via native push), so keep
+	// background mode disabled.
+	if (backgroundMode.isEnabled()) {
 		backgroundMode.setEnabled(false);
 	}
 };
 
 OSApp.Analog.updateMonitors = function(callback) {
 	callback = callback || function () { };
-
-	OSApp.Analog.checkBackgroundMode();
 
 	var timeout = OSApp.Analog.calcTimeout( OSApp.Analog.monitors && OSApp.Analog.monitors.length );
 	return OSApp.Firmware.sendToOS("/ml?pw=", "json", timeout).then(function (data) {
@@ -468,10 +428,6 @@ OSApp.Analog.updateMonitors = function(callback) {
 		if ( data && Array.isArray( data.monitors ) ) {
 			OSApp.Analog.monitors = data.monitors;
 		}
-		OSApp.Analog.checkMonitorAlerts();
-		// Poll the firmware notification event log so configured events
-		// (IFTTT/MQTT/Email) are also shown as push/local notifications.
-		OSApp.Analog.updateEventLog();
 		callback();
 	});
 };
@@ -503,8 +459,9 @@ OSApp.Analog.notification_action_callback = function() {
 
 // Map a notification priority (0=low, 1=medium, 2=high) to the Android channel /
 // color and schedule an OS-level local notification via the maintained
-// cordova-plugin-local-notification. Used for both monitor alerts and the
-// configured notification events polled from the firmware /nl endpoint.
+// cordova-plugin-local-notification. Retained for firmware-update and other
+// internal one-off notifications; routine controller events are delivered via
+// native push instead of this path.
 OSApp.Analog.showLocalNotification = function(opts) {
 	if (!OSApp.Analog.isPushNotificationAllowedNow()) {
 		return;
@@ -530,7 +487,7 @@ OSApp.Analog.showLocalNotification = function(opts) {
 		text: opts.text || "",
 		androidColor: OSApp.Analog.Constants.NOTIFICATION_COLORS[prio],
 		androidLockscreen: true,
-		sound: prio >= 2 ? "default" : null
+		sound: prio >= 1 ? "default" : null
 	};
 	if (typeof opts.data !== "undefined") {
 		options.data = opts.data;
@@ -572,6 +529,19 @@ OSApp.Analog.showNotifPermissionHelp = function() {
 	if (OSApp.UIDom && typeof OSApp.UIDom.openPopup === "function") {
 		OSApp.UIDom.openPopup(popup);
 	}
+};
+
+// Add an event to the in-app notification panel (badge + slide-out list). This
+// makes events visible in the UI on every platform, including the browser where
+// OS-level notifications are not available. Kept for firmware-update and other
+// internal notifications.
+OSApp.Analog.addEventToPanel = function(dname, text) {
+	if (!OSApp.Notifications || typeof OSApp.Notifications.addNotification !== "function") return;
+	OSApp.Notifications.addNotification({
+		title: text || dname,
+		desc: dname,
+		on: function() { }
+	});
 };
 
 // Notification self-test: verifies that OS-level notifications work on this
@@ -646,199 +616,6 @@ OSApp.Analog.testNotification = function() {
 		diag.push("hasPermission: n/a");
 		doSchedule();
 	}
-};
-
-OSApp.Analog.checkMonitorAlerts = function() {
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	if (!localNotification || !OSApp.Analog.monitors || (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS))
-		return;
-
-	for (let i = 0; i < OSApp.Analog.monitors.length; i++) {
-		var monitor = OSApp.Analog.monitors[i];
-		if (monitor.active) {
-
-			if (!OSApp.Analog.monitorAlerts[monitor.nr]) {
-				OSApp.Analog.monitorAlerts[monitor.nr] = true;
-				var dname;
-				if ( typeof OSApp.currentSession.controller.settings.dname !== "undefined" )
-					dname = OSApp.currentSession.controller.settings.dname;
-				else
-				 	dname = "OpenSprinkler";
-				let prio = Object.prototype.hasOwnProperty.call(monitor, "prio") ? parseInt(monitor.prio, 10) : 0;
-				if (isNaN(prio)) prio = 0;
-
-				OSApp.Analog.showLocalNotification({
-					id: monitor.nr,
-					prio: prio,
-					title: dname,
-					text: monitor.name,
-					context: monitor
-				});
-			}
-		}
-		else if (OSApp.Analog.monitorAlerts[monitor.nr]) {
-			OSApp.Analog.monitorAlerts[monitor.nr] = false;
-		}
-	}
-};
-
-// NOTIFY_MONITOR_LOW / MID / HIGH bit values (see firmware defines.h). Monitor
-// events are already surfaced by checkMonitorAlerts(), so they are skipped when
-// polling the /nl event log to avoid duplicate notifications.
-OSApp.Analog.isMonitorEventType = function(type) {
-	return type === 0x4000 || type === 0x8000 || type === 0x10000;
-};
-
-OSApp.Analog.eventIdStorageKey = function() {
-	var site = (OSApp.currentSession && OSApp.currentSession.currentSite) ||
-		(OSApp.currentSession && OSApp.currentSession.ip) || "default";
-	return "OSApp.Analog.lastEventId." + site;
-};
-
-OSApp.Analog.getLastEventId = function() {
-	try {
-		var v = parseInt(localStorage.getItem(OSApp.Analog.eventIdStorageKey()), 10);
-		return isNaN(v) ? 0 : v;
-	} catch (e) { void e; return 0; }
-};
-
-OSApp.Analog.setLastEventId = function(id) {
-	try {
-		if (typeof id !== "number" || isNaN(id)) return;
-		if (id > OSApp.Analog.getLastEventId()) {
-			localStorage.setItem(OSApp.Analog.eventIdStorageKey(), String(id));
-		}
-	} catch (e) { void e; }
-};
-
-// Drop the stored watermark. Used when the firmware event log (an in-RAM ring
-// buffer) resets its ids after a controller reboot.
-OSApp.Analog.resetLastEventId = function() {
-	try { localStorage.removeItem(OSApp.Analog.eventIdStorageKey()); } catch (e) { void e; }
-};
-
-// Add an event to the in-app notification panel (badge + slide-out list). This
-// makes events visible in the UI on every platform, including the browser where
-// OS-level local notifications are not available.
-OSApp.Analog.addEventToPanel = function(dname, text) {
-	if (!OSApp.Notifications || typeof OSApp.Notifications.addNotification !== "function") return;
-	OSApp.Notifications.addNotification({
-		title: text || dname,
-		desc: dname,
-		on: function() { }
-	});
-};
-
-// Surface freshly received events. Every new event is added to the in-app
-// notification panel; on iOS/Android an OS-level local notification is fired in
-// addition (monitor events are skipped there because checkMonitorAlerts()
-// already raises them, to avoid duplicate OS notifications). When panelOnly is
-// true only the in-app panel is updated (used for the initial baseline so the UI
-// is populated without buzzing the device with a backlog of historic events).
-OSApp.Analog.notifyEvents = function(events, panelOnly) {
-	if (!Array.isArray(events)) return;
-
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	var lastSeen = OSApp.Analog.getLastEventId();
-	var dname = (OSApp.currentSession && OSApp.currentSession.controller &&
-		OSApp.currentSession.controller.settings &&
-		typeof OSApp.currentSession.controller.settings.dname !== "undefined") ?
-		OSApp.currentSession.controller.settings.dname : "OpenSprinkler";
-
-	for (var i = 0; i < events.length; i++) {
-		var ev = events[i];
-		if (!ev || typeof ev.id !== "number") continue;
-		if (ev.id <= lastSeen) continue;
-
-		var text = ev.text || "";
-		var prio = (typeof ev.prio === "number") ? ev.prio : 0;
-
-		// Always show in the in-app notification panel.
-		OSApp.Analog.addEventToPanel(dname, text);
-
-		// Additionally raise an OS-level local notification on device, except for
-		// monitor events which are handled by checkMonitorAlerts().
-		if (!panelOnly && localNotification && !OSApp.Analog.isMonitorEventType(ev.type)) {
-			OSApp.Analog.showLocalNotification({
-				// Keep event notification ids in a separate range from monitor ids
-				// (monitor.nr) so they don't cancel each other.
-				id: 100000 + (ev.id % 900000),
-				prio: prio,
-				title: dname,
-				text: text,
-				data: { evid: ev.id, type: ev.type }
-			});
-		}
-	}
-};
-
-// Poll the firmware notification event log (/nl) and surface new events. Runs on
-// all platforms so the in-app notification panel works in the browser too.
-// Firmware without this endpoint simply returns an error which is ignored
-// (feature-detection by request). Throttled and guarded against overlap so it
-// can be called from the frequent status-refresh loop.
-OSApp.Analog.updateEventLog = function(callback) {
-	callback = callback || function () { };
-
-	if (!OSApp.currentSession || typeof OSApp.currentSession.isControllerConnected !== "function" ||
-		!OSApp.currentSession.isControllerConnected()) {
-		callback();
-		return $.Deferred().resolve();
-	}
-	if (OSApp.Analog.eventPollInFlight) {
-		callback();
-		return $.Deferred().resolve();
-	}
-	var now = Date.now();
-	if (OSApp.Analog.lastEventPoll && (now - OSApp.Analog.lastEventPoll) < 12000) {
-		callback();
-		return $.Deferred().resolve();
-	}
-	OSApp.Analog.lastEventPoll = now;
-	OSApp.Analog.eventPollInFlight = true;
-
-	var lastId = OSApp.Analog.getLastEventId();
-	// First poll after a fresh install/site: establish a baseline without firing
-	// notifications for the backlog of historic events.
-	var baseline = (lastId === 0 && OSApp.Analog.eventBaselineDone !== true);
-	var timeout = OSApp.Analog.calcTimeout(24);
-
-	var done = function () {
-		OSApp.Analog.eventPollInFlight = false;
-		callback();
-	};
-
-	return OSApp.Firmware.sendToOS("/nl?after=" + lastId + "&pw=", "json", timeout).then(function (data) {
-		// The firmware event log lives in RAM and restarts its ids at 1 after a
-		// controller reboot. If the reported "last" id is below our stored watermark
-		// the log was reset: drop the stale watermark and re-baseline on the next
-		// poll, otherwise every new event (id 1,2,3…) would be filtered out forever.
-		if (data && typeof data.last === "number" && data.last < lastId) {
-			OSApp.Analog.resetLastEventId();
-			OSApp.Analog.eventBaselineDone = false;
-			OSApp.Analog.lastEventPoll = 0; // allow an immediate re-poll from id 0
-			done();
-			return;
-		}
-		if (data && Array.isArray(data.events)) {
-			if (baseline) {
-				// Populate the in-app panel with the most recent few events (no OS
-				// notifications) so the UI is not empty on first load, without
-				// replaying the whole backlog to the notification center.
-				OSApp.Analog.notifyEvents(data.events.slice(-5), true);
-			} else {
-				OSApp.Analog.notifyEvents(data.events, false);
-			}
-			if (typeof data.last === "number") {
-				OSApp.Analog.setLastEventId(data.last);
-			}
-			OSApp.Analog.eventBaselineDone = true;
-		}
-		done();
-	}, function () {
-		// Endpoint missing (older firmware) or transient error: ignore silently.
-		done();
-	});
 };
 
 OSApp.Analog.updateSensorShowArea = function( page ) {
