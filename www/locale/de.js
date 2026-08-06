@@ -860,7 +860,7 @@
       "Note: There is a limit on the number of character used to configure this station type.": "Hinweis: Die Anzahl der Zeichen ist limitiert.",
       "Notice: If you want to combine multiple sensors, then build a sensor group. ": "Hinweis: Wenn Sie mehrere Sensoren kombinieren möchten, dann bilden Sie eine Sensorgruppe.",
       "Notification Events": "Ereignisse Konfigurieren",
-      "Notifications": "Mitteilungen",
+      "Notifications": "Benachrichtigungen",
       "Notifications are not permitted for this app. Please enable them in the system settings.": "Benachrichtigungen sind für diese App nicht erlaubt. Bitte aktiviere sie in den Systemeinstellungen.",
       "Nov": "Nov",
       "Now": "Jetzt",
