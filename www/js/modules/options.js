@@ -911,8 +911,11 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 	// Open the Integrations section when any integration exists or when native
 	// push is available, so the single push-notifications checkbox can live at
-	// the bottom of it.
-	var nativePushAvail = OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable();
+	// the bottom of it. The checkbox drives the controller's own push-out, so it
+	// is offered whenever the firmware advertises push support (settings.push),
+	// independent of the local-notification plugin (absent in the browser).
+	var nativePushAvail = ( OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) ||
+		( OSApp.currentSession.controller && OSApp.currentSession.controller.settings && typeof OSApp.currentSession.controller.settings.push !== "undefined" );
 	if ( typeof OSApp.currentSession.controller.settings.ifkey !== "undefined" || typeof OSApp.currentSession.controller.settings.mqtt !== "undefined" ||
 		typeof OSApp.currentSession.controller.settings.otc !== "undefined" || typeof OSApp.currentSession.controller.settings.influxdb !== "undefined" || nativePushAvail ) {
 		list += "</fieldset><fieldset data-role='collapsible'" +
@@ -1006,15 +1009,21 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 	// Push notifications: a single checkbox shown at the bottom of the
 	// Integrations section (native push delivered via the forwarder).
-	if ( OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) {
+	if ( nativePushAvail ) {
 		var pushOn = ( typeof OSApp.Analog.isPushEnabled === "function" && OSApp.Analog.isPushEnabled() ) ||
 			( OSApp.currentSession.controller && OSApp.currentSession.controller.settings &&
 			  OSApp.currentSession.controller.settings.push && OSApp.currentSession.controller.settings.push.en ? true : false );
-		list += "<div class='ui-field-contain'><label for='push-en'>" + OSApp.Language._( "Push notifications" ) +
-				"<button data-helptext='" +
-					OSApp.Language._( "Deliver notifications to this device as push, even when the app is closed. The controller sends events to the push service itself; this requires the controller to have internet access." ) +
-					"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
-			"</label><input type='checkbox' data-mini='true' id='push-en'" + ( pushOn ? " checked" : "" ) + "></div>";
+		// Mirror the indented layout of the "mda" weather checkbox: an empty
+		// spacer label fills the left column, the second label (dummy `for`, not
+		// the checkbox id, so jQM associates only the wrapping label) holds the
+		// control in the indented content column.
+		list += "<div class='ui-field-contain'><label for='pushEnSpacer'></label>" +
+				"<label for='pushEnSpacer' id='pushEnLabel'>" +
+					"<button data-helptext='" +
+						OSApp.Language._( "Deliver notifications to this device as push, even when the app is closed. The controller sends events to the push service itself; this requires the controller to have internet access." ) +
+						"' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button>" +
+					"<input data-mini='true' id='push-en' type='checkbox'" + ( pushOn ? " checked='checked'" : "" ) + ">" + OSApp.Language._( "Push notifications" ) +
+				"</label></div>";
 
 		if ( OSApp.Push && typeof OSApp.Push.getBaseUrl === "function" ) {
 			var pushEndpoint = OSApp.Push.getBaseUrl();

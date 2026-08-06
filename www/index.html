@@ -150,7 +150,10 @@
 
 								var handleRedirect = function(fwv, fwm) {
 									whenVersions(function(vData) {
-										var targetVersion = "2.4.0.224";
+										// Fall back to the catalog's own default so this stays
+										// correct across releases; the literal is only a last resort
+										// when versions.json cannot be loaded at all.
+										var targetVersion = (vData && vData.default) || "2.4.0.224";
 										try {
 											var versions = (vData && vData.versions) || [];
 											var preferredFromCatalog = null;
@@ -197,7 +200,7 @@
 													if (baseMatching.length > 0) {
 														targetVersion = baseMatching[0];
 													} else {
-														targetVersion = "2.4.0.215";
+														targetVersion = (vData && vData.default) || "2.4.0.224";
 													}
 												}
 											}
@@ -321,7 +324,7 @@
 		<script src="js/modules/network.js"></script>
 		<script src="js/modules/notifications.js"></script>
 		<script src="js/modules/push.js?v=7"></script>
-		<script src="js/modules/options.js?v=14"></script>
+		<script src="js/modules/options.js?v=18"></script>
 		<script src="js/modules/programs.js?v=1"></script>
 		<script src="js/modules/sites.js?v=osai3"></script>
 		<script src="js/modules/sites-otc.js"></script>

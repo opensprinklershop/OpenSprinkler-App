@@ -1600,6 +1600,8 @@
       "Always": "Always",
       "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.": "Controls whether native push notifications are disabled, shown only while the app is open, or also kept active in background mode.",
       "Push Service URL": "Push Service URL",
+      "Push notifications": "புஷ் அறிவிப்புகள்",
+      "Deliver notifications to this device as push, even when the app is closed. The controller sends events to the push service itself; this requires the controller to have internet access.": "செயலி மூடப்பட்டிருந்தாலும் இந்தச் சாதனத்திற்கு புஷ் அறிவிப்புகளாக அறிவிப்புகளை அனுப்பவும். கட்டுப்படுத்தி நிகழ்வுகளை புஷ் சேவைக்குத் தானே அனுப்புகிறது; இதற்கு கட்டுப்படுத்திக்கு இணைய அணுகல் தேவை.",
       "Optional. URL of the OpenSprinkler push forwarder used to deliver notifications when the app is closed. Leave empty to disable server push.": "Optional. URL of the OpenSprinkler push forwarder used to deliver notifications when the app is closed. Leave empty to disable server push."
    }
 }
