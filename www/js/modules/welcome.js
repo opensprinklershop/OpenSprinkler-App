@@ -255,10 +255,11 @@ OSApp.Welcome.showSetupWizard = function( state ) {
 			OSApp.Welcome.buildWizardStepContent( steps[ stepIndex ], stepIndex + 1, totalSteps ),
 		navHtml = "<div class='setup-wizard-nav'>";
 
+	var browserLang = OSApp.Welcome.getBrowserLanguage();
+
 	if ( isLanguage ) {
-		var browserLang = OSApp.Welcome.getBrowserLanguage(),
-			continueLabel = OSApp.Welcome.ContinueNativeLabels[ browserLang ] || OSApp.Welcome.ContinueNativeLabels.en;
-		navHtml += "<a href='#' class='ui-btn ui-btn-inline setup-lang-next' data-lang-code='" + browserLang + "'>" + continueLabel + "</a>";
+		var continueLabel = OSApp.Welcome.ContinueNativeLabels[ browserLang ] || OSApp.Welcome.ContinueNativeLabels.en;
+		navHtml += "<a href='#' class='ui-btn ui-btn-inline setup-lang-next'>" + continueLabel + "</a>";
 	} else {
 		if ( stepIndex > 0 ) {
 			navHtml += "<a href='#' class='ui-btn ui-btn-inline setup-back'>" + _( "Back" ) + "</a>";
@@ -291,9 +292,19 @@ OSApp.Welcome.showSetupWizard = function( state ) {
 
 	// Language step handlers
 	popup.find( "[data-lang-code]" ).on( "click", function() {
-		var lang = $( this ).data( "lang-code" );
+		var lang = $( this ).attr( "data-lang-code" );
 		closeAndRun( function() {
 			OSApp.Language.updateLang( lang, function() {
+				OSApp.Welcome.showSetupWizard( { view: "steps", step: 0 } );
+			} );
+		} );
+		return false;
+	} );
+
+	// "Continue in <browser language>" applies the detected language.
+	popup.find( ".setup-lang-next" ).on( "click", function() {
+		closeAndRun( function() {
+			OSApp.Language.updateLang( browserLang, function() {
 				OSApp.Welcome.showSetupWizard( { view: "steps", step: 0 } );
 			} );
 		} );
