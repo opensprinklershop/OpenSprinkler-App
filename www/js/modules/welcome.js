@@ -290,24 +290,24 @@ OSApp.Welcome.showSetupWizard = function( state ) {
 		popup.popup( "close" );
 	};
 
+	// Apply the chosen language, then rebuild the guide in that language.
+	// showSetupWizard() destroys the current popup at its top, matching how the
+	// step navigation already swaps popups reliably.
+	var applyLanguage = function( lang ) {
+		OSApp.Language.updateLang( lang, function() {
+			OSApp.Welcome.showSetupWizard( { view: "steps", step: 0 } );
+		} );
+	};
+
 	// Language step handlers
 	popup.find( "[data-lang-code]" ).on( "click", function() {
-		var lang = $( this ).attr( "data-lang-code" );
-		closeAndRun( function() {
-			OSApp.Language.updateLang( lang, function() {
-				OSApp.Welcome.showSetupWizard( { view: "steps", step: 0 } );
-			} );
-		} );
+		applyLanguage( $( this ).attr( "data-lang-code" ) );
 		return false;
 	} );
 
 	// "Continue in <browser language>" applies the detected language.
 	popup.find( ".setup-lang-next" ).on( "click", function() {
-		closeAndRun( function() {
-			OSApp.Language.updateLang( browserLang, function() {
-				OSApp.Welcome.showSetupWizard( { view: "steps", step: 0 } );
-			} );
-		} );
+		applyLanguage( browserLang );
 		return false;
 	} );
 
