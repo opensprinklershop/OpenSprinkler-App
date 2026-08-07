@@ -25,6 +25,28 @@ OSApp.Push._registeredToken = null;
 // Default forwarder endpoint used when the user has not set a custom one.
 OSApp.Push.DEFAULT_BASE_URL = "https://opensprinklershop.de/wp-json/ospf/v1";
 
+// WebPush (browser/PWA) via Firebase Cloud Messaging. These are public client
+// values (as embedded in any web app). Requires HTTPS (or localhost).
+OSApp.Push.FIREBASE_SDK_VERSION = "10.12.2";
+OSApp.Push.FIREBASE_CONFIG = {
+	apiKey: "AIzaSyA5IqYBDxcdnEWPwuos_g0YONrFaYZgW68",
+	authDomain: "opensprinkler-notify.firebaseapp.com",
+	projectId: "opensprinkler-notify",
+	storageBucket: "opensprinkler-notify.firebasestorage.app",
+	messagingSenderId: "558029754966",
+	appId: "1:558029754966:web:b0c03a0b51df18f5b821f7"
+};
+OSApp.Push.VAPID_KEY = "BFPhjFO2dh3eo7svkbIlHbDgO1sf8ei6_KJ9iYe9o6YSkL-ZSmYYM0OGGHnUHawGOubWPqG3_tDPvA2Taguqc3s";
+
+// WebPush is available in a plain browser/PWA (no Cordova) that supports the
+// Service Worker + Push APIs. Delivery still requires HTTPS (localhost exempt).
+OSApp.Push.isWeb = function() {
+	return typeof window.cordova === "undefined" &&
+		"serviceWorker" in navigator &&
+		"PushManager" in window &&
+		typeof window.Notification !== "undefined";
+};
+
 // Resolve the forwarder base URL, e.g. "https://example.com/wp-json/ospf/v1".
 // Unset (null) falls back to the default; an explicitly stored empty string
 // means the user disabled server push.
@@ -90,6 +112,9 @@ OSApp.Push.getUserKey = function() {
 OSApp.Push.getPlatform = function() {
 	if ( OSApp.currentDevice && OSApp.currentDevice.isiOS ) {
 		return "ios";
+	}
+	if ( OSApp.Push.isWeb() ) {
+		return "web";
 	}
 	return "android";
 };
@@ -171,13 +196,93 @@ OSApp.Push.getFcmToken = function( callback ) {
 		return;
 	}
 
+	// Browser / PWA: Firebase Cloud Messaging WebPush.
+	if ( OSApp.Push.isWeb() ) {
+		OSApp.Push._getWebFcmToken( callback );
+		return;
+	}
+
 	callback( null );
+};
+
+// Lazy-load the Firebase compat SDK, init the app and register the dedicated
+// FCM service worker (own scope so it never clashes with the app's /sw.js).
+OSApp.Push._ensureWebFcm = function( cb ) {
+	if ( OSApp.Push._webMessaging ) {
+		cb( OSApp.Push._webMessaging, OSApp.Push._webSwReg );
+		return;
+	}
+	var V = OSApp.Push.FIREBASE_SDK_VERSION;
+	var loadScript = function( src, next ) {
+		var s = document.createElement( "script" );
+		s.src = src;
+		s.onload = next;
+		s.onerror = function() { cb( null ); };
+		document.head.appendChild( s );
+	};
+	var init = function() {
+		try {
+			if ( !window.firebase || !window.firebase.messaging ) { cb( null ); return; }
+			if ( !OSApp.Push._webApp ) {
+				OSApp.Push._webApp = window.firebase.initializeApp( OSApp.Push.FIREBASE_CONFIG );
+			}
+			navigator.serviceWorker.register( "/firebase-messaging-sw.js", { scope: "/firebase-cloud-messaging-push-scope" } )
+				.then( function( reg ) {
+					OSApp.Push._webSwReg = reg;
+					OSApp.Push._webMessaging = window.firebase.messaging();
+					try {
+						OSApp.Push._webMessaging.onMessage( function( payload ) {
+							OSApp.Push._showWebForeground( payload, reg );
+						} );
+					} catch ( e ) { void e; }
+					cb( OSApp.Push._webMessaging, reg );
+				} )
+				.catch( function() { cb( null ); } );
+		} catch ( e ) { void e; cb( null ); }
+	};
+	if ( window.firebase && window.firebase.messaging ) { init(); return; }
+	loadScript( "https://www.gstatic.com/firebasejs/" + V + "/firebase-app-compat.js", function() {
+		loadScript( "https://www.gstatic.com/firebasejs/" + V + "/firebase-messaging-compat.js", init );
+	} );
+};
+
+// Request notification permission (user gesture recommended) and resolve a token.
+OSApp.Push._getWebFcmToken = function( callback ) {
+	OSApp.Push._ensureWebFcm( function( messaging, swReg ) {
+		if ( !messaging ) { callback( null ); return; }
+		var proceed = function() {
+			if ( window.Notification.permission !== "granted" ) { callback( null ); return; }
+			messaging.getToken( { vapidKey: OSApp.Push.VAPID_KEY, serviceWorkerRegistration: swReg } )
+				.then( function( token ) { callback( token || null ); } )
+				.catch( function() { callback( null ); } );
+		};
+		if ( window.Notification.permission === "granted" ) {
+			proceed();
+		} else {
+			window.Notification.requestPermission().then( function() { proceed(); } ).catch( function() { callback( null ); } );
+		}
+	} );
+};
+
+// Show a notification for a foreground WebPush message (FCM does not auto-display
+// while the tab is focused).
+OSApp.Push._showWebForeground = function( payload, reg ) {
+	try {
+		var d = ( payload && payload.data ) || {};
+		var n = ( payload && payload.notification ) || {};
+		var title = n.title || d.notification_title || "OpenSprinkler";
+		var body = n.body || d.event_text || d.notification_body || "";
+		if ( reg && typeof reg.showNotification === "function" ) {
+			reg.showNotification( title, { body: body, tag: d.event_id || undefined, data: d } );
+		}
+	} catch ( e ) { void e; }
 };
 
 OSApp.Push.isFcmAvailable = function() {
 	return !!( ( window.FirebasexMessaging && typeof window.FirebasexMessaging.getToken === "function" ) ||
 		( window.FirebasePlugin && typeof window.FirebasePlugin.getToken === "function" ) ||
-		( typeof window.PushNotification === "object" && typeof window.PushNotification.init === "function" ) );
+		( typeof window.PushNotification === "object" && typeof window.PushNotification.init === "function" ) ||
+		OSApp.Push.isWeb() );
 };
 
 OSApp.Push._request = function( method, path, body ) {
@@ -207,7 +312,7 @@ OSApp.Push._request = function( method, path, body ) {
 // (device_key) + password hash; the firmware pushes events to the forwarder
 // itself, so this works on the local network and without any cloud service.
 OSApp.Push.registerForPush = function() {
-	if ( !OSApp.currentDevice || ( !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS ) ) {
+	if ( !OSApp.currentDevice || ( !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS && !OSApp.Push.isWeb() ) ) {
 		return;
 	}
 	if ( !OSApp.Push.isConfigured() || !OSApp.Push.isFcmAvailable() ) {
