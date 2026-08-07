@@ -27,8 +27,9 @@
     <preference name="loadUrlTimeoutValue" value="700000" />
     <platform name="ios">
         <custom-preference name="ios-XCBuildConfiguration-PRODUCT_BUNDLE_IDENTIFIER[sdk=macosx*]" value="com.albahra.Sprinklers.osx" buildType="release" />
-        <preference name="deployment-target" value="13.0" />
-        <preference name="scheme" value="ionic" />
+        <preference name="deployment-target" value="15.0" />
+        <preference name="scheme" value="file" />
+        <resource-file src="GoogleService-Info.plist" />
         <config-file target="*-Info.plist" parent="NSLocationAlwaysAndWhenInUseUsageDescription">
             <string>Your current location will be used to configure OpenSprinkler.</string>
         </config-file>

@@ -58,3 +58,4 @@ DEADJOE
 *.sav
 # Firebase
 .firebase
+GoogleService-Info.plist
