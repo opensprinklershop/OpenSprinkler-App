@@ -487,33 +487,50 @@ hr.divider {
     width:300px
 }
 
-/* First-time setup assistant: use a fullscreen popup layout for small mobile viewports. */
+/* First-time setup assistant: compact centered dialog on large screens. */
 #setupWizard {
-    width: 100vw !important;
-    max-width: none !important;
-    border: 0 !important;
-    border-radius: 0 !important;
-}
-
-#setupWizard-popup {
-    width: 100vw !important;
-    max-width: none !important;
-    left: 0 !important;
-    right: 0 !important;
-    top: 0 !important;
-    bottom: 0 !important;
-    transform: none !important;
+    width: 460px;
+    max-width: 92vw;
+    box-sizing: border-box;
 }
 
 #setupWizard .ui-content {
-    max-width: none !important;
-    margin: 0 !important;
-    min-height: 100dvh;
-    max-height: 100dvh;
     box-sizing: border-box;
+    max-height: 85vh;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    padding: calc( env( safe-area-inset-top ) + 12px ) 16px calc( env( safe-area-inset-bottom ) + 16px );
+    padding: 16px;
+}
+
+#setupWizard .setup-wizard-content {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Fullscreen layout for small mobile viewports. */
+@media ( max-width: 480px ) {
+    #setupWizard {
+        width: 100vw !important;
+        max-width: none !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    #setupWizard-popup {
+        width: 100vw !important;
+        max-width: none !important;
+        left: 0 !important;
+        right: 0 !important;
+        top: 0 !important;
+        bottom: 0 !important;
+        transform: none !important;
+    }
+
+    #setupWizard .ui-content {
+        min-height: 100dvh;
+        max-height: 100dvh;
+        padding: calc( env( safe-area-inset-top ) + 12px ) 16px calc( env( safe-area-inset-bottom ) + 16px );
+    }
 }
 
 #setupWizard .setup-wizard-steps {
@@ -521,10 +538,101 @@ hr.divider {
     padding-left: 1.2em;
 }
 
-#setupWizard .setup-cloud-login,
+#setupWizard .setup-wizard-content > a.ui-btn {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#setupWizard .setup-wizard-logo {
+    margin: 0 auto 12px;
+}
+
+#setupWizard .setup-wizard-progress {
+    text-align: center;
+    font-size: 12px;
+    opacity: 0.6;
+    margin: 0 0 0.8em;
+}
+
+#setupWizard .setup-wizard-hint {
+    font-size: 12px;
+    opacity: 0.8;
+}
+
+#setupWizard .setup-wizard-devices-title {
+    margin-bottom: 0.3em;
+    font-weight: 600;
+}
+
+#setupWizard .setup-wizard-devices {
+    list-style: none;
+    margin: 0 0 1em;
+    padding: 0;
+}
+
+#setupWizard .setup-wizard-devices li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba( 255, 255, 255, 0.08 );
+}
+
+#setupWizard .setup-wizard-devices li:last-child {
+    border-bottom: 0;
+}
+
+#setupWizard .setup-wizard-device-img {
+    flex: 0 0 auto;
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    border-radius: 6px;
+    background: #fff;
+    padding: 2px;
+    box-sizing: border-box;
+}
+
+#setupWizard .setup-wizard-device-name {
+    flex: 1 1 auto;
+    font-size: 13px;
+}
+
+#setupWizard .setup-wizard-devices a.ui-btn {
+    flex: 0 0 auto;
+    margin: 0;
+    white-space: nowrap;
+}
+
+#setupWizard .setup-wizard-help {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+#setupWizard .setup-wizard-langs {
+    max-height: 45vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+#setupWizard .setup-wizard-nav {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-top: 0.5em;
+}
+
+#setupWizard .setup-wizard-nav a.ui-btn {
+    flex: 1 1 0;
+    box-sizing: border-box;
+    margin: 0;
+}
+
 #setupWizard .setup-skip {
     width: 100%;
     box-sizing: border-box;
+    margin-top: 8px;
 }
 
 /*

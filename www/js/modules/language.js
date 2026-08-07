@@ -138,7 +138,9 @@ OSApp.Language.updateUIElements = function() {
 	}
 };
 
-OSApp.Language.updateLang = function( lang ) {
+OSApp.Language.updateLang = function( lang, callback ) {
+
+	callback = typeof callback === "function" ? callback : function() {};
 
 	//Empty out the current OSApp.uiState.language (English is provided as the key)
 	OSApp.uiState.language = {};
@@ -149,7 +151,7 @@ OSApp.Language.updateLang = function( lang ) {
 			//Identify the current browser's locale
 			var locale = data.lang || navigator.language || navigator.browserLanguage || navigator.systemLanguage || navigator.userLanguage || "en";
 
-			OSApp.Language.updateLang( locale.substring( 0, 2 ) );
+			OSApp.Language.updateLang( locale.substring( 0, 2 ), callback );
 		} );
 		return;
 	}
@@ -159,6 +161,7 @@ OSApp.Language.updateLang = function( lang ) {
 
 	if ( lang === "en" ) {
 		OSApp.Language.setLang();
+		callback();
 		return;
 	}
 
@@ -189,6 +192,7 @@ OSApp.Language.updateLang = function( lang ) {
 				console.error( "Language file format error: missing 'messages' object" );
 				OSApp.Language.setLang();
 			}
+			callback();
 		} ).fail( function( jqxhr, textStatus, errorThrown ) {
 			console.warn( "Language file load failed for " + currentURL + ": " + textStatus + " - " + errorThrown );
 			if ( index + 1 < attempts.length ) {
@@ -197,6 +201,7 @@ OSApp.Language.updateLang = function( lang ) {
 				console.error( "Response status: " + jqxhr.status );
 				alert( "Error loading language file: " + textStatus + "\nURL: " + currentURL );
 				OSApp.Language.setLang();
+				callback();
 			}
 		} );
 	};
