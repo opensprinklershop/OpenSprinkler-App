@@ -138,6 +138,14 @@ for PLAT_RES in platforms/ios/www/res platforms/browser/www/res; do
 	fi
 done
 
+# Ensure the iOS Firebase config (root master) is in the firebasex-core plugin,
+# whose src/ios copy is what gets bundled. plugins/ is gitignored, so the tracked
+# master lives at the repo root.
+if [ -f GoogleService-Info.plist ]; then
+	cp GoogleService-Info.plist plugins/cordova-plugin-firebasex-core/src/ios/GoogleService-Info.plist
+	echo "Copied GoogleService-Info.plist into firebasex-core"
+fi
+
 cordova build ios --device --release --buildConfig build.json
 
 # Clean up dynamically packaged UI versions from git-tracked workspace (keep versions.json if original exists)
