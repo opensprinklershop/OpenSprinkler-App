@@ -132,6 +132,7 @@ OSApp.Storage.loadLocalSettings = function() {
 				OSApp.uiState.is24Hour = false;
 				break;
 			default:
+				OSApp.uiState.is24Hour = OSApp.Utils.getDefault24HourSetting();
 		}
 	} );
 	OSApp.Storage.get( "groupView", function( data ) {

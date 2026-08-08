@@ -84,12 +84,51 @@ OSApp.currentDevice = {
 };
 OSApp.currentDevice.isFileCapable = !OSApp.currentDevice.isiOS && !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isOSXApp && window.FileReader;
 
+// Shared helper utilities
+OSApp.Utils = OSApp.Utils || {};
+OSApp.Utils.getDefault24HourSetting = function() {
+	var tz = null;
+	var locale = null;
+
+	if ( OSApp.currentSession && OSApp.currentSession.controller && OSApp.currentSession.controller.options && OSApp.currentSession.controller.options.tz ) {
+		tz = OSApp.currentSession.controller.options.tz;
+	}
+	if ( !tz && typeof Intl !== "undefined" && Intl.DateTimeFormat ) {
+		try {
+			tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+		} catch ( e ) {
+			void e;
+		}
+	}
+	if ( OSApp.currentSession && OSApp.currentSession.lang ) {
+		locale = OSApp.currentSession.lang;
+	} else if ( navigator && navigator.language ) {
+		locale = navigator.language;
+	}
+	if ( !tz && !locale ) {
+		return false;
+	}
+
+	try {
+		var sampleDate = new Date( "2020-01-01T13:30:00Z" );
+		var formatted = new Intl.DateTimeFormat( locale || undefined, {
+			timeZone: tz || undefined,
+			hour: "numeric",
+			minute: "numeric"
+		} ).format( sampleDate );
+		return !/\b(am|pm)\b/i.test( formatted );
+	} catch ( e ) {
+		void e;
+		return false;
+	}
+};
+
 // UI state
 OSApp.uiState = {
 	appVersion: '0.0.0', // Replaced by build scripts from config.xml or the release workflow
 	errorTimeout: undefined,
 	goingBack: false,
-	is24Hour: false,
+	is24Hour: OSApp.Utils.getDefault24HourSetting(),
 	groupView: false,
 	sortByStationName: false,
 	language: undefined,

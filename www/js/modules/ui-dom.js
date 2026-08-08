@@ -1665,8 +1665,20 @@ OSApp.UIDom.showTimeInput = function( opt ) {
 					val = parseInt( input.val() );
 
 				if ( dir === 1 ) {
-					if ( isHour && ( ( OSApp.uiState.is24Hour && val >= 24 ) || ( !OSApp.uiState.is24Hour && val >= 12 ) ) ) {
-						val = 0;
+					if ( isHour ) {
+						// Increment hour with proper range validation
+						if ( OSApp.uiState.is24Hour ) {
+							if ( val >= 23 ) {
+								val = 0;
+							}
+						} else {
+							// 12-hour format: 1-12 with AM/PM toggle
+							if ( val >= 12 ) {
+								val = 1;
+								isPM = !isPM;
+								popup.find( ".period" ).text( getPeriod() );
+							}
+						}
 					}
 					if ( !isHour && val >= 59 ) {
 						val = -1;
@@ -1681,13 +1693,27 @@ OSApp.UIDom.showTimeInput = function( opt ) {
 							hour.val( hourFixed + 1 );
 						}
 					}
-				} else if ( isHour && val <= 1 ) {
-					val = 13;
-				} else if ( !isHour && val <= 0 ) {
-					return;
+				} else if ( dir === -1 ) {
+					if ( isHour ) {
+						// Decrement hour with proper range validation
+						if ( OSApp.uiState.is24Hour ) {
+							if ( val <= 0 ) {
+								val = 23;
+							}
+						} else {
+							// 12-hour format: 1-12 with AM/PM toggle
+							if ( val <= 1 ) {
+								val = 12;
+								isPM = !isPM;
+								popup.find( ".period" ).text( getPeriod() );
+							}
+						}
+					} else if ( val <= 0 ) {
+						return;
+					}
 				}
 
-				if ( ( !isPM && to > 719 ) || ( isPM && to < 721 ) || ( isPM && to > 1439 ) || ( !isPM && dir === -1 && to < 0 ) ) {
+				if ( !isHour && ( ( !isPM && to > 719 ) || ( isPM && to < 721 ) || ( isPM && to > 1439 ) || ( !isPM && dir === -1 && to < 0 ) ) ) {
 					isPM = !isPM;
 					popup.find( ".period" ).text( getPeriod() );
 				}

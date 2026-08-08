@@ -2025,33 +2025,72 @@ OSApp.Options.showOptions = function( expandItem ) {
 	} );
 
 	page.find( "#o49" ).on( "click", function() {
-		var events = {
-			program: OSApp.Language._( "Program Start" ),
-			sensor1: OSApp.Language._( "Sensor 1 Update" ),
-			flow: OSApp.Language._( "Flow Sensor Update" ),
-			weather: OSApp.Language._( "Weather Adjustment Update" ),
-			reboot: OSApp.Language._( "Controller Reboot" ),
-			run: OSApp.Language._( "Station Finish" ),
-			sensor2: OSApp.Language._( "Sensor 2 Update" ),
-			rain: OSApp.Language._( "Rain Delay Update" ),
-			station: OSApp.Language._( "Station Start" ),
-			flow_alert: OSApp.Language._( "Flow Alert" ),
-			curr_alert: OSApp.Language._( "Under/Overcurrent Fault" ),
-			monthly_report: OSApp.Language._( "Monthly Water Report" ),
-			noflow: OSApp.Language._( "No Flow Alert" ),
-			pipe_burst: OSApp.Language._( "Pipe Burst Alert" ),
-			warning_low: OSApp.Language._("Monitoring-warnings level low"),
-			warning_med: OSApp.Language._("Monitoring-warnings level medium"),
-			warning_high: OSApp.Language._("Monitoring-warnings level high"),
-		}, button = this, curr = parseInt( button.value ), inputs = "", a = 0, ife = 0;
+		var eventGroups = [
+			{
+				title: OSApp.Language._( "Programs" ),
+				events: [
+					{ key: "program", label: OSApp.Language._( "Program Start" ) },
+					{ key: "program_end", label: OSApp.Language._( "Program End" ) }
+				]
+			},
+			{
+				title: OSApp.Language._( "Sensors & Weather" ),
+				events: [
+					{ key: "sensor1", label: OSApp.Language._( "Sensor 1 Update" ) },
+					{ key: "flow", label: OSApp.Language._( "Flow Sensor Update" ) },
+					{ key: "weather", label: OSApp.Language._( "Weather Adjustment Update" ) },
+					{ key: "sensor2", label: OSApp.Language._( "Sensor 2 Update" ) },
+					{ key: "rain", label: OSApp.Language._( "Rain Delay Update" ) }
+				]
+			},
+			{
+				title: OSApp.Language._( "Stations & Flow" ),
+				events: [
+					{ key: "run", label: OSApp.Language._( "Station Finish" ) },
+					{ key: "station", label: OSApp.Language._( "Station Start" ) },
+					{ key: "flow_alert", label: OSApp.Language._( "Flow Alert" ) },
+					{ key: "curr_alert", label: OSApp.Language._( "Under/Overcurrent Fault" ) },
+					{ key: "monthly_report", label: OSApp.Language._( "Monthly Water Report" ) },
+					{ key: "noflow", label: OSApp.Language._( "No Flow Alert" ) },
+					{ key: "pipe_burst", label: OSApp.Language._( "Pipe Burst Alert" ) }
+				]
+			},
+			{
+				title: OSApp.Language._( "Alerts & Monitoring" ),
+				events: [
+					{ key: "warning_low", label: OSApp.Language._( "Monitoring-warnings level low" ) },
+					{ key: "warning_med", label: OSApp.Language._( "Monitoring-warnings level medium" ) },
+					{ key: "warning_high", label: OSApp.Language._( "Monitoring-warnings level high" ) },
+					{ key: "reboot", label: OSApp.Language._( "Controller Reboot" ) }
+				]
+			}
+		];
+		var events = [];
+		var button = this, curr = parseInt( button.value ), inputs = "", a = 0, ife = 0;
+		$.each( eventGroups, function( _, group ) {
+			if ( group.events && group.events.length ) {
+				inputs += "<div class='ui-field-contain' style='margin:0 0 .4em 0;'><div class='ui-bar ui-bar-a'>" + group.title + "</div>";
+				$.each( group.events, function( _, event ) {
+					events.push( event );
+				} );
+				inputs += "</div>";
+			}
+		} );
 
 		let no_ife2 = typeof OSApp.currentSession.controller.options.ife2 === "undefined";
 		let no_ife3 = typeof OSApp.currentSession.controller.options.ife3 === "undefined";
-		$.each( events, function( i, val ) {
-			inputs += "<label for='notif-" + i + "'><input class='needsclick' data-iconpos='right' id='notif-" + i + "' type='checkbox' " +
-				( OSApp.Utils.getBitFromByte( curr, a ) ? "checked='checked'" : "" ) + ( ( no_ife2 && a >= 8 ) || ( no_ife3 && a >= 16 ) ? " disabled" : "" ) + ">" + val +
-			"</label>";
-			a++;
+		inputs = "";
+		$.each( eventGroups, function( _, group ) {
+			if ( group.events && group.events.length ) {
+				inputs += "<div class='ui-field-contain' style='margin:0 0 .4em 0;'><div class='ui-bar ui-bar-a'>" + group.title + "</div>";
+				$.each( group.events, function( _, event ) {
+					inputs += "<label for='notif-" + event.key + "'><input class='needsclick' data-iconpos='right' id='notif-" + event.key + "' type='checkbox' " +
+						( OSApp.Utils.getBitFromByte( curr, a ) ? "checked='checked'" : "" ) + ( ( no_ife2 && a >= 8 ) || ( no_ife3 && a >= 16 ) ? " disabled" : "" ) + ">" + event.label +
+					"</label>";
+					a++;
+				} );
+				inputs += "</div>";
+			}
 		} );
 
 		var popup = $(
@@ -2065,8 +2104,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 		popup.find( ".submit" ).on( "click", function() {
 			a = 0;
-			$.each( events, function( i ) {
-				ife |= popup.find( "#notif-" + i ).is( ":checked" ) << a;
+			$.each( events, function( _, event ) {
+				ife |= popup.find( "#notif-" + event.key ).is( ":checked" ) << a;
 				a++;
 			} );
 			popup.popup( "close" );

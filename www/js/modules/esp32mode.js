@@ -4949,8 +4949,12 @@ OSApp.ESP32Mode.uploadClassicFirmwareBlob = function( blob, filename, variant ) 
 	// part is not yet available there, so it would default to the matter slot and
 	// fail with esp_ota_begin conflict when matter is the running partition.
 	var uploadUrl = OSApp.ESP32Mode.getDirectDeviceUploadUrl();
+	var uploadPw = OSApp.currentSession.pass || "";
 	if ( !OSApp.Firmware.isESP8266Controller() && variant ) {
 		uploadUrl += ( uploadUrl.indexOf( "?" ) === -1 ? "?" : "&" ) + "slot=" + encodeURIComponent( variant );
+	}
+	if ( uploadPw ) {
+		uploadUrl += ( uploadUrl.indexOf( "?" ) === -1 ? "?" : "&" ) + "pw=" + encodeURIComponent( uploadPw );
 	}
 
 	xhr.open( "POST", uploadUrl, true );

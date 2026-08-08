@@ -1630,18 +1630,29 @@ OSApp.Analog.addToObjectStr = function(popup, fieldId, obj) {
 
 OSApp.Analog.parseClockToHHMM = function(raw) {
 	if (raw === undefined || raw === null) return null;
-	var text = String(raw).trim();
+	var text = String(raw).trim().toUpperCase();
 	if (!text) return null;
 
+	// Extract AM/PM suffix if present
+	var ampm = "";
+	var isPM = false;
+	var textWithoutAMPM = text;
+	if (/\s*(AM|PM|A\.M\.?|P\.M\.?)\s*$/.test(text)) {
+		var ampmMatch = text.match(/\s*(AM|PM|A\.M\.?|P\.M\.?)\s*$/);
+		ampm = ampmMatch[1].replace(/\./g, "").trim();
+		isPM = ampm.indexOf("P") === 0;
+		textWithoutAMPM = text.substring(0, text.indexOf(ampmMatch[0])).trim();
+	}
+
 	// Accept common separators used on mobile keyboards/locales.
-	var m = text.match(/^(\d{1,2})\s*[:;.,]\s*(\d{1,2})$/);
+	var m = textWithoutAMPM.match(/^(\d{1,2})\s*[:;.,]\s*(\d{1,2})$/);
 	var hours;
 	var minutes;
 	if (m) {
 		hours = parseInt(m[1], 10);
 		minutes = parseInt(m[2], 10);
-	} else if (/^\d{3,4}$/.test(text)) {
-		var numeric = parseInt(text, 10);
+	} else if (/^\d{3,4}$/.test(textWithoutAMPM)) {
+		var numeric = parseInt(textWithoutAMPM, 10);
 		hours = Math.floor(numeric / 100);
 		minutes = numeric % 100;
 	} else {
@@ -1650,8 +1661,31 @@ OSApp.Analog.parseClockToHHMM = function(raw) {
 
 	if (isNaN(hours) || isNaN(minutes)) return null;
 	if (hours === 24 && minutes === 0) return 2400;
-	if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-	return (hours * 100) + minutes;
+
+	// Validate hours based on whether AM/PM was specified
+	if (ampm) {
+		// 12-hour format with AM/PM: hours should be 1-12
+		if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return null;
+		// Convert 12-hour format to 24-hour HHMM format
+		var convertedHours = hours;
+		if (hours !== 12) {
+			if (isPM) {
+				convertedHours = hours + 12;
+			}
+		} else {
+			// 12 AM/PM special case
+			if (isPM) {
+				convertedHours = 12; // 12 PM
+			} else {
+				convertedHours = 0; // 12 AM = 00:xx
+			}
+		}
+		return (convertedHours * 100) + minutes;
+	} else {
+		// 24-hour format: hours should be 0-23
+		if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+		return (hours * 100) + minutes;
+	}
 };
 
 OSApp.Analog.hhmmToClockText = function(hhmm, fallback) {

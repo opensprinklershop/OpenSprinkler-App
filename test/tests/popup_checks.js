@@ -153,4 +153,17 @@ describe("Popup Checks", function () {
 			OSApp.Language.languageSelect();
 		});
 	});
+
+	it("Shows grouped notification event choices including Program End", function () {
+		OSApp.currentSession.controller.options.ife = 0;
+		OSApp.currentSession.controller.options.ife2 = 0;
+		OSApp.currentSession.controller.options.ife3 = 0;
+		$("#o49").val("0");
+		$("#o49").trigger("click");
+		assert.equal($("#notif-program").length, 1);
+		assert.equal($("#notif-program_end").length, 1);
+		assert.equal($(".ui-bar.ui-bar-a:contains('Programs')").length, 1);
+		assert.equal($(".ui-bar.ui-bar-a:contains('Alerts & Monitoring')").length, 1);
+		$(".ui-popup").popup("close").remove();
+	});
 });
