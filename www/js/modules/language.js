@@ -167,11 +167,16 @@ OSApp.Language.updateLang = function( lang, callback ) {
 
 	var langURL = OSApp.Language.getLocaleFileUrl( lang );
 	var fallbackURL = "/locale/" + lang + ".js";
-	var attempts = [ langURL ];
+	var relativeFallbackURL = "locale/" + lang + ".js";
+	var attempts = [];
 
-	if ( langURL !== fallbackURL ) {
-		attempts.push( fallbackURL );
-	}
+	// Try both absolute and relative locale paths. On some Cordova/iOS app://
+	// environments absolute paths can fail while relative bundled paths work.
+	[ langURL, fallbackURL, relativeFallbackURL ].forEach( function( candidate ) {
+		if ( candidate && attempts.indexOf( candidate ) === -1 ) {
+			attempts.push( candidate );
+		}
+	} );
 
 	var tryLoad = function( index ) {
 		if ( index >= attempts.length ) {
@@ -183,7 +188,7 @@ OSApp.Language.updateLang = function( lang, callback ) {
 		var currentURL = attempts[ index ];
 		console.log( "Loading language file: " + currentURL );
 
-		$.getJSON( currentURL ).done( function( store ) {
+		var onLoaded = function( store ) {
 			console.log( "Language file loaded successfully", store );
 			if ( store && store.messages ) {
 				OSApp.uiState.language = store.messages;
@@ -193,17 +198,94 @@ OSApp.Language.updateLang = function( lang, callback ) {
 				OSApp.Language.setLang();
 			}
 			callback();
-		} ).fail( function( jqxhr, textStatus, errorThrown ) {
-			console.warn( "Language file load failed for " + currentURL + ": " + textStatus + " - " + errorThrown );
+		};
+
+		var onFailed = function( statusText, errorThrown, statusCode ) {
+			console.warn( "Language file load failed for " + currentURL + ": " + statusText + " - " + ( errorThrown || "" ) );
 			if ( index + 1 < attempts.length ) {
 				tryLoad( index + 1 );
 			} else {
-				console.error( "Response status: " + jqxhr.status );
-				alert( "Error loading language file: " + textStatus + "\nURL: " + currentURL );
+				console.error( "Response status: " + ( typeof statusCode === "number" ? statusCode : 0 ) );
 				OSApp.Language.setLang();
 				callback();
 			}
-		} );
+		};
+
+		var tryCordovaFile = function() {
+			if ( !window.cordova || !window.cordova.file || typeof window.resolveLocalFileSystemURL !== "function" || typeof window.FileReader !== "function" ) {
+				return false;
+			}
+
+			var appDir = window.cordova.file.applicationDirectory || "";
+			if ( appDir === "" ) {
+				return false;
+			}
+
+			var fileUrl = appDir.replace( /\/?$/, "/" ) + "www/locale/" + lang + ".js";
+
+			window.resolveLocalFileSystemURL( fileUrl, function( entry ) {
+				entry.file( function( file ) {
+					var reader = new window.FileReader();
+					reader.onloadend = function() {
+						try {
+							onLoaded( JSON.parse( reader.result ) );
+						} catch ( err ) {
+							void err;
+							onFailed( "parsererror", "invalid_json", 0 );
+						}
+					};
+					reader.onerror = function() {
+						onFailed( "error", "file_read_error", 0 );
+					};
+					reader.readAsText( file );
+				}, function() {
+					onFailed( "error", "file_entry_error", 0 );
+				} );
+			}, function() {
+				return false;
+			} );
+
+			return true;
+		};
+
+		var tryJquery = function() {
+			$.getJSON( currentURL ).done( function( store ) {
+				onLoaded( store );
+			} ).fail( function( jqxhr, textStatus, errorThrown ) {
+				onFailed( textStatus, errorThrown, jqxhr && typeof jqxhr.status === "number" ? jqxhr.status : 0 );
+			} );
+		};
+
+		// jQuery AJAX can fail on custom app:// schemes in some Cordova iOS builds,
+		// but fetch can fail there as well depending on WebView/runtime. Try fetch
+		// first and then the same URL via jQuery before advancing to next candidate.
+		if ( tryCordovaFile() ) {
+			return;
+		}
+
+		if ( typeof window.fetch === "function" ) {
+			window.fetch( currentURL, { cache: "no-store" } ).then( function( response ) {
+				if ( !response.ok ) {
+					throw { status: response.status, statusText: response.statusText || "fetch_error" };
+				}
+				return response.text();
+			} ).then( function( text ) {
+				var store;
+				try {
+					store = JSON.parse( text );
+				} catch ( e ) {
+					void e;
+					tryJquery();
+					return;
+				}
+				onLoaded( store );
+			} ).catch( function() {
+				tryJquery();
+			} );
+			return;
+		}
+
+		tryJquery();
 	};
 
 	tryLoad( 0 );

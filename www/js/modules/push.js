@@ -122,6 +122,36 @@ OSApp.Push.getPlatform = function() {
 	return "android";
 };
 
+// Resolve whether push should be active on this install. A local preference
+// explicitly overrides controller state. If no local preference was set yet,
+// fall back to the controller's push opt-in so first-run iOS installs still
+// register without requiring an extra manual toggle.
+OSApp.Push.isPushEnabled = function() {
+	var localKey = "OSApp.Analog.pushNotificationMode";
+	var hasLocal = false;
+	var localEnabled = false;
+
+	if ( OSApp.Analog && typeof OSApp.Analog.getPushModeStorageKey === "function" ) {
+		localKey = OSApp.Analog.getPushModeStorageKey();
+	}
+
+	try {
+		hasLocal = localStorage.getItem( localKey ) !== null;
+	} catch ( e ) { void e; }
+
+	if ( OSApp.Analog && typeof OSApp.Analog.isPushEnabled === "function" ) {
+		localEnabled = OSApp.Analog.isPushEnabled();
+	}
+
+	if ( hasLocal ) {
+		return localEnabled;
+	}
+
+	return !!( OSApp.currentSession && OSApp.currentSession.controller &&
+		OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.push &&
+		OSApp.currentSession.controller.settings.push.en );
+};
+
 // Adapter over the two common cordova FCM plugins.
 OSApp.Push.getFcmToken = function( callback ) {
 	callback = callback || function() {};
@@ -299,15 +329,77 @@ OSApp.Push._request = function( method, path, body ) {
 	if ( apiKey !== "" ) {
 		headers[ "X-OSPF-Key" ] = apiKey;
 	}
-	return $.ajax( {
-		url: base + path,
-		method: method,
-		contentType: "application/json",
-		dataType: "json",
-		timeout: 20000,
-		headers: headers,
-		data: body ? JSON.stringify( body ) : undefined
-	} );
+
+	var ajaxRequest = function() {
+		return $.ajax( {
+			url: base + path,
+			method: method,
+			contentType: "application/json",
+			dataType: "json",
+			timeout: 20000,
+			headers: headers,
+			data: body ? JSON.stringify( body ) : undefined
+		} );
+	};
+
+	var useNativeHttp = !!(
+		OSApp.currentDevice && OSApp.currentDevice.isiOS &&
+		window.cordova && window.cordova.plugin && window.cordova.plugin.http &&
+		typeof window.cordova.plugin.http.sendRequest === "function"
+	);
+
+	if ( useNativeHttp ) {
+		var defer = $.Deferred();
+		var options = {
+			method: ( method || "GET" ).toLowerCase(),
+			headers: headers
+		};
+
+		if ( body ) {
+			options.data = body;
+			options.serializer = "json";
+		}
+
+		var doRequest = function() {
+			if ( typeof window.cordova.plugin.http.setRequestTimeout === "function" ) {
+				window.cordova.plugin.http.setRequestTimeout( 20 );
+			}
+
+			window.cordova.plugin.http.sendRequest( base + path, options, function( response ) {
+				var data = response && typeof response.data !== "undefined" ? response.data : "";
+				if ( typeof data === "string" && data !== "" ) {
+					try {
+						data = JSON.parse( data );
+					} catch ( err ) {
+						void err;
+						defer.reject( { status: response && response.status ? response.status : 0, statusText: "parsererror" } );
+						return;
+					}
+				}
+				defer.resolve( data );
+			}, function( error ) {
+				defer.reject( {
+					status: error && typeof error.status === "number" ? error.status : 0,
+					statusText: error && error.error ? error.error : "error"
+				} );
+			} );
+		};
+
+		if ( typeof window.cordova.plugin.http.setServerTrustMode === "function" ) {
+			window.cordova.plugin.http.setServerTrustMode( "nocheck", function() {
+				doRequest();
+			}, function() {
+				// Trust mode setup can fail depending on runtime/plugin state.
+				// Still try the request for public HTTPS endpoints.
+				doRequest();
+			} );
+		} else {
+			doRequest();
+		}
+		return defer.promise();
+	}
+
+	return ajaxRequest();
 };
 
 // Register the FCM token as a subscriber for the current device using the
@@ -339,6 +431,7 @@ OSApp.Push.registerForPush = function() {
 
 	OSApp.Push.getFcmToken( function( fcmToken ) {
 		if ( !fcmToken ) {
+			OSApp.Push._queueSyncRetry();
 			return;
 		}
 		if ( OSApp.Push._registeredKeys[ deviceKey ] === fcmToken ) {
@@ -355,8 +448,19 @@ OSApp.Push.registerForPush = function() {
 			OSApp.Push._registeredKeys[ deviceKey ] = fcmToken;
 		}, function() {
 			delete OSApp.Push._registeredKeys[ deviceKey ];
+			OSApp.Push._queueSyncRetry();
 		} );
 	} );
+};
+
+OSApp.Push._queueSyncRetry = function() {
+	if ( OSApp.Push._syncRetryTimer ) {
+		return;
+	}
+	OSApp.Push._syncRetryTimer = setTimeout( function() {
+		OSApp.Push._syncRetryTimer = null;
+		OSApp.Push.syncPushRegistration();
+	}, 15000 );
 };
 
 // Resolve the controller MAC (device_key) as 12 uppercase hex chars, matching
@@ -397,7 +501,7 @@ OSApp.Push.unregisterFromPush = function() {
 
 // Reconcile FCM subscription state with the single push-notifications setting.
 OSApp.Push.syncPushRegistration = function() {
-	if ( OSApp.Analog && typeof OSApp.Analog.isPushEnabled === "function" && OSApp.Analog.isPushEnabled() ) {
+	if ( OSApp.Push.isPushEnabled() ) {
 		OSApp.Push.registerForPush();
 	} else {
 		OSApp.Push.unregisterFromPush();

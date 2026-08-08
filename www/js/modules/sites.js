@@ -1820,6 +1820,19 @@ OSApp.Sites.updateControllerSettings = function( callback ) {
 
 				OSApp.currentSession.controller.settings = settings;
 
+				// If the controller already has push enabled, seed the local app
+				// preference the first time we see it so native push can register
+				// on installs that have never toggled the iOS checkbox yet.
+				try {
+					if ( settings && settings.push && settings.push.en ) {
+						var pushModeKey = OSApp.Analog && typeof OSApp.Analog.getPushModeStorageKey === "function" ?
+							OSApp.Analog.getPushModeStorageKey() : "OSApp.Analog.pushNotificationMode";
+						if ( localStorage.getItem( pushModeKey ) === null && OSApp.Analog && typeof OSApp.Analog.setPushEnabled === "function" ) {
+							OSApp.Analog.setPushEnabled( true );
+						}
+					}
+				} catch ( e ) { void e; }
+
 				// Controller settings (incl. push opt-in + MAC) are now available,
 				// so reconcile the FCM push subscription with the current state.
 				if ( OSApp.Push && typeof OSApp.Push.syncPushRegistration === "function" ) {

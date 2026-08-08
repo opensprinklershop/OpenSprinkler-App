@@ -391,10 +391,10 @@ OSApp.Welcome.displayPage = function() {
 			"<ul data-role='none' id='welcome_list' class='ui-listview ui-listview-inset ui-corner-all'>" +
 			"<li><div class='logo' id='welcome_logo'></div></li>" +
 			"<li class='ui-li-static ui-body-inherit ui-first-child ui-last-child ui-li-separate'>" +
-			"<p class='rain-desc'>" +
-			OSApp.Language._( "Welcome to the OpenSprinkler application. This app only works with the OpenSprinkler controller which must be installed and setup on your home network." ) +
+			"<p class='rain-desc' data-translate='Welcome to the OpenSprinkler application. This app only works with the OpenSprinkler controller which must be installed and setup on your home network.'>" +
+			"Welcome to the OpenSprinkler application. This app only works with the OpenSprinkler controller which must be installed and setup on your home network." +
 			"</p>" +
-			"<a class='iab iabNoScale ui-btn ui-mini center' target='_blank' href='https://opensprinkler.com/product/opensprinkler/'>" +
+			"<a class='iab iabNoScale ui-btn ui-mini center' target='_blank' href='https://opensprinklershop.de/en/product/opensprinkler-3-0/'>" +
 			OSApp.Language._( "Purchase OpenSprinkler" ) +
 			"</a>" +
 			"</li>" +
