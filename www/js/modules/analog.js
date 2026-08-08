@@ -42,7 +42,6 @@ OSApp.Analog = {
 
 		COLORS : ["#F3B415", "#F27036", "#663F59", "#6A6E94", "#4E88B4", "#00A7C6", "#18D8D8", '#A9D794', '#46AF78', '#A93F55', '#8C5E58', '#2176FF', '#33A1FD', '#7A918D', '#BAFF29'],
 		COLCOUNT : 15,
-		NOTIFICATION_COLORS : ["#2E7D32", "#F9A825", "#C62828"],
 
 		//detected Analog Sensor Boards:
 		ASB_BOARD1 : 0x01,
@@ -129,9 +128,6 @@ OSApp.Analog = {
 	}
 };
 
-OSApp.Analog.success_callback = function() {
-};
-
 OSApp.Analog.Constants.PUSH_MODE_OFF = 0;
 OSApp.Analog.Constants.PUSH_MODE_OPEN = 1;
 OSApp.Analog.Constants.PUSH_MODE_ALWAYS = 2;
@@ -158,92 +154,11 @@ OSApp.Analog.setPushEnabled = function(enabled) {
 	if (OSApp.DeviceConfig && OSApp.DeviceConfig.saveSetting) {
 		OSApp.DeviceConfig.saveSetting("pushMode", val);
 	}
-	if (enabled) {
-		OSApp.Analog.ensureNotificationPermission();
-	}
 	if (OSApp.Push && typeof OSApp.Push.syncPushRegistration === "function") {
 		OSApp.Push.syncPushRegistration();
 	}
 	return val;
 };
-
-// Backwards-compatible shims: push.js and stored device config still speak in
-// terms of a "mode", now reduced to Off/Always.
-OSApp.Analog.getPushNotificationMode = function() {
-	return OSApp.Analog.isPushEnabled() ? OSApp.Analog.Constants.PUSH_MODE_ALWAYS : OSApp.Analog.Constants.PUSH_MODE_OFF;
-};
-
-OSApp.Analog.setPushNotificationMode = function(mode) {
-	return OSApp.Analog.setPushEnabled(parseInt(mode, 10) === OSApp.Analog.Constants.PUSH_MODE_ALWAYS);
-};
-
-OSApp.Analog.isPushNotificationAllowedNow = function() {
-	return OSApp.Analog.isPushEnabled();
-};
-
-OSApp.Analog.getLocalNotificationPlugin = function() {
-	if (!window.cordova || !window.cordova.plugins || !window.cordova.plugins.notification) return null;
-	return window.cordova.plugins.notification.local || null;
-};
-
-// Native OS notifications are only available in the installed app with the
-// cordova-plugin-local-notification present (not in the browser).
-OSApp.Analog.isNativeNotificationAvailable = function() {
-	return OSApp.Analog.getLocalNotificationPlugin() !== null;
-};
-
-OSApp.Analog.getBackgroundModePlugin = function() {
-	if (!window.cordova || !window.cordova.plugins) return null;
-	return window.cordova.plugins.backgroundMode || null;
-};
-
-OSApp.Analog.requestNotificationPermission = function(callback) {
-	callback = callback || function() { };
-
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	// The maintained cordova-plugin-local-notification exposes requestPermission().
-	// (The legacy appplant plugin used registerPermission().)
-	var request = localNotification && ( localNotification.requestPermission || localNotification.registerPermission );
-	if (!localNotification || typeof request !== "function") {
-		callback(true);
-		return;
-	}
-
-	request.call(localNotification, function(granted) {
-		callback(granted !== false);
-	});
-};
-
-// Ensure the OS notification permission is granted so LIVE events (not just the
-// manual test) can post notifications. On Android 13+/MIUI the system dialog
-// fired silently at startup is often dismissed/blocked, leaving the permission
-// denied — then live events fail quietly and only the test button (with its
-// settings redirect) recovers it. This mirrors that recovery once per session.
-OSApp.Analog.ensureNotificationPermission = function() {
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	if (!localNotification) { return; }
-
-	var afterCheck = function(hasPerm) {
-		if (hasPerm) { return; }
-		OSApp.Analog.requestNotificationPermission(function(granted) {
-			if (granted) { return; }
-			// Still denied: guide the user to the system settings, but only once
-			// per app session so we don't nag on every launch.
-			if (OSApp.Analog._notifPermHelpShown) { return; }
-			OSApp.Analog._notifPermHelpShown = true;
-			if (typeof OSApp.Analog.showNotifPermissionHelp === "function") {
-				OSApp.Analog.showNotifPermissionHelp();
-			}
-		});
-	};
-
-	if (typeof localNotification.hasPermission === "function") {
-		localNotification.hasPermission(function(granted) { afterCheck(granted === true); });
-	} else {
-		afterCheck(false);
-	}
-};
-
 
 OSApp.Analog.syncChartOptionsFromController = function() {
 	// Chart display options are purely UI-side preferences stored in localStorage
@@ -278,61 +193,6 @@ OSApp.Analog.saveChartOptions = function() {
 OSApp.Analog.asb_init = function() {
 	if (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS) return;
 
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	var backgroundMode = OSApp.Analog.getBackgroundModePlugin();
-
-	if (localNotification && OSApp.Analog.getPushNotificationMode() !== OSApp.Analog.Constants.PUSH_MODE_OFF) {
-		OSApp.Analog.ensureNotificationPermission();
-	}
-
-	if (OSApp.currentDevice.isAndroid && localNotification && typeof localNotification.createChannel === "function") {
-		localNotification.createChannel({
-			androidChannelId: 'os_low',
-			androidChannelName:'OpenSprinklerLowNotifications',
-			androidChannelImportance: 'IMPORTANCE_LOW',
-			androidChannelEnableVibration: false,
-			androidChannelSoundUsage: 5, // int (optional), default is USAGE_NOTIFICATION
-			}, OSApp.Analog.success_callback, this);
-		localNotification.createChannel({
-			androidChannelId: 'os_med',
-			androidChannelName:'OpenSprinklerMedNotifications',
-			androidChannelImportance: 'IMPORTANCE_DEFAULT',
-			androidChannelEnableVibration: false,
-			androidChannelSoundUsage: 5,
-			}, OSApp.Analog.success_callback, this);
-		localNotification.createChannel({
-			androidChannelId: 'os_high',
-			androidChannelName:'OpenSprinklerHighNotifications',
-			androidChannelImportance: 'IMPORTANCE_HIGH',
-			androidChannelEnableVibration: true,
-			androidChannelSoundUsage: 5,
-			}, OSApp.Analog.success_callback, this);
-	}
-	if (window.nativeTimer && backgroundMode) {
-
-		OSApp.Analog.timer = new window.nativeTimer();
-		OSApp.Analog.timer.onTick = function() {
-			OSApp.Analog.updateAnalogSensor( function() {
-				OSApp.Analog.updateMonitors();
-			});
-		};
-
-		backgroundMode.on('activate', function() {
-			OSApp.Analog.timer.start(1, 30*1000);
-		});
-		backgroundMode.on('deactivate', function() {
-			OSApp.Analog.timer.stop();
-		});
-
-		backgroundMode.setDefaults({
-			title: "OpenSprinklerASB",
-			text: OSApp.Language._("OpenSprinkler is running in background mode"),
-			subText: OSApp.Language._("active monitor and controlling notifications"),
-			channelName: "BackgroundChannel",
-			allowClose: false,
-			visibility: "public",
-		});
-	}
 	if (window.OSApp && OSApp.Push && typeof OSApp.Push.init === "function") {
 		OSApp.Push.init();
 	}
@@ -406,17 +266,6 @@ OSApp.Analog.updateProgramAdjustments = function( callback ) {
 	} );
 };
 
-OSApp.Analog.checkBackgroundMode = function() {
-	if (!OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS) return;
-	var backgroundMode = OSApp.Analog.getBackgroundModePlugin();
-	if (!backgroundMode || typeof backgroundMode.isEnabled !== "function" || typeof backgroundMode.setEnabled !== "function") return;
-	// Background polling was removed (events arrive via native push), so keep
-	// background mode disabled.
-	if (backgroundMode.isEnabled()) {
-		backgroundMode.setEnabled(false);
-	}
-};
-
 OSApp.Analog.updateMonitors = function(callback) {
 	callback = callback || function () { };
 
@@ -453,49 +302,6 @@ OSApp.Analog.updateAnalogSensor = function( callback ) {
 	} );
 };
 
-OSApp.Analog.notification_action_callback = function() {
-	//	monitorAlerts[monitor.nr] = false;
-};
-
-// Map a notification priority (0=low, 1=medium, 2=high) to the Android channel /
-// color and schedule an OS-level local notification via the maintained
-// cordova-plugin-local-notification. Retained for firmware-update and other
-// internal one-off notifications; routine controller events are delivered via
-// native push instead of this path.
-OSApp.Analog.showLocalNotification = function(opts) {
-	if (!OSApp.Analog.isPushNotificationAllowedNow()) {
-		return;
-	}
-
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	if (!localNotification || typeof localNotification.schedule !== "function") {
-		return;
-	}
-
-	var prio = parseInt(opts.prio, 10);
-	if (isNaN(prio)) prio = 0;
-	prio = Math.max(0, Math.min(OSApp.Analog.Constants.NOTIFICATION_COLORS.length - 1, prio));
-
-	var chan = (prio === 0) ? "os_low" : (prio === 1 ? "os_med" : "os_high");
-	var importance = (prio === 0) ? "IMPORTANCE_LOW" : (prio === 1 ? "IMPORTANCE_DEFAULT" : "IMPORTANCE_HIGH");
-
-	var options = {
-		id: opts.id,
-		androidChannelId: chan,
-		androidChannelImportance: importance,
-		title: opts.title || "OpenSprinkler",
-		text: opts.text || "",
-		androidColor: OSApp.Analog.Constants.NOTIFICATION_COLORS[prio],
-		androidLockscreen: true,
-		sound: prio >= 1 ? "default" : null
-	};
-	if (typeof opts.data !== "undefined") {
-		options.data = opts.data;
-	}
-
-	localNotification.schedule(options, OSApp.Analog.notification_action_callback, opts.context || this);
-};
-
 // Small informational popup (used by the notification self-test).
 OSApp.Analog.showNotifInfo = function(message) {
 	var popup = $(
@@ -503,29 +309,6 @@ OSApp.Analog.showNotifInfo = function(message) {
 			"<p style='margin:2px 6px 12px;'>" + message + "</p>" +
 			"<a href='#' data-rel='back' class='ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._("OK") + "</a>" +
 		"</div>");
-	if (OSApp.UIDom && typeof OSApp.UIDom.openPopup === "function") {
-		OSApp.UIDom.openPopup(popup);
-	}
-};
-
-// Popup shown when the OS notification permission is missing: offers to open the
-// app's system notification settings so the user can enable it.
-OSApp.Analog.showNotifPermissionHelp = function() {
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	var msg = OSApp.Language._("Notifications are not permitted for this app. Please enable them in the system settings.");
-	var popup = $(
-		"<div data-role='popup' data-theme='a' class='ui-content' style='max-width:340px;'>" +
-			"<p style='margin:2px 6px 12px;'>" + msg + "</p>" +
-			"<a href='#' class='open-notif-settings ui-btn ui-btn-b ui-corner-all'>" + OSApp.Language._("Open settings") + "</a>" +
-			"<a href='#' data-rel='back' class='ui-btn ui-corner-all'>" + OSApp.Language._("Cancel") + "</a>" +
-		"</div>");
-	popup.find(".open-notif-settings").on("click", function(e) {
-		e.preventDefault();
-		if (localNotification && typeof localNotification.openNotificationSettings === "function") {
-			localNotification.openNotificationSettings();
-		}
-		popup.popup("close");
-	});
 	if (OSApp.UIDom && typeof OSApp.UIDom.openPopup === "function") {
 		OSApp.UIDom.openPopup(popup);
 	}
@@ -544,10 +327,9 @@ OSApp.Analog.addEventToPanel = function(dname, text) {
 	});
 };
 
-// Notification self-test: verifies that OS-level notifications work on this
-// device. Requests the Android 13+ permission (via user gesture) and, if it is
-// denied, guides the user to the system notification settings. Always adds an
-// entry to the in-app notification panel as well.
+// Notification self-test: adds an entry to the in-app notification panel and
+// explains that OS-level alerts are delivered via the push service (FCM). Local
+// OS scheduling was removed together with cordova-plugin-local-notification.
 OSApp.Analog.testNotification = function() {
 	var dname = (OSApp.currentSession && OSApp.currentSession.controller &&
 		OSApp.currentSession.controller.settings &&
@@ -558,64 +340,7 @@ OSApp.Analog.testNotification = function() {
 	// Always visible in the in-app notification panel (works in the browser too).
 	OSApp.Analog.addEventToPanel(dname, msg);
 
-	var localNotification = OSApp.Analog.getLocalNotificationPlugin();
-	if (!localNotification) {
-		OSApp.Analog.showNotifInfo(OSApp.Language._("System notifications are only available in the installed app. The test was added to the in-app notification panel instead."));
-		return;
-	}
-
-	// On-screen diagnostics so silent failures on restrictive OEMs (e.g. Huawei/EMUI)
-	// or missing permissions become visible without a USB/logcat session.
-	var diag = [];
-	var reported = false;
-	var report = function() {
-		if (reported) { return; }
-		reported = true;
-		OSApp.Analog.showNotifInfo("Notification-Diagnose:<br>" + diag.join("<br>"));
-	};
-
-	var verify = function() {
-		if (typeof localNotification.getIds === "function") {
-			localNotification.getIds(function(ids) {
-				diag.push("getIds: [" + (ids || []).join(",") + "]");
-				report();
-			});
-			setTimeout(report, 1500);
-		} else {
-			report();
-		}
-	};
-
-	var options = {
-		id: 999999,
-		androidChannelId: "os_high",
-		androidChannelImportance: "IMPORTANCE_HIGH",
-		title: dname,
-		text: msg,
-		androidColor: "#C62828",
-		androidLockscreen: true,
-		sound: "default",
-		data: { test: true }
-	};
-
-	var doSchedule = function() {
-		localNotification.schedule(options, function(result) {
-			diag.push("schedule cb: " + JSON.stringify(result));
-			verify();
-		});
-		setTimeout(verify, 2000);
-	};
-
-	diag.push("plugin: ok");
-	if (typeof localNotification.hasPermission === "function") {
-		localNotification.hasPermission(function(granted) {
-			diag.push("hasPermission: " + granted);
-			doSchedule();
-		});
-	} else {
-		diag.push("hasPermission: n/a");
-		doSchedule();
-	}
+	OSApp.Analog.showNotifInfo(OSApp.Language._("The test was added to the in-app notification panel. System notifications are delivered via the push service when push notifications are enabled."));
 };
 
 OSApp.Analog.updateSensorShowArea = function( page ) {

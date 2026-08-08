@@ -241,6 +241,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 							return true;
 						}
 						break;
+					case "push-en":
+					case "push-endpoint":
+						return true;
 					case "otc":
 						if ( OSApp.Utils.escapeJSON( OSApp.currentSession.controller.settings.otc ) === data ) {
 							return true;
@@ -914,10 +917,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 	// Open the Integrations section when any integration exists or when native
 	// push is available, so the single push-notifications checkbox can live at
 	// the bottom of it. The checkbox drives the controller's own push-out, so it
-	// is offered whenever the firmware advertises push support (settings.push),
-	// independent of the local-notification plugin (absent in the browser).
-	var nativePushAvail = ( OSApp.Analog && typeof OSApp.Analog.isNativeNotificationAvailable === "function" && OSApp.Analog.isNativeNotificationAvailable() ) ||
-		( OSApp.currentSession.controller && OSApp.currentSession.controller.settings && typeof OSApp.currentSession.controller.settings.push !== "undefined" );
+	// is offered whenever the firmware advertises push support (settings.push).
+	var nativePushAvail = ( OSApp.currentSession.controller && OSApp.currentSession.controller.settings &&
+		typeof OSApp.currentSession.controller.settings.push !== "undefined" );
 	if ( typeof OSApp.currentSession.controller.settings.ifkey !== "undefined" || typeof OSApp.currentSession.controller.settings.mqtt !== "undefined" ||
 		typeof OSApp.currentSession.controller.settings.otc !== "undefined" || typeof OSApp.currentSession.controller.settings.influxdb !== "undefined" || nativePushAvail ) {
 		list += "</fieldset><fieldset data-role='collapsible'" +

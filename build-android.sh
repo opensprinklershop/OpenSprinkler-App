@@ -74,7 +74,7 @@ cordova plugin add cordova-plugin-device
 # Sync www/ into Android platform assets before building
 cordova prepare android
 
-# Apply Android platform patches (e.g. LocalNotification CordovaWebView fix)
+# Apply Android platform patches (SSL trust anchors, statusbar edge-to-edge, etc.)
 for p in patches/*.patch; do
 	[ -f "$p" ] && patch -p1 -N --forward -r- < "$p" || true
 done

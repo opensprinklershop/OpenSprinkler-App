@@ -20,7 +20,10 @@
 var OSApp = OSApp || {};
 OSApp.Push = OSApp.Push || {};
 
-OSApp.Push._registeredToken = null;
+// Map of deviceKey -> fcmToken for which a /subscribe has succeeded this
+// session. Keyed per device (not just per token) so connecting to a second
+// device still registers it even though the FCM token is unchanged.
+OSApp.Push._registeredKeys = {};
 
 // Default forwarder endpoint used when the user has not set a custom one.
 OSApp.Push.DEFAULT_BASE_URL = "https://opensprinklershop.de/wp-json/ospf/v1";
@@ -143,7 +146,7 @@ OSApp.Push.getFcmToken = function( callback ) {
 			OSApp.Push._refreshHooked = true;
 			window.FirebasexMessaging.onTokenRefresh( function( token ) {
 				if ( token ) {
-					OSApp.Push._registeredToken = null;
+					OSApp.Push._registeredKeys = {};
 					OSApp.Push.syncPushRegistration();
 				}
 			}, function() {} );
@@ -171,7 +174,7 @@ OSApp.Push.getFcmToken = function( callback ) {
 			OSApp.Push._refreshHooked = true;
 			window.FirebasePlugin.onTokenRefresh( function( token ) {
 				if ( token ) {
-					OSApp.Push._registeredToken = null;
+					OSApp.Push._registeredKeys = {};
 					OSApp.Push.syncPushRegistration();
 				}
 			}, function() {} );
@@ -338,8 +341,8 @@ OSApp.Push.registerForPush = function() {
 		if ( !fcmToken ) {
 			return;
 		}
-		if ( OSApp.Push._registeredToken === fcmToken ) {
-			return; // Already registered this token for this session.
+		if ( OSApp.Push._registeredKeys[ deviceKey ] === fcmToken ) {
+			return; // This device is already registered with this token this session.
 		}
 		OSApp.Push._request( "POST", "/subscribe", {
 			device_key: deviceKey,
@@ -349,9 +352,9 @@ OSApp.Push.registerForPush = function() {
 			fcm_token: fcmToken,
 			label: label
 		} ).then( function() {
-			OSApp.Push._registeredToken = fcmToken;
+			OSApp.Push._registeredKeys[ deviceKey ] = fcmToken;
 		}, function() {
-			OSApp.Push._registeredToken = null;
+			delete OSApp.Push._registeredKeys[ deviceKey ];
 		} );
 	} );
 };
@@ -387,7 +390,7 @@ OSApp.Push.unregisterFromPush = function() {
 			device_key: deviceKey,
 			fcm_token: fcmToken
 		} ).always( function() {
-			OSApp.Push._registeredToken = null;
+			delete OSApp.Push._registeredKeys[ deviceKey ];
 		} );
 	} );
 };
@@ -402,5 +405,57 @@ OSApp.Push.syncPushRegistration = function() {
 };
 
 OSApp.Push.init = function() {
+	OSApp.Push.ensureAndroidChannels();
 	OSApp.Push.syncPushRegistration();
 };
+
+// Recreate the Android notification channels the forwarder targets via the FCM
+// payload's channel_id. Without a matching channel Android drops the
+// notification to a low-importance fallback (brief vibrate, no heads-up banner),
+// losing the per-event priority. Channel importance is fixed at creation time
+// and Android will NOT raise it on an existing channel (even after delete +
+// recreate it restores the old importance), so the "_v2" ids are used to force
+// the corrected importances onto devices that still carry the legacy channels.
+// Zone start/stop are priority 1 (os_med) in the firmware, so the medium
+// channel is high importance to show a heads-up banner for those events;
+// os_high adds vibration + light for alarms, os_low stays quiet
+// (weather/sensors/reports). Keep these ids in sync with the push forwarder.
+OSApp.Push.ANDROID_CHANNELS = [
+	{ id: "os_low_v2", name: "OpenSprinkler (low)", importance: "low", sound: null, vibration: false, badge: true, visibility: 1 },
+	{ id: "os_med_v2", name: "OpenSprinkler (medium)", importance: "high", sound: "default", vibration: false, badge: true, visibility: 1 },
+	{ id: "os_high_v2", name: "OpenSprinkler (high)", importance: "high", sound: "default", vibration: true, light: true, badge: true, visibility: 1 }
+];
+
+// Legacy channel ids (created by the removed cordova-plugin-local-notification).
+// Deleted so they no longer clutter the app's notification settings.
+OSApp.Push.LEGACY_ANDROID_CHANNELS = [ "os_low", "os_med", "os_high" ];
+
+OSApp.Push.ensureAndroidChannels = function() {
+	if ( OSApp.currentDevice && OSApp.currentDevice.isiOS ) { return; }
+	if ( OSApp.Push._channelsCreated ) { return; }
+
+	var plugin = null;
+	if ( window.FirebasexMessaging && typeof window.FirebasexMessaging.createChannel === "function" ) {
+		plugin = window.FirebasexMessaging;
+	} else if ( window.FirebasePlugin && typeof window.FirebasePlugin.createChannel === "function" ) {
+		plugin = window.FirebasePlugin;
+	}
+	if ( !plugin ) { return; }
+
+	OSApp.Push._channelsCreated = true;
+
+	if ( typeof plugin.deleteChannel === "function" ) {
+		OSApp.Push.LEGACY_ANDROID_CHANNELS.forEach( function( id ) {
+			try {
+				plugin.deleteChannel( id, function() {}, function() {} );
+			} catch ( e ) { void e; }
+		} );
+	}
+
+	OSApp.Push.ANDROID_CHANNELS.forEach( function( ch ) {
+		try {
+			plugin.createChannel( ch, function() {}, function() {} );
+		} catch ( e ) { void e; }
+	} );
+};
+

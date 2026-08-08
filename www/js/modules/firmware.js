@@ -143,7 +143,7 @@ OSApp.Firmware.nativeHttpRequest = function( obj ) {
 OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 	// Inject password into the request
-	dest = dest.replace( "pw=", "pw=" + encodeURIComponent( OSApp.currentSession.pass ) );
+	dest = dest.replace( /([?&])pw=/, "$1pw=" + encodeURIComponent( OSApp.currentSession.pass ) );
 	type = type || "text";
 
 	// Designate AJAX queue based on command type

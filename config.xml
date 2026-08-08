@@ -106,8 +106,8 @@
             applied to <application> by hooks/after_prepare/03-android-application-security-attrs.js.
             A previous <edit-config mode="merge" target="/manifest/application"> was removed
             because it rewrites <application> on every prepare and strips plugin-injected
-            children (local-notification receivers, background-mode ForegroundService),
-            which silently broke native notifications.
+            children (e.g. cordova-plugin-firebasex-messaging's FirebaseMessagingService),
+            which silently broke push notifications.
         -->
         <!-- Fail-safe: avoid infinite logo/splash when deviceready or JS init stalls. -->
         <preference name="AutoHideSplashScreen" value="true" />
@@ -133,7 +133,6 @@
         </config-file>
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-            <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
         </config-file>
         <!--
         <edit-config file="app/src/main/AndroidManifest.xml" mode="merge" target="/manifest/application">

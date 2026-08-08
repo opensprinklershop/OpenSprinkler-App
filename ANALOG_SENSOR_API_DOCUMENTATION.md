@@ -253,7 +253,7 @@ PROG_DIGITAL_MINMAX: 4  // Digital min/max range
 ### Initialization & Status
 
 #### `OSApp.Analog.asb_init()`
-Initializes the analog sensor board functionality, including background mode and notifications.
+Initializes the analog sensor board functionality and wires up push notifications.
 
 **Parameters:** None
 **Returns:** void
@@ -751,29 +751,17 @@ The API communicates with the controller via these endpoints:
 
 ## Background Operations
 
-### Background Mode (Mobile)
+### Notifications (Mobile)
 
-On Android and iOS devices, the API supports background monitoring:
+OS-level notifications are delivered via Firebase Cloud Messaging (FCM) push
+using `cordova-plugin-firebasex-messaging`. The controller (or the push
+forwarder) sends events to the push service, so alerts arrive even when the app
+is closed — no background polling runs on the device. App-generated events also
+appear in the in-app notification panel.
 
-```javascript
-// Automatically enabled when monitors are configured
-OSApp.Analog.checkBackgroundMode();
-```
-
-**Features:**
-- 30-second update interval in background
-- Push notifications for monitor alerts
-- Three priority levels (low, medium, high)
-
-### Background Fetch (Mobile)
-
-```javascript
-// Configured with 15-minute minimum interval
-BackgroundFetch.configure({
-  minimumFetchInterval: 15,
-  requiredNetworkType: BackgroundFetch.NETWORK_TYPE_ANY
-}, fetchCallback, failureCallback);
-```
+> Note: the former `cordova-plugin-background-mode` / `cordova-plugin-background-fetch`
+> polling and `cordova-plugin-local-notification` scheduling were removed in
+> favour of FCM push.
 
 ---
 
@@ -970,7 +958,7 @@ if (OSApp.Firmware.checkOSVersion(233)) {
 - Clear flags with `/bc?pw=` after device selection
 
 **4. Monitor alerts not working**
-- Verify background mode is enabled
+- Enable push notifications for the device (Options → Integrations)
 - Check notification permissions
 - Ensure monitors are enabled
 

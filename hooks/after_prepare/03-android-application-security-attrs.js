@@ -6,10 +6,9 @@
  *
  * These used to be set via an <edit-config mode="merge" target="/manifest/application">
  * in config.xml. That edit-config rewrites the whole <application> element on every
- * `cordova prepare` and drops the plugin-injected children (cordova-plugin-local-notification's
- * TriggerReceiver/ClearReceiver/RestoreReceiver/ClickActivity/PluginFileProvider and
- * cordova-plugin-background-mode's ForegroundService), which silently broke native
- * notifications. This hook only touches the <application> opening-tag attributes, so
+ * `cordova prepare` and drops the plugin-injected children (e.g.
+ * cordova-plugin-firebasex-messaging's FirebaseMessagingService), which silently broke
+ * push notifications. This hook only touches the <application> opening-tag attributes, so
  * plugin receivers/services survive.
  */
 

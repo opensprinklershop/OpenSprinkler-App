@@ -163,9 +163,6 @@ OSApp.DeviceConfig.APP_SETTINGS = {
 			try {
 				localStorage.setItem( "OSApp.Analog.pushNotificationMode", String( n ) );
 			} catch ( e ) { void e; }
-			if ( OSApp.Analog && OSApp.Analog.checkBackgroundMode ) {
-				OSApp.Analog.checkBackgroundMode();
-			}
 		},
 		fromLocal: function() {
 			var s = localStorage.getItem( "OSApp.Analog.pushNotificationMode" );

@@ -49,9 +49,9 @@
 		"cordova-ios": "^8.1.1",
 		"cordova-osx": "^7.0.0",
 		"cordova-plugin-3dtouch": "^1.3.8",
+		"cordova-plugin-advanced-http": "^3.3.1",
 		"cordova-plugin-geolocation": "^4.1.0",
 		"cordova-plugin-inappbrowser": "^6.0.0",
-		"cordova-plugin-local-notification": "^1.2.3",
 		"cordova-plugin-networkinterface": "^2.2.0",
 		"cordova-plugin-statusbar": "^3.0.0",
 		"cordova-plugin-transport-security": "^0.1.2",
@@ -80,21 +80,16 @@
 	},
 	"cordova": {
 		"plugins": {
-			"cordova-plugin-background-fetch": {},
-			"cordova-plugin-background-mode": {},
 			"cordova-plugin-3dtouch": {},
+			"cordova-plugin-advanced-http": {},
 			"cordova-plugin-geolocation": {
 				"GPS_REQUIRED": "true"
 			},
 			"cordova-plugin-networkinterface": {},
 			"cordova-plugin-statusbar": {},
-			"cordova-plugin-timer": {},
 			"cordova-plugin-transport-security": {},
 			"cordova-plugin-inappbrowser": {},
 			"cordova-custom-config": {},
-			"cordova-plugin-local-notification": {
-				"ANDROIDX_CORE_VERSION": "1.12.0"
-			},
 			"cordova-plugin-device": {},
 			"cordova-plugin-firebasex-messaging": {
 				"FIREBASE_FCM_AUTOINIT_ENABLED": "true",
