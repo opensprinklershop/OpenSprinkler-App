@@ -480,7 +480,7 @@ OSApp.Dashboard.displayPage = function() {
 							var targetDev = null;
 							if ( devicesList && devicesList.length ) {
 								for ( var i = 0; i < devicesList.length; i++ ) {
-									if ( normalizeZigbeeIeee( devicesList[ i ].ieee ) === normalizeZigbeeIeee( currentIeee ) ) {
+									if ( normalizeZigbeeIeeeForCard( devicesList[ i ].ieee ) === normalizeZigbeeIeeeForCard( currentIeee ) ) {
 										targetDev = devicesList[ i ];
 										break;
 									}

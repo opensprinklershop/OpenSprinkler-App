@@ -210,6 +210,50 @@ OSApp.Analog.isESP32 = function() {
 	return (typeof features === "string" || Array.isArray(features)) && features.includes("ESP32");
 };
 
+OSApp.Analog.normalizeZigbeeDeviceSelectionKey = function(value) {
+	var key = String(value == null ? "" : value).trim().toLowerCase();
+	if (!key) {
+		return "";
+	}
+	if (key.indexOf("0x") === 0) {
+		key = key.substring(2);
+	}
+	key = key.replace(/[^0-9a-f]/g, "");
+	while (key.length < 16) {
+		key = "0" + key;
+	}
+	return key.substring(0, 16).toUpperCase();
+};
+
+OSApp.Analog.findZigbeeDeviceBySelectionKey = function(devices, value) {
+	if (!Array.isArray(devices)) {
+		return null;
+	}
+	var targetKey = OSApp.Analog.normalizeZigbeeDeviceSelectionKey(value);
+	for (var i = 0; i < devices.length; i++) {
+		var dev = devices[i] || null;
+		if (!dev) {
+			continue;
+		}
+		var candidateKeys = [
+			dev.ieee,
+			dev.ieee_addr,
+			dev.device_ieee,
+			dev.zb_ieee_ref,
+			dev.short_addr
+		];
+		for (var j = 0; j < candidateKeys.length; j++) {
+			var candidateKey = OSApp.Analog.normalizeZigbeeDeviceSelectionKey(candidateKeys[j]);
+			if (candidateKey && candidateKey === targetKey) {
+				return dev;
+			}
+		}
+		if (targetKey && String(i) === String(value)) {
+			return dev;
+		}
+	}
+	return null;
+};
 
 OSApp.Analog.refresh = function() {
 	setTimeout( function() {
@@ -2502,14 +2546,9 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			scanDialog.find(".apply-scanner-selection").prop("disabled", !(scanCompleted && hasSelection));
 		}
 
-		function setSelectedDeviceByIndex(idx) {
+		function setSelectedDeviceBySelectionValue(selectionValue) {
 			var devices = scanDialog.data("zigbeeDevices") || [];
-			if (!devices || idx < 0 || idx >= devices.length) {
-				selectedDevice = null;
-				updateScannerActions();
-				return;
-			}
-			var dev = devices[idx] || null;
+			var dev = OSApp.Analog.findZigbeeDeviceBySelectionKey(devices, selectionValue);
 			if (!dev) {
 				selectedDevice = null;
 				updateScannerActions();
@@ -2619,10 +2658,11 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 						var device = devices[i] || {};
 						var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
 						var shortAddr = device.short_addr || "0x0000";
+						var selectionValue = OSApp.Analog.normalizeZigbeeDeviceSelectionKey(ieeeAddr) || String(i);
 
-						var friendlyLabel = resolveScannerDeviceLabel(device, i, shortAddr);
+						var friendlyLabel = resolveScannerDeviceLabel(device, selectionValue, shortAddr);
 						var label = friendlyLabel + " | IEEE: " + ieeeAddr + " | " + OSApp.Language._("Short Address") + ": " + shortAddr;
-						sel.append($("<option>").val(String(i)).text(label));
+						sel.append($("<option>").val(selectionValue).text(label));
 
 						// Track last found device
 						var isNew = (device.is_new === true || device.is_new === 1 || device.is_new === "1");
@@ -2669,14 +2709,13 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 
 		// Keep selected device in combobox; final apply is explicit after scan ends.
 		scanDialog.find("#zigbeeDeviceSelectScanner").off("change").on("change", function () {
-			var idxStr = scanDialog.find("#zigbeeDeviceSelectScanner").val();
-			var idx = parseInt(idxStr, 10);
-			if (idxStr === "" || isNaN(idx)) {
+			var selectionValue = scanDialog.find("#zigbeeDeviceSelectScanner").val();
+			if (!selectionValue) {
 				selectedDevice = null;
 				updateScannerActions();
 				return;
 			}
-			setSelectedDeviceByIndex(idx);
+			setSelectedDeviceBySelectionValue(selectionValue);
 		});
 
 		scanDialog.find(".apply-scanner-selection").on("click", function() {
@@ -2823,18 +2862,21 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 					scanCompleted = true;
 					var devices = scanDialog.data("zigbeeDevices") || [];
 					if (devices && devices.length > 0) {
-						var chosenIdx = 0;
+						var chosenSelectionValue = "";
 						for (var i = 0; i < devices.length; i++) {
 							if (devices[i] && (devices[i].is_new === true || devices[i].is_new === 1 || devices[i].is_new === "1")) {
-								chosenIdx = i;
+								var preferredIeee = devices[i].ieee || devices[i].ieee_addr || "";
+								chosenSelectionValue = OSApp.Analog.normalizeZigbeeDeviceSelectionKey(preferredIeee) || String(i);
 								break;
 							}
 						}
-						scanDialog.find("#zigbeeDeviceSelectScanner").val(String(chosenIdx));
+						if (chosenSelectionValue) {
+							scanDialog.find("#zigbeeDeviceSelectScanner").val(chosenSelectionValue);
+						}
 						try {
 							scanDialog.find("#zigbeeDeviceSelectScanner").selectmenu("refresh", true);
 						} catch (e) { void e; }
-						setSelectedDeviceByIndex(chosenIdx);
+						setSelectedDeviceBySelectionValue(chosenSelectionValue || "");
 						OSApp.Firmware.sendToOS("/zc?pw=", "json").always(function () {
 							scanDialog.popup("close");
 							$("#zigbeeScanner").remove();
@@ -3024,13 +3066,13 @@ OSApp.Analog.showBluetoothDeviceScanner = function(popup, callback, errorCallbac
 
 		// Immediately apply selected device on combobox change
 		scanDialog.find("#bluetoothDeviceSelectScanner").off("change").on("change", function () {
-			var idxStr = scanDialog.find("#bluetoothDeviceSelectScanner").val();
-			var idx = parseInt(idxStr, 10);
-			if (idxStr === "" || isNaN(idx)) {
+			var selectionValue = scanDialog.find("#bluetoothDeviceSelectScanner").val();
+			if (!selectionValue) {
 				return;
 			}
 			var devices = scanDialog.data("bluetoothDevices") || [];
-			if (!devices || idx < 0 || idx >= devices.length) {
+			var idx = parseInt(selectionValue, 10);
+			if (!devices || (isNaN(idx) ? false : (idx < 0 || idx >= devices.length))) {
 				return;
 			}
 			var dev = devices[idx] || null;
@@ -3700,7 +3742,7 @@ list += "</select></div>" +
 			return isUnknownMeta(value) ? "" : String(value || "").trim();
 		};
 
-		var resolveZigBeeDeviceLabel = function(device, i) {
+		var resolveZigBeeDeviceLabel = function(device, selectionValue) {
 			if (device.friendly_name) {
 				return device.friendly_name;
 			}
@@ -3725,13 +3767,13 @@ list += "</select></div>" +
 			// If not cached, trigger background lookup to cache it
 			if (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookup === "function") {
 				if (manufacturer && model) {
-					OSApp.ESP32Mode.ZigbeeDeviceDB.lookup(manufacturer, model).done((function(addr, idx) {
+					OSApp.ESP32Mode.ZigbeeDeviceDB.lookup(manufacturer, model).done((function(addr) {
 						return function(dbData) {
 							if (dbData) {
 								OSApp.ESP32Mode.ZigbeeDeviceDB.setCached(addr, dbData);
 								var updatedLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel(addr);
 								if (updatedLabel) {
-									var option = popup.find("#zigbeeDeviceSelect option[value='" + idx + "']");
+									var option = popup.find("#zigbeeDeviceSelect option[value='" + selectionValue + "']");
 									if (option.length) {
 										var text = updatedLabel + " | IEEE: " + addr;
 										option.text(text);
@@ -3781,14 +3823,17 @@ list += "</select></div>" +
 			refreshSelectMenu(logicalSelect);
 		};
 
-		var populateZigBeeLogicalSelectForDevice = function(deviceIndex, includeDbFallback) {
+		var populateZigBeeLogicalSelectForDevice = function(selectionValue, includeDbFallback) {
 			var devices = popup.data("zigbeeDevices") || [];
-			var idx = parseInt(deviceIndex, 10);
-			if (isNaN(idx) || idx < 0 || idx >= devices.length) {
+			var device = OSApp.Analog.findZigbeeDeviceBySelectionKey(devices, selectionValue);
+			if (!device) {
 				resetZigBeeLogicalSelect(OSApp.Language._("No logical devices found"));
 				return;
 			}
-			var device = devices[idx] || {};
+			var idx = devices.indexOf(device);
+			if (idx < 0) {
+				idx = 0;
+			}
 			var logicalSelect = popup.find("#zigbeeLogicalDeviceSelect");
 			var optionMap = {};
 
@@ -3957,9 +4002,8 @@ list += "</select></div>" +
 		};
 
 		var applyZigBeeDeviceSelection = function(value) {
-			var idx = parseInt(value, 10);
 			var devices = popup.data("zigbeeDevices") || [];
-			var dev = devices[idx];
+			var dev = OSApp.Analog.findZigbeeDeviceBySelectionKey(devices, value);
 			if (!dev) { return null; }
 
 			var sel = {
@@ -3971,11 +4015,11 @@ list += "</select></div>" +
 			popup.data("zigbee_model", sel.model);
 			popup.find("#device_ieee").val(sel.ieee).trigger("change");
 			resetZigBeeLogicalSelect(OSApp.Language._("Select a logical device..."));
-			populateZigBeeLogicalSelectForDevice(idx, true);
+			populateZigBeeLogicalSelectForDevice(value, true);
 			var currentName = popup.find(".name").val();
 			if (!currentName || currentName.trim() === "") {
 				var nameField = popup.find(".name");
-				var friendlyLabel = resolveZigBeeDeviceLabel(dev, idx);
+				var friendlyLabel = resolveZigBeeDeviceLabel(dev, value);
 				var cleanName = friendlyLabel.split("|")[0].split("(")[0].trim();
 				if (!cleanName || cleanName === "Unknown") {
 					cleanName = sel.model;
@@ -4069,11 +4113,11 @@ list += "</select></div>" +
 
 		// Standalone handler for BLE Discovered Devices select (active when no scan is running)
 		popup.find("#bluetoothDeviceSelect").on("change", function () {
-			var idxStr = $(this).val();
-			var idx = parseInt(idxStr, 10);
-			if (idxStr === "" || isNaN(idx)) { return; }
+			var selectionValue = $(this).val();
+			if (!selectionValue) { return; }
 			var devices = popup.data("bluetoothDevices") || [];
-			if (idx < 0 || idx >= devices.length) { return; }
+			var idx = parseInt(selectionValue, 10);
+			if (isNaN(idx) || idx < 0 || idx >= devices.length) { return; }
 			var dev = devices[idx];
 			if (!dev) { return; }
 			var selectedCharUuid = dev.char_uuid || dev.characteristic_uuid || dev.charUuid || dev.characteristicUuid || dev.charUUID || dev.characteristicUUID || dev.service_uuid || dev.serviceUuid || "";
@@ -4122,8 +4166,9 @@ list += "</select></div>" +
 					for (var i = 0; i < devices.length; i++) {
 						var device = devices[i] || {};
 						var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
-						var label = resolveZigBeeDeviceLabel(device, i) + " | IEEE: " + ieeeAddr;
-						deviceSelect.append($("<option>").val(String(i)).text(label));
+						var selectionValue = OSApp.Analog.normalizeZigbeeDeviceSelectionKey(ieeeAddr) || String(i);
+						var label = resolveZigBeeDeviceLabel(device, selectionValue) + " | IEEE: " + ieeeAddr;
+						deviceSelect.append($("<option>").val(selectionValue).text(label));
 						if (configuredIeee && String(ieeeAddr).toLowerCase() === configuredIeee) {
 							selectedIdx = i;
 						}
@@ -4143,13 +4188,12 @@ list += "</select></div>" +
 
 		// Standalone handler for Discovered Devices select (active when no scan is running)
 		popup.find("#zigbeeDeviceSelect").on("change", function () {
-			var idxStr = $(this).val();
-			var idx = parseInt(idxStr, 10);
-			if (idxStr === "" || isNaN(idx)) {
+			var selectionValue = $(this).val();
+			if (!selectionValue) {
 				resetZigBeeLogicalSelect(OSApp.Language._("Select a device first"));
 				return;
 			}
-			applyZigBeeDeviceSelection(idxStr);
+			applyZigBeeDeviceSelection(selectionValue);
 		});
 
 		popup.find("#zigbeeLogicalDeviceSelect").on("change", function () {
@@ -4302,8 +4346,9 @@ list += "</select></div>" +
 							for (var i = 0; i < devices.length; i++) {
 								var device = devices[i] || {};
 								var ieeeAddr = device.ieee || device.ieee_addr || "0x0000000000000000";
-								var label = resolveZigBeeDeviceLabel(device, i) + " | IEEE: " + ieeeAddr;
-								deviceSelect.append($("<option>").val(String(i)).text(label));
+								var selectionValue = OSApp.Analog.normalizeZigbeeDeviceSelectionKey(ieeeAddr) || String(i);
+								var label = resolveZigBeeDeviceLabel(device, selectionValue) + " | IEEE: " + ieeeAddr;
+								deviceSelect.append($("<option>").val(selectionValue).text(label));
 							}
 							refreshSelectMenu(deviceSelect);
 						} else {
@@ -4331,13 +4376,12 @@ list += "</select></div>" +
 
 				// Immediately apply selected ZigBee device to fields on combobox change
 				popup.find("#zigbeeDeviceSelect").off("change").on("change", function () {
-					var idxStr = popup.find("#zigbeeDeviceSelect").val();
-					var idx = parseInt(idxStr, 10);
-					if (idxStr === "" || isNaN(idx)) {
+					var selectionValue = popup.find("#zigbeeDeviceSelect").val();
+					if (!selectionValue) {
 						resetZigBeeLogicalSelect(OSApp.Language._("Select a device first"));
 						return;
 					}
-					var selectedDevice = applyZigBeeDeviceSelection(idxStr);
+					var selectedDevice = applyZigBeeDeviceSelection(selectionValue);
 					if (!selectedDevice) { return; }
 
 					// Stop scanning timers but keep the device list visible
@@ -4560,9 +4604,9 @@ list += "</select></div>" +
 
 				// Immediately apply selected device to fields on combobox change
 				popup.find("#bluetoothDeviceSelect").off("change").on("change", function () {
-					var idxStr = popup.find("#bluetoothDeviceSelect").val();
-					var idx = parseInt(idxStr, 10);
-					if (idxStr === "" || isNaN(idx)) {
+					var selectionValue = popup.find("#bluetoothDeviceSelect").val();
+					var idx = parseInt(selectionValue, 10);
+					if (!selectionValue || isNaN(idx)) {
 						return;
 					}
 					var currentDevices = popup.data("bluetoothDevices") || [];
