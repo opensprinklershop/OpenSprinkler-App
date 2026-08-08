@@ -220,13 +220,13 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 					OSApp.Errors.showError( OSApp.Language._( "Check device password and try again." ) );
 				}
 
-				// Tell subsequent handlers this request has failed (use 401 to prevent retry)
-				return $.Deferred().reject( { "status":401 } );
+				// Resolve the promise so UI callbacks still run and loading indicators can clear.
+				return $.Deferred().resolve( data ).promise();
 
 			// Handle page not found by triggering fail
 			} else if ( data.result === 32 ) {
 
-				return $.Deferred().reject( { "status":404 } );
+				return $.Deferred().resolve( data ).promise();
 			}
 
 			// Only show error messages on setting change requests
@@ -239,8 +239,8 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 					OSApp.Errors.showError( OSApp.Language._( "Please check input and try again." ) );
 				}
 
-				// Tell subsequent handlers this request has failed
-				return $.Deferred().reject( data );
+				// Resolve so downstream .done/.always handlers still run and the UI can recover.
+				return $.Deferred().resolve( data ).promise();
 			}
 
 		},
