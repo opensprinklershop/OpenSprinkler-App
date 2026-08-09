@@ -56,7 +56,7 @@ OSApp.Firmware.normalizeDirectHost = function( host, prefix ) {
 
 OSApp.Firmware.canUseNativeHttp = function( url ) {
 	return !!(
-		OSApp.currentDevice.isAndroid &&
+		OSApp.currentDevice && ( OSApp.currentDevice.isAndroid || OSApp.currentDevice.isiOS ) &&
 		!OSApp.currentSession.token &&
 		typeof url === "string" &&
 		/^https:\/\//i.test( url ) &&

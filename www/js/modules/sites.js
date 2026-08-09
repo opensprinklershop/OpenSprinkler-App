@@ -728,14 +728,9 @@ OSApp.Sites.testSite = function( site, id, callback ) {
 		normalizedIp = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) ? OSApp.Firmware.normalizeDirectHost( site.os_ip, prefix ) : site.os_ip,
 		urlDest = "/jo?pw=" + encodeURIComponent( site.os_pw ),
 		url = site.os_token ? "https://cloud.openthings.io/forward/v1/" + site.os_token + urlDest : prefix + normalizedIp + urlDest,
-
-		// Use native HTTP for direct HTTPS device connections on Android (WebView
-		// cannot verify self-signed certs, but cordova-plugin-advanced-http can).
-		useNative = !site.os_token &&
-			site.ssl === "1" &&
-			OSApp.currentDevice.isAndroid &&
-			window.cordova && window.cordova.plugin && window.cordova.plugin.http &&
-			typeof window.cordova.plugin.http.sendRequest === "function";
+		// Use native HTTP for direct HTTPS device connections on Cordova devices.
+		// WebView XHR cannot verify self-signed certs, but cordova-plugin-advanced-http can.
+		useNative = !site.os_token && OSApp.Firmware.canUseNativeHttp( url );
 
 	if ( useNative ) {
 		var headers = {};
