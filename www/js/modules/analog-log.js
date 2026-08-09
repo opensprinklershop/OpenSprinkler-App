@@ -290,6 +290,9 @@ var url = "/so?pw=&csv=2";
 if (_currentFilter !== null) {
 url += "&nr=" + _currentFilter;
 }
+if (OSApp.currentSession && OSApp.currentSession.token) {
+url += "&max=5500";
+}
 
 OSApp.Firmware.sendToOS(url, "text", 120000).then(
 function (csv) {
