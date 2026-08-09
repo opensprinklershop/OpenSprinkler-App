@@ -2,8 +2,14 @@
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-if [ -f "$SCRIPT_DIR/../../.bashrc" ]; then
-	source "$SCRIPT_DIR/../../.bashrc"
+# Load user shell env so GOOGLEMAPSAPIKEY is available in non-login script runs.
+if [ -f "$HOME/.bashrc" ]; then
+	source "$HOME/.bashrc"
+fi
+
+# Only use zshrc as fallback when bashrc didn't provide the key.
+if [ -z "$GOOGLEMAPSAPIKEY" ] && [ -f "$HOME/.zshrc" ]; then
+	source "$HOME/.zshrc"
 fi
 
 if [ -n "$XCODE_26_PATH" ]; then
