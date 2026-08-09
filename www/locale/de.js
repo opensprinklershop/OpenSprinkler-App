@@ -140,6 +140,8 @@
     "Auto fallback only applies while Matter mode is active.": "Automatischer Fallback gilt nur, während der Matter-Modus aktiv ist.",
     "Auto-apply changes without confirmation": "Änderungen ohne Bestätigung automatisch anwenden",
     "Auto-restore failed": "Automatische Wiederherstellung fehlgeschlagen",
+    "Automatic Update (ESP32)": "Automatisches Update (ESP32)",
+    "Automatic Update (ESP8266)": "Automatisches Update (ESP8266)",
     "Automatic fallback already attempted. Keep IEEE802.15.4 disabled and retry manually.": "Automatischer Fallback wurde bereits versucht. Lassen Sie IEEE802.15.4 deaktiviert und versuchen Sie es manuell erneut.",
     "Automatically obtain and renew a free TLS certificate from Let's Encrypt. Your device must be reachable on port 80 from the internet.": "Kostenloses TLS-Zertifikat automatisch von Let's Encrypt beziehen und erneuern. Das Gerät muss von außen auf Port 80 erreichbar sein.",
     "Automatically restore saved configuration after update": "Gespeicherte Konfiguration nach dem Update automatisch wiederherstellen",

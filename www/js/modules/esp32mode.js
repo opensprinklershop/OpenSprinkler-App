@@ -4321,9 +4321,9 @@ OSApp.ESP32Mode.getOnlineUpdateVariantLabel = function() {
 		return OSApp.Language._( "OSPi Script Update" );
 	}
 	if ( OSApp.ESP32Mode.isESP32Supported() ) {
-		return OSApp.Language._( "ESP32 OTA" );
+		return OSApp.Language._( "Automatic Update (ESP32)" );
 	}
-	return OSApp.Language._( "ESP8266 Direct OTA" );
+	return OSApp.Language._( "Automatic Update (ESP8266)" );
 };
 
 OSApp.ESP32Mode.getInteractiveOTAOptionsHtml = function() {
@@ -4406,32 +4406,45 @@ OSApp.ESP32Mode.restoreFromAppBackupInPopup = function( popup ) {
 	);
 	popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Applying saved configuration..." ) );
 
-	OSApp.ESP32Mode.restoreFromAppBackup( backup.data, function() {
-		OSApp.Sites.updateController( function() {
-			OSApp.ESP32Mode.markOTACompleted( popup );
+	OSApp.ESP32Mode.restoreFromAppBackup(
+		backup.data,
+		function() {
+			OSApp.Sites.updateController( function() {
+				OSApp.ESP32Mode.markOTACompleted( popup );
+				OSApp.ESP32Mode.stopOTADurationTimer( popup );
+				popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
+					"&#9745; " + OSApp.Language._( "Update complete. Configuration restored." )
+				);
+				popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is back online." ) );
+				popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+			}, function() {
+				OSApp.ESP32Mode.markOTACompleted( popup );
+				OSApp.ESP32Mode.stopOTADurationTimer( popup );
+				popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
+					"&#9745; " + OSApp.Language._( "Update complete. Configuration restored." )
+				);
+				popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is back online." ) );
+				popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
+			} );
+		},
+		function() {
 			OSApp.ESP32Mode.stopOTADurationTimer( popup );
-			popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
-				"&#9745; " + OSApp.Language._( "Update complete. Configuration restored." )
+			popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
+				"&#9888; " + OSApp.Language._( "Auto-restore failed" )
 			);
-			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is back online." ) );
+			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Restore failed." ) );
 			popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
-		}, function() {
-			OSApp.ESP32Mode.markOTACompleted( popup );
-			OSApp.ESP32Mode.stopOTADurationTimer( popup );
-			popup.find( "#ota-step-5" ).css( "color", "#4CAF50" ).html(
-				"&#9745; " + OSApp.Language._( "Update complete. Configuration restored." )
-			);
-			popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Device is back online." ) );
-			popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
-		} );
-	}, function() {
-		OSApp.ESP32Mode.stopOTADurationTimer( popup );
-		popup.find( "#ota-step-5" ).css( "color", "#FF9800" ).html(
-			"&#9888; " + OSApp.Language._( "Auto-restore failed" )
-		);
-		popup.find( "#ota-progress-msg" ).text( OSApp.Language._( "Restore failed." ) );
-		popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
-	} );
+		},
+		function( attempt, maxAttempts ) {
+			if ( attempt > 1 ) {
+				popup.find( "#ota-progress-msg" ).text(
+					OSApp.Language._( "Applying saved configuration..." ) +
+					" (" + OSApp.Language._( "Retry" ) + " " + attempt + "/" + maxAttempts + ")"
+				);
+			}
+		},
+		5
+	);
 };
 
 /**
@@ -6785,18 +6798,22 @@ OSApp.ESP32Mode.showRestorePopup = function() {
  * Restore controller options from a backup data object.
  * Sends string options (sopts) back using their named /co keys,
  * and restores the password separately via /sp.
- * @param {Object}   data       Backup data (from backupConfigToApp)
- * @param {Function} [onDone]   Optional success callback
- * @param {Function} [onFail]   Optional failure callback
+ * Includes automatic retries if the controller is still warming up after reboot.
+ * @param {Object}   data          Backup data (from backupConfigToApp)
+ * @param {Function} [onDone]      Optional success callback
+ * @param {Function} [onFail]      Optional failure callback
+ * @param {Function} [onProgress]  Optional retry progress callback (attempt, maxAttempts)
+ * @param {number}   [maxRetries]  Maximum number of attempts (default 5)
  */
-OSApp.ESP32Mode.restoreFromAppBackup = function( data, onDone, onFail ) {
+OSApp.ESP32Mode.restoreFromAppBackup = function( data, onDone, onFail, onProgress, maxRetries ) {
 	if ( !data || !data.sopts ) {
 		OSApp.Errors.showError( OSApp.Language._( "Invalid backup data" ) );
 		if ( onFail ) { onFail(); }
 		return;
 	}
 
-	$.mobile.loading( "show" );
+	var maxAttempts = ( typeof maxRetries === "number" && maxRetries > 0 ) ? maxRetries : 5;
+	var attempt = 0;
 
 	// Map sopt indices to /co parameter names.
 	// Indices not listed here are either handled separately (password)
@@ -6843,58 +6860,85 @@ OSApp.ESP32Mode.restoreFromAppBackup = function( data, onDone, onFail ) {
 		} );
 	}
 
-	// Build sequential restore chain: first password, then options
-	var restoreChain = $.Deferred().resolve();
+	function doAttempt() {
+		attempt++;
+		$.mobile.loading( "show" );
+		if ( typeof onProgress === "function" ) {
+			onProgress( attempt, maxAttempts );
+		}
 
-	// Restore password via /sp if present in backup (sopt index 0)
-	if ( data.sopts[ "0" ] ) {
-		restoreChain = restoreChain.then( function() {
-			var pwHash = encodeURIComponent( data.sopts[ "0" ] );
-			return OSApp.Firmware.sendToOS( "/sp?pw=&npw=" + pwHash + "&cpw=" + pwHash, "json" ).then( function( resp ) {
-				// After password change succeeds, update the session so
-				// subsequent requests (e.g. /co) authenticate correctly.
-				OSApp.currentSession.pass = data.sopts[ "0" ];
-				return resp;
-			} );
-		} );
-	}
+		// Build sequential restore chain: first password, then options
+		var restoreChain = $.Deferred().resolve();
 
-	// Restore other options via /co
-	if ( params ) {
-		restoreChain = restoreChain.then( function() {
-			return OSApp.Firmware.sendToOS( "/co?pw=&" + params, "json" );
-		} );
-	}
-
-	// Restore the monthly water usage history as part of the OTA/app backup.
-	if ( data.mwater ) {
-		restoreChain = restoreChain.then( function() {
-			return OSApp.Firmware.sendToOS(
-				"/jw?pw=&mwater=" + encodeURIComponent( JSON.stringify( data.mwater ) ),
-				"json"
-			);
-		} );
-	}
-
-	restoreChain.done( function() {
-		$.mobile.loading( "hide" );
-		localStorage.removeItem( OSApp.ESP32Mode.OTA_BACKUP_KEY );
-		if ( onDone ) {
-			onDone();
-		} else {
-			OSApp.Errors.showError( OSApp.Language._( "Configuration restored successfully" ) );
-			OSApp.Sites.updateController( function() {
-				OSApp.UIDom.goHome();
+		// Restore password via /sp if present in backup (sopt index 0)
+		if ( data.sopts[ "0" ] ) {
+			restoreChain = restoreChain.then( function() {
+				var pwHash = encodeURIComponent( data.sopts[ "0" ] );
+				return OSApp.Firmware.sendToOS( "/sp?pw=&npw=" + pwHash + "&cpw=" + pwHash, "json" ).then( function( resp ) {
+					if ( !resp || resp.result !== 1 ) {
+						return $.Deferred().reject( resp ).promise();
+					}
+					// After password change succeeds, update the session so
+					// subsequent requests (e.g. /co) authenticate correctly.
+					OSApp.currentSession.pass = data.sopts[ "0" ];
+					return resp;
+				} );
 			} );
 		}
-	} ).fail( function() {
-		$.mobile.loading( "hide" );
-		if ( onFail ) {
-			onFail();
-		} else {
-			OSApp.Errors.showError( OSApp.Language._( "Error restoring configuration" ) );
+
+		// Restore other options via /co
+		if ( params ) {
+			restoreChain = restoreChain.then( function() {
+				return OSApp.Firmware.sendToOS( "/co?pw=&" + params, "json" ).then( function( resp ) {
+					if ( !resp || resp.result !== 1 ) {
+						return $.Deferred().reject( resp ).promise();
+					}
+					return resp;
+				} );
+			} );
 		}
-	} );
+
+		// Restore the monthly water usage history as part of the OTA/app backup.
+		if ( data.mwater ) {
+			restoreChain = restoreChain.then( function() {
+				return OSApp.Firmware.sendToOS(
+					"/jw?pw=&mwater=" + encodeURIComponent( JSON.stringify( data.mwater ) ),
+					"json"
+				).then( function( resp ) {
+					if ( !resp || resp.result !== 1 ) {
+						return $.Deferred().reject( resp ).promise();
+					}
+					return resp;
+				} );
+			} );
+		}
+
+		restoreChain.done( function() {
+			$.mobile.loading( "hide" );
+			localStorage.removeItem( OSApp.ESP32Mode.OTA_BACKUP_KEY );
+			if ( onDone ) {
+				onDone();
+			} else {
+				OSApp.Errors.showError( OSApp.Language._( "Configuration restored successfully" ) );
+				OSApp.Sites.updateController( function() {
+					OSApp.UIDom.goHome();
+				} );
+			}
+		} ).fail( function() {
+			if ( attempt < maxAttempts ) {
+				setTimeout( doAttempt, 2500 );
+			} else {
+				$.mobile.loading( "hide" );
+				if ( onFail ) {
+					onFail();
+				} else {
+					OSApp.Errors.showError( OSApp.Language._( "Error restoring configuration" ) );
+				}
+			}
+		} );
+	}
+
+	doAttempt();
 };
 
 // ============================================================================
