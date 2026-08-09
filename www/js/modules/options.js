@@ -2037,22 +2037,22 @@ OSApp.Options.showOptions = function( expandItem ) {
 				title: OSApp.Language._( "Sensors & Weather" ),
 				events: [
 					{ key: "sensor1", label: OSApp.Language._( "Sensor 1 Update" ) },
+					{ key: "sensor2", label: OSApp.Language._( "Sensor 2 Update" ) },
 					{ key: "flow", label: OSApp.Language._( "Flow Sensor Update" ) },
 					{ key: "weather", label: OSApp.Language._( "Weather Adjustment Update" ) },
-					{ key: "sensor2", label: OSApp.Language._( "Sensor 2 Update" ) },
 					{ key: "rain", label: OSApp.Language._( "Rain Delay Update" ) }
 				]
 			},
 			{
 				title: OSApp.Language._( "Stations & Flow" ),
 				events: [
-					{ key: "run", label: OSApp.Language._( "Station Finish" ) },
 					{ key: "station", label: OSApp.Language._( "Station Start" ) },
+					{ key: "run", label: OSApp.Language._( "Station Finish" ) },
 					{ key: "flow_alert", label: OSApp.Language._( "Flow Alert" ) },
 					{ key: "curr_alert", label: OSApp.Language._( "Under/Overcurrent Fault" ) },
-					{ key: "monthly_report", label: OSApp.Language._( "Monthly Water Report" ) },
 					{ key: "noflow", label: OSApp.Language._( "No Flow Alert" ) },
-					{ key: "pipe_burst", label: OSApp.Language._( "Pipe Burst Alert" ) }
+					{ key: "pipe_burst", label: OSApp.Language._( "Pipe Burst Alert" ) },
+					{ key: "monthly_report", label: OSApp.Language._( "Monthly Water Report" ) }
 				]
 			},
 			{
@@ -2082,22 +2082,29 @@ OSApp.Options.showOptions = function( expandItem ) {
 		inputs = "";
 		$.each( eventGroups, function( _, group ) {
 			if ( group.events && group.events.length ) {
-				inputs += "<div class='ui-field-contain' style='margin:0 0 .4em 0;'><div class='ui-bar ui-bar-a'>" + group.title + "</div>";
+				var groupInputs = "";
 				$.each( group.events, function( _, event ) {
-					inputs += "<label for='notif-" + event.key + "'><input class='needsclick' data-iconpos='right' id='notif-" + event.key + "' type='checkbox' " +
-						( OSApp.Utils.getBitFromByte( curr, a ) ? "checked='checked'" : "" ) + ( ( no_ife2 && a >= 8 ) || ( no_ife3 && a >= 16 ) ? " disabled" : "" ) + ">" + event.label +
+					groupInputs += "<label for='notif-" + event.key + "' style='display:flex;align-items:center;justify-content:space-between;padding:5px 0;margin:0;cursor:pointer;font-weight:normal;width:100%;box-sizing:border-box;'>" +
+						"<span style='flex:1;padding-right:12px;font-size:0.9em;color:#333;'>" + event.label + "</span>" +
+						"<input class='needsclick' data-role='none' id='notif-" + event.key + "' type='checkbox' style='margin:0;width:18px;height:18px;flex-shrink:0;cursor:pointer;' " +
+						( OSApp.Utils.getBitFromByte( curr, a ) ? "checked='checked'" : "" ) + ( ( no_ife2 && a >= 8 ) || ( no_ife3 && a >= 16 ) ? " disabled" : "" ) + ">" +
 					"</label>";
 					a++;
 				} );
-				inputs += "</div>";
+				inputs += "<div style='margin-bottom:10px;'>" +
+					"<div style='font-weight:bold;font-size:0.95em;margin:8px 0 4px 0;color:#2f5d7a;border-bottom:1px solid #eee;padding-bottom:2px;'>" + group.title + "</div>" +
+					"<div style='display:flex;flex-direction:column;'>" + groupInputs + "</div>" +
+				"</div>";
 			}
 		} );
 
 		var popup = $(
-			"<div data-role='popup' data-theme='a'>" +
-				"<div data-role='controlgroup' data-mini='true' class='tight'>" +
-					"<div class='ui-bar ui-bar-a'>" + OSApp.Language._( "Select Notification Events" ) + "</div>" +
-						inputs +
+			"<div data-role='popup' data-theme='a' style='padding:12px 16px;min-width:280px;max-width:340px;box-sizing:border-box;'>" +
+				"<div style='font-weight:bold;font-size:1.05em;margin-bottom:10px;text-align:center;border-bottom:1px solid #ccc;padding-bottom:6px;color:#333;'>" + OSApp.Language._( "Select Notification Events" ) + "</div>" +
+				"<div style='max-height:65vh;overflow-y:auto;padding-right:4px;'>" +
+					inputs +
+				"</div>" +
+				"<div style='margin-top:12px;text-align:center;'>" +
 					"<input data-wrapper-class='attrib-submit' class='submit' data-theme='b' type='submit' value='" + OSApp.Language._( "Submit" ) + "' />" +
 				"</div>" +
 			"</div>" );
