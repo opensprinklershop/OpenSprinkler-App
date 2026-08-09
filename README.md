@@ -31,9 +31,9 @@ A mobile interface for the OpenSprinkler irrigation device. This app provides ma
 
 + This application is available for free from the following app stores:
   + [Amazon Appstore](http://www.amazon.com/dp/B00JYFL8LW)
-  + [Apple App Store - iOS](https://itunes.apple.com/us/app/sprinklers/id830988967?ls=1&mt=8)
-  + [Apple App Store - OS X](https://itunes.apple.com/us/app/sprinklers/id903464532?ls=1&mt=12)
-  + [Google Play Store](https://play.google.com/store/apps/details?id=com.albahra.sprinklers)
+  + [Apple App Store - iOS (OpenSprinklerASB)](https://apps.apple.com/app/opensprinklerasb/id830988967)
+  + [Apple App Store - macOS (OpenSprinklerASB)](https://apps.apple.com/app/opensprinklerasb/id903464532)
+  + [Google Play Store (OpenSprinklerASB)](https://play.google.com/store/apps/details?id=de.opensprinklershop.sprinklers)
 
 **Prerequisites:**
 
