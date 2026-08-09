@@ -947,13 +947,48 @@ OSApp.Firmware.pollOTAProgress = function( popup ) {
 				OSApp.currentSession.pass = tryPass;
 				setBar( 100 );
 				setText( OSApp.Language._( "Update complete! Rebooting..." ) );
-				setTimeout( function() {
-					if ( popup ) { popup.popup( "close" ); }
-					OSApp.Errors.showError( OSApp.Language._( "Firmware updated. Device is rebooting..." ) );
-					// Clear cache so next check fetches fresh data
-					OSApp.Storage.setItemSync( "otaUpdateCheck", "" );
-					OSApp.Firmware._otaCache = null;
-				}, 2000 );
+
+				// Update last_ui_version based on the new firmware version before closing the
+				// popup. This prevents a stale pre-OTA cached value from being used when
+				// routeToVersion falls back because the device is briefly unreachable.
+				var fwv = data.fwv, fwm = data.fwm;
+				var navigateAfterClose = function( shouldNavigate ) {
+					setTimeout( function() {
+						if ( popup ) { popup.popup( "close" ); }
+						OSApp.Errors.showError( OSApp.Language._( "Firmware updated. Device is rebooting..." ) );
+						OSApp.Storage.setItemSync( "otaUpdateCheck", "" );
+						OSApp.Firmware._otaCache = null;
+						if ( shouldNavigate && OSApp.Sites && typeof OSApp.Sites.routeToVersion === "function" ) {
+							OSApp.Storage.get( [ "sites", "current_site" ], function( stored ) {
+								var sites = OSApp.Sites.parseSites( stored.sites );
+								var currentSite = stored.current_site;
+								if ( currentSite && sites[ currentSite ] ) {
+									OSApp.Sites.routeToVersion( currentSite, sites[ currentSite ] );
+								}
+							} );
+						}
+					}, 2000 );
+				};
+
+				if ( fwv && OSApp.Sites && typeof OSApp.Sites.mapFirmwareToUIVersion === "function" ) {
+					$.ajax( {
+						url: "versions.json",
+						type: "GET",
+						dataType: "json",
+						timeout: 3000
+					} ).then( function( vData ) {
+						var versions = ( vData && Array.isArray( vData.versions ) ) ? vData.versions : [];
+						var targetVersion = OSApp.Sites.mapFirmwareToUIVersion( fwv, versions, fwm );
+						localStorage.setItem( "last_ui_version", targetVersion );
+						navigateAfterClose( targetVersion );
+					}, function() {
+						// versions.json unavailable — still trigger routeToVersion so it can
+						// probe the device for the correct version itself.
+						navigateAfterClose( true );
+					} );
+				} else {
+					navigateAfterClose( null );
+				}
 			} ).fail( function() {
 				pending = false;
 				if ( seconds >= 120 ) {

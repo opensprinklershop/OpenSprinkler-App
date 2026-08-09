@@ -4990,6 +4990,27 @@ OSApp.ESP32Mode.uploadClassicFirmwareBlob = function( blob, filename, variant ) 
 };
 
 /**
+ * After a successful OTA reconnect, update last_ui_version from the new firmware's
+ * fwv/fwm stored in the current session controller options. This prevents the stale
+ * pre-OTA cached version from being used as a fallback in routeToVersion.
+ */
+OSApp.ESP32Mode._updateUIVersionAfterOTA = function() {
+	var opts = OSApp.currentSession.controller && OSApp.currentSession.controller.options;
+	if ( !opts || !opts.fwv ) { return; }
+	if ( !OSApp.Sites || typeof OSApp.Sites.mapFirmwareToUIVersion !== "function" ) { return; }
+	var fwv = opts.fwv, fwm = opts.fwm;
+	$.ajax( {
+		url: "versions.json",
+		type: "GET",
+		dataType: "json",
+		timeout: 3000
+	} ).then( function( vData ) {
+		var versions = ( vData && Array.isArray( vData.versions ) ) ? vData.versions : [];
+		localStorage.setItem( "last_ui_version", OSApp.Sites.mapFirmwareToUIVersion( fwv, versions, fwm ) );
+	} );
+};
+
+/**
  * Wait for device to come back online after a firmware upload + reboot.
  * Polls /jc until the device responds, then calls onReady().
  * Calls onFail() if the device doesn't respond within ~90 seconds.
@@ -5100,6 +5121,7 @@ OSApp.ESP32Mode.waitForClassicUploadReboot = function( popup ) {
 						OSApp.Storage.setItemSync( "otaUpdateCheck", "" );
 						OSApp.Firmware._otaCache = null;
 						OSApp.Sites.updateController( function() {
+							OSApp.ESP32Mode._updateUIVersionAfterOTA();
 							OSApp.UIDom.goHome();
 						} );
 					}, function() {
@@ -5118,7 +5140,9 @@ OSApp.ESP32Mode.waitForClassicUploadReboot = function( popup ) {
 					popup.find( ".ota-cancel" ).text( OSApp.Language._( "Close" ) );
 					OSApp.Storage.setItemSync( "otaUpdateCheck", "" );
 					OSApp.Firmware._otaCache = null;
-					OSApp.Sites.updateController();
+					OSApp.Sites.updateController( function() {
+						OSApp.ESP32Mode._updateUIVersionAfterOTA();
+					} );
 				}
 			} ).fail( function() {
 				polling = false;
@@ -5957,6 +5981,7 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 							setTimeout( function() {
 								popup.popup( "close" );
 								OSApp.Sites.updateController( function() {
+									OSApp.ESP32Mode._updateUIVersionAfterOTA();
 									OSApp.UIDom.goHome();
 								} );
 							}, 1500 );
