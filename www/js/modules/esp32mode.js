@@ -5471,16 +5471,17 @@ OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
 		return;
 	}
 
-	// When the UI is loaded over HTTPS, the port-8080 OTA upload server always
-	// uses plain HTTP and cannot be reached from an HTTPS page (mixed content).
-	// Skip the probe and route directly: ESP32 → interactive OTA (setupOnlineUpdate),
-	// ESP8266/legacy → setupLegacyOnlineUpdate.
+	// For ESP32 controllers, always use the interactive 2-firmware online update flow (setupOnlineUpdate).
+	// The device controller itself downloads and flashes both partitions (e.g. Zigbee + Matter) via /uu,
+	// avoiding single-firmware direct uploads over HTTP (port 8080) that only flash one partition and stall.
+	if ( OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller() ) {
+		OSApp.ESP32Mode.setupOnlineUpdate();
+		return;
+	}
+
+	// For ESP8266/legacy controllers loaded over HTTPS:
 	if ( window.location.protocol === "https:" ) {
-		if ( OSApp.ESP32Mode.isESP32Supported() && !OSApp.Firmware.isESP8266Controller() ) {
-			OSApp.ESP32Mode.setupOnlineUpdate();
-		} else {
-			OSApp.ESP32Mode.setupLegacyOnlineUpdate();
-		}
+		OSApp.ESP32Mode.setupLegacyOnlineUpdate();
 		return;
 	}
 
@@ -5492,9 +5493,7 @@ OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
 		if ( serverAvailable ) {
 			OSApp.ESP32Mode.setupClassicPostedUpdate();
 		} else {
-			// Port 8080 not reachable — the device firmware predates the browser-push
-			// upload server.  Fall back to device-side download via /uu (the device
-			// fetches the binary from the update server itself).
+			// Port 8080 not reachable — fall back to device-side download via /uu
 			OSApp.ESP32Mode.setupLegacyOnlineUpdate();
 		}
 	} );
@@ -5882,12 +5881,12 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 
 		var originalPass = OSApp.currentSession.pass;
 		var defaultPass = md5( "opendoor" );
-		var baseUrl = OSApp.currentSession.prefix + OSApp.currentSession.ip;
 
-		// Phase 1: poll /us until flash is done (status 8) or failed (status >= 9).
-		// While the device is reachable it serves progress; once it reboots /us stops responding.
+		// Phase 1: poll /us until flash is done (status 8) or failed (error status).
+		// While the device is reachable it serves progress; transient reboot states
+		// (status 13/14) keep polling so phase 2 progress is tracked.
 		var statusPollCount = 0;
-		var maxStatusPolls = 90; // 90 × 2 s = 3 min max for download+flash phase
+		var maxStatusPolls = 150; // 150 × 2 s = 5 min max for download+flash phase
 		var statusTimer = setInterval( function() {
 			statusPollCount++;
 			OSApp.Firmware.sendToOS( "/us?pw=", "json" ).then( function( data ) {
@@ -5896,6 +5895,7 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 				var status = data.status;
 				var progress = data.progress || 0;
 				var message = data.message || "";
+				var ST = OSApp.ESP32Mode.OTA_STATUS || {};
 
 				// Update step 2 label with progress percentage and status message
 				var progressText = progress > 0 ? " (" + progress + "%)" : "";
@@ -5904,7 +5904,7 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 					"&#9658; <b>" + labelText + progressText + "</b>"
 				);
 
-				if ( status === 8 ) {
+				if ( status === ST.DONE || status === 8 ) {
 					// Flash complete — device will reboot now
 					clearInterval( statusTimer );
 					popup.find( "#ota-step-2" ).css( "color", "#4CAF50" ).html(
@@ -5914,7 +5914,14 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 						"&#9658; <b>" + OSApp.Language._( "Waiting for device reboot..." ) + "</b>"
 					);
 					startRebootPolling();
-				} else if ( status >= 9 ) {
+				} else if ( status === ST.REBOOTING_PHASE2 || status === ST.REBOOTING_OTA || status === 13 || status === 14 ) {
+					// Transient reboot states — do NOT stop statusTimer.
+					// Keep polling through the reboot window so phase 2 progress continues.
+					popup.find( "#ota-step-2" ).css( "color", "#1976D2" ).html(
+						"&#9658; <b>" + labelText + progressText + "</b>"
+					);
+				} else if ( ( status >= ST.ERROR_NETWORK && status <= ST.ERROR_FLASH_MATTER ) ||
+							status === ST.ERROR_LOW_MEMORY || ( status >= 9 && status <= 12 ) || status === 15 ) {
 					// Download or flash error reported by firmware
 					clearInterval( statusTimer );
 					popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
@@ -5948,14 +5955,8 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 				// Try original password first (firmware may have restored it),
 				// fall back to default password on alternate attempts.
 				var tryPass = ( pollCount % 2 === 1 ) ? originalPass : defaultPass;
-				var url = baseUrl + "/jc?pw=" + encodeURIComponent( tryPass );
 
-				$.ajax( {
-					url: url,
-					type: "GET",
-					dataType: "json",
-					timeout: 3000
-				} ).done( function( data ) {
+				OSApp.Firmware.probeDevice( tryPass, "/jc", 3000 ).done( function( data ) {
 					if ( !data ) { polling = false; return; }
 					clearInterval( rebootPoll );
 
@@ -6414,20 +6415,12 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 					}
 
 					var waitSeconds = 0;
-					var baseUrl = OSApp.currentSession.token
-						? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
-						: OSApp.currentSession.prefix + OSApp.currentSession.ip;
 					var retryPoll = setInterval( function() {
 						waitSeconds += 3;
 						popup.find( "#ota-progress-msg" ).text(
 							OSApp.Language._( "Waiting for reboot after mode change..." ) + " (" + waitSeconds + "s)"
 						);
-						$.ajax( {
-							url: baseUrl + "/jo?pw=" + encodeURIComponent( OSApp.currentSession.pass ),
-							type: "GET",
-							dataType: "json",
-							timeout: 5000
-						} ).done( function( data ) {
+						OSApp.Firmware.probeDevice( OSApp.currentSession.pass, "/jo", 5000 ).done( function( data ) {
 							if ( !data ) {
 								return;
 							}
@@ -6493,9 +6486,7 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 			popup.find( "#ota-progress-pct" ).text( "95%" );
 			popup.find( ".ota-start-interactive, .ota-start-specific" ).remove();
 
-			// Minimum grace period (seconds) before probing — gives the device
-			// time to physically finish its reboot before a connection check.
-			var MIN_REBOOT_WAIT = 12;
+			// Minimum grace period before probing — start probing at 3s immediately.
 			var reconnectSeconds = 0;
 			var probeCount = 0;
 
@@ -6504,9 +6495,6 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 			// password on each probe attempt (same strategy as legacy OTA).
 			var originalPass = OSApp.currentSession.pass;
 			var defaultPass = md5( "opendoor" );
-			var baseUrl = OSApp.currentSession.token
-				? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
-				: OSApp.currentSession.prefix + OSApp.currentSession.ip;
 
 			reconnectPoll = setInterval( function() {
 				reconnectSeconds += 3;
@@ -6516,9 +6504,7 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 					" (" + reconnectSeconds + "s)"
 				);
 
-				// Skip probing during the minimum grace period or while a
-				// request is already in flight.
-				if ( reconnectSeconds < MIN_REBOOT_WAIT || reconnectPending ) {
+				if ( reconnectPending ) {
 					return;
 				}
 				reconnectPending = true;
@@ -6526,12 +6512,7 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 
 				var tryPass = ( probeCount % 2 === 1 ) ? originalPass : defaultPass;
 
-				$.ajax( {
-					url: baseUrl + "/jo?pw=" + encodeURIComponent( tryPass ),
-					type: "GET",
-					dataType: "json",
-					timeout: 5000
-				} ).done( function( data ) {
+				OSApp.Firmware.probeDevice( tryPass, "/jo", 5000 ).done( function( data ) {
 					reconnectPending = false;
 					if ( !data ) { return; }
 					clearInterval( reconnectPoll );
@@ -6638,8 +6619,9 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 					);
 				}
 
-				// Done (progress 100%)
-				if ( st.status === OSApp.ESP32Mode.OTA_STATUS.DONE ) {
+				// Done (progress 100% or firmware back to idle after reboot)
+				if ( st.status === OSApp.ESP32Mode.OTA_STATUS.DONE ||
+					 ( st.status === OSApp.ESP32Mode.OTA_STATUS.IDLE && lastProgress >= 90 ) ) {
 					startFinalReconnectWait();
 				} else if ( st.status === OSApp.ESP32Mode.OTA_STATUS.ERROR_LOW_MEMORY ) {
 					clearInterval( pollInterval );
@@ -6662,11 +6644,11 @@ OSApp.ESP32Mode.runInteractiveOTA_step2 = function( popup, urlParams, lowMemFall
 				}
 			} ).fail( function() {
 				failCount++;
-				if ( sawRebootPhase2 || sawRebootOTA ) {
-					if ( phase2Started && lastProgress >= 90 ) {
-						startFinalReconnectWait();
-						return;
-					}
+				if ( lastProgress >= 90 ) {
+					startFinalReconnectWait();
+					return;
+				}
+				if ( sawRebootPhase2 || sawRebootOTA || lastProgress >= 40 ) {
 					popup.find( "#ota-progress-msg" ).text(
 						OSApp.Language._( "Waiting for device to restart..." ) +
 						" (" + ( failCount * 2 ) + "s)"
