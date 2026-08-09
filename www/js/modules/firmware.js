@@ -273,6 +273,40 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 	return defer;
 };
 
+/**
+ * Probe a device endpoint (e.g. /jo or /jc) with a specific password.
+ * Uses native HTTP plugin on Cordova/mobile to support self-signed SSL certs
+ * and normalizes the host (stripping temporary OTA ports like 8080).
+ */
+OSApp.Firmware.probeDevice = function( tryPass, path, timeout ) {
+	path = path || "/jo";
+	timeout = ( typeof timeout === "number" ) ? timeout : 5000;
+	var dest = path + "?pw=" + encodeURIComponent( tryPass );
+	var normalizedIp = OSApp.currentSession.token
+		? OSApp.currentSession.ip
+		: OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix );
+	var url = OSApp.currentSession.token
+		? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + dest
+		: OSApp.currentSession.prefix + normalizedIp + dest;
+
+	var obj = {
+		url: url,
+		type: "GET",
+		dataType: "json",
+		timeout: timeout,
+		headers: {}
+	};
+
+	if ( OSApp.currentSession.auth ) {
+		obj.headers.Authorization = "Basic " + btoa( OSApp.currentSession.authUser + ":" + OSApp.currentSession.authPass );
+	}
+
+	if ( OSApp.Firmware.canUseNativeHttp( obj.url ) ) {
+		return OSApp.Firmware.nativeHttpRequest( obj );
+	}
+	return $.ajax( obj );
+};
+
 // OpenSprinkler feature detection functions
 OSApp.Firmware.checkOSVersion = function( check ) {
 	// Return early if we are missing controller object
@@ -921,9 +955,6 @@ OSApp.Firmware.pollOTAProgress = function( popup ) {
 		// between the session password and the default on each probe.
 		var originalPass = OSApp.currentSession.pass;
 		var defaultPass = md5( "opendoor" );
-		var baseUrl = OSApp.currentSession.token
-			? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
-			: OSApp.currentSession.prefix + OSApp.currentSession.ip;
 		var seconds = 0;
 		var probeCount = 0;
 		var pending = false;
@@ -931,16 +962,11 @@ OSApp.Firmware.pollOTAProgress = function( popup ) {
 		var reconnectTimer = setInterval( function() {
 			seconds += 3;
 			setText( OSApp.Language._( "Waiting for device to restart..." ) + " (" + seconds + "s)" );
-			if ( seconds < 12 || pending ) { return; }
+			if ( pending ) { return; }
 			pending = true;
 			probeCount++;
 			var tryPass = ( probeCount % 2 === 1 ) ? originalPass : defaultPass;
-			$.ajax( {
-				url: baseUrl + "/jo?pw=" + encodeURIComponent( tryPass ),
-				type: "GET",
-				dataType: "json",
-				timeout: 5000
-			} ).done( function( data ) {
+			OSApp.Firmware.probeDevice( tryPass, "/jo", 5000 ).done( function( data ) {
 				pending = false;
 				if ( !data ) { return; }
 				clearInterval( reconnectTimer );

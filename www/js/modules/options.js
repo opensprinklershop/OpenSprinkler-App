@@ -2101,7 +2101,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 		var popup = $(
 			"<div data-role='popup' data-theme='a' style='padding:12px 16px;min-width:280px;max-width:340px;box-sizing:border-box;'>" +
 				"<div style='font-weight:bold;font-size:1.05em;margin-bottom:10px;text-align:center;border-bottom:1px solid #ccc;padding-bottom:6px;color:#333;'>" + OSApp.Language._( "Select Notification Events" ) + "</div>" +
-				"<div style='max-height:65vh;overflow-y:auto;padding-right:4px;'>" +
+				"<div>" +
 					inputs +
 				"</div>" +
 				"<div style='margin-top:12px;text-align:center;'>" +
