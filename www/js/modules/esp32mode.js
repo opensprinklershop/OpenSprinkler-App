@@ -2243,6 +2243,27 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 	popup.enhanceWithin();
 	// Ensure manufacturer/model are always manually editable in the editor.
 	popup.find( "#zbed-manuf, #zbed-model" ).prop( "readonly", false ).prop( "disabled", false ).removeAttr( "readonly" ).removeAttr( "disabled" );
+
+	// Resolve the display name from the device DB (server-side, generic alias
+	// engine — e.g. "_TZE284_8zizsafo|TS0601" -> "GIEX GX03"). Only replaces the
+	// generic manufacturer+model fallback, never a firmware friendly_name or a
+	// name the user typed.
+	if ( !device.friendly_name && devManuf &&
+		OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookup === "function" ) {
+		var localGenericName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( devManuf, devModel ) || "";
+		OSApp.ESP32Mode.ZigbeeDeviceDB.lookup( devManuf, devModel ).done( function( data ) {
+			if ( !data || !( data.vendor || data.description ) ) { return; }
+			OSApp.ESP32Mode.ZigbeeDeviceDB.setCached( devIeee, data );
+			var resolved = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName(
+				data.vendor, data.model_id || data.model || "", data.description );
+			if ( !resolved ) { return; }
+			var current = String( popup.find( "#zbed-name" ).val() || "" ).trim();
+			if ( current === "" || current === localGenericName ) {
+				popup.find( "#zbed-name" ).val( String( resolved ).slice( 0, 40 ) );
+			}
+		} );
+	}
+
 	// If metadata is still missing, try to hydrate manufacturer/model from DB search.
 	if ( !devManuf || !devModel ) {
 		var seedQuery = String( devName || devModel || devManuf || "" ).trim();
