@@ -1555,6 +1555,8 @@
     "Voltage": "Spannung",
     "Volume": "Volumen",
     "Waiting for device data…": "Warte auf Sensor-Daten…",
+    "Waiting for device data...": "Warte auf Sensor-Daten...",
+    "Waiting for device data": "Warte auf Gerätedaten",
     "Waiting for device reboot...": "Warte auf Geräte-Neustart...",
     "Waiting for device to come back online...": "Warte darauf, dass das Gerät wieder online kommt...",
     "Waiting for device to restart...": "Warte auf Geräte-Neustart...",

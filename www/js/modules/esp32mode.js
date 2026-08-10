@@ -2725,7 +2725,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 				applyRecognizedEntries( entries );
 				var appliedCount = logicals.length;
 				$result.html( "<div><strong>" + OSApp.Language._( "Found" ) + ":</strong> " + appliedCount + " " +
-					OSApp.Language._( "logical device(s)" ) + " — " +
+					OSApp.Language._( "logical device(s)" ) + " - " +
 					OSApp.Language._( "applied from database" ) + "</div>" );
 			} ).fail( function() {
 				$result.html( "<em style='color:#a00;'>" + OSApp.Language._( "Database query failed" ) + "</em>" );
@@ -2823,7 +2823,7 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 				applyRecognizedEntries( entries );
 				$autoResult.html( "<div><strong>" + OSApp.Language._( "Found" ) + ":</strong> " +
 					logicals.length + " " + OSApp.Language._( "logical device(s)" ) +
-					" — " + OSApp.Language._( "applied from database" ) + "</div>" );
+					" - " + OSApp.Language._( "applied from database" ) + "</div>" );
 			} ).fail( function() {
 				$autoResult.html( "<em style='color:#a00;'>" + OSApp.Language._( "Database query failed" ) + "</em>" );
 			} );
@@ -2885,10 +2885,10 @@ OSApp.ESP32Mode.showZigBeeDeviceDBSearch = function( initialQuery, onPick ) {
 		for ( var i = 0; i < results.length; i++ ) {
 			var r = results[ i ] || {};
 			h += "<div class='zbsearch-row' data-idx='" + i + "' style='padding:8px 4px;border-bottom:1px solid #eee;cursor:pointer;'>";
-			h += "<div style='font-weight:bold;'>" + OSApp.Utils.htmlEscape( r.vendor || "—" ) + " · " +
-				OSApp.Utils.htmlEscape( r.model || r.model_id || "—" ) + "</div>";
+			h += "<div style='font-weight:bold;'>" + OSApp.Utils.htmlEscape( r.vendor || "-" ) + " &middot; " +
+				OSApp.Utils.htmlEscape( r.model || r.model_id || "-" ) + "</div>";
 			h += "<div style='font-family:monospace;font-size:0.85em;color:#666;word-break:break-all;'>" +
-				OSApp.Utils.htmlEscape( r.manufacturer || "—" ) + "</div>";
+				OSApp.Utils.htmlEscape( r.manufacturer || "-" ) + "</div>";
 			if ( r.description ) {
 				h += "<div style='font-size:0.9em;color:#444;margin-top:2px;'>" +
 					OSApp.Utils.htmlEscape( r.description ) + "</div>";
@@ -3140,6 +3140,9 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			if ( !cachedDevLabel ) {
 				cachedDevLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( dev.manufacturer, dev.model );
 			}
+			// A resolved name is one the firmware/DB provided (friendly_name) or a
+			// previously cached label — not the raw manufacturer/model fallback.
+			var nameResolved = !!( dev.friendly_name || ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) );
 			var hasModel = dev.model && dev.model !== "unknown";
 			var hasMfr   = dev.manufacturer && dev.manufacturer !== "unknown";
 			var ldVendor = ( dev.logical_devices && dev.logical_devices.length ) ? ( dev.logical_devices[ 0 ].vendor || "" ) : "";
@@ -3165,8 +3168,10 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 
 			// Row 1: status + title + actions (actions wrap to next line on narrow screens)
 			content += "<div style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;'>";
+			var nameSpinner = nameResolved ? "" :
+				"<span class='zb-name-spinner' title='" + OSApp.Language._( "Waiting for device data" ) + "'>\u23F3</span>";
 			content += "<div class='zg-dev-title' style='flex:1 1 auto;min-width:0;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" +
-				statusDot + OSApp.Utils.htmlEscape( deviceTitle ) + "</div>";
+				statusDot + nameSpinner + OSApp.Utils.htmlEscape( deviceTitle ) + "</div>";
 			content += "<div style='flex:0 0 auto;white-space:nowrap;'>";
 			if ( dev.ieee ) {
 				var ieee4btn = dev.ieee.replace( /'/g, "" );
@@ -3202,7 +3207,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			if ( isWaiting ) {
 				content += "<div class='zb-wait-row' style='margin-top:4px;display:flex;align-items:center;font-size:0.82em;color:#555;'>" +
 					"<span class='zb-data-spinner'></span>" +
-					OSApp.Utils.htmlEscape( OSApp.Language._( "Waiting for device data\u2026" ) ) +
+					OSApp.Utils.htmlEscape( OSApp.Language._( "Waiting for device data..." ) ) +
 					"</div>";
 			}
 
@@ -3501,6 +3506,9 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			".zb-data-spinner{display:inline-block;width:11px;height:11px;" +
 				"border:2px solid #bbb;border-top-color:#2196f3;border-radius:50%;" +
 				"animation:zbSpin 0.8s linear infinite;vertical-align:middle;margin-right:5px;flex-shrink:0;}" +
+			".zb-name-spinner{display:inline-block;font-size:12px;line-height:1;" +
+				"vertical-align:middle;margin-right:5px;flex-shrink:0;cursor:help;" +
+				"animation:zbSpin 1.6s linear infinite;}" +
 		"</style>" ).appendTo( "head" );
 	}
 
@@ -3527,7 +3535,10 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			if ( !wd || !wd.ieee ) { continue; }
 			var wIsNew = ( wd.is_new === 1 || wd.is_new === true || wd.is_new === "1" );
 			var wLds   = Array.isArray( wd.logical_devices ) ? wd.logical_devices.length : 0;
-			if ( wIsNew && wLds === 0 ) {
+			var wHasName = !!( wd.friendly_name || OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( wd.ieee ) );
+			// Waiting while the device has no logical devices yet (new join) OR
+			// the firmware has not resolved a display name yet.
+			if ( ( wIsNew && wLds === 0 ) || !wHasName ) {
 				waitingSnapshot[ String( wd.ieee ).toLowerCase() ] = 0;
 			}
 		}
@@ -3567,10 +3578,12 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 					if ( !Object.prototype.hasOwnProperty.call( waitingSnapshot, pKey ) ) { continue; }
 					// Device transitions to "has data" when:
 					//   - logical_devices is now non-empty, OR
-					//   - is_new flag cleared
+					//   - is_new flag cleared, OR
+					//   - the firmware resolved a display name (friendly_name)
 					var pLds   = Array.isArray( pd.logical_devices ) ? pd.logical_devices.length : 0;
 					var pIsNew = ( pd.is_new === 1 || pd.is_new === true || pd.is_new === "1" );
-					if ( pLds > 0 || !pIsNew ) {
+					var pHasName = !!( pd.friendly_name || OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( pd.ieee ) );
+					if ( pLds > 0 || !pIsNew || pHasName ) {
 						gotData = true;
 						break;
 					}
@@ -3813,7 +3826,7 @@ OSApp.ESP32Mode.zigBeePermitJoin = function() {
 			"</p>" +
 			"<div style='display:flex;justify-content:space-between;align-items:center;margin:4px 0;'>" +
 				"<span id='zbPjDeviceCount' style='font-size:0.9em;color:#333;'>" +
-					OSApp.Language._( "Paired devices" ) + ": …</span>" +
+					OSApp.Language._( "Paired devices" ) + ": ...</span>" +
 				"<span style='font-size:0.9em;color:#333;'>" +
 					OSApp.Language._( "Next extension in" ) + " " +
 					"<span id='zbPjCountdown' style='font-family:monospace;font-weight:bold;'>5:00</span>" +
