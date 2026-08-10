@@ -274,6 +274,34 @@ self.addEventListener("fetch", function (e) {
                             pathname.startsWith("/img/") ||
                             pathname.startsWith("/locale/");
 
+        // Code and translations change with every deploy; serve them Network-First
+        // so a single reload picks up the new build (falls back to cache offline).
+        // Other static assets (css/img/vendor) stay Stale-While-Revalidate for speed.
+        var isFreshFirst = pathname.startsWith("/js/") || pathname.startsWith("/locale/");
+
+        if (isStaticAsset && isFreshFirst) {
+            e.respondWith(
+                fetch(e.request).then(function (response) {
+                    if (response && response.status === 200 && response.type === "basic") {
+                        var respClone = response.clone();
+                        caches.open(cacheName).then(function (cache) {
+                            cache.put(e.request, respClone);
+                        });
+                    }
+                    return response;
+                }).catch(function () {
+                    return caches.match(e.request).then(function (cachedResponse) {
+                        return cachedResponse || new Response("Static asset offline and not cached", {
+                            status: 503,
+                            statusText: "Service Unavailable",
+                            headers: { "Content-Type": "text/plain; charset=utf-8" }
+                        });
+                    });
+                })
+            );
+            return;
+        }
+
         if (isStaticAsset) {
             // Stale-While-Revalidate: serve the cached copy immediately (fast +
             // offline), but always fetch a fresh copy in the background and

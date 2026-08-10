@@ -3169,7 +3169,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			// Row 1: status + title + actions (actions wrap to next line on narrow screens)
 			content += "<div style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;'>";
 			var nameSpinner = nameResolved ? "" :
-				"<span class='zb-name-spinner' title='" + OSApp.Language._( "Waiting for device data" ) + "'>\u23F3</span>";
+				"<span class='zb-name-spinner' title='" + OSApp.Language._( "Waiting for device data" ) + "'></span>";
 			content += "<div class='zg-dev-title' style='flex:1 1 auto;min-width:0;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" +
 				statusDot + nameSpinner + OSApp.Utils.htmlEscape( deviceTitle ) + "</div>";
 			content += "<div style='flex:0 0 auto;white-space:nowrap;'>";
@@ -3499,18 +3499,19 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 
 	OSApp.UIDom.openPopup( popup );
 
-	// Inject spinner keyframe CSS once (charset-safe, no raw non-ASCII)
-	if ( !$( "#zb-spinner-css" ).length ) {
-		$( "<style id='zb-spinner-css'>" +
-			"@keyframes zbSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}" +
-			".zb-data-spinner{display:inline-block;width:11px;height:11px;" +
-				"border:2px solid #bbb;border-top-color:#2196f3;border-radius:50%;" +
-				"animation:zbSpin 0.8s linear infinite;vertical-align:middle;margin-right:5px;flex-shrink:0;}" +
-			".zb-name-spinner{display:inline-block;font-size:12px;line-height:1;" +
-				"vertical-align:middle;margin-right:5px;flex-shrink:0;cursor:help;" +
-				"animation:zbSpin 1.6s linear infinite;}" +
-		"</style>" ).appendTo( "head" );
-	}
+	// Inject spinner keyframe CSS (charset-safe, no raw non-ASCII). Replace any
+	// prior copy so CSS changes take effect on panel reopen within a session.
+	$( "#zb-spinner-css" ).remove();
+	$( "<style id='zb-spinner-css'>" +
+		"@keyframes zbSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}" +
+		".zb-data-spinner{display:inline-block;width:11px;height:11px;" +
+			"border:2px solid #bbb;border-top-color:#2196f3;border-radius:50%;" +
+			"animation:zbSpin 0.8s linear infinite;vertical-align:middle;margin-right:5px;flex-shrink:0;}" +
+		".zb-name-spinner{display:inline-block;width:11px;height:11px;" +
+			"border:2px solid #bbb;border-top-color:#2196f3;border-radius:50%;" +
+			"animation:zbSpin 0.8s linear infinite;vertical-align:middle;margin-right:5px;" +
+			"flex-shrink:0;cursor:help;}" +
+	"</style>" ).appendTo( "head" );
 
 	// ── "Waiting for data" background watcher ────────────────────────────────
 	// While any newly-joined device has no logical devices yet (Tuya DPs not
