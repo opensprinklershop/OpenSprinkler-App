@@ -1084,11 +1084,6 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	},
 
 	buildFriendlyName: function( vendor, model, description ) {
-		var local = this.getLocalFriendlyName( vendor, model );
-		if ( local ) {
-			return local;
-		}
-
 		var v = String( vendor || "" ).replace( /\s+/g, " " ).trim();
 		var m = String( model || "" ).replace( /\s+/g, " " ).trim();
 		var d = String( description || "" ).replace( /\s+/g, " " ).trim();
@@ -1106,7 +1101,11 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 			parts.push( d );
 		}
 
-		return parts.join( " " );
+		if ( parts.length ) {
+			return parts.join( " " );
+		}
+
+		return this.getLocalFriendlyName( vendor, model );
 	},
 
 	setCached: function( ieee, data ) {
@@ -1125,89 +1124,20 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	},
 
 	getLocalFriendlyName: function( manufacturer, model ) {
+		// Generic fallback: device names are retrieved dynamically from the online/local
+		// device database (devices_api.php / devices.json) for ALL device manufacturers and models.
 		var mfr = String( manufacturer || "" ).trim();
 		var mdl = String( model || "" ).trim();
 
 		if ( !mfr && !mdl ) { return null; }
 
-		var mfrLower = mfr.toLowerCase();
-		var mdlLower = mdl.toLowerCase();
-
-		var gx03Mfrs = [
-			"_tze284_8zizsafo",
-			"_tze284_iilebqoo"
-		];
-		var isGx03Mfr = false;
-		for ( var i = 0; i < gx03Mfrs.length; i++ ) {
-			if ( mfrLower.indexOf( gx03Mfrs[ i ] ) !== -1 ) {
-				isGx03Mfr = true;
-				break;
-			}
+		// If manufacturer or model are valid strings and not "unknown", build a generic fallback label
+		if ( mfr && mfr !== "unknown" && mdl && mdl !== "unknown" ) {
+			return mfr + " " + mdl;
 		}
-
-		var gx04Mfrs = [
-			"_tze284_aao3yzhs",
-			"_tze284_nhgdf6qr",
-			"_tze284_ap9owrsa",
-			"_tze284_33bwcga2",
-			"_tze284_wckqztdq",
-			"_tze284_3urschql",
-			"_tze284_tgrzpqf4"
-		];
-		var isGx04Mfr = false;
-		for ( var j = 0; j < gx04Mfrs.length; j++ ) {
-			if ( mfrLower.indexOf( gx04Mfrs[ j ] ) !== -1 ) {
-				isGx04Mfr = true;
-				break;
-			}
+		if ( mdl && mdl !== "unknown" ) {
+			return mdl;
 		}
-
-		var gx02Mfrs = [
-			"_tze200_sh1btabb",
-			"_tze284_7ytb3h8u",
-			"_tze200_7ytb3h8u",
-			"_tze204_7ytb3h8u",
-			"_tze200_a7sghmms",
-			"_tze204_a7sghmms"
-		];
-		var isGx02Mfr = false;
-		for ( var k = 0; k < gx02Mfrs.length; k++ ) {
-			if ( mfrLower.indexOf( gx02Mfrs[ k ] ) !== -1 ) {
-				isGx02Mfr = true;
-				break;
-			}
-		}
-
-		// 1. GIEX GX03 2-zone watering timer
-		if (
-			mdlLower === "gx03" ||
-			isGx03Mfr
-		) {
-			return "GIEX GX03 2-zone watering timer";
-		}
-
-		// 2. GIEX GX04 Soil Sensor (Tuya TS0601 family)
-		if (
-			mdlLower === "ts0601_soil_3" ||
-			isGx04Mfr
-		) {
-			return "GIEX GX04 Soil Sensor";
-		}
-
-		// 3. GIEX GX02 Water irrigation valve
-		if (
-			mdlLower === "qt06_2" ||
-			mdlLower === "qt06_1" ||
-			isGx02Mfr
-		) {
-			return "GIEX GX02 Water Valve";
-		}
-
-		// Tuya fallback placeholder to avoid displaying raw technical name
-		if ( mdlLower === "ts0601" || mdlLower === "ts0001" ) {
-			return "Tuya Smart Device (" + mdl.toUpperCase() + ")";
-		}
-
 		return null;
 	},
 
@@ -2056,18 +1986,16 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			if ( pickedManuf ) { popup.find( "#zbed-manuf" ).val( pickedManuf ); }
 			if ( pickedModel ) { popup.find( "#zbed-model" ).val( pickedModel ); }
 			if ( picked ) {
-				// The user explicitly picked a specific database entry, so trust
-				// the server-resolved name/description for THAT entry. Re-deriving
-				// the name from the raw manufacturer/model_id (e.g. "TS0601") via
-				// the local heuristic can mislabel devices — several GX03 variants
-				// share the generic "_TZE284_" prefix that the heuristic maps to
-				// "GX04 Soil Sensor".
-				var devName = String( picked.description || "" ).trim();
+				// The user explicitly picked a specific database entry. Try local
+				// friendly name resolution (or vendor + model) first, before falling
+				// back to the raw database description string.
+				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( pickedManuf, pickedModel ) ||
+				              OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( picked.vendor, picked.model || pickedModel );
 				if ( !devName ) {
 					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, picked.model || pickedModel, picked.description );
 				}
 				if ( !devName ) {
-					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( pickedManuf, pickedModel ) || "";
+					devName = String( picked.description || "" ).trim();
 				}
 				popup.find( "#zbed-name" ).val( String( devName ).slice( 0, 40 ) );
 			}
@@ -2735,7 +2663,8 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 					popup.find( "#zbed-model" ).val( mdl );
 					devModel = mdl;
 				}
-				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( mfr, mdl );
+				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( mfr, mdl ) ||
+				              OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( picked.vendor, mdl );
 				if ( !devName ) {
 					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, mdl, picked.description );
 				}
@@ -3346,7 +3275,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 				? OSApp.Language._( "Resolving" )
 				: OSApp.Language._( "Scanning" );
 			scanBtn.text( phaseTxt + " " + secLeft + "s (" +
-				count + " " + OSApp.Language._( "found" ) + ") \u2014 " +
+				count + " " + OSApp.Language._( "found" ) + ") - " +
 				OSApp.Language._( "tap to stop" ) );
 		}
 

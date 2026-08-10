@@ -2626,11 +2626,7 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 			var localLabel = (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName === "function") ?
 				OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName(manufacturer, model) : null;
 
-			if (localLabel) {
-				return localLabel;
-			}
-
-			// If not cached, trigger background lookup to cache it
+			// Trigger background lookup to fetch full vendor/description from DB
 			if (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookup === "function") {
 				if (manufacturer && model) {
 					OSApp.ESP32Mode.ZigbeeDeviceDB.lookup(manufacturer, model).done(function(dbData) {
@@ -2656,6 +2652,10 @@ OSApp.Analog.showZigBeeDeviceScanner = function(popup, callback, errorCallback, 
 						}
 					});
 				}
+			}
+
+			if (localLabel) {
+				return localLabel;
 			}
 
 			var manu = manufacturer || cleanMeta(device.vendor);
@@ -3794,11 +3794,7 @@ list += "</select></div>" +
 			var localLabel = (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName === "function") ?
 				OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName(manufacturer, model) : null;
 
-			if (localLabel) {
-				return localLabel;
-			}
-
-			// If not cached, trigger background lookup to cache it
+			// Trigger background lookup to fetch full vendor/description from DB
 			if (OSApp.ESP32Mode && OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookup === "function") {
 				if (manufacturer && model) {
 					OSApp.ESP32Mode.ZigbeeDeviceDB.lookup(manufacturer, model).done((function(addr) {
@@ -3816,8 +3812,12 @@ list += "</select></div>" +
 								}
 							}
 						};
-					})(ieeeAddr, i));
+					})(ieeeAddr));
 				}
+			}
+
+			if (localLabel) {
+				return localLabel;
 			}
 
 			var modelId = model || cleanMeta(device.vendor);
