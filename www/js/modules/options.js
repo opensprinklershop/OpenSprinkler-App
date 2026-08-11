@@ -2025,48 +2025,49 @@ OSApp.Options.showOptions = function( expandItem ) {
 	} );
 
 	page.find( "#o49" ).on( "click", function() {
+		// bit = fixed firmware NOTIFY_* bit position (defines.h), NOT display order
 		var eventGroups = [
 			{
 				title: OSApp.Language._( "Programs" ),
 				events: [
-					{ key: "program", label: OSApp.Language._( "Program Start" ) },
-					{ key: "program_end", label: OSApp.Language._( "Program End" ) }
+					{ key: "program", bit: 0, label: OSApp.Language._( "Program Start" ) },
+					{ key: "program_end", bit: 17, label: OSApp.Language._( "Program End" ) }
 				]
 			},
 			{
 				title: OSApp.Language._( "Sensors & Weather" ),
 				events: [
-					{ key: "sensor1", label: OSApp.Language._( "Sensor 1 Update" ) },
-					{ key: "sensor2", label: OSApp.Language._( "Sensor 2 Update" ) },
-					{ key: "flow", label: OSApp.Language._( "Flow Sensor Update" ) },
-					{ key: "weather", label: OSApp.Language._( "Weather Adjustment Update" ) },
-					{ key: "rain", label: OSApp.Language._( "Rain Delay Update" ) }
+					{ key: "sensor1", bit: 1, label: OSApp.Language._( "Sensor 1 Update" ) },
+					{ key: "sensor2", bit: 6, label: OSApp.Language._( "Sensor 2 Update" ) },
+					{ key: "flow", bit: 2, label: OSApp.Language._( "Flow Sensor Update" ) },
+					{ key: "weather", bit: 3, label: OSApp.Language._( "Weather Adjustment Update" ) },
+					{ key: "rain", bit: 7, label: OSApp.Language._( "Rain Delay Update" ) }
 				]
 			},
 			{
 				title: OSApp.Language._( "Stations & Flow" ),
 				events: [
-					{ key: "station", label: OSApp.Language._( "Station Start" ) },
-					{ key: "run", label: OSApp.Language._( "Station Finish" ) },
-					{ key: "flow_alert", label: OSApp.Language._( "Flow Alert" ) },
-					{ key: "curr_alert", label: OSApp.Language._( "Under/Overcurrent Fault" ) },
-					{ key: "noflow", label: OSApp.Language._( "No Flow Alert" ) },
-					{ key: "pipe_burst", label: OSApp.Language._( "Pipe Burst Alert" ) },
-					{ key: "monthly_report", label: OSApp.Language._( "Monthly Water Report" ) }
+					{ key: "station", bit: 8, label: OSApp.Language._( "Station Start" ) },
+					{ key: "run", bit: 5, label: OSApp.Language._( "Station Finish" ) },
+					{ key: "flow_alert", bit: 9, label: OSApp.Language._( "Flow Alert" ) },
+					{ key: "curr_alert", bit: 10, label: OSApp.Language._( "Under/Overcurrent Fault" ) },
+					{ key: "noflow", bit: 12, label: OSApp.Language._( "No Flow Alert" ) },
+					{ key: "pipe_burst", bit: 13, label: OSApp.Language._( "Pipe Burst Alert" ) },
+					{ key: "monthly_report", bit: 11, label: OSApp.Language._( "Monthly Water Report" ) }
 				]
 			},
 			{
 				title: OSApp.Language._( "Alerts & Monitoring" ),
 				events: [
-					{ key: "warning_low", label: OSApp.Language._( "Monitoring-warnings level low" ) },
-					{ key: "warning_med", label: OSApp.Language._( "Monitoring-warnings level medium" ) },
-					{ key: "warning_high", label: OSApp.Language._( "Monitoring-warnings level high" ) },
-					{ key: "reboot", label: OSApp.Language._( "Controller Reboot" ) }
+					{ key: "warning_low", bit: 14, label: OSApp.Language._( "Monitoring-warnings level low" ) },
+					{ key: "warning_med", bit: 15, label: OSApp.Language._( "Monitoring-warnings level medium" ) },
+					{ key: "warning_high", bit: 16, label: OSApp.Language._( "Monitoring-warnings level high" ) },
+					{ key: "reboot", bit: 4, label: OSApp.Language._( "Controller Reboot" ) }
 				]
 			}
 		];
 		var events = [];
-		var button = this, curr = parseInt( button.value ), inputs = "", a = 0, ife = 0;
+		var button = this, curr = parseInt( button.value ), inputs = "", ife = 0;
 		$.each( eventGroups, function( _, group ) {
 			if ( group.events && group.events.length ) {
 				inputs += "<div class='ui-field-contain' style='margin:0 0 .4em 0;'><div class='ui-bar ui-bar-a'>" + group.title + "</div>";
@@ -2087,9 +2088,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 					groupInputs += "<label for='notif-" + event.key + "' style='display:flex;align-items:center;justify-content:space-between;padding:5px 0;margin:0;cursor:pointer;font-weight:normal;width:100%;box-sizing:border-box;'>" +
 						"<span style='flex:1;padding-right:12px;font-size:0.9em;color:#333;'>" + event.label + "</span>" +
 						"<input class='needsclick' data-role='none' id='notif-" + event.key + "' type='checkbox' style='margin:0;width:18px;height:18px;flex-shrink:0;cursor:pointer;' " +
-						( OSApp.Utils.getBitFromByte( curr, a ) ? "checked='checked'" : "" ) + ( ( no_ife2 && a >= 8 ) || ( no_ife3 && a >= 16 ) ? " disabled" : "" ) + ">" +
+						( OSApp.Utils.getBitFromByte( curr, event.bit ) ? "checked='checked'" : "" ) + ( ( no_ife2 && event.bit >= 8 ) || ( no_ife3 && event.bit >= 16 ) ? " disabled" : "" ) + ">" +
 					"</label>";
-					a++;
 				} );
 				inputs += "<div style='margin-bottom:10px;'>" +
 					"<div style='font-weight:bold;font-size:0.95em;margin:8px 0 4px 0;color:#2f5d7a;border-bottom:1px solid #eee;padding-bottom:2px;'>" + group.title + "</div>" +
@@ -2110,10 +2110,8 @@ OSApp.Options.showOptions = function( expandItem ) {
 			"</div>" );
 
 		popup.find( ".submit" ).on( "click", function() {
-			a = 0;
 			$.each( events, function( _, event ) {
-				ife |= popup.find( "#notif-" + event.key ).is( ":checked" ) << a;
-				a++;
+				ife |= popup.find( "#notif-" + event.key ).is( ":checked" ) << event.bit;
 			} );
 			popup.popup( "close" );
 

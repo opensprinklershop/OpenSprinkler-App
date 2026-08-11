@@ -1118,6 +1118,30 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 	},
 
 
+	// In-memory negative cache: IEEEs whose DB lookup returned nothing, so we
+	// don't re-query the server on every panel render / editor open.
+	_noResult: {},
+	_markNoResult: function( ieee ) { if ( ieee ) { this._noResult[ ieee ] = Date.now(); } },
+	_hasNoResult: function( ieee ) {
+		var t = ieee && this._noResult[ ieee ];
+		return !!t && ( Date.now() - t < 3600000 );  // suppress re-query for 1 h
+	},
+
+	// Normalize a devices_api.php response to a single record with
+	// vendor/model/description. Handles both the flat fingerprint object and the
+	// search-style { results: [...] } wrapper.
+	_unwrapLookupData: function( data, manufacturer, model ) {
+		if ( !data ) { return null; }
+		if ( data.vendor || data.description ) { return data; }
+		if ( Array.isArray( data.results ) && data.results.length ) {
+			return this._pickBestSearchResult(
+				data.results, manufacturer, model,
+				this._buildSearchValue( manufacturer, model ) ) || data.results[ 0 ] || null;
+		}
+		return null;
+	},
+
+
 	/** Returns the cached display label for a device by IEEE address, or null. */
 	getCachedLabel: function( ieee ) {
 		try { return localStorage.getItem( "zb_name_" + ieee ) || null; } catch ( e ) { void e; return null; }
@@ -1558,12 +1582,18 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 
 		var cached = this.getCached( ieee );
 		if ( cached ) { self._apply( $li, cached ); return; }
+		if ( this._hasNoResult( ieee ) ) { return; }  // already looked up, no DB entry
 
 		this.lookup( mfr, mdl ).done( function( data ) {
-			if ( data && ( data.vendor || data.description ) ) {
-				self.setCached( ieee, data );
-				self._apply( $li, data );
+			var resolved = self._unwrapLookupData( data, mfr, mdl );
+			if ( resolved && ( resolved.vendor || resolved.description ) ) {
+				self.setCached( ieee, resolved );
+				self._apply( $li, resolved );
+			} else {
+				self._markNoResult( ieee );
 			}
+		} ).fail( function() {
+			self._markNoResult( ieee );
 		} );
 	},
 
@@ -1986,13 +2016,14 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			if ( pickedManuf ) { popup.find( "#zbed-manuf" ).val( pickedManuf ); }
 			if ( pickedModel ) { popup.find( "#zbed-model" ).val( pickedModel ); }
 			if ( picked ) {
-				// The user explicitly picked a specific database entry. Try local
-				// friendly name resolution (or vendor + model) first, before falling
-				// back to the raw database description string.
-				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( pickedManuf, pickedModel ) ||
-				              OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( picked.vendor, picked.model || pickedModel );
+				// The user explicitly picked a specific database entry. Prefer the
+				// rich descriptive name (vendor + model + description, e.g. "GIEX
+				// GX03 2-zone watering timer") over the raw manufacturer/model
+				// fallback so the description is carried over as the device name.
+				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, picked.model || pickedModel, picked.description );
 				if ( !devName ) {
-					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, picked.model || pickedModel, picked.description );
+					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( pickedManuf, pickedModel ) ||
+					              OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( picked.vendor, picked.model || pickedModel );
 				}
 				if ( !devName ) {
 					devName = String( picked.description || "" ).trim();
@@ -2039,10 +2070,14 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 
 	popup.on( "click", ".zbed-save", function() {
 		var nameVal = String( popup.find( "#zbed-name" ).val() || "" ).trim();
+		// Only persist the name (which marks the device is_custom_name) when the
+		// user actually changed it. Saving an unchanged / DB-derived name would
+		// wrongly flag it custom and block firmware DB name resolution.
+		var nameChanged = ( nameVal !== String( devName || "" ).trim() );
 
 		$.mobile.loading( "show" );
 
-		saveNameToFirmware( nameVal, function( nameOk ) {
+		function afterName( nameOk ) {
 			if ( !nameOk ) {
 				$.mobile.loading( "hide" );
 				OSApp.Errors.showError( OSApp.Language._( "Failed to save device name to firmware." ) );
@@ -2050,8 +2085,10 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 			}
 
 			// Also update local device object directly
-			device.friendly_name = nameVal;
-			device.is_custom_name = true;
+			if ( nameChanged ) {
+				device.friendly_name = nameVal;
+				device.is_custom_name = true;
+			}
 
 			var manufVal = String( popup.find( "#zbed-manuf" ).val() || "" ).trim();
 			var modelVal = String( popup.find( "#zbed-model" ).val() || "" ).trim();
@@ -2110,7 +2147,15 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 				$.mobile.loading( "hide" );
 				popup.popup( "close" );
 			}
-		} );
+		}
+
+		if ( nameChanged && nameVal ) {
+			saveNameToFirmware( nameVal, afterName );
+		} else {
+			// Name unchanged (or cleared) — do not rename/mark custom; let the
+			// firmware resolve the name from the device database.
+			afterName( true );
+		}
 		return false;
 	} );
 
@@ -2243,26 +2288,6 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 	popup.enhanceWithin();
 	// Ensure manufacturer/model are always manually editable in the editor.
 	popup.find( "#zbed-manuf, #zbed-model" ).prop( "readonly", false ).prop( "disabled", false ).removeAttr( "readonly" ).removeAttr( "disabled" );
-
-	// Resolve the display name from the device DB (server-side, generic alias
-	// engine — e.g. "_TZE284_8zizsafo|TS0601" -> "GIEX GX03"). Only replaces the
-	// generic manufacturer+model fallback, never a firmware friendly_name or a
-	// name the user typed.
-	if ( !device.friendly_name && devManuf &&
-		OSApp.ESP32Mode.ZigbeeDeviceDB && typeof OSApp.ESP32Mode.ZigbeeDeviceDB.lookup === "function" ) {
-		var localGenericName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( devManuf, devModel ) || "";
-		OSApp.ESP32Mode.ZigbeeDeviceDB.lookup( devManuf, devModel ).done( function( data ) {
-			if ( !data || !( data.vendor || data.description ) ) { return; }
-			OSApp.ESP32Mode.ZigbeeDeviceDB.setCached( devIeee, data );
-			var resolved = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName(
-				data.vendor, data.model_id || data.model || "", data.description );
-			if ( !resolved ) { return; }
-			var current = String( popup.find( "#zbed-name" ).val() || "" ).trim();
-			if ( current === "" || current === localGenericName ) {
-				popup.find( "#zbed-name" ).val( String( resolved ).slice( 0, 40 ) );
-			}
-		} );
-	}
 
 	// If metadata is still missing, try to hydrate manufacturer/model from DB search.
 	if ( !devManuf || !devModel ) {
@@ -2684,10 +2709,10 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 					popup.find( "#zbed-model" ).val( mdl );
 					devModel = mdl;
 				}
-				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( mfr, mdl ) ||
-				              OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( picked.vendor, mdl );
+				var devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, mdl, picked.description );
 				if ( !devName ) {
-					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.buildFriendlyName( picked.vendor, mdl, picked.description );
+					devName = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( mfr, mdl ) ||
+					              OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( picked.vendor, mdl );
 				}
 				if ( !devName ) {
 					devName = picked.description || "";
@@ -3093,9 +3118,167 @@ OSApp.ESP32Mode.startZigBeeWifiOffScan = function( scanBtn, reloadBtn, popup ) {
 		reloadBtn.removeClass( "ui-state-disabled ui-disabled" ).removeAttr( "disabled" );
 		// WiFi should be back now \u2014 reconnect to the controller and reload the
 		// device list (this also resolves names / logical devices from the DB).
-		popup.popup( "close" );
+		try { if ( popup.data( "mobile-popup" ) ) { popup.popup( "close" ); } } catch ( e ) { void e; }
 		setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 500 );
 	}, 1000 );
+};
+
+/**
+ * Build the full <li> card HTML for a single ZigBee device row. Extracted from
+ * showZigBeeGatewayPanel so a single row can be refreshed in place (see
+ * refreshZigBeeDeviceRow) instead of reloading the whole gateway panel.
+ *
+ * @param {Object} dev  Device descriptor from /zg (.ieee, .model, .manufacturer, .is_new, .logical_devices, ...).
+ * @param {Object} ctx  { supportsEditor:Boolean, wifiOnly:Boolean }
+ */
+OSApp.ESP32Mode.buildZigBeeDeviceCardHtml = function( dev, ctx ) {
+	ctx = ctx || {};
+	var supportsEditor = !!ctx.supportsEditor;
+	var wifiOnly = !!ctx.wifiOnly;
+	var html = "";
+
+	// 4-state responsiveness lamp based on wall-clock last-seen age:
+	//   grey  = unknown (never heard from / no time info)
+	//   green = OK (responded within the last hour)
+	//   amber = seen within the last 24h
+	//   red   = no response for more than 24h
+	var rxAge = ( typeof dev.last_rx_s === "number" ) ? dev.last_rx_s : null;
+	var UNKNOWN_RX = 4294967295;
+	var lampColor, lampTitle;
+	if ( rxAge === null || rxAge >= UNKNOWN_RX || !dev.last_seen ) {
+		lampColor = "#bdbdbd"; lampTitle = OSApp.Language._( "Unknown" );
+	} else if ( rxAge < 3600 ) {
+		lampColor = "#4caf50"; lampTitle = OSApp.Language._( "OK" );
+	} else if ( rxAge < 86400 ) {
+		lampColor = "#f5a623"; lampTitle = OSApp.Language._( "Last seen within 24h" );
+	} else {
+		lampColor = "#e53935"; lampTitle = OSApp.Language._( "No response for over 24h" );
+	}
+	var statusDot = "<span style='display:inline-block;width:10px;height:10px;background-color:" +
+		lampColor + ";border-radius:50%;vertical-align:middle;margin-right:6px;' title='" +
+		OSApp.Utils.htmlEscape( lampTitle ) + "'></span>";
+	var ieeeAttr = dev.ieee ? " data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'" : "";
+	var cachedDevLabel = dev.friendly_name || ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) || null;
+	if ( !cachedDevLabel ) {
+		cachedDevLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( dev.manufacturer, dev.model );
+	}
+	// A resolved name is one the firmware/DB provided (friendly_name) or a
+	// previously cached label — not the raw manufacturer/model fallback.
+	var nameResolved = !!( dev.friendly_name || ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) );
+	var hasModel = dev.model && dev.model !== "unknown";
+	var hasMfr   = dev.manufacturer && dev.manufacturer !== "unknown";
+	var ldVendor = ( dev.logical_devices && dev.logical_devices.length ) ? ( dev.logical_devices[ 0 ].vendor || "" ) : "";
+	var deviceTitle = cachedDevLabel ||
+		( hasModel ? dev.model : "" ) ||
+		ldVendor ||
+		( hasMfr ? dev.manufacturer : OSApp.Language._( "Unknown Device" ) );
+	var rowBg = dev.is_new ? "background-color:#fff8d0;" : "background-color:#fff;";
+
+	// A device is "waiting for data" when it has no logical devices yet
+	// (Tuya DPs not received) and was just discovered.
+	var hasLogicals = Array.isArray( dev.logical_devices ) && dev.logical_devices.length > 0;
+	var isWaiting = ( dev.is_new === 1 || dev.is_new === true || dev.is_new === "1" ) && !hasLogicals;
+
+	// Subtitle: "Manufacturer · Model" (omit empty parts gracefully)
+	var subParts = [];
+	if ( hasMfr )   { subParts.push( OSApp.Utils.htmlEscape( dev.manufacturer ) ); }
+	if ( hasModel ) { subParts.push( OSApp.Utils.htmlEscape( dev.model ) ); }
+	var subtitle = subParts.join( " &middot; " );
+
+	var waitingClass = isWaiting ? " zg-dev-waiting" : "";
+	html += "<li" + ieeeAttr + " class='zg-dev-card" + waitingClass + "' style='border:1px solid #ddd;border-radius:6px;padding:8px 10px;margin:6px 0;" + rowBg + "'>";
+
+	// Row 1: status + title + actions (actions wrap to next line on narrow screens)
+	html += "<div style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;'>";
+	// The name spinner indicates the friendly name is still being resolved.
+	// Only show it while the device is genuinely still waiting (new AND no
+	// logical devices yet). A device that already has logical devices is
+	// functionally identified — its friendly name may never resolve (e.g. a
+	// sleepy Tuya device whose manufacturer can't be read), so a permanent
+	// spinner would be wrong.
+	var nameSpinner = ( nameResolved || !isWaiting ) ? "" :
+		"<span class='zb-name-spinner' title='" + OSApp.Language._( "Waiting for device data" ) + "'></span>";
+	html += "<div class='zg-dev-title' style='flex:1 1 auto;min-width:0;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" +
+		statusDot + nameSpinner + OSApp.Utils.htmlEscape( deviceTitle ) + "</div>";
+	html += "<div style='flex:0 0 auto;white-space:nowrap;'>";
+	if ( dev.ieee ) {
+		var ieee4btn = dev.ieee.replace( /'/g, "" );
+		if ( supportsEditor ) {
+			html += "<a href='#' class='zigbee-device-edit ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-edit ui-btn-icon-notext' " +
+				"title='" + OSApp.Language._( "Edit" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
+		}
+		if ( !wifiOnly ) {
+			html += "<a href='#' class='zigbee-device-rejoin ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-refresh ui-btn-icon-notext' " +
+				"title='" + OSApp.Language._( "Force Rejoin" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
+		}
+		html += "<a href='#' class='zigbee-device-remove ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-delete ui-btn-icon-notext' " +
+			"title='" + OSApp.Language._( "Remove" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
+	}
+	html += "</div>";
+	html += "</div>";
+
+	// Row 2: manufacturer · model
+	if ( subtitle ) {
+		html += "<div style='font-size:0.85em;color:#555;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + subtitle + "</div>";
+	}
+
+	// Row 3: IEEE (monospace, wraps if needed)
+	if ( dev.ieee ) {
+		html += "<div style='font-family:monospace;font-size:0.8em;color:#888;margin-top:2px;word-break:break-all;'>" +
+			OSApp.Utils.htmlEscape( dev.ieee ) + "</div>";
+	}
+
+	// Row 4 (hidden until enriched): DB info
+	html += "<div class='zb-db-info' style='display:none;font-size:0.8em;color:#666;margin-top:2px;'></div>";
+
+	// Row 5: "Waiting for data" spinner — shown while Tuya DPs have not arrived yet
+	if ( isWaiting ) {
+		html += "<div class='zb-wait-row' style='margin-top:4px;display:flex;align-items:center;font-size:0.82em;color:#555;'>" +
+			"<span class='zb-data-spinner'></span>" +
+			OSApp.Utils.htmlEscape( OSApp.Language._( "Waiting for device data..." ) ) +
+			"</div>";
+	}
+
+	html += "</li>";
+	return html;
+};
+
+/**
+ * Refresh a single device row of the gateway panel in place (name, spinner,
+ * subtitle, logical-device state) instead of reloading the whole popup.
+ * Replaces only the matching <li> card and re-enhances its jQuery Mobile
+ * buttons. Uses the render context stashed by showZigBeeGatewayPanel.
+ *
+ * @param {String} ieee     Device IEEE address.
+ * @param {Object} [devData] Optional device object from /zg; when omitted, /zg is fetched.
+ */
+OSApp.ESP32Mode.refreshZigBeeDeviceRow = function( ieee, devData ) {
+	if ( !ieee ) { return; }
+	var popup = $( "#zigbeeGatewayPopup" );
+	if ( !popup.length ) { return; }
+	var ctx = OSApp.ESP32Mode._zbGwCtx || {};
+	var key = String( ieee ).toLowerCase();
+
+	function apply( dev ) {
+		if ( !dev ) { return; }
+		var $row = popup.find( ".zg-dev-card[data-ieee='" + String( ieee ).replace( /'/g, "" ) + "']" );
+		if ( !$row.length ) { return; }
+		var $new = $( OSApp.ESP32Mode.buildZigBeeDeviceCardHtml( dev, ctx ) );
+		$row.replaceWith( $new );
+		try { $new.enhanceWithin(); } catch ( e ) { void e; }
+	}
+
+	if ( devData ) { apply( devData ); return; }
+
+	OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( resp ) {
+		var devices = ( resp && resp.devices ) || [];
+		for ( var i = 0; i < devices.length; i++ ) {
+			if ( devices[ i ] && String( devices[ i ].ieee ).toLowerCase() === key ) {
+				apply( devices[ i ] );
+				return;
+			}
+		}
+	} );
 };
 
 /**
@@ -3115,6 +3298,9 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	// unavailable; only the self-contained WiFi-off scan is offered. Older
 	// firmware omits use_eth (undefined) — treat that as Ethernet (full features).
 	var wifiOnly = ( data.use_eth === 0 || data.use_eth === "0" );
+	// Stash render context so single rows can be refreshed in place
+	// (refreshZigBeeDeviceRow) without reloading the whole panel.
+	OSApp.ESP32Mode._zbGwCtx = { supportsEditor: supportsEditor, wifiOnly: wifiOnly };
 
 	content += "<div class='ui-content' role='main'>";
 	content += "<div style='display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;'>";
@@ -3148,91 +3334,7 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 		// aligned button strip.
 		content += "<ul class='zg-dev-list' style='list-style:none;margin:0;padding:0;'>";
 		for ( var i = 0; i < data.devices.length; i++ ) {
-			var dev = data.devices[ i ];
-			var isOnline  = dev.online === 1 || dev.online === true;
-			var hasRxInfo = dev.last_rx_s !== undefined && dev.last_rx_s !== null;
-			var statusDot = isOnline
-				? "<span style='display:inline-block;width:10px;height:10px;background-color:#4caf50;border-radius:50%;vertical-align:middle;margin-right:6px;' title='" + OSApp.Language._( "Online" ) + "'></span>"
-				: ( hasRxInfo
-					? "<span style='display:inline-block;width:10px;height:10px;border:2px solid #999;border-radius:50%;vertical-align:middle;margin-right:6px;box-sizing:border-box;' title='" + OSApp.Language._( "Offline" ) + "'></span>"
-					: "<span style='display:inline-block;width:10px;height:10px;margin-right:6px;'></span>" );
-			var ieeeAttr = dev.ieee ? " data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'" : "";
-			var cachedDevLabel = dev.friendly_name || ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) || null;
-			if ( !cachedDevLabel ) {
-				cachedDevLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( dev.manufacturer, dev.model );
-			}
-			// A resolved name is one the firmware/DB provided (friendly_name) or a
-			// previously cached label — not the raw manufacturer/model fallback.
-			var nameResolved = !!( dev.friendly_name || ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) );
-			var hasModel = dev.model && dev.model !== "unknown";
-			var hasMfr   = dev.manufacturer && dev.manufacturer !== "unknown";
-			var ldVendor = ( dev.logical_devices && dev.logical_devices.length ) ? ( dev.logical_devices[ 0 ].vendor || "" ) : "";
-			var deviceTitle = cachedDevLabel ||
-				( hasModel ? dev.model : "" ) ||
-				ldVendor ||
-				( hasMfr ? dev.manufacturer : OSApp.Language._( "Unknown Device" ) );
-			var rowBg = dev.is_new ? "background-color:#fff8d0;" : "background-color:#fff;";
-
-			// A device is "waiting for data" when it has no logical devices yet
-			// (Tuya DPs not received) and was just discovered.
-			var hasLogicals = Array.isArray( dev.logical_devices ) && dev.logical_devices.length > 0;
-			var isWaiting = ( dev.is_new === 1 || dev.is_new === true || dev.is_new === "1" ) && !hasLogicals;
-
-			// Subtitle: "Manufacturer · Model" (omit empty parts gracefully)
-			var subParts = [];
-			if ( hasMfr )   { subParts.push( OSApp.Utils.htmlEscape( dev.manufacturer ) ); }
-			if ( hasModel ) { subParts.push( OSApp.Utils.htmlEscape( dev.model ) ); }
-			var subtitle = subParts.join( " &middot; " );
-
-			var waitingClass = isWaiting ? " zg-dev-waiting" : "";
-			content += "<li" + ieeeAttr + " class='zg-dev-card" + waitingClass + "' style='border:1px solid #ddd;border-radius:6px;padding:8px 10px;margin:6px 0;" + rowBg + "'>";
-
-			// Row 1: status + title + actions (actions wrap to next line on narrow screens)
-			content += "<div style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;'>";
-			var nameSpinner = nameResolved ? "" :
-				"<span class='zb-name-spinner' title='" + OSApp.Language._( "Waiting for device data" ) + "'></span>";
-			content += "<div class='zg-dev-title' style='flex:1 1 auto;min-width:0;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" +
-				statusDot + nameSpinner + OSApp.Utils.htmlEscape( deviceTitle ) + "</div>";
-			content += "<div style='flex:0 0 auto;white-space:nowrap;'>";
-			if ( dev.ieee ) {
-				var ieee4btn = dev.ieee.replace( /'/g, "" );
-				if ( supportsEditor ) {
-					content += "<a href='#' class='zigbee-device-edit ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-edit ui-btn-icon-notext' " +
-						"title='" + OSApp.Language._( "Edit" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
-				}
-				if ( !wifiOnly ) {
-					content += "<a href='#' class='zigbee-device-rejoin ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-refresh ui-btn-icon-notext' " +
-						"title='" + OSApp.Language._( "Force Rejoin" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
-				}
-				content += "<a href='#' class='zigbee-device-remove ui-btn ui-btn-inline ui-mini ui-corner-all ui-icon-delete ui-btn-icon-notext' " +
-					"title='" + OSApp.Language._( "Remove" ) + "' data-ieee='" + ieee4btn + "' style='margin:1px;'></a>";
-			}
-			content += "</div>";
-			content += "</div>";
-
-			// Row 2: manufacturer · model
-			if ( subtitle ) {
-				content += "<div style='font-size:0.85em;color:#555;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" + subtitle + "</div>";
-			}
-
-			// Row 3: IEEE (monospace, wraps if needed)
-			if ( dev.ieee ) {
-				content += "<div style='font-family:monospace;font-size:0.8em;color:#888;margin-top:2px;word-break:break-all;'>" +
-					OSApp.Utils.htmlEscape( dev.ieee ) + "</div>";
-			}
-
-			// Row 4 (hidden until enriched): DB info
-			content += "<div class='zb-db-info' style='display:none;font-size:0.8em;color:#666;margin-top:2px;'></div>";
-
-			// Row 5: "Waiting for data" spinner — shown while Tuya DPs have not arrived yet
-			if ( isWaiting ) {
-				content += "<div class='zb-wait-row' style='margin-top:4px;display:flex;align-items:center;font-size:0.82em;color:#555;'>" +
-					"<span class='zb-data-spinner'></span>" +
-					OSApp.Utils.htmlEscape( OSApp.Language._( "Waiting for device data..." ) ) +
-					"</div>";
-			}
-
-			content += "</li>";
+			content += OSApp.ESP32Mode.buildZigBeeDeviceCardHtml( data.devices[ i ], { supportsEditor: supportsEditor, wifiOnly: wifiOnly } );
 		}
 		content += "</ul>";
 	} else {
@@ -3327,38 +3429,13 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			scanBtn.text( origText );
 			reloadBtn.prop( "disabled", false );
 
-			// If a brand-new device joined during this scan, open the variant
-			// popup so the user can pick the matching device-DB profile and the
-			// firmware persists the logical devices for it. Without this step a
-			// freshly paired device shows up in the gateway list but has no
-			// logical devices attached (no DPs / no clusters).
-			var newDev = null;
-			for ( var i = 0; i < lastDevices.length; i++ ) {
-				var d = lastDevices[ i ] || {};
-				if ( d.is_new === 1 || d.is_new === true || d.is_new === "1" ) {
-					newDev = {
-						ieee: d.ieee || d.ieee_addr || "",
-						short_addr: d.short_addr || "0x0000",
-						model: d.model || d.model_id || "",
-						manufacturer: d.manufacturer || "",
-						vendor: d.vendor || "",
-						endpoint: parseInt( d.endpoint, 10 ) || 1
-					};
-					break;
-				}
-			}
-			var reloadGateway = function() {
-				setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 500 );
-			};
-			if ( newDev && newDev.ieee &&
-				typeof OSApp.ESP32Mode.showZigBeeScanVariantPopup === "function" ) {
-				// Closing the gateway popup is required because JQM only allows
-				// one popup at a time; the variant/editor popup will open next.
-				popup.popup( "close" );
-				OSApp.ESP32Mode.showZigBeeScanVariantPopup( newDev, lastDevices, reloadGateway );
-			} else {
-				reloadGateway();
-			}
+			// A freshly paired device just needs to appear in the list. Do NOT
+			// open the device editor for it — the user asked to simply see the
+			// new entry with its waiting spinner while name and logical devices
+			// resolve in the background (handled per-row by the data-wait
+			// watcher in showZigBeeGatewayPanel). Reload the panel once so the
+			// new row shows up.
+			setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 500 );
 		}
 
 		state = { running: true, cancelled: false, finish: finish };
@@ -3557,10 +3634,11 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 			if ( !wd || !wd.ieee ) { continue; }
 			var wIsNew = ( wd.is_new === 1 || wd.is_new === true || wd.is_new === "1" );
 			var wLds   = Array.isArray( wd.logical_devices ) ? wd.logical_devices.length : 0;
-			var wHasName = !!( wd.friendly_name || OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( wd.ieee ) );
-			// Waiting while the device has no logical devices yet (new join) OR
-			// the firmware has not resolved a display name yet.
-			if ( ( wIsNew && wLds === 0 ) || !wHasName ) {
+			// Only watch freshly-joined devices that have not delivered their
+			// logical devices yet. Name resolution is handled in-place by enrich
+			// and must NOT trigger a panel reload (would loop for devices with no
+			// DB entry).
+			if ( wIsNew && wLds === 0 ) {
 				waitingSnapshot[ String( wd.ieee ).toLowerCase() ] = 0;
 			}
 		}
@@ -3592,35 +3670,27 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 				if ( !active ) { return; }
 				if ( !resp || !resp.devices ) { return; }
 
-				var gotData = false;
 				for ( var pi = 0; pi < resp.devices.length; pi++ ) {
 					var pd = resp.devices[ pi ];
 					if ( !pd || !pd.ieee ) { continue; }
 					var pKey = String( pd.ieee ).toLowerCase();
 					if ( !Object.prototype.hasOwnProperty.call( waitingSnapshot, pKey ) ) { continue; }
-					// Device transitions to "has data" when:
-					//   - logical_devices is now non-empty, OR
-					//   - is_new flag cleared, OR
-					//   - the firmware resolved a display name (friendly_name)
+					// Device transitions to "has data" when logical_devices is now
+					// non-empty or the is_new flag cleared.
 					var pLds   = Array.isArray( pd.logical_devices ) ? pd.logical_devices.length : 0;
 					var pIsNew = ( pd.is_new === 1 || pd.is_new === true || pd.is_new === "1" );
-					var pHasName = !!( pd.friendly_name || OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( pd.ieee ) );
-					if ( pLds > 0 || !pIsNew || pHasName ) {
-						gotData = true;
-						break;
+					if ( pLds > 0 || !pIsNew ) {
+						// Refresh only this one row in place (clears its spinner,
+						// shows resolved name / logical devices) instead of
+						// reloading the whole panel. Stop watching this device.
+						delete waitingSnapshot[ pKey ];
+						OSApp.ESP32Mode.refreshZigBeeDeviceRow( pd.ieee, pd );
 					}
 				}
 
-				if ( gotData ) {
+				// All previously-waiting devices resolved — stop polling.
+				if ( !Object.keys( waitingSnapshot ).length ) {
 					stopWatcher();
-					// Reload the gateway panel to show the updated device info
-					// and newly populated logical devices.
-					setTimeout( function() {
-						if ( typeof OSApp.ESP32Mode.setupZigBeeGateway === "function" ) {
-							popup.popup( "close" );
-							setTimeout( function() { OSApp.ESP32Mode.setupZigBeeGateway(); }, 200 );
-						}
-					}, 300 );
 				}
 			} );
 		}, POLL_INTERVAL_MS );
@@ -3635,18 +3705,6 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 	// handler) so a forced rejoin always re-triggers the query.
 	if ( data.devices && data.devices.length ) {
 		OSApp.ESP32Mode.autoQueryZigBeeMissingMeta( data.devices, { reloadAfterMs: 4000 } );
-	}
-
-	if ( data.devices ) {
-		for ( var j = 0; j < data.devices.length; j++ ) {
-			var d = data.devices[ j ];
-			if ( d.ieee ) {
-				( function( dev ) {
-					var $row = popup.find( "[data-ieee='" + dev.ieee.replace( /'/g, "" ) + "']" );
-					OSApp.ESP32Mode.ZigbeeDeviceDB.enrich( dev, $row );
-				}( d ) );
-			}
-		}
 	}
 };
 
@@ -3671,6 +3729,7 @@ OSApp.ESP32Mode.autoQueryZigBeeMissingMeta = function( devices, opts ) {
 	var minIntervalMs = ( typeof opts.minIntervalMs === "number" ) ? opts.minIntervalMs : 30000;
 	var now = Date.now();
 	var triggered = 0;
+	var queriedIeees = [];
 	for ( var i = 0; i < devices.length; i++ ) {
 		var d = devices[ i ];
 		if ( !d || !d.ieee ) { continue; }
@@ -3685,11 +3744,26 @@ OSApp.ESP32Mode.autoQueryZigBeeMissingMeta = function( devices, opts ) {
 		OSApp.Firmware.sendToOS(
 			"/zg?pw=&action=query_basic&ieee=" + encodeURIComponent( d.ieee ) +
 			"&endpoint=" + ep, "json" );
+		queriedIeees.push( key );
 		triggered++;
 	}
 	if ( triggered > 0 && opts.reloadAfterMs > 0 ) {
 		setTimeout( function() {
-			if ( typeof OSApp.ESP32Mode.setupZigBeeGateway === "function" ) {
+			// Refresh only the queried rows in place (single /zg fetch) instead
+			// of reloading the whole panel. Fall back to a full reload only if
+			// the panel isn't open anymore.
+			var popup = $( "#zigbeeGatewayPopup" );
+			if ( popup.length && typeof OSApp.ESP32Mode.refreshZigBeeDeviceRow === "function" ) {
+				OSApp.Firmware.sendToOS( "/zg?pw=", "json" ).done( function( resp ) {
+					var devs = ( resp && resp.devices ) || [];
+					for ( var di = 0; di < devs.length; di++ ) {
+						var dv = devs[ di ];
+						if ( dv && dv.ieee && queriedIeees.indexOf( String( dv.ieee ).toLowerCase() ) !== -1 ) {
+							OSApp.ESP32Mode.refreshZigBeeDeviceRow( dv.ieee, dv );
+						}
+					}
+				} );
+			} else if ( typeof OSApp.ESP32Mode.setupZigBeeGateway === "function" ) {
 				OSApp.ESP32Mode.setupZigBeeGateway();
 			}
 		}, opts.reloadAfterMs );

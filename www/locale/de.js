@@ -914,6 +914,8 @@
     "On Command": "An-Befehl",
     "On Network": "Im Netzwerk",
     "Online": "Online",
+    "Last seen within 24h": "Zuletzt innerhalb von 24 Std.",
+    "No response for over 24h": "Keine Antwort seit über 24 Std.",
     "Online Firmware Update": "Online-Firmware-Update",
     "Online Update": "Online-Update",
     "Online firmware update requires firmware version 2.4.0 or newer.": "Online-Firmware-Updates erfordern Firmware-Version 2.4.0 oder neuer.",
