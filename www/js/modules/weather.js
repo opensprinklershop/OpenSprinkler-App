@@ -546,7 +546,7 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 						"<label class='center'>" +
 							OSApp.Language._( "Baseline ETo" ) + ( OSApp.currentDevice.isMetric ? " (mm" : "(in" ) + "/day)" +
 						"</label>" +
-						"<input data-wrapper-class='pad_buttons' class='baseline-ETo' type='text' inputmode='decimal' min='0' " + ( OSApp.currentDevice.isMetric ? "max='25' step='0.01'" : "max='1' step='0.01'" ) + " value='" + options.baseETo + "'>" +
+						"<input data-wrapper-class='pad_buttons' class='baseline-ETo' type='text' inputmode='decimal' min='0' " + ( OSApp.currentDevice.isMetric ? "max='25' step='0.01'" : "max='1' step='0.01'" ) + " value='" + OSApp.Utils.formatNumber( options.baseETo, { useGrouping: false } ) + "'>" +
 					"</div>" +
 					"<div class='ui-block-b'>" +
 						"<label class='center'>" +
@@ -602,9 +602,11 @@ OSApp.Weather.showEToAdjustmentOptions = function( button, callback ) {
 					baselineETo = Math.round( baselineETo * 25.4 * 100 ) / 100;
 				}
 
-				$( ".baseline-ETo" ).val( baselineETo );
+				var baselineEToDisplay = OSApp.Utils.formatNumber( baselineETo, { useGrouping: false } );
 
-				window.alert( "Detected baseline ETo for configured location is " + baselineETo + ( OSApp.currentDevice.isMetric ? "mm" : "in" ) + "/day" );
+				$( ".baseline-ETo" ).val( baselineEToDisplay );
+
+				window.alert( "Detected baseline ETo for configured location is " + baselineEToDisplay + ( OSApp.currentDevice.isMetric ? "mm" : "in" ) + "/day" );
 			},
 			error: function( xhr, errorType ) {
 

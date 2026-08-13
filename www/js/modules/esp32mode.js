@@ -1159,9 +1159,10 @@ OSApp.ESP32Mode.ZigbeeDeviceDB = {
 		if ( mfr && mfr !== "unknown" && mdl && mdl !== "unknown" ) {
 			return mfr + " " + mdl;
 		}
-		if ( mdl && mdl !== "unknown" ) {
-			return mdl;
-		}
+		// A model alone (e.g. the generic Tuya "TS0601" shared by thousands of
+		// devices) is not a usable device name. Without a manufacturer the DB name
+		// lookup cannot run yet — return null so callers show "Unknown Device"
+		// instead of the raw model id.
 		return null;
 	},
 
@@ -3162,22 +3163,39 @@ OSApp.ESP32Mode.buildZigBeeDeviceCardHtml = function( dev, ctx ) {
 	if ( !cachedDevLabel ) {
 		cachedDevLabel = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( dev.manufacturer, dev.model );
 	}
-	// A resolved name is one the firmware/DB provided (friendly_name) or a
-	// previously cached label — not the raw manufacturer/model fallback.
-	var nameResolved = !!( dev.friendly_name || ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) );
 	var hasModel = dev.model && dev.model !== "unknown";
 	var hasMfr   = dev.manufacturer && dev.manufacturer !== "unknown";
 	var ldVendor = ( dev.logical_devices && dev.logical_devices.length ) ? ( dev.logical_devices[ 0 ].vendor || "" ) : "";
-	var deviceTitle = cachedDevLabel ||
-		( hasModel ? dev.model : "" ) ||
-		ldVendor ||
-		( hasMfr ? dev.manufacturer : OSApp.Language._( "Unknown Device" ) );
-	var rowBg = dev.is_new ? "background-color:#fff8d0;" : "background-color:#fff;";
+	// A resolved name is one the firmware/DB provided (friendly_name) or a
+	// previously cached label — but NOT a bare model id. The generic Tuya model
+	// "TS0601" is stamped before the DB name lookup completes; a label equal to
+	// the raw model means the name is still pending → show "Unknown Device".
+	var resolvedLabel = dev.friendly_name || ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) || "";
+	var labelIsBareModel = !!resolvedLabel && !!hasModel &&
+		String( resolvedLabel ).trim().toLowerCase() === String( dev.model ).trim().toLowerCase();
+	var nameResolved = !!resolvedLabel && !labelIsBareModel;
 
 	// A device is "waiting for data" when it has no logical devices yet
 	// (Tuya DPs not received) and was just discovered.
 	var hasLogicals = Array.isArray( dev.logical_devices ) && dev.logical_devices.length > 0;
 	var isWaiting = ( dev.is_new === 1 || dev.is_new === true || dev.is_new === "1" ) && !hasLogicals;
+
+	// The name is "pending" until the firmware assigns a friendly name (resolved
+	// from the ZigBee database). While pending the UI shows a neutral "Unknown
+	// Device" placeholder (+ spinner) instead of the raw model id, independent of
+	// is_new — a device can clear is_new before the firmware's DB lookup completes.
+	var namePending = !nameResolved;
+	var deviceTitle;
+	if ( namePending ) {
+		deviceTitle = OSApp.Language._( "Unknown Device" );
+	} else {
+		// Never fall back to the bare model id here: a resolved title is either the
+		// DB/cached label or (last resort) the manufacturer.
+		deviceTitle = cachedDevLabel ||
+			ldVendor ||
+			( hasMfr ? dev.manufacturer : OSApp.Language._( "Unknown Device" ) );
+	}
+	var rowBg = dev.is_new ? "background-color:#fff8d0;" : "background-color:#fff;";
 
 	// Subtitle: "Manufacturer · Model" (omit empty parts gracefully)
 	var subParts = [];
@@ -3190,14 +3208,10 @@ OSApp.ESP32Mode.buildZigBeeDeviceCardHtml = function( dev, ctx ) {
 
 	// Row 1: status + title + actions (actions wrap to next line on narrow screens)
 	html += "<div style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;'>";
-	// The name spinner indicates the friendly name is still being resolved.
-	// Only show it while the device is genuinely still waiting (new AND no
-	// logical devices yet). A device that already has logical devices is
-	// functionally identified — its friendly name may never resolve (e.g. a
-	// sleepy Tuya device whose manufacturer can't be read), so a permanent
-	// spinner would be wrong.
-	var nameSpinner = ( nameResolved || !isWaiting ) ? "" :
-		"<span class='zb-name-spinner' title='" + OSApp.Language._( "Waiting for device data" ) + "'></span>";
+	// The name spinner indicates the firmware is still resolving the friendly
+	// name from the ZigBee database. Shown whenever the name is pending.
+	var nameSpinner = namePending ?
+		"<span class='zb-name-spinner' title='" + OSApp.Language._( "Waiting for device data" ) + "'></span>" : "";
 	html += "<div class='zg-dev-title' style='flex:1 1 auto;min-width:0;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>" +
 		statusDot + nameSpinner + OSApp.Utils.htmlEscape( deviceTitle ) + "</div>";
 	html += "<div style='flex:0 0 auto;white-space:nowrap;'>";
@@ -3626,25 +3640,37 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 
 		var devices = data.devices || [];
 
-		// Build a snapshot of devices currently in "waiting" state:
-		// { ieee → logical_devices.length at render time }
-		var waitingSnapshot = {};
+		// A device is "pending" until the firmware fully resolves it: it either
+		// has no friendly name yet (DB lookup in progress) or a freshly-joined
+		// device has not delivered its logical devices / DPs yet. We poll /zg and
+		// refresh just that row in place once the firmware fills in the data
+		// (name + logical devices), which clears the spinner.
+		function nameIsResolved( d ) {
+			return !!( d.friendly_name || ( d.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( d.ieee ) ) );
+		}
+		function isPending( d ) {
+			var lds   = Array.isArray( d.logical_devices ) ? d.logical_devices.length : 0;
+			var isNew = ( d.is_new === 1 || d.is_new === true || d.is_new === "1" );
+			return !nameIsResolved( d ) || ( isNew && lds === 0 );
+		}
+		function stateSig( d ) {
+			var lds   = Array.isArray( d.logical_devices ) ? d.logical_devices.length : 0;
+			var isNew = ( d.is_new === 1 || d.is_new === true || d.is_new === "1" ) ? 1 : 0;
+			return ( d.friendly_name || "" ) + "|" + lds + "|" + isNew;
+		}
+
+		// { ieee → last-seen state signature } for every pending device.
+		var pending = {};
 		for ( var wi = 0; wi < devices.length; wi++ ) {
 			var wd = devices[ wi ];
 			if ( !wd || !wd.ieee ) { continue; }
-			var wIsNew = ( wd.is_new === 1 || wd.is_new === true || wd.is_new === "1" );
-			var wLds   = Array.isArray( wd.logical_devices ) ? wd.logical_devices.length : 0;
-			// Only watch freshly-joined devices that have not delivered their
-			// logical devices yet. Name resolution is handled in-place by enrich
-			// and must NOT trigger a panel reload (would loop for devices with no
-			// DB entry).
-			if ( wIsNew && wLds === 0 ) {
-				waitingSnapshot[ String( wd.ieee ).toLowerCase() ] = 0;
+			if ( isPending( wd ) ) {
+				pending[ String( wd.ieee ).toLowerCase() ] = stateSig( wd );
 			}
 		}
 
 		// Nothing to watch — skip.
-		if ( !Object.keys( waitingSnapshot ).length ) { return; }
+		if ( !Object.keys( pending ).length ) { return; }
 
 		var POLL_INTERVAL_MS = 3000;
 		var MAX_WAIT_MS      = 5 * 60 * 1000; // give up after 5 minutes
@@ -3674,22 +3700,23 @@ OSApp.ESP32Mode.showZigBeeGatewayPanel = function( data ) {
 					var pd = resp.devices[ pi ];
 					if ( !pd || !pd.ieee ) { continue; }
 					var pKey = String( pd.ieee ).toLowerCase();
-					if ( !Object.prototype.hasOwnProperty.call( waitingSnapshot, pKey ) ) { continue; }
-					// Device transitions to "has data" when logical_devices is now
-					// non-empty or the is_new flag cleared.
-					var pLds   = Array.isArray( pd.logical_devices ) ? pd.logical_devices.length : 0;
-					var pIsNew = ( pd.is_new === 1 || pd.is_new === true || pd.is_new === "1" );
-					if ( pLds > 0 || !pIsNew ) {
-						// Refresh only this one row in place (clears its spinner,
-						// shows resolved name / logical devices) instead of
-						// reloading the whole panel. Stop watching this device.
-						delete waitingSnapshot[ pKey ];
+					if ( !Object.prototype.hasOwnProperty.call( pending, pKey ) ) { continue; }
+					// Only touch the DOM when the firmware actually changed the
+					// device (name assigned, logical devices arrived, is_new
+					// cleared) — refresh that one row in place.
+					var ns = stateSig( pd );
+					if ( ns !== pending[ pKey ] ) {
+						pending[ pKey ] = ns;
 						OSApp.ESP32Mode.refreshZigBeeDeviceRow( pd.ieee, pd );
+					}
+					// Stop watching once fully resolved (name + data present).
+					if ( !isPending( pd ) ) {
+						delete pending[ pKey ];
 					}
 				}
 
-				// All previously-waiting devices resolved — stop polling.
-				if ( !Object.keys( waitingSnapshot ).length ) {
+				// All pending devices resolved — stop polling.
+				if ( !Object.keys( pending ).length ) {
 					stopWatcher();
 				}
 			} );
@@ -3872,15 +3899,15 @@ OSApp.ESP32Mode.zigBeePermitJoin = function() {
 	function deviceLabel( dev ) {
 		if ( dev.friendly_name ) { return dev.friendly_name; }
 		var cached = OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee );
-		if ( cached ) { return cached; }
+		// Ignore a cached label that is merely the bare model id (generic
+		// "TS0601"): the DB name lookup has not completed yet.
+		if ( cached && cached.trim().toLowerCase() !== String( dev.model || "" ).trim().toLowerCase() ) { return cached; }
 		var local = OSApp.ESP32Mode.ZigbeeDeviceDB.getLocalFriendlyName( dev.manufacturer, dev.model );
 		if ( local ) { return local; }
-		var parts = [];
-		if ( dev.manufacturer && dev.manufacturer !== "unknown" ) { parts.push( dev.manufacturer ); }
-		if ( dev.model && dev.model !== "unknown" )        { parts.push( dev.model ); }
-		var label = parts.join( " " );
-		if ( !label ) { label = dev.ieee || OSApp.Language._( "unknown device" ); }
-		return label;
+		// Never fall back to the bare model id: without a manufacturer the name is
+		// still pending → show a neutral placeholder.
+		if ( dev.manufacturer && dev.manufacturer !== "unknown" ) { return dev.manufacturer; }
+		return OSApp.Language._( "Unknown Device" );
 	}
 
 	function pollDevices( isBaseline ) {

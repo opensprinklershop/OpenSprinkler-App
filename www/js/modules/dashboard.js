@@ -1059,10 +1059,10 @@ OSApp.Dashboard.displayPage = function() {
 				if (OSApp.Supported.fas()) { // fas = flow alert setpoint
 					var fas = OSApp.currentSession.controller.stations.stn_fas[ sid ].toFixed(2) / 100;
 					select += "<div class='ui-bar-a ui-bar'>" + OSApp.Language._("Flow alert setpoint") + " (liter/min):</div>" +
-						"<input class='center' id='fas' type='text' inputmode='decimal' min='0' max='640' value='" + fas + "' >";
+						"<input class='center' id='fas' type='text' inputmode='decimal' min='0' max='640' value='" + OSApp.Utils.formatNumber( fas, { useGrouping: false } ) + "' >";
 						if (OSApp.currentSession.controller.stations.stn_favg) {
 							select += "<div class='ui-bar-a ui-bar'>" + OSApp.Language._("Average flow value") + " (liter/min):</div>" +
-							"<label class='center'>" + OSApp.currentSession.controller.stations.stn_favg[ sid ].toFixed(2) / 100 + "</label>";
+							"<label class='center'>" + OSApp.Utils.formatNumber( OSApp.currentSession.controller.stations.stn_favg[ sid ].toFixed(2) / 100, { useGrouping: false } ) + "</label>";
 						}
 				}
 				}
@@ -1315,7 +1315,7 @@ OSApp.Dashboard.displayPage = function() {
 						}
 
 						if (OSApp.Supported.fas()) {
-							fas = Math.floor(parseFloat(attrib.attr( "data-fas" )) * 100);
+							fas = Math.floor(OSApp.Utils.parseNumber( attrib.attr( "data-fas" ) ) * 100);
 						}
 					}
 				}
