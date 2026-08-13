@@ -59,6 +59,24 @@ OSApp.Weather.Constants = {
 		"50":	"Corrupt Adjustment Options",
 		"51":	"Missing Adjustment Option",
 		"99":	"Unexpected Error"
+	},
+
+	// Weather status reason codes reported by the firmware (wtreason).
+	// Must stay in sync with WT_REASON_* in Firmware weather.h.
+	// Do NOT use Language._ to translate these here during definition. Do it when rendering!
+	weatherReasons: {
+		"0":	"Success",
+		"1":	"Pending",
+		"2":	"No Network Connection",
+		"3":	"Low Memory",
+		"4":	"Weather Server Not Configured",
+		"5":	"Connection Failed",
+		"6":	"Request Timed Out",
+		"7":	"Empty Response",
+		"8":	"No Response",
+		"9":	"Weather Server Error",
+		"10":	"Stale Data",
+		"11":	"DNS Lookup Failed"
 	}
 };
 
@@ -1071,6 +1089,15 @@ OSApp.Weather.getWeatherError = function( err ) {
 	}
 
 	return OSApp.Language._( "Unrecognised" ) + " (" + err + ")";
+};
+
+// Returns a human-readable reason for the weather service status (firmware wtreason).
+OSApp.Weather.getWeatherReason = function( reason ) {
+	if ( reason in OSApp.Weather.Constants.weatherReasons ) {
+		return OSApp.Language._( OSApp.Weather.Constants.weatherReasons[ reason ] );
+	}
+
+	return OSApp.Language._( "Unrecognised" ) + " (" + reason + ")";
 };
 
 OSApp.Weather.getWeatherStatus = function( status ) {

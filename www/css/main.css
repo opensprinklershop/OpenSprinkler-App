@@ -1191,7 +1191,8 @@ html.theme-colorful .station-status.off:after {
     border-right: none;
 }
 
-#verify-api {
+#verify-api,
+#fetch-pws {
     height: 34px;
     width: 80px;
     margin:0;

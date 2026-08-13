@@ -38,6 +38,7 @@ OSApp.SystemDiagnostics.showDiagnostics = function() {
 					( typeof OSApp.currentSession.controller.settings.lrbtc === "number" ? "<tr><td>" + OSApp.Language._( "Reboot Reason" ) + "</td><td>" + OSApp.Firmware.getRebootReason( OSApp.currentSession.controller.settings.lrbtc ) + "</td></tr>" : "" ) +
 					( typeof OSApp.currentSession.controller.settings.RSSI === "number" ? "<tr><td>" + OSApp.Language._( "WiFi Strength" ) + "</td><td>" + OSApp.Network.getWiFiRating( OSApp.currentSession.controller.settings.RSSI ) + "</td></tr>" : "" ) +
 					( typeof OSApp.currentSession.controller.settings.wterr === "number" ? "<tr><td>" + OSApp.Language._( "Weather Service" ) + "</td><td>" + OSApp.Weather.getWeatherStatus( OSApp.currentSession.controller.settings.wterr ) + "</td></tr>" : "" ) +
+					( typeof OSApp.currentSession.controller.settings.wtreason === "number" ? "<tr><td>" + OSApp.Language._( "Weather Reason" ) + "</td><td>" + OSApp.Weather.getWeatherReason( OSApp.currentSession.controller.settings.wtreason ) + "</td></tr>" : "" ) +
 				"</table>" +
 				"<div class='debugWUHeading'>Watering Level</div>" +
 				"<table class='debugWUTable'>" +
@@ -67,6 +68,7 @@ OSApp.SystemDiagnostics.showDiagnostics = function() {
 
 		popup += ( typeof OSApp.currentSession.controller.settings.lwc === "number" ? "<tr><td>" + OSApp.Language._( "Last Request" ) + "</td><td>" + OSApp.Dates.dateToString( new Date( OSApp.currentSession.controller.settings.lwc * 1000 ), null, 2 ) + "</td></tr>" : "" );
 		popup += ( typeof OSApp.currentSession.controller.settings.wterr === "number" ? "<tr><td>" + OSApp.Language._( "Last Response" ) + "</td><td>" + OSApp.Weather.getWeatherError( OSApp.currentSession.controller.settings.wterr ) + "</td></tr>" : "" );
+		popup += ( typeof OSApp.currentSession.controller.settings.wtreason === "number" ? "<tr><td>" + OSApp.Language._( "Weather Reason" ) + "</td><td>" + OSApp.Weather.getWeatherReason( OSApp.currentSession.controller.settings.wtreason ) + "</td></tr>" : "" );
 		popup += "</table></div>";
 
 		if ( typeof OSApp.currentSession.controller.settings.otcs === "number" || (status && Object.hasOwn("status")) ) {
