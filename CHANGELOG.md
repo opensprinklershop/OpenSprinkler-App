@@ -1,5 +1,29 @@
 # Changelog
 
+## [2.4.225] - 2026-08-13
+
+Release 2.4.225 (Android Build 225 / iOS 2.4.225)
+
+### Hinzugefügt
+
+- **Wetterdienst-Fehlerursachen in der Systemdiagnose**: Zusätzlich zum Fehlercode zeigt die Systemdiagnose nun eine konkrete Ursache, warum der Wetterabruf fehlschlägt (z. B. keine Netzwerkverbindung, wenig Speicher, Wetterserver nicht konfiguriert, Zeitüberschreitung, DNS-Lookup fehlgeschlagen, Serverfehler oder veraltete Daten). Die passenden Übersetzungen wurden ergänzt.
+- **Automatische Zigbee-Namensauflösung im Geräte-Editor**: Beim Öffnen eines Zigbee-Geräts wird der Anzeigename jetzt automatisch über die Online-Gerätedatenbank aufgelöst; bei einer manuellen Datenbanksuche wird die Geräte-Beschreibung (z. B. „GIEX GX03 2-Zonen-Bewässerungstimer") als Name übernommen.
+- **Native HTTP-Anfragen für HTTPS-Geräteverbindungen (Cordova)**: In der installierten App können HTTPS-Verbindungen zum Controller nun über die native HTTP-Schicht laufen, was Verbindungen zu Geräten mit selbstsignierten Zertifikaten zuverlässiger macht.
+
+### Geändert
+
+- **Lokalisierte Formatierung von Durchfluss- und ETo-Werten**: Durchfluss- und Verdunstungswerte (ETo) werden nun konsistent im lokalen Zahlenformat dargestellt.
+- **Zigbee-Gateway-Panel aktualisiert Geräte einzeln**: Statt das gesamte Panel neu zu laden, werden einzelne Zigbee-Geräte gezielt aktualisiert; die Namensauflösung wurde optimiert und fest kodierte Namensheuristiken (z. B. die Anzeige des reinen Modells „TS0601" als Name) entfernt.
+- **Sauberer Lade-Indikator für ausstehende Zigbee-Namen**: Die Unicode-Sanduhr wurde durch einen CSS-Ladeindikator ersetzt; noch nicht aufgelöste Gerätenamen zeigen jetzt einen Lade-Indikator mit verbesserter Warte-Logik (kein Dauer-Spinner mehr).
+- **Optimiertes Service-Worker-Caching**: Verbessertes Cache-Verhalten für zuverlässigere Updates der Web-/PWA-Oberfläche.
+- **Robusterer automatischer Update-Algorithmus**: Die OTA-Update-Logik wurde stabilisiert.
+- **Datensatzbegrenzung per `max`-Parameter**: Abfragen können nun die maximale Anzahl zurückgegebener Datensätze begrenzen und so das Datenvolumen reduzieren.
+
+### Behoben
+
+- **Korrekte Bit-Zuordnung der Benachrichtigungsereignisse**: Die einzelnen Benachrichtigungs-Ereignisse (Ereignis-Bitmaske) waren gegenüber der Firmware vertauscht, sodass z. B. „Programmende" ein falsches Ereignis auslöste bzw. anzeigte. Die Ereignisse werden nun auf feste Firmware-Bit-Positionen abgebildet.
+- **iOS-Build repariert**: Build-Probleme unter iOS behoben (u. a. Google-Maps-Build-Phase).
+
 ## [2.4.224] - 2026-08-09
 
 Release 2.4.224 (Android Build 224 / iOS 2.4.224)

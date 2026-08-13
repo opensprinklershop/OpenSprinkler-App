@@ -6712,7 +6712,8 @@ OSApp.Analog.updateCharts = function(limit2sensor) {
 		chart3 = new Array(OSApp.Analog.Constants.CHARTS);
 
 	var esp32 = OSApp.Analog.isESP32();
-	var limit = (OSApp.currentSession.token && !esp32) ? "&max=5500" : ""; //download limit is 140kb, 5500 lines ca 137kb
+	// OTC forwards responses up to ~140kb (5500 CSV lines ≈ 137kb); cap for any cloud session, ESP32 included, else /so 404s.
+	var limit = OSApp.currentSession.token ? "&max=5500" : "";
 	var lvl0 = esp32 ? "/so?pw=&lasthours=96&csv=2" : "/so?pw=&lasthours=48&csv=2";
 	var lvl0text = esp32 ? OSApp.Language._("last 96h") : OSApp.Language._("last 48h");
 	var tzo = OSApp.Dates.getTimezoneOffsetOS() * 60;
