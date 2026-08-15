@@ -4650,10 +4650,22 @@ OSApp.ESP32Mode.setupOnlineUpdate = function() {
 		} );
 
 		popup.on( "click", ".ota-older-version", function() {
-			popup.popup( "close" );
-			setTimeout( function() {
+			var pickerOpened = false;
+			var openPickerOnce = function() {
+				if ( pickerOpened ) { return; }
+				pickerOpened = true;
 				OSApp.ESP32Mode.showVersionPicker( data );
-			}, 400 );
+			};
+
+			popup.one( "popupafterclose.otaOlder", function() {
+				openPickerOnce();
+			} );
+			popup.popup( "close" );
+
+			// Fallback for rare jQM timing issues where popupafterclose is not observed.
+			setTimeout( function() {
+				openPickerOnce();
+			}, 650 );
 			return false;
 		} );
 
@@ -5724,11 +5736,22 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
 		} );
 
 		popup.on( "click", ".legacy-ota-older", function() {
-			popup.popup( "close" );
-			popup.on( "popupafterclose", function() {
-				popup.off( "popupafterclose" );
+			var pickerOpened = false;
+			var openPickerOnce = function() {
+				if ( pickerOpened ) { return; }
+				pickerOpened = true;
 				OSApp.ESP32Mode.showLegacyVersionPicker( data );
+			};
+
+			popup.one( "popupafterclose.legacyOtaOlder", function() {
+				openPickerOnce();
 			} );
+			popup.popup( "close" );
+
+			// Fallback for rare jQM timing issues where popupafterclose is not observed.
+			setTimeout( function() {
+				openPickerOnce();
+			}, 650 );
 			return false;
 		} );
 
