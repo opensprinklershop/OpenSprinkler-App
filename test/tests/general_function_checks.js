@@ -66,6 +66,13 @@ describe("General Function Checks", function () {
 		assert.equal("/locale/de.js", OSApp.Language.getLocaleFileUrl("de", "/"));
 	});
 
+	it("OSApp.Language.normalizeCode should normalize browser locale values to supported app languages", function () {
+		assert.equal("de", OSApp.Language.normalizeCode("de-DE"));
+		assert.equal("pt", OSApp.Language.normalizeCode("pt_BR"));
+		assert.equal("pes", OSApp.Language.normalizeCode("pes"));
+		assert.equal("en", OSApp.Language.normalizeCode("xx-YY"));
+	});
+
 	it("OSApp.Sites.getKnownFallbackVersion should prefer the latest catalog release when no bundle is pinned", function () {
 		localStorage.removeItem("last_ui_version");
 		assert.equal("2.4.0.224", OSApp.Sites.getKnownFallbackVersion(["dev", "2.4.0.224", "2.4.0.223"]));

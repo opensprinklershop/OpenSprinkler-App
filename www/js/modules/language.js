@@ -50,7 +50,113 @@ OSApp.Language.Constants = {
 		tr: "Turkish",
 		sv: "Swedish",
 		ro: "Romanian"
+	},
+	nativeStorageFile: "os-lang.txt"
+};
+
+OSApp.Language.normalizeCode = function( lang ) {
+	var normalized;
+
+	if ( typeof lang !== "string" ) {
+		return "en";
 	}
+
+	normalized = lang.toLowerCase().replace( /_/g, "-" ).trim();
+
+	if ( normalized === "" ) {
+		return "en";
+	}
+
+	if ( Object.prototype.hasOwnProperty.call( OSApp.Language.Constants.languageCodes, normalized ) ) {
+		return normalized;
+	}
+
+	normalized = normalized.split( "-" )[ 0 ];
+
+	if ( Object.prototype.hasOwnProperty.call( OSApp.Language.Constants.languageCodes, normalized ) ) {
+		return normalized;
+	}
+
+	return "en";
+};
+
+OSApp.Language.canUseNativeStorage = function() {
+	return !!(
+		window.cordova &&
+		window.cordova.file &&
+		window.cordova.file.dataDirectory &&
+		typeof window.resolveLocalFileSystemURL === "function" &&
+		typeof window.FileReader === "function"
+	);
+};
+
+OSApp.Language.readNativeStoredLang = function( callback ) {
+	var fileUrl;
+
+	callback = typeof callback === "function" ? callback : function() {};
+
+	if ( !OSApp.Language.canUseNativeStorage() ) {
+		callback( "" );
+		return;
+	}
+
+	fileUrl = window.cordova.file.dataDirectory.replace( /\/?$/, "/" ) + OSApp.Language.Constants.nativeStorageFile;
+
+	window.resolveLocalFileSystemURL( fileUrl, function( entry ) {
+		entry.file( function( file ) {
+			var reader = new window.FileReader();
+			reader.onloadend = function() {
+				callback( typeof reader.result === "string" ? reader.result.trim() : "" );
+			};
+			reader.onerror = function() {
+				callback( "" );
+			};
+			reader.readAsText( file );
+		}, function() {
+			callback( "" );
+		} );
+	}, function() {
+		callback( "" );
+	} );
+};
+
+OSApp.Language.writeNativeStoredLang = function( lang ) {
+	var directoryUrl;
+
+	if ( !OSApp.Language.canUseNativeStorage() ) {
+		return;
+	}
+
+	directoryUrl = window.cordova.file.dataDirectory;
+
+	window.resolveLocalFileSystemURL( directoryUrl, function( dirEntry ) {
+		dirEntry.getFile( OSApp.Language.Constants.nativeStorageFile, { create: true }, function( fileEntry ) {
+			fileEntry.createWriter( function( writer ) {
+				var truncating = false;
+
+				writer.onwriteend = function() {
+					if ( truncating ) {
+						return;
+					}
+					truncating = true;
+					writer.truncate( writer.position );
+				};
+
+				writer.onerror = function() {
+					console.warn( "Failed to persist language to native storage" );
+				};
+
+				writer.seek( 0 );
+				writer.write( lang );
+			}, function() {
+				console.warn( "Failed to open native language storage writer" );
+			} );
+		}, function() {
+			console.warn( "Failed to create native language storage file" );
+		} );
+	}, function() {
+		console.warn( "Failed to access native language storage directory" );
+	} );
 };
 
 //Localization functions
@@ -147,17 +253,26 @@ OSApp.Language.updateLang = function( lang, callback ) {
 
 	if ( typeof lang === "undefined" ) {
 		OSApp.Storage.get( "lang", function( data ) {
+			var storedLang = OSApp.Language.normalizeCode( data.lang || "" );
 
-			//Identify the current browser's locale
-			var locale = data.lang || navigator.language || navigator.browserLanguage || navigator.systemLanguage || navigator.userLanguage || "en";
+			if ( data.lang ) {
+				OSApp.Language.updateLang( storedLang, callback );
+				return;
+			}
 
-			OSApp.Language.updateLang( locale.substring( 0, 2 ), callback );
+			OSApp.Language.readNativeStoredLang( function( nativeLang ) {
+				var locale = nativeLang || navigator.language || navigator.browserLanguage || navigator.systemLanguage || navigator.userLanguage || "en";
+				OSApp.Language.updateLang( OSApp.Language.normalizeCode( locale ), callback );
+			} );
 		} );
 		return;
 	}
 
+	lang = OSApp.Language.normalizeCode( lang );
+
 	OSApp.Storage.set( { "lang": lang } );
 	OSApp.currentSession.lang = lang;
+	OSApp.Language.writeNativeStoredLang( lang );
 
 	if ( lang === "en" ) {
 		OSApp.Language.setLang();
