@@ -896,6 +896,12 @@ OSApp.UIDom.bindPanel = function() {
 					listview = panel.find( "ul[data-role='listview']" ),
 					onlineUpdateSupported = OSApp.Firmware.isDirectFirmwareUploadSupported() || OSApp.Firmware.isOSPi();
 
+				// ESP8266 online update is not available over a remote (OTC) connection
+				// (device-side /uu download is unreliable); hide the menu entry there.
+				if ( OSApp.Firmware.isESP8266Controller() && OSApp.currentSession && OSApp.currentSession.token ) {
+					onlineUpdateSupported = false;
+				}
+
 				panel.find( ".toggleOperation span:first" ).html( operation ).attr( "data-translate", operation );
 
 				// Show Live Debug menu only if dbg mode is active in options/settings or "DEBUG" is a compiled feature

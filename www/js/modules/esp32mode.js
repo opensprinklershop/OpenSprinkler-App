@@ -5539,6 +5539,13 @@ OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
 		return;
 	}
 
+	// The ESP8266 device-side online update (/uu) is unreliable over a remote
+	// OTC/cloud connection; require a local network connection instead.
+	if ( OSApp.Firmware.isESP8266Controller() && OSApp.currentSession && OSApp.currentSession.token ) {
+		OSApp.Errors.showError( OSApp.Language._( "Online firmware update for ESP8266 is not available over a remote (OTC) connection. Please connect to the device on your local network to update the firmware." ) );
+		return;
+	}
+
 	if ( OSApp.currentSession && OSApp.currentSession.token ) {
 		OSApp.ESP32Mode.setupLegacyOnlineUpdate();
 		return;

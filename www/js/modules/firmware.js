@@ -1288,6 +1288,10 @@ OSApp.Firmware.showOTAPopup = function() {
 OSApp.Firmware.initOTACheck = function() {
 	if ( !OSApp.Firmware.isDirectFirmwareUploadSupported() ) return;
 
+	// ESP8266 cannot update over a remote (OTC) connection; don't surface the
+	// update notification that would route into an unavailable flow.
+	if ( OSApp.Firmware.isESP8266Controller() && OSApp.currentSession && OSApp.currentSession.token ) return;
+
 	OSApp.Firmware.checkOTAUpdate( false ).then( function( data ) {
 		if ( !data || data.available !== 1 ) return;
 
