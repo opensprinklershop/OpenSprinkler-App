@@ -1014,8 +1014,6 @@ OSApp.UIDom.changePage = function( toPage, opts ) {
 	}
 
 	if ( ( toPage === "#site-control" || toPage === "#start" ) && OSApp.Sites && !OSApp.Sites.isRootPath() ) {
-		localStorage.setItem("show_sites", "1");
-
 		var origin = window.location.origin;
 		if (!origin || origin === "null") {
 			origin = window.location.protocol + "//" + window.location.host;
@@ -1031,8 +1029,19 @@ OSApp.UIDom.changePage = function( toPage, opts ) {
 		var baseHref = origin + path;
 
 		var targetHash = ( toPage === "#site-control" ) ? "#site-control" : "#start";
-		window.location.href = (baseHref.endsWith("/") ? baseHref : baseHref + "/") + "index.html" + targetHash;
-		return;
+		var targetHref = (baseHref.endsWith("/") ? baseHref : baseHref + "/") + "index.html" + targetHash;
+
+		// Only escape to the root app when it actually changes the URL. On a device
+		// (bare IP host, no version bundle) isRootPath() is false yet the stripped
+		// base equals the current URL, so redirecting here re-points to the same
+		// address without a page change -> permanent black screen. Fall back to the
+		// main controller page instead.
+		if ( targetHref !== window.location.href ) {
+			localStorage.setItem("show_sites", "1");
+			window.location.href = targetHref;
+			return;
+		}
+		toPage = "#sprinklers";
 	}
 
 	// Close the panel before page transition to avoid bug in jQM 1.4+

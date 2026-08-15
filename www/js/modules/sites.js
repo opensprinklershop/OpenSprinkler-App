@@ -1808,7 +1808,7 @@ OSApp.Sites.updateControllerSettings = function( callback ) {
 				}
 
 				// Update the current coordinates if the user's location is using them
-				if ( settings.loc.match( OSApp.Constants.regex.GPS ) ) {
+				if ( typeof settings.loc === "string" && settings.loc.match( OSApp.Constants.regex.GPS ) ) {
 					var location = settings.loc.split( "," );
 					OSApp.currentSession.coordinates = [ parseFloat( location[ 0 ] ), parseFloat( location[ 1 ] ) ];
 				}
