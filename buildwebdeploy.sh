@@ -143,5 +143,10 @@ if [ -f "$SCRIPT_DIR_IONOS/deploy-ionos.inc" ]; then
 		fi
 	fi
 	# OS-UI-Webspace: ui.opensprinklershop.de (eigenes Webprojekt)
-	ionos_mirror_osui "$DEPLOY_SRC/"
+	# Primaer HTTPS-Upload ("Selbst-Update"-Endpoint), Fallback SSH/rsync.
+	if type ionos_deploy >/dev/null 2>&1; then
+		ionos_deploy "$DEPLOY_SRC/"
+	else
+		ionos_mirror_osui "$DEPLOY_SRC/"
+	fi
 fi

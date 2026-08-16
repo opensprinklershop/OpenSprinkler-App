@@ -33,6 +33,12 @@ typings/
 # Local deploy secrets (SSH keys, IONOS webspace host/user) - must never be committed
 deploy-ionos.inc
 
+# HTTPS deploy path (alternative "self-update" upload) - local only, contains
+# credentials / webspace specifics; must never be committed
+deploy-secrets/
+deploy-upload.php
+deploy-https-upload.js
+
 # OS Meta data files
 Thumbs.db
 .DS_Store
