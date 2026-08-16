@@ -274,7 +274,7 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 		// Due to potentially large number of zones, we split zone names import to maximum 16 per group
 		for ( k = 0; k < ncs; k++ ) {
 			for ( i = k * 16; i < ( k + 1 ) * 16 && i < data.stations.snames.length; i++ ) {
-				station = data.stations.snames[ i ].replace( /\s/g, "_" );
+				station = data.stations.snames[ i ];
 				csi[ k ] += "&s" + i + "=" + encodeURIComponent( station );
 			}
 		}

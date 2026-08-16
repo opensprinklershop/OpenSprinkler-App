@@ -1301,8 +1301,8 @@ OSApp.Dashboard.displayPage = function() {
 					// Only send the name of the station being updated
 					if ( sid === id ) {
 
-						// Because the firmware has a bug regarding spaces, let us replace them out now with a compatible separator
-						names[ "s" + sid ] = page.find( "#station_" + sid ).text().replace( /\s/g, "_" );
+						// Send the name as entered; the firmware URL-decodes and stores spaces correctly.
+						names[ "s" + sid ] = page.find( "#station_" + sid ).text();
 
 						if ( OSApp.Supported.special() && attrib.data( "hs" ) ) {
 							special.st = attrib.data( "hs" );

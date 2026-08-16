@@ -1,5 +1,25 @@
 # Changelog
 
+## [2.4.226] - 2026-08-16
+
+Release 2.4.226 (Android Build 226 / iOS 2.4.226)
+
+### Hinzugefügt
+
+- **Native Speicherung der Sprachauswahl**: In der installierten App wird die gewählte Sprache jetzt zusätzlich nativ im App-Datenverzeichnis abgelegt, sodass sie zuverlässig über App-Neustarts und Aktualisierungen hinweg erhalten bleibt.
+- **Normalisierung von Sprachcodes**: Sprachcodes werden nun robust normalisiert (Groß-/Kleinschreibung, Unterstrich/Bindestrich, Regionsvarianten wie `de-DE` → `de`) und fallen bei unbekannten Codes sauber auf Englisch zurück.
+
+### Geändert
+
+- **Kein Online-Firmware-Update für ESP8266 über Fernverbindungen**: Bei ESP8266-Controllern, die über eine Cloud-/Remote-Verbindung (OTC) erreicht werden, wird der Menüeintrag „Online-Update" sowie die Update-Benachrichtigung ausgeblendet, da der geräteseitige Update-Ablauf über Remote-Verbindungen nicht zuverlässig funktioniert.
+
+### Behoben
+
+- **Zuverlässigere Versionsauswahl beim OTA-Update**: Die Auswahl der Firmware-Version beim Online-Update erhielt einen Fallback-Mechanismus und öffnet das Auswahlfenster nicht mehr mehrfach.
+- **Schwarzer Bildschirm bei Direktaufruf auf dem Gerät**: Der Aufruf von `#site-control`/`#start` direkt über die Geräte-URL führte zu einer Weiterleitungsschleife (Selbst-Redirect ohne Seitenwechsel) und damit zu einem schwarzen Bildschirm; es wird nun stattdessen die Hauptsteuerungsseite angezeigt.
+- **Geschützter GPS-Koordinatenabgleich**: Der Abgleich der Standortkoordinaten wird nur noch durchgeführt, wenn der Standortwert tatsächlich als Zeichenkette vorliegt, was einen möglichen Fehler beim Speichern der Controller-Einstellungen verhindert.
+- **Erzwungener Flash-Commit beim Sensor-Import**: Beim Import von Sensoren wird das Schreiben in den Flash-Speicher nun erzwungen, damit importierte Daten zuverlässig persistiert werden.
+
 ## [2.4.225] - 2026-08-13
 
 Release 2.4.225 (Android Build 225 / iOS 2.4.225)
