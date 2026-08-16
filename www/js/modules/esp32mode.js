@@ -5551,10 +5551,8 @@ OSApp.ESP32Mode.startOnlineUpdateFlow = function() {
 		return;
 	}
 
-	// The ESP8266 device-side online update (/uu) is unreliable over a remote
-	// OTC/cloud connection; require a local network connection instead.
-	if ( OSApp.Firmware.isESP8266Controller() && OSApp.currentSession && OSApp.currentSession.token ) {
-		OSApp.Errors.showError( OSApp.Language._( "Online firmware update for ESP8266 is not available over a remote (OTC) connection. Please connect to the device on your local network to update the firmware." ) );
+	if ( !OSApp.Firmware.isOTCOTAAllowed() ) {
+		OSApp.Errors.showError( OSApp.Language._( "OTA update over OTC is available from firmware 2.2.7 or newer. Please update locally first." ) );
 		return;
 	}
 
@@ -5613,11 +5611,56 @@ OSApp.ESP32Mode.setupClassicPostedUpdate = function() {
 	} );
 };
 
+OSApp.ESP32Mode.normalizeEsp8266OTAUrl = function( url ) {
+	if ( !url ) {
+		return "";
+	}
+
+	// Device-side ESP8266 downloader is more stable over plain HTTP.
+	return String( url ).replace( /^https:\/\//i, "http://" );
+};
+
+OSApp.ESP32Mode.getEsp8266ArchiveOTAUrl = function( entry ) {
+	if ( !entry || typeof entry.fw_version === "undefined" || typeof entry.fw_minor === "undefined" ) {
+		return "";
+	}
+
+	return "http://opensprinklershop.de/upgrade/archive/v" + entry.fw_version + "_" + entry.fw_minor + "/firmware_esp8266.bin";
+};
+
+OSApp.ESP32Mode.withEsp8266FUParam = function( extraParams, url ) {
+	var fu = OSApp.ESP32Mode.normalizeEsp8266OTAUrl( url );
+	var parts = String( extraParams || "" ).split( "&" );
+	var filtered = [];
+	var i;
+
+	for ( i = 0; i < parts.length; i++ ) {
+		if ( !parts[ i ] ) {
+			continue;
+		}
+		if ( parts[ i ].indexOf( "fu=" ) === 0 ) {
+			continue;
+		}
+		filtered.push( parts[ i ] );
+	}
+
+	if ( fu ) {
+		filtered.push( "fu=" + encodeURIComponent( fu ) );
+	}
+
+	return filtered.length ? ( "&" + filtered.join( "&" ) ) : "";
+};
+
 /**
  * Legacy online update flow (ESP8266 and non-ESP32 builds).
  * Uses direct online update endpoints (/uc, /uu, /us).
  */
 OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
+	if ( !OSApp.Firmware.isOTCOTAAllowed() ) {
+		OSApp.Errors.showError( OSApp.Language._( "OTA update over OTC is available from firmware 2.2.7 or newer. Please update locally first." ) );
+		return;
+	}
+
 	$.mobile.loading( "show" );
 	OSApp.Firmware.checkOTAUpdate( true ).done( function( data ) {
 		$.mobile.loading( "hide" );
@@ -5688,7 +5731,7 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
 		if ( selectedEntry ) {
 			if ( OSApp.Firmware.isESP8266Controller() ) {
 				if ( selectedEntry.esp8266_url ) {
-					extraParams += "&fu=" + encodeURIComponent( selectedEntry.esp8266_url );
+					extraParams = OSApp.ESP32Mode.withEsp8266FUParam( extraParams, selectedEntry.esp8266_url );
 				}
 			} else {
 				if ( selectedEntry.zigbee_url ) {
@@ -5718,7 +5761,7 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
 				var fallbackProtocol = ( window.location.protocol === "https:" ) ? "https:" : "http:";
 				var fallbackUrl = fallbackProtocol + "//opensprinklershop.de/upgrade/archive/v" + currentEntry.fw_version + "_" + currentEntry.fw_minor + "/firmware_";
 				if ( OSApp.Firmware.isESP8266Controller() ) {
-					currentEntry.esp8266_url = fallbackUrl + "esp8266.bin";
+					currentEntry.esp8266_url = OSApp.ESP32Mode.normalizeEsp8266OTAUrl( fallbackUrl + "esp8266.bin" );
 				} else {
 					var options = OSApp.options || {};
 					var featureFlags = options.mopts ? options.mopts[0] : 0;
@@ -5766,6 +5809,8 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
 				popup.find( "#ota-step-1" ).css( "color", "#4CAF50" ).html(
 					"&#9745; " + OSApp.Language._( "Configuration backed up" )
 				);
+				popup.data( "legacyOtaTarget", targetEntry || null );
+				popup.data( "legacyOtaRetryCount", 0 );
 				OSApp.ESP32Mode.runLegacyDirectOTA( popup, extraParams );
 			} ).fail( function( errMsg ) {
 				popup.find( "#ota-step-1" ).css( "color", "#FF9800" ).html(
@@ -5775,6 +5820,8 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
 					OSApp.Language._( "Configuration backup failed. Continue with update anyway?" ),
 					"",
 					function() {
+						popup.data( "legacyOtaTarget", targetEntry || null );
+						popup.data( "legacyOtaRetryCount", 0 );
 						OSApp.ESP32Mode.runLegacyDirectOTA( popup, extraParams );
 					}
 				);
@@ -5889,9 +5936,7 @@ OSApp.ESP32Mode.showLegacyVersionPicker = function( checkData ) {
 			};
 			if ( OSApp.Firmware.isESP8266Controller() ) {
 				selectedEntry.esp8266_url = $( this ).data( "fu" );
-				if ( window.location.protocol === "https:" && selectedEntry.esp8266_url && selectedEntry.esp8266_url.indexOf( "http://" ) === 0 ) {
-					selectedEntry.esp8266_url = selectedEntry.esp8266_url.replace( "http://", "https://" );
-				}
+				selectedEntry.esp8266_url = OSApp.ESP32Mode.normalizeEsp8266OTAUrl( selectedEntry.esp8266_url );
 			} else {
 				selectedEntry.zigbee_url = $( this ).data( "zu" );
 				selectedEntry.matter_url = $( this ).data( "mu" );
@@ -5967,12 +6012,45 @@ OSApp.ESP32Mode.setupOSPiOnlineUpdate = function() {
 };
 
 OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
+	var isEsp8266Otc = OSApp.Firmware.isESP8266Controller() && OSApp.currentSession && OSApp.currentSession.token;
+	var retryCount = Number( popup.data( "legacyOtaRetryCount" ) || 0 );
+
+	var maybeRetry = function( reasonText ) {
+		if ( !isEsp8266Otc || retryCount >= 1 ) {
+			return false;
+		}
+
+		var targetEntry = popup.data( "legacyOtaTarget" ) || null;
+		var fallbackUrl = OSApp.ESP32Mode.getEsp8266ArchiveOTAUrl( targetEntry );
+		var retryParams = OSApp.ESP32Mode.withEsp8266FUParam( extraParams, fallbackUrl );
+
+		popup.data( "legacyOtaRetryCount", retryCount + 1 );
+		popup.find( "#ota-step-2" ).css( "color", "#FF9800" ).html(
+			"&#9888; " + OSApp.Language._( "Retrying update with fallback download URL..." )
+		);
+
+		if ( reasonText ) {
+			popup.find( "#ota-step-3" ).css( "color", "#FF9800" ).html(
+				"&#9888; " + $( "<span>" ).text( reasonText ).html()
+			);
+		}
+
+		setTimeout( function() {
+			OSApp.ESP32Mode.runLegacyDirectOTA( popup, retryParams );
+		}, 1500 );
+
+		return true;
+	};
+
 	popup.find( "#ota-step-2" ).css( "color", "#1976D2" ).html(
 		"&#9658; <b>" + OSApp.Language._( "Downloading and installing firmware..." ) + "</b>"
 	);
 
 	OSApp.Firmware.sendToOS( OSApp.Firmware.buildOTAUpdateRequest( extraParams ), "json" ).done( function( resp ) {
 		if ( !resp || resp.result !== 1 ) {
+			if ( maybeRetry( resp && resp.message ? resp.message : "" ) ) {
+				return;
+			}
 			popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
 				"&#9746; " + OSApp.Language._( "Failed to start update" ) +
 				( resp && resp.message ? ": " + $( "<span>" ).text( resp.message ).html() : "" )
@@ -6032,6 +6110,9 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 							status === ST.ERROR_LOW_MEMORY || ( status >= 9 && status <= 12 ) || status === 15 ) {
 					// Download or flash error reported by firmware
 					clearInterval( statusTimer );
+					if ( maybeRetry( message || ( "status " + status ) ) ) {
+						return;
+					}
 					popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
 						"&#9746; " + OSApp.Language._( "Update failed" ) +
 						( message ? ": " + $( "<span>" ).text( message ).html() : " (status " + status + ")" )
@@ -6123,6 +6204,9 @@ OSApp.ESP32Mode.runLegacyDirectOTA = function( popup, extraParams ) {
 		} // end startRebootPolling
 
 	} ).fail( function() {
+		if ( maybeRetry( OSApp.Language._( "Error starting update" ) ) ) {
+			return;
+		}
 		popup.find( "#ota-step-2" ).css( "color", "#f44336" ).html(
 			"&#9746; " + OSApp.Language._( "Error starting update" )
 		);

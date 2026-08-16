@@ -665,6 +665,39 @@ OSApp.Firmware.isDirectFirmwareUploadSupported = function() {
 	return hwv > 0 && hwv < 64;
 };
 
+OSApp.Firmware.MIN_OTC_OTA_FWV = 227;
+
+OSApp.Firmware.getControllerFwvNumber = function() {
+	var fwv = OSApp.Firmware.getControllerOptions().fwv;
+
+	if ( typeof fwv === "number" ) {
+		return fwv;
+	}
+
+	if ( typeof fwv === "string" ) {
+		if ( fwv.indexOf( "." ) !== -1 ) {
+			var parts = fwv.split( "." );
+			return ( parseInt( parts[ 0 ], 10 ) || 0 ) * 100 + ( parseInt( parts[ 1 ], 10 ) || 0 ) * 10 + ( parseInt( parts[ 2 ], 10 ) || 0 );
+		}
+
+		return parseInt( fwv, 10 ) || 0;
+	}
+
+	return 0;
+};
+
+OSApp.Firmware.isOTCOTAAllowed = function() {
+	if ( !( OSApp.currentSession && OSApp.currentSession.token ) ) {
+		return true;
+	}
+
+	if ( OSApp.Firmware.isOSPi() ) {
+		return true;
+	}
+
+	return OSApp.Firmware.getControllerFwvNumber() >= OSApp.Firmware.MIN_OTC_OTA_FWV;
+};
+
 OSApp.Firmware.isNewerOTAVersion = function( data, curFwv, curFwm ) {
 	if ( !data || typeof data !== "object" ) return false;
 	return ( data.fw_version > curFwv ) ||
@@ -701,7 +734,8 @@ OSApp.Firmware.buildOTAUpdateRequest = function( extraParams ) {
 
 	if ( OSApp.Firmware.isESP8266Controller() ) {
 		if ( cache.esp8266_url ) {
-			request += "&fu=" + encodeURIComponent( cache.esp8266_url );
+			// ESP8266 download path: use plain HTTP to avoid TLS memory issues.
+			request += "&fu=" + encodeURIComponent( String( cache.esp8266_url ).replace( /^https:\/\//i, "http://" ) );
 		}
 	} else {
 		if ( cache.zigbee_url ) {
@@ -1287,10 +1321,7 @@ OSApp.Firmware.showOTAPopup = function() {
  */
 OSApp.Firmware.initOTACheck = function() {
 	if ( !OSApp.Firmware.isDirectFirmwareUploadSupported() ) return;
-
-	// ESP8266 cannot update over a remote (OTC) connection; don't surface the
-	// update notification that would route into an unavailable flow.
-	if ( OSApp.Firmware.isESP8266Controller() && OSApp.currentSession && OSApp.currentSession.token ) return;
+	if ( !OSApp.Firmware.isOTCOTAAllowed() ) return;
 
 	OSApp.Firmware.checkOTAUpdate( false ).then( function( data ) {
 		if ( !data || data.available !== 1 ) return;

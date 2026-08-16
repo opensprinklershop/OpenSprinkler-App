@@ -896,9 +896,7 @@ OSApp.UIDom.bindPanel = function() {
 					listview = panel.find( "ul[data-role='listview']" ),
 					onlineUpdateSupported = OSApp.Firmware.isDirectFirmwareUploadSupported() || OSApp.Firmware.isOSPi();
 
-				// ESP8266 online update is not available over a remote (OTC) connection
-				// (device-side /uu download is unreliable); hide the menu entry there.
-				if ( OSApp.Firmware.isESP8266Controller() && OSApp.currentSession && OSApp.currentSession.token ) {
+				if ( onlineUpdateSupported && !OSApp.Firmware.isOTCOTAAllowed() ) {
 					onlineUpdateSupported = false;
 				}
 
