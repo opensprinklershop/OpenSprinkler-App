@@ -1227,7 +1227,14 @@ OSApp.UIDom.goBack = function() {
 	page = page.attr( "id" );
 
 	var managerStart = ( page === "site-control" && !OSApp.currentSession.isControllerConnected() ),
-		popup = $( ".ui-popup-active" );
+		popup = $( ".ui-popup-active" ),
+		panel = $( ".ui-panel-open" );
+
+	// Close any open side menu/panel first instead of leaving the app
+	if ( panel.length ) {
+		panel.panel( "close" );
+		return;
+	}
 
 	if ( popup.length ) {
 		popup.find( "[data-role='popup']" ).popup( "close" );

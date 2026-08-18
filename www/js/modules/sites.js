@@ -956,7 +956,20 @@ OSApp.Sites.checkConfigured = function( firstLoad ) {
 };
 
 OSApp.Sites.parseSites = function( sites ) {
-	return ( sites === undefined || sites === null ) ? {} : JSON.parse( sites );
+	if ( sites === undefined || sites === null ) {
+		return {};
+	}
+
+	// Always resolve to a plain object. A corrupted storage value (e.g. the string
+	// "false" written by a failed cloud sync) must not propagate and make the whole
+	// app believe there are zero sites.
+	try {
+		var parsed = JSON.parse( sites );
+		return ( parsed && typeof parsed === "object" && !Array.isArray( parsed ) ) ? parsed : {};
+	} catch ( err ) {
+		void err;
+		return {};
+	}
 };
 
 OSApp.Sites.showSiteSelect = function( list ) {
@@ -2098,6 +2111,10 @@ OSApp.Sites.updateSite = function( newsite, opts ) {
 						} else {
 							OSApp.currentSession.fw183 = false;
 						}
+
+						// Populate the panel site-selector; newLoad() alone does not, so
+						// connecting via the "connect" button would leave the dropdown empty.
+						OSApp.Sites.updateSiteList( Object.keys( sites ), newsite );
 
 						OSApp.Sites.newLoad();
 						return;

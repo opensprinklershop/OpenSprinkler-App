@@ -344,7 +344,7 @@ OSApp.Network.checkPublicAccess = function( eip ) {
 };
 
 OSApp.Network.addSyncStatus = function( token ) {
-	var server = OSApp.Network.normalizeSyncServer( OSApp.Storage.getItemSync( "cloudServer" ) );
+	var server = OSApp.Network.storedSyncServer( OSApp.Storage.getItemSync( "cloudServer" ) );
 	var ele = $( "<div class='ui-bar smaller ui-bar-a ui-corner-all logged-in-alert'>" +
 			"<div class='inline ui-btn ui-icon-recycle btn-no-border ui-btn-icon-notext ui-mini'></div>" +
 			"<div class='inline syncStatus'>" + OSApp.Language._( "Synced with" ) + " " + server + " (" + OSApp.Network.getTokenUser( token ) + ")</div>" +
@@ -476,6 +476,15 @@ OSApp.Network.cloudEndpoint = function( server ) {
 	return "https://" + OSApp.Network.normalizeSyncServer( server ) + "/wp-admin/admin-ajax.php";
 };
 
+// Sync server that issued tokens before multi-server support existed. When an
+// authenticated session has a token but no stored cloudServer, it must be a legacy
+// login and its requests have to keep going to opensprinkler.com (not the new default).
+OSApp.Network.LEGACY_SYNC_SERVER = "opensprinkler.com";
+
+OSApp.Network.storedSyncServer = function( server ) {
+	return OSApp.Network.normalizeSyncServer( server || OSApp.Network.LEGACY_SYNC_SERVER );
+};
+
 OSApp.Network.cloudLogin = function( user, pass, server, callback ) {
 	// Backwards-compatible signature: ( user, pass, callback )
 	if ( typeof server === "function" ) {
@@ -522,7 +531,7 @@ OSApp.Network.cloudSaveSites = function( callback ) {
 		$.ajax( {
 			type: "POST",
 			dataType: "json",
-			url: OSApp.Network.cloudEndpoint( data.cloudServer ),
+			url: OSApp.Network.cloudEndpoint( OSApp.Network.storedSyncServer( data.cloudServer ) ),
 			data: {
 				action: "saveSites",
 				token: data.cloudToken,
@@ -564,7 +573,7 @@ OSApp.Network.cloudGetSites = function( callback ) {
 		$.ajax( {
 			type: "POST",
 			dataType: "json",
-			url: OSApp.Network.cloudEndpoint( local.cloudServer ),
+			url: OSApp.Network.cloudEndpoint( OSApp.Network.storedSyncServer( local.cloudServer ) ),
 			data: {
 				action: "getSites",
 				token: local.cloudToken
@@ -586,6 +595,7 @@ OSApp.Network.cloudGetSites = function( callback ) {
 							OSApp.Network.handleInvalidDataToken();
 						}
 						callback( false );
+						return;
 					}
 
 					try {
@@ -605,6 +615,14 @@ OSApp.Network.cloudGetSites = function( callback ) {
 
 OSApp.Network.cloudSyncStart = function() {
 	OSApp.Network.cloudGetSites( function( sites ) {
+
+		// An empty/failed cloud response resolves to `false`. Treat it as an empty site
+		// map, never the boolean: otherwise the assignments below silently no-op and the
+		// serialized "false" string overwrites the local site list, emptying the menu.
+		if ( !sites || typeof sites !== "object" ) {
+			sites = {};
+		}
+
 		var page = $( ".ui-page-active" ).attr( "id" );
 
 		if ( page === "start" ) {
@@ -631,7 +649,10 @@ OSApp.Network.cloudSyncStart = function() {
 								OSApp.Language._( "Do you wish to add this location to your cloud synced site list?" ),
 								OSApp.Language._( "This site is not found in the currently synced site list but may be added now." ),
 								function() {
-									sites[ OSApp.currentSession.ip ] = data.sites.Local;
+									var localSite = data.sites[ OSApp.currentSession.currentSite ] || data.sites.Local;
+									if ( localSite ) {
+										sites[ OSApp.currentSession.ip ] = localSite;
+									}
 									OSApp.Storage.set( { "sites": JSON.stringify( sites ) }, () => OSApp.Network.cloudSaveSites() );
 									OSApp.Storage.set( { "current_site": OSApp.currentSession.ip } );
 									OSApp.Sites.updateSiteList( Object.keys( sites ), OSApp.currentSession.ip );
@@ -708,14 +729,27 @@ OSApp.Network.cloudSync = function( callback ) {
 		}
 
 		OSApp.Network.cloudGetSites( function( data ) {
-			if ( data !== false ) {
+			if ( !data || typeof data !== "object" ) {
+				return;
+			}
+
+			// Never let an empty cloud object wipe a populated local list. A previously
+			// corrupted sync could have pushed an empty blob upstream; overwriting here
+			// would re-empty the site menu on every refresh. The local list is pushed
+			// back up on the next save instead.
+			OSApp.Storage.get( "sites", function( stored ) {
+				var localSites = OSApp.Sites.parseSites( stored.sites );
+				if ( Object.keys( data ).length === 0 && Object.keys( localSites ).length > 0 ) {
+					return;
+				}
+
 				OSApp.Storage.set( { "sites":JSON.stringify( data ) }, function() {
 					OSApp.Sites.updateSiteList( Object.keys( data ), local.current_site );
 					callback();
 
 					$( "html" ).trigger( "siterefresh" );
 				} );
-			}
+			} );
 		} );
 	} );
 };
