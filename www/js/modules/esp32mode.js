@@ -570,7 +570,7 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo, de
 
 		var pass = encodeURIComponent( OSApp.currentSession.pass ),
 			urlBase = OSApp.currentSession.token
-				? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
+				? OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer )
 				: OSApp.currentSession.prefix + OSApp.currentSession.ip,
 			ajaxCfg = {
 				url: urlBase + "/tl?pw=" + pass,
@@ -661,7 +661,7 @@ OSApp.ESP32Mode.showESP32ModePopup = function( radioInfo, certInfo, acmeInfo, de
 
 		var pass = encodeURIComponent( OSApp.currentSession.pass ),
 			urlBase = OSApp.currentSession.token
-				? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
+				? OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer )
 				: OSApp.currentSession.prefix + OSApp.currentSession.ip,
 			ajaxCfg = {
 				url: urlBase + "/tc?pw=" + pass,
@@ -7282,7 +7282,7 @@ OSApp.ESP32Mode.showCertManagementPopup = function( certInfo ) {
 		// Password stays in the URL query string; cert/key go in the request body.
 		var pass = encodeURIComponent( OSApp.currentSession.pass ),
 			urlBase = OSApp.currentSession.token
-				? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token
+				? OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer )
 				: OSApp.currentSession.prefix + OSApp.currentSession.ip,
 			ajaxCfg = {
 				url: urlBase + "/tl?pw=" + pass,

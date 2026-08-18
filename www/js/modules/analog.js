@@ -4867,7 +4867,7 @@ list += "</select></div>" +
 			var dest = "/so?pw=&csv=1&nr="+ sensor.nr + limit;
 			dest = dest.replace("pw=", "pw=" + OSApp.Analog.enc(OSApp.currentSession.pass));
 			link.target = "_blank";
-			link.href = OSApp.currentSession.token ? ("https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + dest) : (OSApp.currentSession.prefix + OSApp.currentSession.ip + dest);
+			link.href = OSApp.currentSession.token ? ( OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer ) + dest) : (OSApp.currentSession.prefix + OSApp.currentSession.ip + dest);
 			document.body.appendChild(link); // Required for FF
 			link.click();
 			return false;
@@ -5420,7 +5420,7 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			var dest = "/so?pw=&csv=1" + limit;
 			dest = dest.replace("pw=", "pw=" + OSApp.Analog.enc(OSApp.currentSession.pass));
 			link.target = "_blank";
-			link.href = OSApp.currentSession.token ? ("https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + dest) : (OSApp.currentSession.prefix + OSApp.currentSession.ip + dest);
+			link.href = OSApp.currentSession.token ? ( OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer ) + dest) : (OSApp.currentSession.prefix + OSApp.currentSession.ip + dest);
 			document.body.appendChild(link); // Required for FF
 			link.click();
 			return false;

@@ -26,7 +26,7 @@ OSApp.Push = OSApp.Push || {};
 OSApp.Push._registeredKeys = {};
 
 // Default forwarder endpoint used when the user has not set a custom one.
-OSApp.Push.DEFAULT_BASE_URL = "https://opensprinklershop.de/wp-json/ospf/v1";
+OSApp.Push.DEFAULT_BASE_URL = "https://io.opensprinklershop.de/wp-json/ospf/v1";
 
 // WebPush (browser/PWA) via Firebase Cloud Messaging. These are public client
 // values (as embedded in any web app). Requires HTTPS (or localhost).

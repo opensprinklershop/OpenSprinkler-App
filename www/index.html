@@ -20,6 +20,16 @@
 		<script>
 			(function() {
 				var path = window.location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "");
+				var isRawIpHost = /^\d+\.\d+\.\d+\.\d+$/.test(window.location.hostname || "");
+
+				// When UI is opened via direct server IP, do not auto-jump into a previously
+				// saved controller. Force site chooser so stale LAN entries do not trigger
+				// immediate cross-origin/mixed-content failures and a perceived black screen.
+				if (isRawIpHost) {
+					try {
+						localStorage.setItem("show_sites", "1");
+					} catch (e) {}
+				}
 
 				// Only perform multi-version redirection if we are on opensprinklershop.de, localhost, or mobile apps!
 				// When loaded directly from a local hardware controller, versions are not supported.
@@ -368,7 +378,7 @@
 				<li class="ai-assistant-menu" data-icon="comment"><a href="#ai-assistant" data-translate="AI Assistant">AI Assistant</a></li>
 				<li data-icon="location"><a href="#localization" data-translate="Localization">Localization</a></li>
 				<li class="hidden logout-button" data-icon="power"><a id="logout" href="#" data-translate="Logout">Logout</a></li>
-				<li class="hidden login-button"><a class="cloud-login" href="#" data-translate="OpenSprinkler.com Login"></a></li>
+				<li class="hidden login-button"><a class="cloud-login" href="#" data-translate="Cloud Sync Login"></a></li>
 				<li data-role="list-divider" data-translate="Advanced">Advanced</li>
 				<li class="esp32-mode-setup hidden" data-icon="gear"><a href="#" class="setup-esp32-mode" data-translate="Setup ESP32 Mode">Setup ESP32 Mode</a></li>
 				<li class="matter-setup hidden" data-icon="cloud"><a href="#" class="setup-matter" data-translate="Setup Matter">Setup Matter</a></li>

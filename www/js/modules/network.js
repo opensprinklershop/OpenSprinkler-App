@@ -344,9 +344,10 @@ OSApp.Network.checkPublicAccess = function( eip ) {
 };
 
 OSApp.Network.addSyncStatus = function( token ) {
+	var server = OSApp.Network.normalizeSyncServer( OSApp.Storage.getItemSync( "cloudServer" ) );
 	var ele = $( "<div class='ui-bar smaller ui-bar-a ui-corner-all logged-in-alert'>" +
 			"<div class='inline ui-btn ui-icon-recycle btn-no-border ui-btn-icon-notext ui-mini'></div>" +
-			"<div class='inline syncStatus'>" + OSApp.Language._( "Synced with OpenSprinkler.com" ) + " (" + OSApp.Network.getTokenUser( token ) + ")</div>" +
+			"<div class='inline syncStatus'>" + OSApp.Language._( "Synced with" ) + " " + server + " (" + OSApp.Network.getTokenUser( token ) + ")</div>" +
 			"<div class='inline ui-btn ui-icon-delete btn-no-border ui-btn-icon-notext ui-mini logout'></div>" +
 		"</div>" );
 
@@ -367,15 +368,21 @@ OSApp.Network.requestCloudAuth = function( callback ) {
 
 	var popup = $( "<div data-role='popup' class='modal' id='requestCloudAuth' data-theme='a'>" +
 				"<ul data-role='listview' data-inset='true'>" +
-					"<li data-role='list-divider'>" + OSApp.Language._( "OpenSprinkler.com Login" ) + "</li>" +
+					"<li data-role='list-divider'>" + OSApp.Language._( "Cloud Sync Login" ) + "</li>" +
 					"<li><p class='rain-desc tight'>" +
-						OSApp.Language._( "Use your OpenSprinkler.com login and password to securely sync sites between all your devices." ) +
+						OSApp.Language._( "Use your account login and password to securely sync sites between all your devices." ) +
 						"<br><br>" +
-						OSApp.Language._( "Don't have an account?" ) + " <a href='https://opensprinkler.com/my-account/' class='iab'>" +
+						OSApp.Language._( "Don't have an account?" ) + " <a href='https://opensprinklershop.de/my-account/' class='iab' id='cloudRegisterLink'>" +
 						OSApp.Language._( "Register here" ) + "</a>" +
 					"</p></li>" +
 					"<li>" +
 						"<form method='post' novalidate>" +
+							"<label for='cloudServerSel'>" + OSApp.Language._( "Sync Server:" ) + "</label>" +
+							"<div id='cloud_server_select_container'></div>" +
+							"<div id='cloudServerCustom' style='display:none;'>" +
+								"<label for='cloudServerHost'>" + OSApp.Language._( "Server host:" ) + "</label>" +
+								"<input type='text' name='cloudServerHost' id='cloudServerHost' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false' placeholder='example.com'>" +
+							"</div>" +
 							"<label for='cloudUser'>" + OSApp.Language._( "Username:" ) + "</label>" +
 							"<input type='text' name='cloudUser' id='cloudUser' autocomplete='off' autocorrect='off' autocapitalize='off' " +
 								"spellcheck='false'>" +
@@ -388,9 +395,50 @@ OSApp.Network.requestCloudAuth = function( callback ) {
 		"</div>" ),
 		didSucceed = false;
 
+	var applyPreset = function() {
+		var opt = popup.find( "#cloudServerSel option:selected" );
+		var preset = opt.val();
+		if (preset === "edit_list") {
+			OSApp.Utils.showSyncServerManager(function() {
+				renderSelect();
+			});
+			return;
+		}
+		popup.find( "#cloudServerCustom" ).toggle( preset === "custom" );
+		var reg = opt.data( "register" );
+		if ( reg ) {
+			popup.find( "#cloudRegisterLink" ).attr( "href", reg ).show();
+		} else {
+			popup.find( "#cloudRegisterLink" ).hide();
+		}
+	};
+
+	var renderSelect = function() {
+		var prevVal = popup.find( "#cloudServerSel" ).val();
+		popup.find( "#cloud_server_select_container" ).html( OSApp.Utils.buildSyncServerSelectHtml( "cloudServerSel", null ) );
+		popup.find( "#cloudServerSel" ).on( "change", applyPreset );
+		if (prevVal && prevVal !== "edit_list") {
+			popup.find( "#cloudServerSel" ).val(prevVal);
+		}
+		try { popup.find( "#cloudServerSel" ).selectmenu().selectmenu("refresh", true); } catch(err) { void err; }
+		applyPreset();
+	};
+
+	renderSelect();
+
 	popup.find( "form" ).on( "submit", function() {
+		var serverOpt = popup.find( "#cloudServerSel option:selected" );
+		if (serverOpt.val() === "edit_list") {
+			return false;
+		}
+		var server = serverOpt.val() === "custom" ? ( popup.find( "#cloudServerHost" ).val() || "" ).trim() : String(serverOpt.data("server") || serverOpt.val());
+		if ( serverOpt.val() === "custom" && !server ) {
+			OSApp.Errors.showError( OSApp.Language._( "Please enter a sync server." ) );
+			return false;
+		}
+
 		$.mobile.loading( "show" );
-		OSApp.Network.cloudLogin( popup.find( "#cloudUser" ).val(), popup.find( "#cloudPass" ).val(), function( result ) {
+		OSApp.Network.cloudLogin( popup.find( "#cloudUser" ).val(), popup.find( "#cloudPass" ).val(), server, function( result ) {
 			if ( result === false ) {
 				OSApp.Errors.showError( OSApp.Language._( "Invalid username/password combination. Please try again." ) );
 				return;
@@ -413,13 +461,34 @@ OSApp.Network.requestCloudAuth = function( callback ) {
 	OSApp.UIDom.openPopup( popup );
 };
 
-OSApp.Network.cloudLogin = function( user, pass, callback ) {
+// Default cloud-sync provider (stores the encrypted device/site list).
+OSApp.Network.DEFAULT_SYNC_SERVER = "opensprinklershop.de";
+
+// Normalize a stored/selected sync server to a bare host.
+OSApp.Network.normalizeSyncServer = function( server ) {
+	var host = String( server || OSApp.Network.DEFAULT_SYNC_SERVER ).trim();
+	host = host.replace( /^https?:\/\//i, "" ).replace( /\/.*$/, "" ).replace( /:\d+$/, "" );
+	return host || OSApp.Network.DEFAULT_SYNC_SERVER;
+};
+
+// Build the WordPress admin-ajax endpoint for a sync server.
+OSApp.Network.cloudEndpoint = function( server ) {
+	return "https://" + OSApp.Network.normalizeSyncServer( server ) + "/wp-admin/admin-ajax.php";
+};
+
+OSApp.Network.cloudLogin = function( user, pass, server, callback ) {
+	// Backwards-compatible signature: ( user, pass, callback )
+	if ( typeof server === "function" ) {
+		callback = server;
+		server = undefined;
+	}
 	callback = callback || function() {};
+	server = OSApp.Network.normalizeSyncServer( server );
 
 	$.ajax( {
 		type: "POST",
 		dataType: "json",
-		url: "https://opensprinkler.com/wp-admin/admin-ajax.php",
+		url: OSApp.Network.cloudEndpoint( server ),
 		data: {
 			action: "ajaxLogin",
 			username: user,
@@ -429,6 +498,7 @@ OSApp.Network.cloudLogin = function( user, pass, callback ) {
 			if ( typeof data.token === "string" ) {
 				OSApp.Storage.set( {
 					"cloudToken": data.token,
+					"cloudServer": server,
 					"cloudDataToken": sjcl.codec.hex.fromBits( sjcl.hash.sha256.hash( pass ) )
 				} );
 			}
@@ -443,7 +513,7 @@ OSApp.Network.cloudLogin = function( user, pass, callback ) {
 OSApp.Network.cloudSaveSites = function( callback ) {
 	callback = callback || function() {};
 
-	OSApp.Storage.get( [ "cloudToken", "cloudDataToken", "sites" ], function( data ) {
+	OSApp.Storage.get( [ "cloudToken", "cloudDataToken", "cloudServer", "sites" ], function( data ) {
 		if ( data.cloudToken === null || data.cloudToken === undefined ) {
 			callback( false );
 			return;
@@ -452,7 +522,7 @@ OSApp.Network.cloudSaveSites = function( callback ) {
 		$.ajax( {
 			type: "POST",
 			dataType: "json",
-			url: "https://opensprinkler.com/wp-admin/admin-ajax.php",
+			url: OSApp.Network.cloudEndpoint( data.cloudServer ),
 			data: {
 				action: "saveSites",
 				token: data.cloudToken,
@@ -479,7 +549,7 @@ OSApp.Network.cloudSaveSites = function( callback ) {
 OSApp.Network.cloudGetSites = function( callback ) {
 	callback = callback || function() {};
 
-	OSApp.Storage.get( [ "cloudToken", "cloudDataToken" ], function( local ) {
+	OSApp.Storage.get( [ "cloudToken", "cloudDataToken", "cloudServer" ], function( local ) {
 		if ( local.cloudToken === undefined || local.cloudToken === null ) {
 			callback( false );
 			return;
@@ -494,7 +564,7 @@ OSApp.Network.cloudGetSites = function( callback ) {
 		$.ajax( {
 			type: "POST",
 			dataType: "json",
-			url: "https://opensprinkler.com/wp-admin/admin-ajax.php",
+			url: OSApp.Network.cloudEndpoint( local.cloudServer ),
 			data: {
 				action: "getSites",
 				token: local.cloudToken
@@ -655,11 +725,11 @@ OSApp.Network.getTokenUser = function( token ) {
 };
 
 OSApp.Network.handleExpiredLogin = function() {
-	OSApp.Storage.remove( [ "cloudToken" ], () => OSApp.UIDom.updateLoginButtons() );
+	OSApp.Storage.remove( [ "cloudToken", "cloudServer" ], () => OSApp.UIDom.updateLoginButtons() );
 
 	OSApp.Notifications.addNotification( {
-		title: OSApp.Language._( "OpenSprinkler.com Login Expired" ),
-		desc: OSApp.Language._( "Click here to re-login to OpenSprinkler.com" ),
+		title: OSApp.Language._( "Cloud Sync Login Expired" ),
+		desc: OSApp.Language._( "Click here to re-login to your sync account" ),
 		on: function() {
 			var button = $( this ).parent();
 
@@ -852,7 +922,7 @@ OSApp.Network.changePassword = function( opt ) {
 				var urlDest = "/jc?pw=" + pw;
 
 				$.ajax( {
-					url: OSApp.currentSession.token ? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + urlDest : OSApp.currentSession.prefix + OSApp.currentSession.ip + urlDest,
+					url: OSApp.currentSession.token ? OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer ) + urlDest : OSApp.currentSession.prefix + OSApp.currentSession.ip + urlDest,
 					type: "GET",
 					dataType: "json",
 					timeout: OSApp.currentSession.token ? 30000 : 10000
@@ -882,7 +952,7 @@ OSApp.Network.checkPW = function( pass, callback ) {
 	var urlDest = "/sp?pw=" + encodeURIComponent( pass ) + "&npw=" + encodeURIComponent( pass ) + "&cpw=" + encodeURIComponent( pass );
 
 	$.ajax( {
-		url: OSApp.currentSession.token ? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + urlDest : OSApp.currentSession.prefix + OSApp.currentSession.ip + urlDest,
+		url: OSApp.currentSession.token ? OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer ) + urlDest : OSApp.currentSession.prefix + OSApp.currentSession.ip + urlDest,
 		cache: false,
 		crossDomain: true,
 		type: "GET"
@@ -941,11 +1011,11 @@ OSApp.Network.logout = function( success ) {
 
 	OSApp.UIDom.areYouSure( OSApp.Language._( "Are you sure you want to logout?" ), "", function() {
 		if ( OSApp.currentSession.local ) {
-			OSApp.Storage.remove( [ "sites", "current_site", "lang", "provider", "wapikey", "runonce", "cloudToken" ], function() {
+			OSApp.Storage.remove( [ "sites", "current_site", "lang", "provider", "wapikey", "runonce", "cloudToken", "cloudServer" ], function() {
 				location.reload();
 			} );
 		} else {
-			OSApp.Storage.remove( [ "cloudToken" ], function() {
+			OSApp.Storage.remove( [ "cloudToken", "cloudServer" ], function() {
 				OSApp.UIDom.updateLoginButtons();
 				success();
 			} );

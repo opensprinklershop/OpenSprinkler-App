@@ -145,15 +145,15 @@ OSApp.Welcome.buildWizardStepContent = function( step, stepNumber, totalSteps ) 
 			break;
 		case "cloud":
 			html =
-				"<h2 class='tight center'>" + _( "OpenSprinkler.com account (optional)" ) + "</h2>" +
+				"<h2 class='tight center'>" + _( "Cloud sync account (optional)" ) + "</h2>" +
 				progress +
 				"<p class='rain-desc'>" +
-					_( "Sign in with your OpenSprinkler.com account to keep a server-stored copy of your device list and manage several OpenSprinkler controllers across your devices." ) +
+					_( "Sign in with your OpenSprinklerShop.de or OpenSprinkler.com account to keep a server-stored copy of your device list and manage several OpenSprinkler controllers across your devices." ) +
 				"</p>" +
 				"<p class='rain-desc setup-wizard-hint'>" +
 					_( "Note: this does not enable remote access on its own. For access from anywhere you additionally need an OTC (OpenThings Cloud) token, which you create at openthings.io and add per device later. This step is optional." ) +
 				"</p>" +
-				"<a href='#' class='ui-btn ui-btn-b setup-cloud-login'>" + _( "OpenSprinkler.com Login" ) + "</a>";
+				"<a href='#' class='ui-btn ui-btn-b setup-cloud-login'>" + _( "Cloud Sync Login" ) + "</a>";
 			break;
 		case "finish":
 			html =
@@ -399,7 +399,7 @@ OSApp.Welcome.displayPage = function() {
 			"</a>" +
 			"</li>" +
 			"<li class='ui-first-child ui-last-child'>" +
-			"<a href='#' class='ui-btn center cloud-login'>" + OSApp.Language._( "OpenSprinkler.com Login" ) + "</a>" +
+			"<a href='#' class='ui-btn center cloud-login'>" + OSApp.Language._( "Cloud Sync Login" ) + "</a>" +
 			"</li>" +
 			"<hr class='content-divider'>" +
 			"<li id='auto-scan' class='ui-first-child'>" +

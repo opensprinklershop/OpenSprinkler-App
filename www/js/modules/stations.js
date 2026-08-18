@@ -266,7 +266,7 @@ OSApp.Stations.verifyRemoteStation = function( data, callback ) {
 	data = OSApp.Stations.parseRemoteStationData( data );
 
 	$.ajax( {
-		url: ( data.otc ? ( "https://cloud.openthings.io/forward/v1/" + data.otc ) : ( "http://" + data.ip + ":" + data.port ) ) + "/jo?pw=" + encodeURIComponent( OSApp.currentSession.pass ),
+		url: ( data.otc ? OSApp.Utils.otcForwardBase( data.otc, OSApp.currentSession.otcServer ) : ( "http://" + data.ip + ":" + data.port ) ) + "/jo?pw=" + encodeURIComponent( OSApp.currentSession.pass ),
 		type: "GET",
 		dataType: "json"
 	} ).then(
@@ -291,7 +291,7 @@ OSApp.Stations.convertRemoteToExtender = function( data ) {
 	data = OSApp.Stations.parseRemoteStationData( data );
 	var comm;
 	if ( data.otc ) {
-		comm = "https://cloud.openthings.io/forward/v1/" + data.otc;
+		comm = OSApp.Utils.otcForwardBase( data.otc, OSApp.currentSession.otcServer );
 	} else {
 		comm = "http://" + data.ip + ":" + data.port;
 	}

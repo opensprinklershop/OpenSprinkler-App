@@ -2246,7 +2246,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			if ( curr === OSApp.Utils.escapeJSON( options ) ) {
 				return;
 			} else {
-				button.value = OSApp.Utils.escapeJSON( options );
+				$(button).val( OSApp.Utils.escapeJSON( options ) );
 				header.eq( 2 ).prop( "disabled", false );
 				page.find( ".submit" ).addClass( "hasChanges" );
 			}
@@ -2343,7 +2343,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			if ( curr === OSApp.Utils.escapeJSON( options ) ) {
 				return;
 			} else {
-				button.value = OSApp.Utils.escapeJSON( options );
+				$(button).val( OSApp.Utils.escapeJSON( options ) );
 				header.eq( 2 ).prop( "disabled", false );
 				page.find( ".submit" ).addClass( "hasChanges" );
 			}
@@ -2460,7 +2460,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			if ( curr === OSApp.Utils.escapeJSON( options ) ) {
 				return;
 			} else {
-				button.value = OSApp.Utils.escapeJSON( options );
+				$(button).val( OSApp.Utils.escapeJSON( options ) );
 				header.eq( 2 ).prop( "disabled", false );
 				page.find( ".submit" ).addClass( "hasChanges" );
 			}
@@ -2503,15 +2503,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 								"<label for='server' style='padding-top:10px'>" + OSApp.Language._( "Server" ) + "</label>" +
 							"</div>" +
 							"<div class='ui-block-b' style='width:75%'>" +
-								"<input class='otc-input' type='text' id='server' data-mini='true' maxlength='50' autocomplete='off' autocorrect='off' autocapitalize='off' spellcheck='false'" +
-									( currentOptions.en ? "" : "disabled='disabled'" ) + " placeholder='" + OSApp.Language._( "server" ) + "' value='" + currentOptions.server + "' required />" +
-							"</div>" +
-							"<div class='ui-block-a' style='width:25%'>" +
-								"<label for='port' style='padding-top:10px'>" + OSApp.Language._( "Port" ) + "</label>" +
-							"</div>" +
-							"<div class='ui-block-b' style='width:75%'>" +
-								"<input class='otc-input' type='number' id='port' data-mini='true' pattern='[0-9]*' min='0' max='65535'" +
-									( currentOptions.en ? "" : "disabled='disabled'" ) + " placeholder='80' value='" + currentOptions.port + "' required />" +
+								OSApp.Utils.buildOtcServerSelectHtml( "server", currentOptions.server, currentOptions.port, { noCustom: true, noEdit: true } ) +
 							"</div>" +
 						"</div>" +
 					"</div>" +
@@ -2522,23 +2514,29 @@ OSApp.Options.showOptions = function( expandItem ) {
 		popup.find( "#enable" ).on( "change", function() {
 			if ( this.checked ) {
 				popup.find( ".otc-input" ).textinput( "enable" );
+				try { popup.find( "#server" ).selectmenu( "enable" ); } catch( e ) { void e; }
 			} else {
 				popup.find( ".otc-input" ).textinput( "disable" );
+				try { popup.find( "#server" ).selectmenu( "disable" ); } catch( e ) { void e; }
 			}
 		} );
 		popup.find( ".submit" ).on( "click", function() {
-			var token = popup.find( "#token" ).val();
+			var token = popup.find( "#token" ).val().trim();
 
-			if ( popup.find( "#enable" ).prop( "checked" ) && token !== currentOptions.token && token.length !== 32 ) {
-				OSApp.Errors.showError( OSApp.Language._( "OpenThings Token must be 32 characters long." ) );
+			if ( popup.find( "#enable" ).prop( "checked" ) && token !== currentOptions.token && !OSApp.Utils.isOtcTokenFormat( token ) ) {
+				OSApp.Errors.showError( OSApp.Language._( "Invalid OTC token format. Token must start with 'OT' followed by at least 30 alphanumeric characters." ) );
 				return;
 			}
+
+			var serverOpt = popup.find( "#server option:selected" );
+			var serverStr = String( serverOpt.data( "server" ) );
+			var portNum = OSApp.Utils.deriveOtcPort( serverStr );
 
 			var options = {
 				en: ( popup.find( "#enable" ).prop( "checked" ) ? 1 : 0 ),
 				token: token,
-				server: popup.find( "#server" ).val(),
-				port: parseInt( popup.find( "#port" ).val() )
+				server: serverStr,
+				port: isNaN( portNum ) ? OSApp.Utils.DEFAULT_OTC_PORT : portNum
 			};
 
 			if ( options.en ) {
@@ -2551,7 +2549,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 			if ( curr === OSApp.Utils.escapeJSON( options ) ) {
 				return;
 			} else {
-				button.value = OSApp.Utils.escapeJSON( options );
+				$(button).val( OSApp.Utils.escapeJSON( options ) );
 				header.eq( 2 ).prop( "disabled", false );
 				page.find( ".submit" ).addClass( "hasChanges" );
 			}
@@ -2560,6 +2558,10 @@ OSApp.Options.showOptions = function( expandItem ) {
 		popup.css( "max-width", "380px" );
 
 		OSApp.UIDom.openPopup( popup, { positionTo: "window" } );
+
+		if ( !currentOptions.en ) {
+			try { popup.find( "#server" ).selectmenu( "disable" ); } catch( e ) { void e; }
+		}
     } );
 
 	page.find( ".datetime-input" ).on( "click", function() {

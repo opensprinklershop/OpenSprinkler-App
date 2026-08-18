@@ -207,7 +207,7 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 	var prefix = siteData.ssl === "1" ? "https://" : "http://",
 		normalizedIp = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) ? OSApp.Firmware.normalizeDirectHost( siteData.os_ip, prefix ) : siteData.os_ip,
 		urlDest = "/jo?pw=" + encodeURIComponent( siteData.os_pw ),
-		url = siteData.os_token ? "https://cloud.openthings.io/forward/v1/" + siteData.os_token + urlDest : prefix + normalizedIp + urlDest;
+		url = siteData.os_token ? OSApp.Utils.otcForwardBase( siteData.os_token, siteData.os_otc_server ) + urlDest : prefix + normalizedIp + urlDest;
 
 	$.ajax( {
 		url: url,
@@ -385,6 +385,10 @@ OSApp.Sites.displayPage = function() {
 							"<label for='ctoken-" + i + "'>" + OSApp.Language._( "Change Token" ) + "</label><input id='ctoken-" + i + "' type='text' value='" + b.os_token +
 							"' autocomplete='off' autocorrect='off' autocapitalize='off' pattern='' spellcheck='false'>" +
 							"</div>" : "" ) +
+						( b.os_token ? "<div class='ui-field-contain'>" +
+							"<label for='cotcserver-" + i + "'>" + OSApp.Language._( "OTC Server" ) + "</label>" +
+							OSApp.Utils.buildOtcServerSelectHtml( "cotcserver-" + i, b.os_otc_server, b.os_otc_port ) +
+							"</div>" : "" ) +
 						"<div class='ui-field-contain'>" +
 						"<label for='cpw-" + i + "'>" + OSApp.Language._( "Change Password" ) + "</label><input id='cpw-" + i + "' type='password'>" +
 						"</div>" +
@@ -482,6 +486,32 @@ OSApp.Sites.displayPage = function() {
 					$( this ).find( ".submit" ).addClass( "hasChanges" );
 				} );
 
+				var bindOtcSelect = function(sel, cIdx) {
+					void cIdx;
+					var applySel = function() {
+						var opt = sel.find("option:selected");
+						if (opt.val() === "edit_list") {
+							OSApp.Utils.showOtcServerManager(function() {
+								var prevVal = sel.val();
+								sel.html( $(OSApp.Utils.buildOtcServerSelectHtml("dummy", null, null)).html() );
+								if (prevVal && prevVal !== "edit_list") {
+									sel.val(prevVal);
+								}
+								try { sel.selectmenu("refresh", true); } catch(err) { void err; }
+								applySel();
+							});
+							return;
+						}
+					};
+					sel.on("change", function() { applySel(); });
+					applySel();
+				};
+
+				list.find( "select[id^='cotcserver-']" ).each(function() {
+					var cIdx = $(this).attr("id").split("-")[1];
+					bindOtcSelect($(this), cIdx);
+				});
+
 				list.find( ".connectnow" ).on( "click", function() {
 					OSApp.Sites.updateSite( siteNames[ $( this ).data( "site" ) ], { goSprinklers: true } );
 					return false;
@@ -536,14 +566,22 @@ OSApp.Sites.displayPage = function() {
 						id = form.data( "site" ),
 						site = siteNames[ id ],
 						ip = sites[ site ].os_token ? "" : list.find( "#cip-" + id ).val().replace(/\/$/, ""),
-						token = sites[ site ].os_token ? list.find( "#ctoken-" + id ).val() : "",
+						token = sites[ site ].os_token ? list.find( "#ctoken-" + id ).val().trim() : "",
 						pw = list.find( "#cpw-" + id ).val(),
 						nm = list.find( "#cnm-" + id ).val(),
 						useauth = list.find( "#useauth-" + id ).is( ":checked" ),
 						usessl = list.find( "#usessl-" + id ).is( ":checked" ) ? "1" : undefined,
 						authUser = list.find( "#useauth-" + id ).data( "user" ),
-						authPass = list.find( "#useauth-" + id ).data( "pw" ),
-						needsReconnect = ( ip !== "" && ip !== sites[ site ].os_ip ) ||
+						authPass = list.find( "#useauth-" + id ).data( "pw" );
+
+					var otcServer = "", otcPort = NaN;
+					if ( sites[ site ].os_token ) {
+						var selOpt = list.find( "#cotcserver-" + id + " option:selected" );
+						otcServer = String( selOpt.data( "server" ) );
+						otcPort = OSApp.Utils.deriveOtcPort( otcServer );
+					}
+
+					var needsReconnect = ( ip !== "" && ip !== sites[ site ].os_ip ) ||
 							usessl !== sites[ site ].ssl ||
 							authUser !== sites[ site ].auth_user ||
 							authPass !== sites[ site ].auth_pw,
@@ -570,12 +608,32 @@ OSApp.Sites.displayPage = function() {
 						sites[ site ].os_ip = ip;
 					}
 					var tokenInval = false;
+					var tokenChanged = false;
 					if ( token !== "" && token !== sites[ site ].os_token ) {
-						if ( token.startsWith("OT") && token.length == 32) {
+						if ( OSApp.Utils.isOtcTokenFormat( token ) ) {
 							sites[ site ].os_token = token;
+							tokenChanged = true;
 						} else {
 							tokenInval = true;
 							OSApp.Errors.showError( OSApp.Language._( "Invalid new OTC token. Any other changes were made successfully." ) );
+						}
+					}
+					if ( sites[ site ].os_token ) {
+						if ( otcServer && otcServer !== OSApp.Utils.DEFAULT_OTC_SERVER ) {
+							if ( otcServer !== sites[ site ].os_otc_server ) {
+								tokenChanged = true;
+							}
+							sites[ site ].os_otc_server = otcServer;
+						} else {
+							if ( sites[ site ].os_otc_server ) {
+								tokenChanged = true;
+							}
+							delete sites[ site ].os_otc_server;
+						}
+						if ( !isNaN( otcPort ) && otcPort !== OSApp.Utils.DEFAULT_OTC_PORT ) {
+							sites[ site ].os_otc_port = otcPort;
+						} else {
+							delete sites[ site ].os_otc_port;
 						}
 					}
 					if ( pw !== "" && pw !== sites[ site ].os_pw ) {
@@ -605,7 +663,11 @@ OSApp.Sites.displayPage = function() {
 						if ( pw !== "" ) {
 							OSApp.currentSession.pass = pw;
 						}
-						if ( needsReconnect ) {
+						if ( tokenChanged ) {
+							OSApp.currentSession.token = sites[ site ].os_token;
+							OSApp.currentSession.otcServer = sites[ site ].os_otc_server || OSApp.Utils.DEFAULT_OTC_SERVER;
+						}
+						if ( needsReconnect || tokenChanged ) {
 							OSApp.Sites.checkConfigured();
 						}
 					}
@@ -727,7 +789,7 @@ OSApp.Sites.testSite = function( site, id, callback ) {
 	var prefix = site.ssl === "1" ? "https://" : "http://",
 		normalizedIp = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) ? OSApp.Firmware.normalizeDirectHost( site.os_ip, prefix ) : site.os_ip,
 		urlDest = "/jo?pw=" + encodeURIComponent( site.os_pw ),
-		url = site.os_token ? "https://cloud.openthings.io/forward/v1/" + site.os_token + urlDest : prefix + normalizedIp + urlDest,
+		url = site.os_token ? OSApp.Utils.otcForwardBase( site.os_token, site.os_otc_server ) + urlDest : prefix + normalizedIp + urlDest,
 		// Use native HTTP for direct HTTPS device connections on Cordova devices.
 		// WebView XHR cannot verify self-signed certs, but cordova-plugin-advanced-http can.
 		useNative = !site.os_token && OSApp.Firmware.canUseNativeHttp( url );
@@ -858,6 +920,7 @@ OSApp.Sites.checkConfigured = function( firstLoad ) {
 
 		OSApp.currentSession.currentSite = current;
 		OSApp.currentSession.token = sites[ current ].os_token;
+		OSApp.currentSession.otcServer = sites[ current ].os_otc_server || OSApp.Utils.DEFAULT_OTC_SERVER;
 
 		OSApp.currentSession.ip = sites[ current ].os_ip;
 		OSApp.currentSession.pass = sites[ current ].os_pw;
@@ -972,6 +1035,9 @@ OSApp.Sites.showAddNew = function( autoIP, closeOld, options ) {
 							"<input type='checkbox' name='os_useauth' id='os_useauth'>" +
 							"<label for='os_useauth'>" + OSApp.Language._( "Use Auth" ) + "</label>" +
 							"</fieldset>" +
+							"<label class='otc-field' for='os_otc_server'>" + OSApp.Language._( "OTC Server" ) + "</label>" +
+							"<p class='smaller otc-field'>" + OSApp.Language._( "Only used with an OTC token. Leave default for OpenThings Cloud." ) + "</p>" +
+							"<div class='otc-field'>" + OSApp.Utils.buildOtcServerSelectHtml("os_otc_server", null, null) + "</div>" +
 						"</div>" ) +
 					"<input type='submit' data-theme='b' value='" + OSApp.Language._( "Submit" ) + "'>" +
 				"</form>" +
@@ -979,6 +1045,28 @@ OSApp.Sites.showAddNew = function( autoIP, closeOld, options ) {
 		"</div>" );
 
 	addnew.data( "setupOptions", options );
+
+	var bindAddNewOtcSelect = function() {
+		var sel = addnew.find("#os_otc_server");
+		var applySel = function() {
+			var opt = sel.find("option:selected");
+			if (opt.val() === "edit_list") {
+				OSApp.Utils.showOtcServerManager(function() {
+					var prevVal = sel.val();
+					sel.html( $(OSApp.Utils.buildOtcServerSelectHtml("dummy", null, null)).html() );
+					if (prevVal && prevVal !== "edit_list") {
+						sel.val(prevVal);
+					}
+					try { sel.selectmenu("refresh", true); } catch(err) { void err; }
+					applySel();
+				});
+				return;
+			}
+		};
+		sel.on("change", function() { applySel(); });
+		applySel();
+	};
+	bindAddNewOtcSelect();
 
 	addnew.find( "form" ).on( "submit", function() {
 		OSApp.Sites.submitNewSite();
@@ -1026,7 +1114,7 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 	$.mobile.loading( "show" );
 
        var input = $( "#os_url" ).val().trim(),
-			   connectionType = input.startsWith("OT") && input.length == 32 ? "token" : "direct",
+			   connectionType = OSApp.Utils.isOtcTokenFormat( input ) ? "token" : "direct",
 			   rawUrl = connectionType === "direct" ? input : null,
                token = connectionType === "token" ? input : null,
                ip, parsedUrl,
@@ -1080,6 +1168,16 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 				sites[ name ] = {};
 				sites[ name ].os_token = OSApp.currentSession.token = token;
 				sites[ name ].os_ip = OSApp.currentSession.ip = ip;
+
+				if ( token ) {
+					if ( otcServerInput && otcServerInput !== OSApp.Utils.DEFAULT_OTC_SERVER ) {
+						sites[ name ].os_otc_server = otcServerInput;
+					}
+					if ( !isNaN( otcPortInput ) && otcPortInput !== OSApp.Utils.DEFAULT_OTC_PORT ) {
+						sites[ name ].os_otc_port = otcPortInput;
+					}
+					OSApp.currentSession.otcServer = sites[ name ].os_otc_server || OSApp.Utils.DEFAULT_OTC_SERVER;
+				}
 
 				if ( typeof data.fwv === "number" && data.fwv >= 213 ) {
 					if ( typeof data.wl === "number" ) {
@@ -1211,7 +1309,7 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 		return;
 	}
 
-	if ( token && token.length !== 32 ) {
+	if ( token && token.length < 32 ) {
 		OSApp.Errors.showError( OSApp.Language._( "OpenThings Token must be 32 characters long." ) );
 		return;
 	}
@@ -1237,9 +1335,16 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 		$( "#addnew" ).popup( "reposition", { positionTo:"window" } );
 	}
 
+	var otcServerInput = "", otcPortInput = NaN;
+	if ( token ) {
+		var selOptNew = $( "#os_otc_server option:selected" );
+		otcServerInput = String( selOptNew.data( "server" ) );
+		otcPortInput = OSApp.Utils.deriveOtcPort( otcServerInput );
+	}
+
 	var normalizedIp = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) ? OSApp.Firmware.normalizeDirectHost( ip, prefix ) : ip,
 		urlDest = "/jo?pw=" + md5( $( "#os_pw" ).val() ),
-		url = token ? "https://cloud.openthings.io/forward/v1/" + token + urlDest : prefix + normalizedIp + urlDest;
+		url = token ? OSApp.Utils.otcForwardBase( token, otcServerInput ) + urlDest : prefix + normalizedIp + urlDest;
 
 	//Submit form data to the server
 	$.ajax( {
@@ -1262,7 +1367,7 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 				return;
 			}
 			$.ajax( {
-				url: token ? "https://cloud.openthings.io/forward/v1/" + token : prefix + ip,
+				url: token ? OSApp.Utils.otcForwardBase( token, otcServerInput ) : prefix + ip,
 				type: "GET",
 				dataType: "text",
 				timeout: 10000,
@@ -1963,6 +2068,7 @@ OSApp.Sites.updateSite = function( newsite, opts ) {
 					if ( opts.goSprinklers === true ) {
 						OSApp.currentSession.currentSite = newsite;
 						OSApp.currentSession.token = sites[ newsite ].os_token;
+						OSApp.currentSession.otcServer = sites[ newsite ].os_otc_server || OSApp.Utils.DEFAULT_OTC_SERVER;
 
 						OSApp.currentSession.ip = sites[ newsite ].os_ip;
 						OSApp.currentSession.pass = sites[ newsite ].os_pw;

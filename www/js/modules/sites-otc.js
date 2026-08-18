@@ -30,18 +30,20 @@ OSApp.Sites.showAddOTCConnection = function( siteName, siteData ) {
 				"<p class='smaller'>" +
 					OSApp.Language._( "To add an OTC (OpenThings Cloud) connection to this local device, you need an OTC token." ) +
 				"</p>" +
+				"<label for='otc_server_preset'>" + OSApp.Language._( "OTC Server" ) + ":</label>" +
+				"<div id='otc_server_select_container'></div>" +
 				"<p class='smaller'>" +
 					"<strong>" + OSApp.Language._( "Step 1:" ) + "</strong> " +
 					OSApp.Language._( "Register an account at:" ) +
 				"</p>" +
-				"<a href='#' class='ui-btn ui-btn-b ui-corner-all open-link' data-url='https://opensprinkler.com/my-account'>" +
+				"<a href='#' class='ui-btn ui-btn-b ui-corner-all open-link' id='otc_account_link' data-url='https://opensprinkler.com/my-account'>" +
 					"opensprinkler.com/my-account" +
 				"</a>" +
 				"<p class='smaller'>" +
 					"<strong>" + OSApp.Language._( "Step 2:" ) + "</strong> " +
 					OSApp.Language._( "Create an entry and get your token at:" ) +
 				"</p>" +
-				"<a href='#' class='ui-btn ui-btn-b ui-corner-all open-link' data-url='https://openthings.io/my-account/'>" +
+				"<a href='#' class='ui-btn ui-btn-b ui-corner-all open-link' id='otc_token_link' data-url='https://openthings.io/my-account/'>" +
 					"openthings.io/my-account" +
 				"</a>" +
 				"<p class='smaller'>" +
@@ -51,11 +53,47 @@ OSApp.Sites.showAddOTCConnection = function( siteName, siteData ) {
 				"<label for='otc_token'>" + OSApp.Language._( "OTC Token:" ) + "</label>" +
 				"<input autocomplete='off' autocorrect='off' autocapitalize='off' " +
 					"spellcheck='false' type='text' name='otc_token' id='otc_token' " +
-					"placeholder='OT...' pattern='^OT[A-Za-z0-9]{30}$'>" +
+					"placeholder='OT...' pattern='^[A-Za-z0-9]{32,}$'>" +
 				"<input type='submit' data-theme='b' value='" + OSApp.Language._( "Add Connection" ) + "'>" +
 			"</form>" +
 		"</div>" +
 	"</div>" );
+
+	var applyPreset = function() {
+		var opt = popup.find( "#otc_server_preset option:selected" );
+		var preset = opt.val();
+		if (preset === "edit_list") {
+			OSApp.Utils.showOtcServerManager(function() {
+				renderSelect();
+			});
+			return;
+		}
+		var accountUrl = opt.data( "account" );
+		var tokenUrl = opt.data( "token" );
+		if ( accountUrl ) {
+			popup.find( "#otc_account_link" ).data( "url", accountUrl ).text( accountUrl.replace( /^https?:\/\//, "" ).replace( /\/$/, "" ) );
+		} else {
+			popup.find( "#otc_account_link" ).data( "url", "https://opensprinkler.com/my-account" ).text( "opensprinkler.com/my-account" );
+		}
+		if ( tokenUrl ) {
+			popup.find( "#otc_token_link" ).data( "url", tokenUrl ).text( tokenUrl.replace( /^https?:\/\//, "" ).replace( /\/$/, "" ) );
+		} else {
+			popup.find( "#otc_token_link" ).data( "url", "https://openthings.io/my-account/" ).text( "openthings.io/my-account" );
+		}
+	};
+
+	var renderSelect = function() {
+		var prevVal = popup.find( "#otc_server_preset" ).val();
+		popup.find( "#otc_server_select_container" ).html( OSApp.Utils.buildOtcServerSelectHtml( "otc_server_preset", null, null ) );
+		popup.find( "#otc_server_preset" ).on( "change", applyPreset );
+		if (prevVal && prevVal !== "edit_list") {
+			popup.find( "#otc_server_preset" ).val(prevVal);
+		}
+		try { popup.find( "#otc_server_preset" ).selectmenu().selectmenu("refresh", true); } catch(err) { void err; }
+		applyPreset();
+	};
+
+	renderSelect();
 
 	popup.find( ".open-link" ).on( "click", function( e ) {
 		e.preventDefault();
@@ -72,13 +110,20 @@ OSApp.Sites.showAddOTCConnection = function( siteName, siteData ) {
 		var token = $( "#otc_token" ).val().trim();
 
 		// Validate token format (OT followed by 30 alphanumeric characters)
-		if ( !token.match( /^OT[A-Za-z0-9]{30}$/ ) ) {
+		if ( !OSApp.Utils.isOtcTokenFormat( token ) ) {
 			OSApp.Errors.showError( OSApp.Language._( "Invalid OTC token format. Token must start with 'OT' followed by 30 alphanumeric characters." ) );
 			return false;
 		}
 
+		var opt = popup.find( "#otc_server_preset option:selected" );
+		if ( opt.val() === "edit_list" ) {
+			return false;
+		}
+		var server = String( opt.data( "server" ) );
+		var port = OSApp.Utils.deriveOtcPort( server );
+
 		popup.popup( "close" );
-		OSApp.Sites.registerOTCToken( siteName, siteData, token );
+		OSApp.Sites.registerOTCToken( siteName, siteData, token, server, port );
 		return false;
 	} );
 
@@ -90,6 +135,7 @@ OSApp.Sites.showAddOTCConnection = function( siteName, siteData ) {
 	} ).enhanceWithin();
 
 	popup.popup( "open" );
+	applyPreset();
 
 	OSApp.UIDom.fixInputClick( popup );
 
@@ -97,15 +143,18 @@ OSApp.Sites.showAddOTCConnection = function( siteName, siteData ) {
 };
 
 // Register OTC token with local device and create new OTC site entry
-OSApp.Sites.registerOTCToken = function( siteName, siteData, token ) {
+OSApp.Sites.registerOTCToken = function( siteName, siteData, token, server, port ) {
 	$.mobile.loading( "show" );
+
+	server = server || OSApp.Utils.DEFAULT_OTC_SERVER;
+	port = ( typeof port === "number" && !isNaN( port ) ) ? port : OSApp.Utils.DEFAULT_OTC_PORT;
 
 	// Prepare the JSON data to send to the device
 	var otcConfig = {
 		"en": 1,
 		"token": token,
-		"server": "ws.cloud.openthings.io",
-		"port": 80
+		"server": server,
+		"port": port
 	};
 
 	// URL encode the JSON
@@ -153,6 +202,12 @@ OSApp.Sites.registerOTCToken = function( siteName, siteData, token ) {
 					os_token: token,
 					os_pw: siteData.os_pw
 				};
+				if ( server && server !== OSApp.Utils.DEFAULT_OTC_SERVER ) {
+					sites[ otcSiteName ].os_otc_server = server;
+				}
+				if ( port && port !== OSApp.Utils.DEFAULT_OTC_PORT ) {
+					sites[ otcSiteName ].os_otc_port = port;
+				}
 
 				// Save the updated sites
 				OSApp.Storage.set( { "sites": JSON.stringify( sites ) }, function() {

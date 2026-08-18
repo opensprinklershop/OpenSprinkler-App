@@ -156,7 +156,7 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 		requestTimeout = ( typeof timeout === "number" ) ? timeout : ( OSApp.currentSession.token ? 30000 : undefined ),
 		normalizedIp = OSApp.currentSession.token ? OSApp.currentSession.ip : OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix ),
 		obj = {
-			url: OSApp.currentSession.token ? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + urlDest : OSApp.currentSession.prefix + normalizedIp + urlDest,
+			url: OSApp.currentSession.token ? OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer ) + urlDest : OSApp.currentSession.prefix + normalizedIp + urlDest,
 			type: usePOST ? "POST" : "GET",
 			data: usePOST ? OSApp.Firmware.getUrlVars( dest ) : null,
 			dataType: type,
@@ -286,7 +286,7 @@ OSApp.Firmware.probeDevice = function( tryPass, path, timeout ) {
 		? OSApp.currentSession.ip
 		: OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix );
 	var url = OSApp.currentSession.token
-		? "https://cloud.openthings.io/forward/v1/" + OSApp.currentSession.token + dest
+		? OSApp.Utils.otcForwardBase( OSApp.currentSession.token, OSApp.currentSession.otcServer ) + dest
 		: OSApp.currentSession.prefix + normalizedIp + dest;
 
 	var obj = {
