@@ -731,29 +731,39 @@ OSApp.Firmware.sortCatalogVersionsDesc = function( versions ) {
 OSApp.Firmware.buildOTAUpdateRequest = function( extraParams ) {
 	var cache = OSApp.Firmware._otaCache || {};
 	var request = "/uu?pw=";
+	var extra = extraParams || "";
+
+	// A cached checksum is only valid for the cached binary URL. When the caller
+	// overrides a URL via extraParams (e.g. installing an older version), the
+	// firmware reads the FIRST matching param, so a stale cache SHA would be
+	// verified against the override binary and always fail. Skip any cache value
+	// that extraParams overrides, and only emit a SHA together with its own URL.
+	var overrides = function( key ) {
+		return new RegExp( "[&?]" + key + "=" ).test( extra );
+	};
 
 	if ( OSApp.Firmware.isESP8266Controller() ) {
-		if ( cache.esp8266_url ) {
+		if ( cache.esp8266_url && !overrides( "fu" ) ) {
 			// ESP8266 download path: use plain HTTP to avoid TLS memory issues.
 			request += "&fu=" + encodeURIComponent( String( cache.esp8266_url ).replace( /^https:\/\//i, "http://" ) );
 		}
 	} else {
-		if ( cache.zigbee_url ) {
+		if ( cache.zigbee_url && !overrides( "zu" ) ) {
 			request += "&zu=" + encodeURIComponent( cache.zigbee_url );
+			if ( cache.zigbee_sha256 && !overrides( "zs" ) ) {
+				request += "&zs=" + encodeURIComponent( cache.zigbee_sha256 );
+			}
 		}
-		if ( cache.matter_url ) {
+		if ( cache.matter_url && !overrides( "mu" ) ) {
 			request += "&mu=" + encodeURIComponent( cache.matter_url );
-		}
-		if ( cache.zigbee_sha256 ) {
-			request += "&zs=" + encodeURIComponent( cache.zigbee_sha256 );
-		}
-		if ( cache.matter_sha256 ) {
-			request += "&ms=" + encodeURIComponent( cache.matter_sha256 );
+			if ( cache.matter_sha256 && !overrides( "ms" ) ) {
+				request += "&ms=" + encodeURIComponent( cache.matter_sha256 );
+			}
 		}
 	}
 
-	if ( extraParams ) {
-		request += extraParams;
+	if ( extra ) {
+		request += extra;
 	}
 
 	return request;

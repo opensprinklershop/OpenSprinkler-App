@@ -5740,6 +5740,15 @@ OSApp.ESP32Mode.setupLegacyOnlineUpdate = function( selectedEntry ) {
 				if ( selectedEntry.matter_url ) {
 					extraParams += "&mu=" + encodeURIComponent( selectedEntry.matter_url );
 				}
+				// Forward the selected version's checksums so the device verifies
+				// the override binaries against the RIGHT SHA, not the cached
+				// latest-version SHA (which would always mismatch on a downgrade).
+				if ( selectedEntry.zigbee_sha256 && selectedEntry.zigbee_sha256.length === 64 ) {
+					extraParams += "&zs=" + encodeURIComponent( selectedEntry.zigbee_sha256 );
+				}
+				if ( selectedEntry.matter_sha256 && selectedEntry.matter_sha256.length === 64 ) {
+					extraParams += "&ms=" + encodeURIComponent( selectedEntry.matter_sha256 );
+				}
 			}
 		}
 
@@ -5930,16 +5939,23 @@ OSApp.ESP32Mode.showLegacyVersionPicker = function( checkData ) {
 		picker.on( "click", ".ota-legacy-version-item", function() {
 			var fwv = parseInt( $( this ).data( "fwv" ), 10 );
 			var fwm = parseInt( $( this ).data( "fwm" ), 10 );
+			// Pull the full catalog entry so the install carries the version's own
+			// checksums (for SHA verification) and changelog (for a correct popup).
+			var catalogEntry = OSApp.Firmware.getCatalogEntryForVersion( versions, fwv, fwm ) || {};
 			var selectedEntry = {
 				fw_version: fwv,
-				fw_minor: fwm
+				fw_minor: fwm,
+				changelog: catalogEntry.changelog || ""
 			};
 			if ( OSApp.Firmware.isESP8266Controller() ) {
 				selectedEntry.esp8266_url = $( this ).data( "fu" );
 				selectedEntry.esp8266_url = OSApp.ESP32Mode.normalizeEsp8266OTAUrl( selectedEntry.esp8266_url );
+				selectedEntry.esp8266_sha256 = catalogEntry.esp8266_sha256 || "";
 			} else {
 				selectedEntry.zigbee_url = $( this ).data( "zu" );
 				selectedEntry.matter_url = $( this ).data( "mu" );
+				selectedEntry.zigbee_sha256 = catalogEntry.zigbee_sha256 || "";
+				selectedEntry.matter_sha256 = catalogEntry.matter_sha256 || "";
 				if ( window.location.protocol === "https:" ) {
 					if ( selectedEntry.zigbee_url && selectedEntry.zigbee_url.indexOf( "http://" ) === 0 ) {
 						selectedEntry.zigbee_url = selectedEntry.zigbee_url.replace( "http://", "https://" );
