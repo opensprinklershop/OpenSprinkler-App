@@ -2037,18 +2037,56 @@ OSApp.AIAssistant.saveHistory = function( arr ) {
 	} catch ( e ) {}
 };
 
-OSApp.AIAssistant.pushHistory = function( role, text, cls ) {
+OSApp.AIAssistant.pushHistory = function( role, text, cls, extra ) {
 	if ( !text ) {
 		return;
 	}
 	var arr = OSApp.AIAssistant.loadHistory();
-	arr.push( { role: role, text: String( text ), cls: cls || "", ts: Date.now() } );
+	var item = { role: role, text: String( text ), cls: cls || "", ts: Date.now() };
+	if ( extra && typeof extra === "object" ) {
+		if ( extra.changes ) {
+			item.changes = extra.changes;
+		}
+		if ( extra.commands ) {
+			item.commands = extra.commands;
+		}
+		if ( extra.autoApplied ) {
+			item.autoApplied = true;
+		}
+	}
+	arr.push( item );
 	OSApp.AIAssistant.saveHistory( arr );
 };
 
 OSApp.AIAssistant.clearHistory = function() {
 	try {
 		localStorage.removeItem( OSApp.AIAssistant.HISTORY_KEY );
+		//eslint-disable-next-line
+	} catch ( e ) {}
+};
+
+// Backend vorwärmen: Der erste echte Aufruf trifft sonst einen Cold-Start
+// (WordPress/REST-Bootstrap + TLS), der im Backend in den 5s-Timeout mit
+// internem Retry läuft. Ein leichter GET auf das Basis-Endpoint beim Öffnen
+// des Dialogs wärmt Verbindung und Backend vor – ohne (kostenpflichtigen) LLM-Aufruf.
+OSApp.AIAssistant.WARMUP_COOLDOWN_MS = 60 * 1000;
+OSApp.AIAssistant.warmup = function() {
+	try {
+		var now = Date.now();
+		if ( OSApp.AIAssistant._lastWarmup && ( now - OSApp.AIAssistant._lastWarmup ) < OSApp.AIAssistant.WARMUP_COOLDOWN_MS ) {
+			return;
+		}
+		OSApp.AIAssistant._lastWarmup = now;
+		var base = OSApp.AIAssistant.getServiceUrl().replace( /\/+$/, "" );
+		if ( !base ) {
+			return;
+		}
+		// Fire-and-forget: Ergebnis ist egal (404/405 sind ok), es zählt nur der Bootstrap.
+		$.ajax( {
+			url: base,
+			method: "GET",
+			timeout: 15000
+		} );
 		//eslint-disable-next-line
 	} catch ( e ) {}
 };
@@ -2075,6 +2113,9 @@ OSApp.AIAssistant.openDialog = function() {
 	if ( $( "#ai-chat-overlay" ).length ) {
 		return;
 	}
+
+	// Backend vorwärmen, während der Nutzer noch tippt (verhindert Cold-Start-Timeout beim ersten Aufruf).
+	OSApp.AIAssistant.warmup();
 
 	var L = OSApp.AIAssistant.t;
 	var recognition = null;
@@ -2183,6 +2224,85 @@ OSApp.AIAssistant.openDialog = function() {
 		return t;
 	}
 
+	// Rendert die interaktive Befehlsliste (mit "Ausführen"-Buttons) an eine Bot-Nachricht.
+	function renderCommandsUI( bot, commands ) {
+		if ( !Array.isArray( commands ) || !commands.length ) {
+			return;
+		}
+		var isDe = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de";
+		var reqDetails = $( '<details style="margin-top:8px; border:1px solid #ddd; border-radius:4px; padding:6px; background:#fafafa; font-size:12px; outline:none;"></details>' );
+		var reqSummary = $( '<summary style="cursor:pointer; font-weight:600; outline:none; color:#1565c0; user-select:none;"></summary>' )
+			.text( isDe ? "Befehle anzeigen" : "Show commands" );
+		var reqBody = $( '<div style="margin-top:6px"></div>' );
+		commands.forEach( function( cmd ) {
+			var desc = cmd && cmd.description ? String( cmd.description ) : "Command";
+			var ep = OSApp.AIAssistant.ensureCommandEndpoint( cmd && cmd.endpoint ? String( cmd.endpoint ) : "" );
+			var row = $( '<div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #eee;"></div>' );
+			row.append(
+				$( '<div style="margin-bottom:4px"></div>' ).html(
+					"<strong>" + OSApp.AIAssistant.escapeHtml( desc ) + "</strong><br><code>" + OSApp.AIAssistant.escapeHtml( ep ) + "</code>"
+				)
+			);
+			var runBtn = $( '<button type="button" class="ai-btn-apply"></button>' ).text( isDe ? "Ausführen" : "Run" );
+			runBtn.on( "click", function() {
+				row.find( ".osai-cmd-status" ).remove();
+				runBtn.prop( "disabled", true );
+				OSApp.AIAssistant.executeCommand( cmd ).done( function() {
+					$( '<div class="smaller osai-cmd-status" style="color:#2e7d32;margin-top:4px"></div>' )
+						.text( isDe ? "Befehl ausgeführt." : "Command executed." )
+						.appendTo( row );
+				} ).fail( function() {
+					$( '<div class="smaller osai-cmd-status" style="color:#b00;margin-top:4px"></div>' )
+						.text( isDe ? "Befehl fehlgeschlagen." : "Command failed." )
+						.appendTo( row );
+				} ).always( function() {
+					runBtn.prop( "disabled", false );
+					scrollDown();
+				} );
+			} );
+			row.append( runBtn );
+			reqBody.append( row );
+		} );
+		reqDetails.append( reqSummary ).append( reqBody ).appendTo( bot );
+	}
+
+	// Rendert den einklappbaren JSON-Diff plus "Auf Gerät anwenden"/"Verwerfen"-Buttons an eine Bot-Nachricht.
+	function renderChangesUI( bot, changes, autoApplied ) {
+		if ( !changes || typeof changes !== "object" || !Object.keys( changes ).length ) {
+			return;
+		}
+		var detailsLabel = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de"
+			? "Konfigurationsänderungen einblenden (JSON)"
+			: "Show configuration changes (JSON)";
+		var details = $(
+			'<details style="margin-top:8px; border:1px solid #ddd; border-radius:4px; padding:6px; background:#fafafa; font-size:12px; outline:none;">' +
+				'<summary style="cursor:pointer; font-weight:600; outline:none; color:#1565c0; user-select:none;">' + OSApp.AIAssistant.escapeHtml( detailsLabel ) + '</summary>' +
+				'<pre class="ai-diff" style="margin-top:6px; padding:6px; background:#fff; border:1px solid #eee; border-radius:4px; overflow-x:auto; max-height:180px; font-family:monospace; font-size:11px; white-space:pre-wrap; margin-bottom:0;"></pre>' +
+			'</details>'
+		);
+		details.find( ".ai-diff" ).text( JSON.stringify( changes, null, 2 ) );
+		details.appendTo( bot );
+
+		if ( autoApplied ) {
+			$( '<div class="smaller" style="color:#2e7d32;margin-top:6px"></div>' ).text( L( "Applied to device." ) ).appendTo( bot );
+		} else {
+			var actions = $( '<div class="ai-actions"></div>' );
+			var applyBtn = $( '<button type="button" class="ai-btn-apply"></button>' ).text( L( "Apply to device" ) );
+			var discardBtn = $( '<button type="button" class="ai-btn-discard"></button>' ).text( L( "Discard" ) );
+			applyBtn.on( "click", function() {
+				OSApp.AIAssistant.applyChanges( changes );
+				actions.remove();
+				$( '<div class="smaller" style="color:#2e7d32;margin-top:6px"></div>' ).text( L( "Applied to device." ) ).appendTo( bot );
+				scrollDown();
+			} );
+			discardBtn.on( "click", function() {
+				actions.remove();
+			} );
+			actions.append( applyBtn ).append( discardBtn ).appendTo( bot );
+		}
+		scrollDown();
+	}
+
 	function addResult( res ) {
 		var bot = addMessage( "bot", res.summary || L( "Done." ) );
 		if ( res.explanation ) {
@@ -2194,89 +2314,26 @@ OSApp.AIAssistant.openDialog = function() {
 		var hasChanges = res.changes && typeof res.changes === "object" && Object.keys( res.changes ).length > 0;
 		var hasCommands = Array.isArray( res.commands ) && res.commands.length > 0;
 		var forceConfirm = !!res.require_confirmation;
+		var autoApplied = hasChanges && OSApp.AIAssistant.getAutoApply() && !forceConfirm;
 
-		// Persistenter Verlauf (Zusammenfassung + Erklärung; Diff/Buttons sind sitzungsbezogen).
+		// Persistenter Verlauf: Zusammenfassung/Erklärung als Text, Diff + Befehle strukturiert,
+		// damit beim Wiederöffnen die Buttons erneut gerendert werden können (statt nacktem JSON).
 		var histText = ( res.summary || L( "Done." ) ) + ( res.explanation ? "\n" + res.explanation : "" );
-		if ( hasChanges ) {
-			histText += "\n\n[" + L( "Proposed changes" ) + "]\n" + JSON.stringify( res.changes, null, 2 );
-		}
-		if ( hasCommands ) {
-			histText += "\n\n[Commands]\n" + JSON.stringify( res.commands, null, 2 );
-		}
-		OSApp.AIAssistant.pushHistory( "bot", histText );
+		OSApp.AIAssistant.pushHistory( "bot", histText, "", {
+			changes: hasChanges ? res.changes : null,
+			commands: hasCommands ? res.commands : null,
+			autoApplied: autoApplied
+		} );
 
 		if ( hasCommands ) {
-			var isDe = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de";
-			var reqDetails = $( '<details style="margin-top:8px; border:1px solid #ddd; border-radius:4px; padding:6px; background:#fafafa; font-size:12px; outline:none;"></details>' );
-			var reqSummary = $( '<summary style="cursor:pointer; font-weight:600; outline:none; color:#1565c0; user-select:none;"></summary>' )
-				.text( isDe ? "Befehle anzeigen" : "Show commands" );
-			var reqBody = $( '<div style="margin-top:6px"></div>' );
-			res.commands.forEach( function( cmd ) {
-				var desc = cmd && cmd.description ? String( cmd.description ) : "Command";
-				var ep = OSApp.AIAssistant.ensureCommandEndpoint( cmd && cmd.endpoint ? String( cmd.endpoint ) : "" );
-				var row = $( '<div style="margin-bottom:8px; padding-bottom:8px; border-bottom:1px solid #eee;"></div>' );
-				row.append(
-					$( '<div style="margin-bottom:4px"></div>' ).html(
-						"<strong>" + OSApp.AIAssistant.escapeHtml( desc ) + "</strong><br><code>" + OSApp.AIAssistant.escapeHtml( ep ) + "</code>"
-					)
-				);
-				var runBtn = $( '<button type="button" class="ai-btn-apply"></button>' ).text( isDe ? "Ausführen" : "Run" );
-				runBtn.on( "click", function() {
-					row.find( ".osai-cmd-status" ).remove();
-					runBtn.prop( "disabled", true );
-					OSApp.AIAssistant.executeCommand( cmd ).done( function() {
-						$( '<div class="smaller osai-cmd-status" style="color:#2e7d32;margin-top:4px"></div>' )
-							.text( isDe ? "Befehl ausgeführt." : "Command executed." )
-							.appendTo( row );
-					} ).fail( function() {
-						$( '<div class="smaller osai-cmd-status" style="color:#b00;margin-top:4px"></div>' )
-							.text( isDe ? "Befehl fehlgeschlagen." : "Command failed." )
-							.appendTo( row );
-					} ).always( function() {
-						runBtn.prop( "disabled", false );
-						scrollDown();
-					} );
-				} );
-				row.append( runBtn );
-				reqBody.append( row );
-			} );
-			reqDetails.append( reqSummary ).append( reqBody ).appendTo( bot );
+			renderCommandsUI( bot, res.commands );
 		}
 
 		if ( hasChanges ) {
-			var detailsLabel = OSApp.AIAssistant.currentLang().substr( 0, 2 ).toLowerCase() === "de"
-				? "Konfigurationsänderungen einblenden (JSON)"
-				: "Show configuration changes (JSON)";
-			var details = $(
-				'<details style="margin-top:8px; border:1px solid #ddd; border-radius:4px; padding:6px; background:#fafafa; font-size:12px; outline:none;">' +
-					'<summary style="cursor:pointer; font-weight:600; outline:none; color:#1565c0; user-select:none;">' + OSApp.AIAssistant.escapeHtml( detailsLabel ) + '</summary>' +
-					'<pre class="ai-diff" style="margin-top:6px; padding:6px; background:#fff; border:1px solid #eee; border-radius:4px; overflow-x:auto; max-height:180px; font-family:monospace; font-size:11px; white-space:pre-wrap; margin-bottom:0;"></pre>' +
-				'</details>'
-			);
-			details.find( ".ai-diff" ).text( JSON.stringify( res.changes, null, 2 ) );
-			details.appendTo( bot );
-		}
-
-		if ( hasChanges ) {
-			if ( OSApp.AIAssistant.getAutoApply() && !forceConfirm ) {
+			if ( autoApplied ) {
 				OSApp.AIAssistant.applyChanges( res.changes );
-				$( '<div class="smaller" style="color:#2e7d32;margin-top:6px"></div>' ).text( L( "Applied to device." ) ).appendTo( bot );
-			} else {
-				var actions = $( '<div class="ai-actions"></div>' );
-				var applyBtn = $( '<button type="button" class="ai-btn-apply"></button>' ).text( L( "Apply to device" ) );
-				var discardBtn = $( '<button type="button" class="ai-btn-discard"></button>' ).text( L( "Discard" ) );
-				applyBtn.on( "click", function() {
-					OSApp.AIAssistant.applyChanges( res.changes );
-					actions.remove();
-					$( '<div class="smaller" style="color:#2e7d32;margin-top:6px"></div>' ).text( L( "Applied to device." ) ).appendTo( bot );
-					scrollDown();
-				} );
-				discardBtn.on( "click", function() {
-					actions.remove();
-				} );
-				actions.append( applyBtn ).append( discardBtn ).appendTo( bot );
 			}
-			scrollDown();
+			renderChangesUI( bot, res.changes, autoApplied );
 		}
 	}
 
@@ -2502,7 +2559,13 @@ OSApp.AIAssistant.openDialog = function() {
 	var history = OSApp.AIAssistant.loadHistory();
 	if ( history.length ) {
 		history.forEach( function( m ) {
-			addMessage( m.role === "user" ? "user" : "bot", m.text, m.cls );
+			var bot = addMessage( m.role === "user" ? "user" : "bot", m.text, m.cls );
+			if ( m.role !== "user" && m.commands ) {
+				renderCommandsUI( bot, m.commands );
+			}
+			if ( m.role !== "user" && m.changes ) {
+				renderChangesUI( bot, m.changes, !!m.autoApplied );
+			}
 		} );
 	} else {
 		addMessage( "bot", L( "Hi! I'm your OpenSprinkler assistant. Tell me what you'd like to change, or ask a question about irrigation." ) );
