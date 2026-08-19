@@ -66,6 +66,16 @@ describe("General Function Checks", function () {
 		assert.equal("/locale/de.js", OSApp.Language.getLocaleFileUrl("de", "/"));
 	});
 
+	it("OSApp.Storage.getItemSync should restore a legacy namespaced lang value on restart", function () {
+		var legacyKey = (OSApp.Storage.prefix || "") + "lang";
+		localStorage.removeItem("lang");
+		localStorage.setItem(legacyKey, "de");
+		assert.equal("de", OSApp.Storage.getItemSync("lang"));
+		assert.equal("de", localStorage.getItem("lang"));
+		localStorage.removeItem("lang");
+		localStorage.removeItem(legacyKey);
+	});
+
 	it("OSApp.Language.normalizeCode should normalize browser locale values to supported app languages", function () {
 		assert.equal("de", OSApp.Language.normalizeCode("de-DE"));
 		assert.equal("pt", OSApp.Language.normalizeCode("pt_BR"));

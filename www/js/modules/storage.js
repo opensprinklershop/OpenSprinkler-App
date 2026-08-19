@@ -39,6 +39,27 @@ OSApp.Storage._key = function( key ) {
 
 OSApp.Storage.getItemSync = function( key ) {
        var value = localStorage.getItem( OSApp.Storage._key( key ) );
+
+       if ( value === null && key === "lang" ) {
+               var i,
+                       legacyKey = null;
+
+               for ( i = 0; i < localStorage.length; i++ ) {
+                       var candidate = localStorage.key( i );
+                       if ( candidate && ( candidate === "lang" || candidate.endsWith( ":lang" ) ) ) {
+                               legacyKey = candidate;
+                               break;
+                       }
+               }
+
+               if ( legacyKey ) {
+                       value = localStorage.getItem( legacyKey );
+                       if ( value !== null ) {
+                               OSApp.Storage.setItemSync( key, value );
+                       }
+               }
+       }
+
        if ( value === null && OSApp.Storage.prefix && !OSApp.Storage.isGlobalKey( key ) ) {
                value = localStorage.getItem( key );
        }
