@@ -610,7 +610,7 @@
     "Install Selected Version": "Install Selected Version",
     "Install firmware version": "Install firmware version",
     "Install older version...": "Install older version...",
-    "Integrations": "Acumulados",
+    "Integrations": "Integrações",
     "Interface Warnings": "Interface Warnings",
     "Internal (built-in)": "Internal (built-in)",
     "Internal (within app)": "Interno (dentro da aplicação)",
