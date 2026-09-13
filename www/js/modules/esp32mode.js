@@ -1956,7 +1956,8 @@ OSApp.ESP32Mode.showZigBeeDeviceEditor = function( device, done ) {
 	var html = "<div data-role='header' data-theme='b'>";
 	html += "<a href='#' data-rel='back' data-role='button' data-theme='a' data-icon='delete' data-iconpos='notext' class='ui-btn-right'>" + OSApp.Language._( "close" ) + "</a>";
 	html += "<h1>" + ( devName ? OSApp.Language._( "Edit ZigBee Device" ) : OSApp.Language._( "New ZigBee Device" ) ) + "</h1>";
-	html += "</div><div class='ui-content'>";
+	html += "</div><div class='ui-content' style='position:relative;'>";
+	html += OSApp.ESP32Mode.buildZigBeeSignalBadgeHtml( device, "position:absolute;top:6px;right:10px;" );
 
 	// Name row with inline Search-DB button
 	html += "<label for='zbed-name' style='margin-bottom:2px;'>" + OSApp.Language._( "Device Name" ) + "</label>";
@@ -3132,6 +3133,38 @@ OSApp.ESP32Mode.startZigBeeWifiOffScan = function( scanBtn, reloadBtn, popup ) {
  * @param {Object} dev  Device descriptor from /zg (.ieee, .model, .manufacturer, .is_new, .logical_devices, ...).
  * @param {Object} ctx  { supportsEditor:Boolean, wifiOnly:Boolean }
  */
+/**
+ * Signal-quality badge for a ZigBee device: three bars coloured by link
+ * quality. Uses dev.rssi (dBm, negative, 0 = unknown) and falls back to
+ * dev.lqi (0-255, 0 = unknown).
+ */
+OSApp.ESP32Mode.buildZigBeeSignalBadgeHtml = function( dev, extraStyle ) {
+	var rssi = ( typeof dev.rssi === "number" && dev.rssi !== 0 && dev.rssi !== 127 ) ? dev.rssi : null,
+		lqi = ( typeof dev.lqi === "number" && dev.lqi > 0 ) ? dev.lqi : null,
+		level, color, text;
+
+	if ( rssi !== null ) {
+		level = ( rssi >= -70 ) ? 3 : ( rssi >= -85 ) ? 2 : 1;
+		text = rssi + "\u2009dBm";
+	} else if ( lqi !== null ) {
+		level = ( lqi >= 120 ) ? 3 : ( lqi >= 60 ) ? 2 : 1;
+		text = "LQI\u2009" + lqi;
+	} else {
+		return "";  // no measurement yet: show nothing rather than an empty badge
+	}
+	color = ( level === 3 ) ? "#4caf50" : ( level === 2 ) ? "#f5a623" : ( level === 1 ) ? "#e53935" : "#bdbdbd";
+
+	var bars = "";
+	for ( var i = 1; i <= 3; i++ ) {
+		var on = ( level >= i ) || ( level === 1 && i === 1 );
+		bars += "<span style='display:inline-block;width:3px;height:" + ( 3 + i * 3 ) + "px;margin-right:1px;" +
+			"background-color:" + ( on ? color : "#ddd" ) + ";vertical-align:bottom;'></span>";
+	}
+	return "<span class='zb-signal' style='display:inline-flex;align-items:flex-end;gap:3px;line-height:1;" +
+		"font-size:0.68em;color:" + color + ";white-space:nowrap;" + ( extraStyle || "" ) + "'>" +
+		bars + ( text ? "<span>" + text + "</span>" : "" ) + "</span>";
+};
+
 OSApp.ESP32Mode.buildZigBeeDeviceCardHtml = function( dev, ctx ) {
 	ctx = ctx || {};
 	var supportsEditor = !!ctx.supportsEditor;
@@ -3158,6 +3191,14 @@ OSApp.ESP32Mode.buildZigBeeDeviceCardHtml = function( dev, ctx ) {
 	var statusDot = "<span style='display:inline-block;width:10px;height:10px;background-color:" +
 		lampColor + ";border-radius:50%;vertical-align:middle;margin-right:6px;' title='" +
 		OSApp.Utils.htmlEscape( lampTitle ) + "'></span>";
+
+	// Signal-quality badge (3 bars). RSSI in dBm as seen by the coordinator
+	// (neighbor table, /zd "rssi"); falls back to LQI (0-255) when no RSSI.
+	//   green  = good   (>= -70 dBm / LQI >= 120)
+	//   amber  = fair   (>= -85 dBm / LQI >= 60)
+	//   red    = weak   (below) -> device too far away, commands get lost
+	//   grey   = unknown
+	var signalBadge = OSApp.ESP32Mode.buildZigBeeSignalBadgeHtml( dev, "position:absolute;right:6px;bottom:4px;" );
 	var ieeeAttr = dev.ieee ? " data-ieee='" + dev.ieee.replace( /'/g, "" ) + "'" : "";
 	var cachedDevLabel = dev.friendly_name || ( dev.ieee && OSApp.ESP32Mode.ZigbeeDeviceDB.getCachedLabel( dev.ieee ) ) || null;
 	if ( !cachedDevLabel ) {
@@ -3204,7 +3245,7 @@ OSApp.ESP32Mode.buildZigBeeDeviceCardHtml = function( dev, ctx ) {
 	var subtitle = subParts.join( " &middot; " );
 
 	var waitingClass = isWaiting ? " zg-dev-waiting" : "";
-	html += "<li" + ieeeAttr + " class='zg-dev-card" + waitingClass + "' style='border:1px solid #ddd;border-radius:6px;padding:8px 10px;margin:6px 0;" + rowBg + "'>";
+	html += "<li" + ieeeAttr + " class='zg-dev-card" + waitingClass + "' style='position:relative;border:1px solid #ddd;border-radius:6px;padding:8px 10px;margin:6px 0;" + rowBg + "'>";
 
 	// Row 1: status + title + actions (actions wrap to next line on narrow screens)
 	html += "<div style='display:flex;flex-wrap:wrap;align-items:center;gap:4px;'>";
@@ -3253,6 +3294,7 @@ OSApp.ESP32Mode.buildZigBeeDeviceCardHtml = function( dev, ctx ) {
 			"</div>";
 	}
 
+	html += signalBadge;
 	html += "</li>";
 	return html;
 };

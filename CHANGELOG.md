@@ -1,5 +1,23 @@
 # Changelog
 
+## [2.4.227] - 2026-08-22
+
+Release 2.4.227 (Android Build 227 / iOS 2.4.227)
+
+### Hinzugefügt
+- **Konfigurierbare OTC- und Cloud-Sync-Server**: Es können nun vordefinierte Server-Presets ausgewählt oder eigene Server konfiguriert werden. Die Weiterleitungslogik und Benutzeroberfläche wurden entsprechend angepasst.
+- **Neue Benachrichtigungssymbole**: Hochauflösende Symbole für die Benachrichtigungsleiste hinzugefügt, um auf allen Geräten ein sauberes Erscheinungsbild zu gewährleisten.
+- **HTTPS-Deployment**: Die App-Bereitstellung (Deployment) nutzt nun standardmäßig HTTPS-Upload mit einem Fallback auf SSH/rsync.
+
+### Geändert
+- **ESP8266 OTA-Updates über lokale Verbindungen**: Firmware-Updates für ESP8266-Controller sind nun über lokale Verbindungen möglich. Dazu wurde die Verfügbarkeitsprüfung angepasst und Fallback-Mechanismen für den Download implementiert.
+
+### Behoben
+- **Sprachauswahl**: Ein weiterer Fehler bei der Sprachauswahl wurde behoben.
+- **Benutzeroberfläche**: Problem mit der „Zurück“-Taste und der Standortliste korrigiert.
+- **SHA-Verifizierung**: Fehler bei der SHA-Prüfsummen-Verifizierung behoben.
+- **KI-Chat**: Timeout-Probleme im KI-Assistenten-Chat gelöst.
+
 ## [2.4.226] - 2026-08-16
 
 Release 2.4.226 (Android Build 226 / iOS 2.4.226)

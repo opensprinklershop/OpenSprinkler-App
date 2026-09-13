@@ -281,8 +281,9 @@ OSApp.Utils.saveOtcServersList = function(customList) {
 };
 
 // Derive the OTC websocket port for a server. ESP8266 always uses 80. For
-// OpenSprinklerShop.de, TLS/443 requires the OTC SSL support added in firmware
-// 2.4.0.227; older firmware can only use plain ws on port 80. Everything else 80.
+// OpenSprinklerShop.de, TLS/443 requires working OTC SSL support. Firmware
+// 2.4.0.227 and older always connect plain (notls) even on port 443, so they
+// must use port 80; only firmware newer than 2.4.0.227 may use 443. Else 80.
 OSApp.Utils.deriveOtcPort = function(server) {
 	var host = String(server || "").toLowerCase();
 	if (OSApp.Firmware && typeof OSApp.Firmware.isESP8266Controller === "function" && OSApp.Firmware.isESP8266Controller()) {
@@ -291,7 +292,7 @@ OSApp.Utils.deriveOtcPort = function(server) {
 	if (host.indexOf("opensprinklershop.de") !== -1) {
 		var fwv = (OSApp.Firmware && typeof OSApp.Firmware.getControllerFwvNumber === "function") ? OSApp.Firmware.getControllerFwvNumber() : 0;
 		var fwm = (OSApp.Firmware && typeof OSApp.Firmware.getControllerOptions === "function") ? (OSApp.Firmware.getControllerOptions().fwm || 0) : 0;
-		if (fwv > 240 || (fwv === 240 && fwm >= 227)) {
+		if (fwv > 240 || (fwv === 240 && fwm > 227)) {
 			return 443;
 		}
 		return 80;

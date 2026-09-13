@@ -178,6 +178,7 @@ ul.tabs li.current {
 .ui-icon-zigbee,
 .ui-icon-zigbee.zigbee-on,
 .ui-icon-zigbee.zigbee-off,
+.ui-icon-zigbee.zigbee-wait,
 .ui-icon-zigbee.zigbee-error {
     background-color: transparent !important;
     border-color: transparent !important;
@@ -188,6 +189,9 @@ ul.tabs li.current {
 }
 .ui-icon-zigbee.zigbee-on:after {
     background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2014%2014%22%3E%3Cpath%20stroke%3D%22%230078D4%22%20stroke-width%3D%221.5%22%20stroke-linejoin%3D%22round%22%20fill%3D%22none%22%20d%3D%22M3%2C3%20h8%20L3%2C11%20h8%22%2F%3E%3Ccircle%20cx%3D%223%22%20cy%3D%223%22%20r%3D%221.5%22%20fill%3D%22%230078D4%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%223%22%20r%3D%221.5%22%20fill%3D%22%230078D4%22%2F%3E%3Ccircle%20cx%3D%223%22%20cy%3D%2211%22%20r%3D%221.5%22%20fill%3D%22%230078D4%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2211%22%20r%3D%221.5%22%20fill%3D%22%230078D4%22%2F%3E%3C%2Fsvg%3E");
+}
+.ui-icon-zigbee.zigbee-wait:after {
+    background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2014%2014%22%3E%3Cpath%20stroke%3D%22%23F0AD4E%22%20stroke-width%3D%221.5%22%20stroke-linejoin%3D%22round%22%20fill%3D%22none%22%20d%3D%22M3%2C3%20h8%20L3%2C11%20h8%22%2F%3E%3Ccircle%20cx%3D%223%22%20cy%3D%223%22%20r%3D%221.5%22%20fill%3D%22%23F0AD4E%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%223%22%20r%3D%221.5%22%20fill%3D%22%23F0AD4E%22%2F%3E%3Ccircle%20cx%3D%223%22%20cy%3D%2211%22%20r%3D%221.5%22%20fill%3D%22%23F0AD4E%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2211%22%20r%3D%221.5%22%20fill%3D%22%23F0AD4E%22%2F%3E%3C%2Fsvg%3E");
 }
 .ui-icon-zigbee.zigbee-error:after {
     background-image:url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2214%22%20height%3D%2214%22%20viewBox%3D%220%200%2014%2014%22%3E%3Cpath%20stroke%3D%22%23D9534F%22%20stroke-width%3D%221.5%22%20stroke-linejoin%3D%22round%22%20fill%3D%22none%22%20d%3D%22M3%2C3%20h8%20L3%2C11%20h8%22%2F%3E%3Ccircle%20cx%3D%223%22%20cy%3D%223%22%20r%3D%221.5%22%20fill%3D%22%23D9534F%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%223%22%20r%3D%221.5%22%20fill%3D%22%23D9534F%22%2F%3E%3Ccircle%20cx%3D%223%22%20cy%3D%2211%22%20r%3D%221.5%22%20fill%3D%22%23D9534F%22%2F%3E%3Ccircle%20cx%3D%2211%22%20cy%3D%2211%22%20r%3D%221.5%22%20fill%3D%22%23D9534F%22%2F%3E%3C%2Fsvg%3E");

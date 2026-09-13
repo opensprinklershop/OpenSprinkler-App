@@ -1764,6 +1764,7 @@
     "Program End": "Programmende",
     "Sensors & Weather": "Sensoren & Wetter",
     "Stations & Flow": "Stationen & Durchfluss",
-    "The test was added to the in-app notification panel. System notifications are delivered via the push service when push notifications are enabled.": "Der Test wurde im In-App-Benachrichtigungsfeld hinzugefügt. Systembenachrichtigungen werden über den Push-Dienst zugestellt, wenn Push-Benachrichtigungen aktiviert sind."
+    "The test was added to the in-app notification panel. System notifications are delivered via the push service when push notifications are enabled.": "Der Test wurde im In-App-Benachrichtigungsfeld hinzugefügt. Systembenachrichtigungen werden über den Push-Dienst zugestellt, wenn Push-Benachrichtigungen aktiviert sind.",
+    "OpenSprinkler Pi (OSPi) with OpenSprinklerShop firmware": "OpenSprinkler Pi (OSPi) mit OpenSprinklerShop-Firmware"
   }
 }

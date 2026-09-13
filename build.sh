@@ -474,6 +474,34 @@ cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/ra
 mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
 cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
 
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
+# Copy server certificate to Android raw resources for trust-anchors
+mkdir -p /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/
+cp cert/server_cert.der /srv/www/htdocs/ui/platforms/android/app/src/main/res/raw/server_cert.der
+
 # Sync www/ into Android platform assets before building
 cordova prepare android
 
@@ -495,9 +523,21 @@ cordova build android --release --buildConfig=build.json -- --packageType=apk
 # Install the built APK to a connected device if one is present.
 # Uses adb install directly (not `cordova run`) so the build never hangs on the
 # post-install app launch, and a missing/locked device is tolerated.
+# A "package invalid / App not installed" failure on the device is almost never a
+# defect in the APK (it is v2-signed, minSdk 24, targetSdk 36) but a conflict with
+# an already-installed copy: either a different signing key (e.g. the Play Store
+# build) or a higher versionCode already present. Detect those cases and retry
+# once after uninstalling the existing app.
 APK_OUT="platforms/android/app/build/outputs/apk/release/app-release.apk"
+APP_ID="de.opensprinklershop.sprinklers"
 if [ -f "$APK_OUT" ] && adb get-state 1>/dev/null 2>&1; then
-	timeout 120 adb install -r "$APK_OUT" || echo "adb install skipped/failed (continuing build)"
+	INSTALL_LOG=$(timeout 120 adb install -r "$APK_OUT" 2>&1)
+	echo "$INSTALL_LOG"
+	if echo "$INSTALL_LOG" | grep -qiE "INSTALL_FAILED_UPDATE_INCOMPATIBLE|INSTALL_FAILED_VERSION_DOWNGRADE|signatures do not match|INSTALL_PARSE_FAILED|INSTALL_FAILED_INVALID_APK"; then
+		echo "Install conflict detected (signature mismatch or downgrade) — uninstalling existing app and retrying."
+		adb uninstall "$APP_ID" >/dev/null 2>&1 || true
+		timeout 120 adb install "$APK_OUT" || echo "adb install still failed after uninstall (continuing build)"
+	fi
 else
 	echo "No connected device or APK missing; skipping device install."
 fi

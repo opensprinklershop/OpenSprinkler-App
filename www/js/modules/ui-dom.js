@@ -307,10 +307,18 @@ OSApp.UIDom.launchApp = function() {
 			// enqueuing another batch of requests that grows the queue without bound and delays every other
 			// request. Skip a tick while the previous status refresh is still pending.
 			var statusRefreshPending = false,
+				statusRefreshStartedAt = 0,
 				settleStatusRefresh = function() { statusRefreshPending = false; },
 				refreshStatusInterval = setInterval( function() {
+					// Watchdog: a request that never settles (no timeout on LAN
+					// requests, or a handler that threw) must not block polling
+					// forever. Release the guard after 20 s and poll again.
+					if ( statusRefreshPending && ( Date.now() - statusRefreshStartedAt ) > 20000 ) {
+						statusRefreshPending = false;
+					}
 					if ( statusRefreshPending ) { return; }
 					statusRefreshPending = true;
+					statusRefreshStartedAt = Date.now();
 					OSApp.Status.refreshStatus( settleStatusRefresh, settleStatusRefresh );
 				}, 4000 ), // FIXME: refactor this 4000 interval out to Constants or config/settings
 				refreshDataInterval;

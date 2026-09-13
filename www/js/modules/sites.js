@@ -1614,12 +1614,24 @@ OSApp.Sites.updateController = function( callback, fail ) {
 		);
 	};
 	var finish = function() {
-		$( "html" ).trigger( "datarefresh" );
-		OSApp.Status.checkStatus();
-		if ( OSApp.ESP32Mode && OSApp.ESP32Mode.prefetchRadioInfo ) {
-			OSApp.ESP32Mode.prefetchRadioInfo();
+		// The periodic status poll (ui-dom.js) holds a re-entrancy guard until
+		// this callback runs. Any exception thrown while re-rendering (a card
+		// renderer, the status bar, the radio prefetch) must not swallow the
+		// callback, otherwise the guard stays set and the UI never refreshes
+		// again until the page is left ("status does not update").
+		try {
+			$( "html" ).trigger( "datarefresh" );
+			OSApp.Status.checkStatus();
+			if ( OSApp.ESP32Mode && OSApp.ESP32Mode.prefetchRadioInfo ) {
+				OSApp.ESP32Mode.prefetchRadioInfo();
+			}
+		} catch ( e ) {
+			if ( window.console && console.error ) {
+				console.error( "updateController: refresh handler threw", e );
+			}
+		} finally {
+			callback();
 		}
-		callback();
 	};
 
 	if ( OSApp.currentSession.isControllerConnected() ) {

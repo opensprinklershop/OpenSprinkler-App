@@ -185,12 +185,19 @@ OSApp.Dashboard.displayPage = function() {
 				return "zigbee-off";
 			}
 
+			// zst codes from the firmware: 0 idle, 1 command pending (not yet
+			// confirmed by the device), 2 failed, 3 confirmed on, 4 confirmed on
+			// with another command pending.
 			if ( statusCode === 2 ) {
 				return "zigbee-error";
 			}
 
-			if ( statusCode === 1 || statusCode === 3 || statusCode === 4 ) {
+			if ( statusCode === 3 || statusCode === 4 ) {
 				return "zigbee-on";
+			}
+
+			if ( statusCode === 1 ) {
+				return "zigbee-wait";
 			}
 
 			return "zigbee-off";
@@ -1634,7 +1641,7 @@ OSApp.Dashboard.displayPage = function() {
 					}
 					var zigbeeClass = getZigbeeIconStateClass( sid );
 					card.find( ".special-station" )
-						.removeClass( "hidden ui-icon-wifi ui-icon-rs485 ui-icon-gardena ui-icon-zigbee zigbee-on zigbee-off zigbee-error" )
+						.removeClass( "hidden ui-icon-wifi ui-icon-rs485 ui-icon-gardena ui-icon-zigbee zigbee-on zigbee-off zigbee-wait zigbee-error" )
 						.addClass( specIconClass + ( OSApp.Stations.isSpecial( sid ) ? ( specIconClass === "ui-icon-zigbee" ? ( " " + zigbeeClass ) : "" ) : " hidden" ) );
 
 					var zigbeeBatteryPercent = getZigbeeStationBatteryPercent( sid );
@@ -1862,11 +1869,16 @@ OSApp.Dashboard.displayPage = function() {
 							var preParam = qo ? "&qo=1" : "";
 							OSApp.Firmware.sendToOS( "/cm?sid=" + sid + "&en=1&t=" + duration + preParam + "&pw=", "json" ).done( function() {
 
-								// Update local state until next device refresh occurs
+								// Update local state until next device refresh occurs.
+								// The firmware sets the station bit in its main loop a few
+								// seconds after /cm returns, so an immediate /js still reports
+								// the station as off; mark it running optimistically (like the
+								// stop path does) and re-read the status once the bit is set.
 								OSApp.Stations.setPID( sid, OSApp.Constants.options.MANUAL_STATION_PID );
 								OSApp.Stations.setRemainingRuntime( sid, duration );
-
-								OSApp.Status.refreshStatus();
+								OSApp.Stations.setStatus( sid, 1 );
+								$( "html" ).trigger( "datarefresh" );
+								setTimeout( OSApp.Status.refreshStatus, 4000 );
 								OSApp.Errors.showError( OSApp.Language._( "Station has been queued" ) );
 
 								// Save run time for this station

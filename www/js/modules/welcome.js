@@ -96,6 +96,11 @@ OSApp.Welcome.buildWizardStepContent = function( step, stepNumber, totalSteps ) 
 						"<span class='setup-wizard-device-name'>" + _( "OpenSprinkler with ESP32 Upgrade Board" ) + "</span>" +
 						"<a class='iab iabNoScale ui-btn ui-mini ui-btn-inline' target='_blank' href='https://opensprinklershop.de/en/product/esp32-board-fuer-opensprinkler-3-3-upgrade/'>" + _( "View in Shop" ) + "</a>" +
 					"</li>" +
+					"<li>" +
+						"<img class='setup-wizard-device-img' loading='lazy' alt='OpenSprinkler Pi' src='https://opensprinklershop.de/wp-content/uploads/2024/12/enclosure6-247x234.avif'>" +
+						"<span class='setup-wizard-device-name'>" + _( "OpenSprinkler Pi (OSPi) with OpenSprinklerShop firmware" ) + "</span>" +
+						"<a class='iab iabNoScale ui-btn ui-mini ui-btn-inline' target='_blank' href='https://opensprinklershop.de/en/product/ospi20/'>" + _( "View in Shop" ) + "</a>" +
+					"</li>" +
 				"</ul>" +
 				"<p class='rain-desc'>" +
 					_( "This short guide walks you through connecting your controller. You can skip any step and change everything later in the settings." ) +
