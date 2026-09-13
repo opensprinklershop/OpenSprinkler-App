@@ -77,6 +77,33 @@ OSApp.Supported.changePause = function() {
 	return true;
 };
 
+/* Upstream "Expanded Sensor" API (official firmware 2.2.1(5): /jsn, /jsd, /jsl,
+ * /csn, /dsn, /dsl, /jpa). The OpenSprinklerShop firmware implements this API
+ * as a facade over its own sensor system, so the official sensor pages are
+ * available on every controller that answers /jsn. The legacy analog pages
+ * (analog.js) stay available for the OpenSprinklerShop-specific sensor types. */
+OSApp.Supported.officialSensorAPIAllowed = function( controller ) {
+	controller = controller || OSApp.currentSession.controller;
+	if ( !controller || !controller.options ) {
+		return false;
+	}
+	if ( OSApp.Analog.checkAnalogSensorAvail( controller ) ) {
+		// OpenSprinklerShop firmware: the compatibility API exists from 2.4.0(229).
+		// Older firmware simply has no "sensors" in /ja (and answers 404 on /jsn),
+		// which keeps the sensor pages hidden via OSApp.Supported.sensors().
+		return true;
+	}
+	return OSApp.Firmware.checkOSVersion( 2215 );
+};
+
+OSApp.Supported.legacySensorEndpoints = function( controller ) {
+	return OSApp.Supported.officialSensorAPIAllowed( controller );
+};
+
+OSApp.Supported.sensors = function() {
+	return OSApp.Supported.officialSensorAPIAllowed() && Array.isArray( OSApp.currentSession.controller?.sensors?.sn );
+};
+
 OSApp.Supported.verifyWeatherAPIKey = function() {
 	return typeof OSApp.currentSession.controller.options.uwt !== "undefined" &&
 			typeof OSApp.currentSession.controller.settings.wto === "object";

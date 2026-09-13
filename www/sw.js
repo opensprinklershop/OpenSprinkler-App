@@ -25,6 +25,7 @@ var cacheFiles = [
 // App main javascript
 cacheFiles = cacheFiles.concat([
 	"/js/hasher.js",
+	"/js/chart-touch.js",
 	"/js/home.js",
 	"/js/main.js",
 	"/js/map.js",
@@ -61,6 +62,7 @@ cacheFiles = cacheFiles.concat([
 	"/js/modules/station-queue.js",
 	"/js/modules/stations.js",
 	"/js/modules/status.js",
+	"/js/modules/sensors.js",
 	"/js/modules/storage.js",
 	"/js/modules/supported.js",
 	"/js/modules/system-diagnostics.js",
@@ -73,6 +75,9 @@ cacheFiles = cacheFiles.concat([
 // Vendor Javascript
 cacheFiles = cacheFiles.concat([
 	"/vendor-js/apexcharts.min.js",
+	"/vendor-js/chart.js",
+	"/vendor-js/chartjs-plugin-zoom.min.js",
+	"/vendor-js/chartjs-adapter-date-fns.bundle.min.js",
 	"/vendor-js/jquery.js",
 	"/vendor-js/jqm.js",
 	"/vendor-js/dataTables-2.1.8.min.js",

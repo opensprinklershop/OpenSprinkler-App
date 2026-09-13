@@ -207,7 +207,19 @@
 													var baseMatching = versions.filter(function(v) {
 														return v.indexOf(fwvStr) === 0;
 													});
-													if (baseMatching.length > 0) {
+													// Firmware newer than every snapshot of this base version (e.g. a
+													// development build 2.4.0.228 while the newest snapshot is 2.4.0.227):
+													// an older snapshot would lack the features the firmware offers, so use
+													// the current build instead ("dev" if published, else this root).
+													var fwmNum = parseInt(fwm, 10);
+													var newestSnapshot = -1;
+													baseMatching.forEach(function(v) {
+														var m = parseInt(v.split(".")[3], 10);
+														if (!isNaN(m) && m > newestSnapshot) { newestSnapshot = m; }
+													});
+													if (!isNaN(fwmNum) && baseMatching.length > 0 && fwmNum > newestSnapshot) {
+														targetVersion = (versions.indexOf("dev") !== -1) ? "dev" : "";
+													} else if (baseMatching.length > 0) {
 														targetVersion = baseMatching[0];
 													} else {
 														targetVersion = (vData && vData.default) || "2.4.0.224";
@@ -218,6 +230,11 @@
 
 										localStorage.removeItem("show_sites");
 										window.clearTimeout(fastPathFailsafe);
+										if (!targetVersion) {
+											// stay on this (newest) build
+											revealFastPath();
+											return;
+										}
 										window.location.href = computeBaseHref() + targetVersion + "/index.html";
 									});
 								};
@@ -315,9 +332,9 @@
 	<script src="js/modules/language.js"></script>
 	<script src="js/modules/about.js"></script>
 	<script src="js/modules/ai-assistant.js?v=osai23"></script>
-	<script src="js/modules/analog.js?v=13"></script>
+	<script src="js/modules/analog.js?v=14"></script>
 	<script src="js/modules/analog-log.js?v=1"></script>
-	<script src="js/modules/irrigation-db-integration.js"></script>
+	<script src="js/modules/irrigation-db-integration.js?v=2"></script>
 		<script src="js/modules/programview.js?v=1"></script>
 		<script src="js/modules/card-list.js"></script>
 		<script src="js/modules/cards.js"></script>
@@ -343,6 +360,7 @@
 		<script src="js/modules/stations.js"></script>
 		<script src="js/modules/statistics.js?v=1"></script>
 		<script src="js/modules/status.js?v=1"></script>
+		<script src="js/modules/sensors.js"></script>
 		<script src="js/modules/storage.js"></script>
 		<script src="js/modules/supported.js"></script>
 		<script src="js/modules/system-diagnostics.js"></script>

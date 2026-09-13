@@ -276,6 +276,12 @@ hr.divider {
     opacity: 0.2;
     margin: 15px auto;
 }
+hr.section-divider {
+    border: none;
+    border-top: 1px solid currentColor;
+    opacity: 0.2;
+    margin: 16px 0;
+}
 .content-divider {
     border: 0;
     height: 0;
@@ -331,6 +337,9 @@ hr.divider {
 	color:#FFF!important;
 	font-weight:400;
 	text-shadow:none!important;
+}
+.blue.ui-btn {
+	border-color:#5D99C3!important;
 }
 .blue-text {
 	color: #5D99C3!important;
@@ -2078,4 +2087,521 @@ button[id^="start_1-"] {
 .stats-kpi-table td {
     text-align: right;
     font-weight: 700;
+}
+
+#run-program-dialog {
+    width: min(300px, calc(100vw - 30px));
+    box-sizing: border-box;
+}
+
+#run-program-dialog .ui-checkbox .ui-btn,
+#run-program-dialog .ui-radio .ui-btn {
+    white-space: normal;
+}
+
+.program-section-divider {
+    border: none;
+    border-top: 1px solid #ddd;
+    margin: 16px 0 8px;
+}
+
+/* ---- Expanded Sensors (ported from OpenSprinkler-App upstream, sensors.js) ---- */
+
+#sensors_list input:invalid,
+#add-sensor input:invalid,
+#sensorSettings input:invalid,
+#masterSettings input:invalid,
+[id^="sensor-options-"] input:invalid {
+  background-color: #fff4f4 !important;
+  color: #111 !important;
+  outline: 2px solid #b00020 !important;
+  text-shadow: none !important;
+}
+
+#sensors_list,
+#add-sensor .ui-content {
+    max-width: 600px;
+}
+
+.sensor-add-card {
+    background-color: #f9f9f9;
+    border: 1px solid #d8d8d8;
+    border-radius: 6px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+    padding: 12px 14px;
+    margin: 16px 0;
+}
+
+.sensor-page-notice {
+    margin: 1.5em 0 0 0;
+    padding-top: 1em;
+    border-top: 1px solid #d8d8d8;
+}
+
+.sensor-hw-missing {
+    margin: 0.25em 0 0.75em 0;
+    font-size: 0.9em;
+    color: #8b1e2d;
+    font-style: italic;
+}
+
+.sensor-home-header {
+    max-width: 500px;
+    margin: 1.5em auto 0.5em auto;
+    padding-top: 0.75em;
+    border-top: 1px solid #d8d8d8;
+    text-align: center;
+    font-size: 0.9em;
+}
+
+.sensors-home-combined {
+    display: block;
+    color: inherit !important;
+    font-size: 0.9em;
+    text-decoration: none;
+}
+
+.sensor-home-list {
+    column-gap: 16px;
+    -webkit-column-gap: 16px;
+    -moz-column-gap: 16px;
+}
+
+@media (min-width: 1032px) {
+    .sensor-home-list {
+        column-count: 2;
+        -webkit-column-count: 2;
+        -moz-column-count: 2;
+    }
+    /* Widen the sensor card and its header to span both station-card columns
+       so each sensor row has enough room for long names. */
+    .sensors-home-combined,
+    .sensor-home-header {
+        max-width: 1010px;
+    }
+}
+
+.sensor-home-row {
+    /* Don't let a row split across columns. */
+    -webkit-column-break-inside: avoid;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    padding: 2px 0;
+    display: flex;
+    gap: 12px;
+}
+
+.sensor-home-name {
+    min-width: 0;
+    font-weight: normal;
+}
+
+/* App Settings: lay all toggle buttons in a single wrap-friendly row so
+   they sit side-by-side on wide screens and stack onto extra rows as the
+   viewport narrows. */
+.app-settings-row .ui-controlgroup-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+}
+
+.app-settings-row .ui-checkbox {
+    flex: 0 0 auto;
+}
+
+/* JQM's horizontal controlgroup strips inner borders/radii because adjacent
+   buttons share an edge — but with a 6px gap each button stands alone, so
+   restore a full outline on every button. */
+.app-settings-row .ui-checkbox .ui-btn {
+    border-right-width: 1px;
+    border-radius: 0.3125em;
+}
+
+.sensor-home-value {
+    font-weight: normal;
+    white-space: nowrap;
+}
+
+@media (min-width: 28em) {
+    .sensor-hw-missing {
+        margin-left: calc(30% + 0.5em);
+    }
+}
+
+.master-config-button {
+    margin: 0.75em 0;
+}
+
+#masterSettings .ui-field-contain > label,
+#sensorSettings .ui-field-contain > label {
+    padding-right: 14px;
+}
+
+#masterSettings .master-step-hint {
+    margin: 1em 0 0.75em 0;
+    font-size: 0.85em;
+    color: #666;
+}
+
+#sensorSettings .sn-prg-hint {
+    margin: 1em 0 0.75em 0;
+    font-size: 0.85em;
+    color: #666;
+}
+
+#sensorSettings .ui-select .ui-btn,
+#sensorSettings input[type='number'] {
+    font-size: 1.05em;
+    padding-top: 0.6em;
+    padding-bottom: 0.6em;
+}
+
+#sensors_list .ui-field-contain > label {
+    padding-right: 14px;
+}
+
+
+.sensor-flags-label {
+    display: none;
+}
+
+/* Wrap between whole buttons on narrow screens; never inside a label. Flag
+   names come from the firmware /jsd schema, so their length is not ours to
+   control (nor is it fixed across translations). */
+.sensor-flags-checkboxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    padding: 4px 0;
+}
+
+.sensor-flags-checkboxes .ui-checkbox label.ui-btn {
+    white-space: nowrap;
+}
+
+.sensor-flags-checkboxes .ui-checkbox {
+    margin: 0;
+}
+
+.sensor-flags-checkboxes .ui-checkbox label.ui-btn {
+    padding-top: 0.4em;
+    padding-bottom: 0.4em;
+    font-size: 0.9em;
+    margin: 0;
+    min-height: 0;
+}
+
+.sensor-current-value-text {
+    font-size: 1em;
+    color: inherit;
+}
+
+.sensor-value-valid {
+    color: #27ae60;
+}
+
+.sensor-value-warning {
+    color: #e67e22;
+}
+
+.sensor-value-clamped {
+    color: #5D99C3;
+}
+
+.sensor-array-buttons {
+    overflow: hidden;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 0;
+}
+
+.sensor-child-popup {
+    min-width: 280px;
+    overflow: auto;
+}
+
+.sensor-child-popup-title {
+    text-align: center;
+}
+
+@media all and (min-width: 28em) {
+    .sensor-flags-label {
+        display: inline-block;
+        float: left;
+        width: 20%;
+    }
+    .sensor-flags-checkboxes {
+        display: inline-flex;
+        width: 79%;
+    }
+}
+
+
+.sensor-chart-controls {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 4px;
+}
+
+.sensor-log-chart-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 5 / 2;
+    min-height: 250px;
+    max-height: 450px;
+}
+
+.sensor-log-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 0 16px;
+    border-bottom: 1px solid #ddd;
+    margin-bottom: 8px;
+}
+
+.sensor-log-filter-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.sensor-log-filter-toggle label {
+    font-weight: bold;
+}
+
+.sensor-log-global-controls {
+    display: flex;
+    max-width: 100%;
+}
+
+.sensor-log-control-group {
+    margin: 0;
+}
+
+.sensor-log-action-controls {
+    margin-left: -1px;
+}
+
+.sensor-log-control-group .ui-controlgroup-controls {
+    display: flex;
+    flex-wrap: nowrap;
+}
+
+.sensor-log-global-controls .ui-btn {
+    flex: 0 0 auto;
+}
+
+/* JQM's default .ui-btn looks oversized for these secondary log controls on
+   touch devices. Shrinking the font also scales its em-based padding. */
+@media (pointer: coarse) {
+    .sensor-log-global-controls .ui-btn,
+    .sensor-chart-controls .ui-btn {
+        font-size: 12.5px;
+    }
+}
+
+.sensor-log-global-controls .sensor-log-range-selected {
+    background-color: #16a085 !important;
+    border-color: #16a085 !important;
+    color: #fff !important;
+    text-shadow: 0 1px 0 #0b6252 !important;
+}
+
+/* Pinned below the fixed JQM header so it stays visible while the user is
+   scrolled down among sensor cards. position:sticky does not work inside
+   jQuery Mobile's absolutely-positioned pages, so this is fixed to the
+   viewport; left/right + max-width keep it aligned with .ui-content. */
+.sensor-log-progress {
+    background-color: #f9f9f9;
+    border-bottom: 1px solid #ddd;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+    box-sizing: border-box;
+    padding: 8px 10px 12px;
+    position: fixed;
+    top: 2.8125em;
+    left: 0;
+    right: 0;
+    max-width: 1000px;
+    margin: 0 auto;
+    z-index: 999;
+}
+
+.sensor-log-progress-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+}
+
+.sensor-log-progress-label {
+    font-size: 0.9em;
+}
+
+.sensor-log-stop-btn.ui-btn {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0;
+    padding: 5px 12px;
+}
+
+/* .ui-btn sets display, which overrides the [hidden] attribute, so the Stop
+   button would otherwise stay visible during non-deletion progress (e.g.
+   loading). Force [hidden] to win so it only shows while deleting. */
+.sensor-log-stop-btn[hidden] {
+    display: none !important;
+}
+
+.sensor-log-progress-estimate {
+    margin-top: 6px;
+    font-size: 0.85em;
+    opacity: 0.8;
+}
+
+.sensor-log-warning-label {
+    color: #800000;
+    text-decoration: underline;
+}
+
+/* Neutral track that reads on both the light (a) and dark (b) themes; the
+   inset shadow (ui-shadow-inset) gives it a groove. Fill uses the app's
+   "active" accent (#16a085), matching running-station green. */
+.sensor-log-progress-track {
+    width: 100%;
+    height: 14px;
+    background: rgba(127, 127, 127, 0.25);
+    overflow: hidden;
+}
+
+.sensor-log-progress-fill {
+    width: 0;
+    height: 100%;
+    background: #16a085;
+    transition: width 0.2s ease;
+}
+
+/* Indeterminate mode (single-request loads with no measurable progress):
+   a full-width fill with a slow, low-contrast shimmer to signal activity
+   without a percentage. Kept gentle (long duration, soft peak) so it reads
+   as calm rather than flashing. */
+.sensor-log-progress-indeterminate .sensor-log-progress-fill {
+    width: 100%;
+    transition: none;
+    background: linear-gradient(90deg,
+        rgba(22, 160, 133, 0.2) 25%,
+        #16a085 50%,
+        rgba(22, 160, 133, 0.2) 75%);
+    background-size: 200% 100%;
+    animation: sensor-log-indeterminate 4s linear infinite;
+}
+
+@keyframes sensor-log-indeterminate {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+}
+
+@media (max-width: 27.99em) {
+    .sensor-log-global-controls {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .sensor-log-control-group,
+    .sensor-log-control-group .ui-controlgroup-controls {
+        width: 100%;
+    }
+
+    .sensor-log-action-controls {
+        margin-left: 0;
+        margin-top: 4px;
+    }
+
+    .sensor-log-range-controls .ui-btn {
+        box-sizing: border-box;
+        width: 25%;
+    }
+
+    .sensor-log-action-controls .ui-btn {
+        box-sizing: border-box;
+        width: 50%;
+    }
+}
+
+.sensor-log-delete-btn {
+    background-color: #444 !important;
+    border-color: #555 !important;
+    color: #fff !important;
+    text-shadow: 0 1px 0 #333 !important;
+}
+
+.sensor-log-delete-all-btn {
+    background-color: #444 !important;
+    border-color: #555 !important;
+    color: #fff !important;
+    text-shadow: 0 1px 0 #333 !important;
+    font-weight: bold !important;
+}
+
+.sensor-splits-table {
+    table-layout: fixed;
+    margin: 0 auto;
+}
+
+.sensor-splits-table th:nth-child(1),
+.sensor-splits-table td:nth-child(1) {
+    width: 54px;
+    text-align: center;
+}
+
+.sensor-splits-table th:nth-child(2) {
+    width: 150px;
+}
+
+.sensor-splits-table th:nth-child(3) {
+    width: 150px;
+}
+
+.sensor-splits-table th:nth-child(4),
+.sensor-splits-table td:nth-child(4) {
+    width: 40px;
+    text-align: center;
+}
+
+.sensor-splits-table td .ui-input-text {
+    margin: 2px 0;
+}
+
+.split-remove {
+    width: 32px !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Points editor (sensors.js) — keep the label at the top of its column rather
+   than vertically centered against the growing table, and allow the table to
+   scroll horizontally if it exceeds its parent's width on narrow viewports. */
+.sensor-points-field {
+    align-items: flex-start !important;
+}
+
+.sensor-points-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.sensor-log-card {
+    background-color: #f2f2f2;
+    border: 1px solid #d8d8d8;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    padding: 12px 14px;
+    margin: 24px 0;
 }

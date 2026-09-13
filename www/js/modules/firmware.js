@@ -139,15 +139,32 @@ OSApp.Firmware.nativeHttpRequest = function( obj ) {
 	return defer.promise();
 };
 
+// Requests that change controller state (routed through the "change" queue,
+// sent as POST on newer firmware). Includes the Expanded Sensor API mutations.
+OSApp.Firmware.isChangeRequest = function( dest ) {
+	return /\/(?:cv|cs|csn|cr|cp|uwa|dp|dsn|dsl|co|cl|cu|up|cm|sp|pq|dl|sa|sc|sb|sn)(?:\?|$)/.test( dest );
+};
+
+// Expanded Sensor API endpoints (upstream 2.2.1(5)); the sensor pages expect
+// upstream promise semantics: any firmware result other than 1 rejects.
+OSApp.Firmware.isSensorApiRequest = function( dest ) {
+	return /\/(?:jsn|csn|dsn|jsd|jsl|dsl|jpa)(?:\?|$)/.test( dest );
+};
+
 // Wrapper function to communicate with OpenSprinkler
-OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
+// options: number (request timeout in ms) or { timeout: ms, signal: AbortSignal }
+OSApp.Firmware.sendToOS = function( dest, type, options ) {
 
 	// Inject password into the request
 	dest = dest.replace( /([?&])pw=/, "$1pw=" + encodeURIComponent( OSApp.currentSession.pass ) );
 	type = type || "text";
 
+	var requestOptions = ( options && typeof options === "object" ) ? options : {},
+		timeout = ( typeof options === "number" ) ? options : requestOptions.timeout;
+
 	// Designate AJAX queue based on command type
-	var isChange = /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|up|cm)/.exec( dest ),
+	var isChange = OSApp.Firmware.isChangeRequest( dest ),
+		isSensorApi = OSApp.Firmware.isSensorApiRequest( dest ),
 		queue = isChange ? "change" : "default",
 
 		// Use POST when sending data to the controller (requires firmware 2.1.8 or newer)
@@ -165,6 +182,9 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 			timeout: requestTimeout,
 			headers: {},
 			shouldRetry: function( xhr, current ) {
+				if ( requestOptions.signal && requestOptions.signal.aborted ) {
+					return false;
+				}
 				if ( xhr.status === 0 && xhr.statusText === "abort" || OSApp.Constants.http.RETRY_COUNT < current ) {
 					$.ajaxq.abort( queue );
 					return false;
@@ -172,15 +192,125 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 				return true;
 			}
 		},
-		defer;
+		defer,
+		activeRequest = null,
+		abortRequest = function() {
+			if ( activeRequest ) {
+				activeRequest.abort();
+			}
+		};
 
 	if ( OSApp.currentSession.auth ) {
 		obj.headers.Authorization = "Basic " + btoa( OSApp.currentSession.authUser + ":" + OSApp.currentSession.authPass );
+	}
+	if ( OSApp.currentSession.auth || requestOptions.signal ) {
 		$.extend( obj, {
 			beforeSend: function( xhr ) {
-				xhr.setRequestHeader( "Authorization", obj.headers.Authorization );
+				activeRequest = xhr;
+				if ( obj.headers.Authorization ) {
+					xhr.setRequestHeader( "Authorization", obj.headers.Authorization );
+				}
+				if ( requestOptions.signal && requestOptions.signal.aborted ) {
+					xhr.abort();
+					return false;
+				}
 			}
 		} );
+	}
+
+	// Binary / blob transfers (sensor log export, /jsl) use fetch() so that the
+	// response headers (X-OS-* pagination) and the raw body are available.
+	if ( type === "arraybuffer" || type === "arraybuffer-response" || type === "blob" ) {
+		const includeResponse = type === "arraybuffer-response";
+		const fetchHeaders = {};
+		if ( obj.headers.Authorization ) {
+			fetchHeaders[ "Authorization" ] = obj.headers.Authorization;
+		}
+		const abortController = typeof AbortController === "function" ? new AbortController() : null;
+		const fetchOptions = { headers: fetchHeaders };
+		const isSensorLog = /\/jsl(?:\?|$)/.test( dest );
+		if ( abortController ) {
+			fetchOptions.signal = abortController.signal;
+		} else if ( requestOptions.signal ) {
+			fetchOptions.signal = requestOptions.signal;
+		}
+		defer = $.Deferred();
+		const abortFetch = function() {
+			if ( abortController ) {
+				abortController.abort();
+			}
+			defer.reject( { status: 0, statusText: "abort" } );
+		};
+		if ( requestOptions.signal ) {
+			if ( requestOptions.signal.aborted ) {
+				abortFetch();
+				return defer.promise();
+			}
+			requestOptions.signal.addEventListener( "abort", abortFetch, { once: true } );
+		}
+		const fetchTimeout = setTimeout( function() {
+			if ( abortController ) {
+				abortController.abort();
+			}
+			defer.reject( { status: 0, statusText: "timeout" } );
+		}, type === "blob" ? 10 * 60 * 1000 : ( requestTimeout || $.ajaxSettings.timeout || 10000 ) );
+		const handleBinaryFirmwareResponse = function( data ) {
+			if ( data && data.result === 1 ) {
+				return $.Deferred().reject( { status: 0, statusText: "parsererror" } );
+			}
+			if ( data && data.result === 2 ) {
+				return $.Deferred().reject( { status: 401 } );
+			}
+			return $.Deferred().reject( data );
+		};
+		fetch( obj.url, fetchOptions )
+			.then( function( r ) {
+				if ( !r.ok ) {
+					throw { status: r.status };
+				}
+				var contentType = r.headers.get( "Content-Type" ) || "";
+				if ( isSensorLog && /json/i.test( contentType ) ) {
+					return r.json().then( function( data ) {
+						// result 80: no log yet (upstream); treat as empty log
+						if ( data && data.result === 80 ) {
+							if ( type === "blob" ) {
+								return new Blob( [ "uuid,timestamp,value\n" ], { type: "text/csv;charset=utf-8;" } );
+							}
+							var emptyLog = new ArrayBuffer( 0 );
+							emptyLog.noLogHeader = true;
+							return includeResponse ? { data: emptyLog, headers: r.headers } : emptyLog;
+						}
+						return handleBinaryFirmwareResponse( data );
+					} );
+				}
+				if ( isSensorLog && ( type === "blob" ? !/^text\/csv(?:\s*;|$)/i.test( contentType ) :
+					!/^application\/octet-stream(?:\s*;|$)/i.test( contentType ) ) ) {
+					return $.Deferred().reject( { status: 0, statusText: "parsererror" } );
+				}
+				return ( type === "blob" ? r.blob() : r.arrayBuffer() ).then( function( data ) {
+					return includeResponse ? { data: data, headers: r.headers } : data;
+				} );
+			} )
+			.then( function( response ) {
+				var buf = includeResponse ? response.data : response;
+				if ( type !== "blob" && isSensorLog && ( !( buf instanceof ArrayBuffer ) || buf.byteLength % 10 !== 0 ) ) {
+					return $.Deferred().reject( { status: 0, statusText: "parsererror" } );
+				}
+				return response;
+			} )
+			.then( function( buf ) { defer.resolve( buf ); } )
+			.catch( function( err ) { defer.reject( err ); } )
+			.finally( function() {
+				clearTimeout( fetchTimeout );
+				if ( requestOptions.signal ) {
+					requestOptions.signal.removeEventListener( "abort", abortFetch );
+				}
+			} );
+		return defer.promise();
+	}
+
+	if ( requestOptions.signal ) {
+		requestOptions.signal.addEventListener( "abort", abortRequest, { once: true } );
 	}
 
 	if ( OSApp.currentSession.fw183 ) {
@@ -213,10 +343,33 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 			// Return as successful
 			if ( data.result === 1 ) {
 				return data;
+			}
+
+			// Expanded Sensor API: upstream promise semantics (reject on any error
+			// code, friendly message for mutations). The sensor pages rely on this.
+			if ( isSensorApi ) {
+				if ( isChange ) {
+					var sensorMsgs = {
+						0x02: OSApp.Language._( "Check device password and try again." ),
+						0x10: OSApp.Language._( "A required field is missing." ),
+						0x11: OSApp.Language._( "A value is out of range." ),
+						0x12: OSApp.Language._( "A field has an invalid format." ),
+						0x30: OSApp.Language._( "Operation not permitted." ),
+						0x41: OSApp.Language._( "Not enough storage space on the device to save this new entry. Please delete unused sensors, monitors or logs (or reduce logging) before adding new ones." )
+					};
+					OSApp.Errors.showError( ( sensorMsgs[ data.result ] || OSApp.Language._( "Please check input and try again." ) ) + " (Error " + data.result + ")" );
+				}
+				if ( data.result === 2 ) {
+					return $.Deferred().reject( { "status": 401 } );
+				} else if ( data.result === 32 ) {
+					return $.Deferred().reject( { "status": 404 } );
+				}
+				return $.Deferred().reject( data );
+			}
 
 			// Handle incorrect password
-			} else if ( data.result === 2 ) {
-				if ( /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|up|cm)/.exec( dest ) ) {
+			if ( data.result === 2 ) {
+				if ( isChange ) {
 					OSApp.Errors.showError( OSApp.Language._( "Check device password and try again." ) );
 				}
 
@@ -230,7 +383,7 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 			}
 
 			// Only show error messages on setting change requests
-			if ( /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|up|cm)/.exec( dest ) ) {
+			if ( isChange ) {
 				if ( data.result === 48 ) {
 					OSApp.Errors.showError(
 						OSApp.Language._( "The selected station is already running or is scheduled to run." )
@@ -245,7 +398,10 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 
 		},
 		function( e ) {
-			if ( ( e.statusText === "timeout" || e.status === 0 ) && /\/(?:cv|cs|cr|cp|uwa|dp|co|cl|cu|cm)/.exec( dest ) ) {
+			if ( requestOptions.signal && requestOptions.signal.aborted ) {
+				return $.Deferred().reject( e );
+			}
+			if ( ( e.statusText === "timeout" || e.status === 0 ) && isChange ) {
 
 				// Handle the connection timing out but only show error on setting change
 				if ( OSApp.currentSession.prefix === "https://" ) {
@@ -266,9 +422,20 @@ OSApp.Firmware.sendToOS = function( dest, type, timeout ) {
 				//Handle unauthorized requests
 				OSApp.Errors.showError( OSApp.Language._( "Check device password and try again." ) );
 			}
+			if ( isSensorApi ) {
+				// Sensor pages need the failure to propagate (a failed /jsn must
+				// not look like a successful empty response).
+				return $.Deferred().reject( e );
+			}
 			return;
 		}
 	);
+	defer.always( function() {
+		activeRequest = null;
+		if ( requestOptions.signal ) {
+			requestOptions.signal.removeEventListener( "abort", abortRequest );
+		}
+	} );
 
 	return defer;
 };

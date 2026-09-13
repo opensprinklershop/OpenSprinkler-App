@@ -125,6 +125,7 @@ OSApp.Analog = {
 		PROG_DIGITAL_MIN                : 2, //under or equal min : factor1 else factor2
 		PROG_DIGITAL_MAX                : 3, //over or equal max  : factor2 else factor1
 		PROG_DIGITAL_MINMAX             : 4, //under min or over max : factor1 else factor2
+		PROG_PIECEWISE                  : 5, //piecewise linear curve over points (sensor value -> factor)
 	}
 };
 
@@ -1058,7 +1059,8 @@ OSApp.Analog.getDefaultAdjustmentTypes = function() {
 		{ type: 1, name: "Linear scaling" },
 		{ type: 2, name: "Digital under min" },
 		{ type: 3, name: "Digital over max" },
-		{ type: 4, name: "Digital under min or over max" }
+		{ type: 4, name: "Digital under min or over max" },
+		{ type: 5, name: "Piecewise linear curve" }
 	];
 };
 
@@ -1068,31 +1070,31 @@ OSApp.Analog.getSupportedAdjustmentTypes = function(forceRefresh) {
 	}
 
 	if (!forceRefresh && OSApp.Analog.adjustmentTypesRequest) {
-		return $.Deferred().resolve(OSApp.Analog.getDefaultAdjustmentTypes()).promise();
+		return OSApp.Analog.adjustmentTypesRequest;
 	}
 
+	// Wait for the firmware's list (/sh is fast); fall back to the static list
+	// only when the request fails. Answering with the static list first made
+	// the editor show a wrong type list on the first open.
 	OSApp.Analog.adjustmentTypesRequest = OSApp.Firmware.sendToOS("/sh?pw=", "json", 5000).then(function(data) {
 		var types = (data && Array.isArray(data.progTypes)) ? data.progTypes : [];
 		if (types.length > 0) {
 			OSApp.Analog.cachedAdjustmentTypes = types;
+			return types;
 		}
-		return types;
-	}, function(err) {
+		return OSApp.Analog.getDefaultAdjustmentTypes();
+	}, function() {
 		if (Array.isArray(OSApp.Analog.cachedAdjustmentTypes) && OSApp.Analog.cachedAdjustmentTypes.length > 0) {
-			return OSApp.Analog.cachedAdjustmentTypes;
+			return $.Deferred().resolve(OSApp.Analog.cachedAdjustmentTypes).promise();
 		}
-		return $.Deferred().reject(err).promise();
+		return $.Deferred().resolve(OSApp.Analog.getDefaultAdjustmentTypes()).promise();
 	});
 
 	OSApp.Analog.adjustmentTypesRequest.always(function() {
 		OSApp.Analog.adjustmentTypesRequest = null;
 	});
 
-	if (forceRefresh) {
-		return OSApp.Analog.adjustmentTypesRequest;
-	}
-
-	return $.Deferred().resolve(OSApp.Analog.getDefaultAdjustmentTypes()).promise();
+	return OSApp.Analog.adjustmentTypesRequest;
 };
 
 OSApp.Analog.getDefaultMonitorTypes = function() {
@@ -1192,6 +1194,17 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 
 	OSApp.Analog.getSupportedAdjustmentTypes().then(function (supportedAdjustmentTypes) {
 		var i;
+		// The stored type must stay selectable even when this firmware does not
+		// list it (e.g. a piecewise curve edited on an older controller); otherwise
+		// the select would silently jump to the first entry and save that.
+		supportedAdjustmentTypes = supportedAdjustmentTypes.slice();
+		if (progAdjust.type !== undefined && progAdjust.type !== null) {
+			var typeKnown = supportedAdjustmentTypes.some(function (t) { return t.type === progAdjust.type; });
+			if (!typeKnown) {
+				var def = OSApp.Analog.getDefaultAdjustmentTypes().filter(function (t) { return t.type === progAdjust.type; })[0];
+				supportedAdjustmentTypes.push(def || { type: progAdjust.type, name: "Type " + progAdjust.type });
+			}
+		}
 		if (!Object.prototype.hasOwnProperty.call(progAdjust, "stale_timeout")) progAdjust.stale_timeout = 0;
 		if (!Object.prototype.hasOwnProperty.call(progAdjust, "stale_policy")) progAdjust.stale_policy = 0;
 		if (!Object.prototype.hasOwnProperty.call(progAdjust, "stale_fallback")) progAdjust.stale_fallback = 1;
@@ -1291,6 +1304,15 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 			"</label>" +
 			"<input class='max' type='text' inputmode='decimal' value='" + OSApp.Utils.formatNumber( progAdjust.max, { useGrouping: false } ) + "'>" +
 
+			// Piecewise linear curve (type 5): sensor value -> adjustment in %
+			"<div class='adj-points-wrap' style='display:none'>" +
+			"<label>" + OSApp.Language._("Curve points (sensor value and adjustment in %)") + "</label>" +
+			"<table class='adj-points-table' style='width:100%;border-collapse:collapse'><thead><tr>" +
+			"<th style='width:2em'>#</th><th>" + OSApp.Language._("Sensor Value") + "</th><th>" + OSApp.Language._("Watering %") + "</th><th style='width:3em'></th>" +
+			"</tr></thead><tbody></tbody></table>" +
+			"<button type='button' class='adj-add-point' data-mini='true' data-icon='plus' data-inline='true'>" + OSApp.Language._("Add a Point") + "</button>" +
+			"</div>" +
+
 			"<label>" +
 			OSApp.Language._("Stale timeout in minutes") +
 			"</label>" +
@@ -1356,6 +1378,55 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 		let adjFunc = function () {
 			OSApp.Analog.updateAdjustmentChart(popup);
 		};
+
+		// ---- piecewise curve editor (PROG_PIECEWISE = 5) ----
+		var pointsBody = popup.find(".adj-points-table tbody"),
+			initialPoints = OSApp.Analog.parseAdjustPoints(progAdjust.points),
+			renderPoints = function (pts) {
+				pointsBody.empty();
+				pts.forEach(function (pt, idx) {
+					pointsBody.append(
+						"<tr><td>" + (idx + 1) + "</td>" +
+						"<td><input class='pt-x' type='text' inputmode='decimal' data-mini='true' value='" + OSApp.Utils.formatNumber(pt[0], { useGrouping: false }) + "'></td>" +
+						"<td><input class='pt-y' type='number' inputmode='decimal' data-mini='true' min='0' max='2000' value='" + Math.round(pt[1] * 100) + "'></td>" +
+						"<td><a href='#' class='pt-del ui-btn ui-btn-icon-notext ui-icon-delete ui-mini ui-corner-all' style='margin:0'></a></td></tr>");
+				});
+				if (popup.parent().length) pointsBody.closest(".adj-points-wrap").enhanceWithin();
+			},
+			updateTypeFields = function () {
+				var pw = parseInt(popup.find("#type").val(), 10) === OSApp.Analog.PROG_PIECEWISE;
+				popup.find(".factor1, .factor2, .min, .max").each(function () {
+					var $i = $(this), wrap = $i.closest(".ui-input-text");
+					if (!wrap.length) wrap = $i;
+					wrap.toggle(!pw);
+					wrap.prev("label").toggle(!pw);
+				});
+				popup.find(".adj-points-wrap").toggle(pw);
+				if (pw && pointsBody.children().length === 0) {
+					var pts = initialPoints.length >= 2 ? initialPoints : [
+						[OSApp.Utils.parseNumber(popup.find(".min").val()) || 0, OSApp.Utils.parseNumber(popup.find(".factor1").val()) / 100 || 1],
+						[OSApp.Utils.parseNumber(popup.find(".max").val()) || 100, OSApp.Utils.parseNumber(popup.find(".factor2").val()) / 100 || 0]
+					];
+					renderPoints(pts);
+				}
+			};
+
+		popup.find("#type").change(updateTypeFields);
+		popup.find(".adj-add-point").on("click", function () {
+			var pts = OSApp.Analog.getAdjustPoints(popup),
+				last = pts.length ? pts[pts.length - 1] : [0, 1];
+			if (pts.length >= 8) return false;
+			pts.push([last[0] + 10, last[1]]);
+			renderPoints(pts);
+			adjFunc();
+			return false;
+		});
+		pointsBody.on("change", "input", adjFunc).on("click", ".pt-del", function () {
+			$(this).closest("tr").remove();
+			renderPoints(OSApp.Analog.getAdjustPoints(popup));
+			adjFunc();
+			return false;
+		});
 
 		popup.find("#sensor").change(adjFunc);
 		popup.find("#type").change(adjFunc);
@@ -1426,13 +1497,51 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 		popup.css("max-width", "580px");
 		popup.find("#stale-policy").change();
 
-		adjFunc();
 		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
+		updateTypeFields();
+		adjFunc();
 	});
 };
 
+OSApp.Analog.PROG_PIECEWISE = 5;
+
+// Points of a piecewise adjustment as [[x, factor], ...]; accepts the firmware
+// array form ([[x,y],...]) and the "x,y,x,y" request string form.
+OSApp.Analog.parseAdjustPoints = function (points) {
+	var out = [];
+	if (Array.isArray(points)) {
+		points.forEach(function (pt) {
+			if (Array.isArray(pt) && pt.length >= 2 && isFinite(pt[0]) && isFinite(pt[1])) out.push([Number(pt[0]), Number(pt[1])]);
+		});
+	} else if (typeof points === "string" && points.length) {
+		var v = points.split(",").map(Number);
+		for (var i = 0; i + 1 < v.length; i += 2) {
+			if (isFinite(v[i]) && isFinite(v[i + 1])) out.push([v[i], v[i + 1]]);
+		}
+	}
+	return out;
+};
+
+// Current points of the editor, sorted by sensor value, factor as 0..1
+OSApp.Analog.getAdjustPoints = function (popup) {
+	var pts = [];
+	popup.find(".adj-points-table tbody tr").each(function () {
+		var x = OSApp.Utils.parseNumber($(this).find(".pt-x").val()),
+			y = OSApp.Utils.parseNumber($(this).find(".pt-y").val());
+		if (isFinite(x) && isFinite(y)) pts.push([x, Math.max(0, y) / 100]);
+	});
+	pts.sort(function (a, b) { return a[0] - b[0]; });
+	return pts.slice(0, 8);
+};
+
+// "x0,y0,x1,y1,..." request parameter for /sb and /sd (undefined when not piecewise)
+OSApp.Analog.getAdjustPointsParam = function (popup) {
+	if (parseInt(popup.find("#type").val(), 10) !== OSApp.Analog.PROG_PIECEWISE) return undefined;
+	return OSApp.Analog.getAdjustPoints(popup).map(function (pt) { return pt[0] + "," + pt[1]; }).join(",");
+};
+
 OSApp.Analog.getProgAdjust = function(popup) {
-	return {
+	var out = {
 		nr: parseInt(popup.find(".nr").val()),
 		name: popup.find(".adj-name").val(),
 		type: parseInt(popup.find("#type").val()),
@@ -1446,17 +1555,35 @@ OSApp.Analog.getProgAdjust = function(popup) {
 		stale_policy: parseInt(popup.find("#stale-policy").val(), 10),
 		stale_fallback: Math.max(0, Math.min(200, OSApp.Utils.parseNumber(popup.find(".stale-fallback").val()) || 0)) / 100
 	};
+	OSApp.Analog.applyAdjustPoints(popup, out);
+	return out;
+};
+
+// For a piecewise adjustment add the points parameter and mirror the curve
+// ends into min/max/factor1/factor2 (used by lists, gauges and old clients).
+OSApp.Analog.applyAdjustPoints = function (popup, obj) {
+	var param = OSApp.Analog.getAdjustPointsParam(popup);
+	if (param === undefined) return obj;
+	var pts = OSApp.Analog.getAdjustPoints(popup);
+	obj.points = param;
+	if (pts.length) {
+		obj.min = pts[0][0];
+		obj.max = pts[pts.length - 1][0];
+		obj.factor1 = pts[0][1];
+		obj.factor2 = pts[pts.length - 1][1];
+	}
+	return obj;
 };
 
 OSApp.Analog.getProgAdjustForCalc = function(popup) {
-	return {
+	return OSApp.Analog.applyAdjustPoints(popup, {
 		type: parseInt(popup.find("#type").val()),
 		sensor: parseInt(popup.find("#sensor").val()),
 		factor1: OSApp.Utils.parseNumber(popup.find(".factor1").val()) / 100,
 		factor2: OSApp.Utils.parseNumber(popup.find(".factor2").val()) / 100,
 		min: OSApp.Utils.parseNumber(popup.find(".min").val()),
 		max: OSApp.Utils.parseNumber(popup.find(".max").val())
-	};
+	});
 };
 
 OSApp.Analog.updateAdjustmentChart = function(popup) {
@@ -2205,10 +2332,14 @@ OSApp.Analog.updateSensorVisibility = function(popup, sensortype) {
 	popup.find(".mac_label").hide();
 	popup.find(".rs485_port_modbus_container").hide();
 	popup.find(".rs485_help").hide();
+	popup.find(".port_field").show();
 
 	if (OSApp.Analog.isRS485Sensor(sensortype)) {
-		// RS485 sensors need IP/Port (for TCP/IP adapter) and RS485 port/Modbus ID
+		// RS485 sensors: IP (TCP/IP adapter) + "RS485 Device/Port" (saved as port)
+		// + the ID field as Modbus ID. The generic Port field would duplicate
+		// the RS485 port, so it is hidden here.
 		popup.find(".ip_port_container").show();
+		popup.find(".port_field").hide();
 		popup.find(".rs485_port_modbus_container").show();
 		popup.find(".rs485_help").show();
 		// ID field as Modbus ID
@@ -3363,7 +3494,7 @@ list += "</select></div>" +
 "<div class='ip_port_container' style='display: flex; gap: 12px; flex-wrap: wrap;'>" +
 	"<div style='flex: 2; min-width: 180px;'><label for='sensor_ip'>" + OSApp.Language._("IP Address") + "</label>" +
 	"<input class='ip' id='sensor_ip' data-mini='true' type='text' style='width: 100%;' value='" + (sensor.ip ? OSApp.Analog.toByteArray(sensor.ip).join(".") : "") + "'></div>" +
-	"<div style='flex: 1; min-width: 120px;'><label for='sensor_port'>" + OSApp.Language._("Port") + "</label>" +
+	"<div class='port_field' style='flex: 1; min-width: 120px;'><label for='sensor_port'>" + OSApp.Language._("Port") + "</label>" +
 	"<input class='port' id='sensor_port' data-mini='true' type='number' inputmode='decimal' min='0' max='65535' style='width: 100%;' value='" + sensor.port + "'></div>" +
 	"</div>" +
 
@@ -3383,7 +3514,9 @@ list += "</select></div>" +
 "<div class='rs485_port_modbus_container' style='display: flex; gap: 12px; flex-wrap: wrap;'>" +
 	"<div style='flex: 1; min-width: 150px;'><label for='rs485_port'>" + OSApp.Language._("RS485 Device/Port") + "</label>" +
 	"<input class='rs485_port' id='rs485_port' data-mini='true' type='number' inputmode='decimal' min='0' max='65535' style='width: 100%;' value='" + (sensor.port ? sensor.port : 0) + "'></div>" +
-	"<div style='flex: 1; min-width: 120px;'><label for='rs485_id'>" + OSApp.Language._("Modbus ID") + "</label>" +
+	// The Modbus address is edited in the generic ID field (".id", relabelled
+	// "Modbus ID" for RS485 sensors); this duplicate stays hidden.
+	"<div class='rs485_id_field' style='display:none; flex: 1; min-width: 120px;'><label for='rs485_id'>" + OSApp.Language._("Modbus ID") + "</label>" +
 	"<input class='rs485_id' id='rs485_id' data-mini='true' type='number' inputmode='decimal' min='1' max='247' style='width: 100%;' value='" + (sensor.id ? sensor.id : 1) + "'></div>" +
 	"</div>" +
 
@@ -6391,8 +6524,8 @@ OSApp.Analog.buildSensorConfig = function() {
 			"<td><a data-role='button' class='edit-progadjust wraptext' value='" + item.nr + "' row='" + row + "' href='#' data-mini='true' data-icon='edit'>" +
 			item.name + "</a></td>",
 			$("<td class=\"hidecol2\">").text(progName),
-			$("<td class=\"hidecol2\">").text(Math.round(item.factor1 * 100) + "%"),
-			$("<td class=\"hidecol2\">").text(Math.round(item.factor2 * 100) + "%"),
+			$("<td class=\"hidecol2\">").text(item.type === OSApp.Analog.PROG_PIECEWISE ? (OSApp.Analog.parseAdjustPoints(item.points).length + " " + OSApp.Language._("points")) : (Math.round(item.factor1 * 100) + "%")),
+			$("<td class=\"hidecol2\">").text(item.type === OSApp.Analog.PROG_PIECEWISE ? "" : (Math.round(item.factor2 * 100) + "%")),
 			$("<td class=\"hidecol2\">").text(item.min),
 			$("<td class=\"hidecol2\">").text(item.max),
 			$("<td>").text(item.current === undefined ? "" : (Math.round(item.current * 100.0) + "%"))

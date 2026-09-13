@@ -1611,7 +1611,22 @@ OSApp.Sites.updateController = function( callback, fail ) {
 			OSApp.Sites.updateControllerOptions(),
 			OSApp.Sites.updateControllerStatus(),
 			OSApp.Sites.updateControllerSettings()
-		);
+		).then( function() {
+			// Expanded Sensor API (/jsn, /jsd): optional, a 404 or error simply
+			// leaves the sensor pages disabled.
+			if ( !OSApp.Supported.legacySensorEndpoints( OSApp.currentSession.controller ) ) {
+				return;
+			}
+			var optional = function( request, clear ) {
+				var d = $.Deferred();
+				request.then( function( data ) { d.resolve( data ); }, function() { clear(); d.resolve( null ); } );
+				return d.promise();
+			};
+			return $.when(
+				optional( OSApp.Sites.updateControllerSensors(), function() { delete OSApp.currentSession.controller.sensors; } ),
+				optional( OSApp.Sites.updateControllerSensorDescription(), function() { OSApp.currentSession.controller.sensor_desc = null; } )
+			);
+		} );
 	};
 	var finish = function() {
 		// The periodic status poll (ui-dom.js) holds a re-entrancy guard until
@@ -1642,13 +1657,31 @@ OSApp.Sites.updateController = function( callback, fail ) {
 				return;
 			}
 
-			// The /ja call does not contain special station data, so let's cache it
-			var special = OSApp.currentSession.controller.special;
+			// The /ja call does not contain special station data, so let's cache it.
+			// The sensor description schema (/jsd) and the program adjustment
+			// cache (/jpa) are fetched separately as well and must survive the refresh.
+			var special = OSApp.currentSession.controller.special,
+				sensorDesc = OSApp.currentSession.controller.sensor_desc,
+				jpaData = OSApp.currentSession.controller.jpaData,
+				jpaMaxRuntime = OSApp.currentSession.controller.jpaMaxRuntime;
 
 			OSApp.currentSession.controller = data;
 
 			// Restore the station cache to the object
 			OSApp.currentSession.controller.special = special;
+			if ( typeof sensorDesc !== "undefined" ) {
+				OSApp.currentSession.controller.sensor_desc = sensorDesc;
+			}
+			if ( typeof jpaData !== "undefined" ) {
+				OSApp.currentSession.controller.jpaData = jpaData;
+			}
+			if ( typeof jpaMaxRuntime !== "undefined" ) {
+				OSApp.currentSession.controller.jpaMaxRuntime = jpaMaxRuntime;
+			}
+			if ( !OSApp.Supported.officialSensorAPIAllowed( OSApp.currentSession.controller ) ) {
+				delete OSApp.currentSession.controller.sensors;
+				delete OSApp.currentSession.controller.sensor_desc;
+			}
 
 			// Fix the station status array
 			OSApp.currentSession.controller.zigbeeStationStatus = OSApp.currentSession.controller.status.zst || [];
@@ -1664,11 +1697,27 @@ OSApp.Sites.updateController = function( callback, fail ) {
 				}
 			}
 
+			// /ja includes the live sensor data ("sensors"), but the firmware keeps
+			// the larger sensor-description schema on /jsd. Prime it once so unit
+			// labels and the sensor editor are ready; a missing endpoint disables
+			// the sensor pages instead of failing the refresh.
+			var finishWithSensorDesc = function() {
+				if ( Array.isArray( OSApp.currentSession.controller.sensors?.sn ) &&
+					typeof OSApp.currentSession.controller.sensor_desc === "undefined" ) {
+					OSApp.Sites.updateControllerSensorDescription().then( finish, function() {
+						OSApp.currentSession.controller.sensor_desc = null;
+						finish();
+					} );
+				} else {
+					finish();
+				}
+			};
+
 			if ( hasSpecial ) {
-				OSApp.Sites.updateControllerStationSpecial().always( finish );
+				OSApp.Sites.updateControllerStationSpecial().always( finishWithSensorDesc );
 			} else {
 				OSApp.currentSession.controller.special = {};
-				finish();
+				finishWithSensorDesc();
 			}
 		}, function( error ) {
 			if ( error && error.status === 401 ) {
@@ -1683,6 +1732,42 @@ OSApp.Sites.updateController = function( callback, fail ) {
 	} else {
 		loadControllerLegacy().then( finish, fail );
 	}
+};
+
+// Expanded Sensor API: current sensor list and readings (/jsn)
+OSApp.Sites.updateControllerSensors = function( callback ) {
+	callback = callback || function() {};
+	if ( OSApp.currentSession.fw183 === true || !OSApp.Supported.officialSensorAPIAllowed( OSApp.currentSession.controller ) ) {
+		delete OSApp.currentSession.controller.sensors;
+		callback();
+		return $.Deferred().resolve( null ).promise();
+	}
+	return OSApp.Firmware.sendToOS( "/jsn?pw=", "json" ).then( function( sensors ) {
+		if ( !sensors || !Array.isArray( sensors.sn ) ) {
+			return $.Deferred().reject( sensors ).promise();
+		}
+		OSApp.currentSession.controller.sensors = sensors;
+		callback();
+		return sensors;
+	} );
+};
+
+// Expanded Sensor API: sensor type / unit / argument descriptions (/jsd)
+OSApp.Sites.updateControllerSensorDescription = function( callback ) {
+	callback = callback || function() {};
+	if ( OSApp.currentSession.fw183 === true || !OSApp.Supported.officialSensorAPIAllowed( OSApp.currentSession.controller ) ) {
+		OSApp.currentSession.controller.sensor_desc = null;
+		callback();
+		return $.Deferred().resolve( null ).promise();
+	}
+	return OSApp.Firmware.sendToOS( "/jsd?pw=", "json" ).then( function( desc ) {
+		if ( !desc || !Array.isArray( desc.sensors ) ) {
+			return $.Deferred().reject( desc ).promise();
+		}
+		OSApp.currentSession.controller.sensor_desc = OSApp.Sensors.normalizeJsd( desc );
+		callback();
+		return desc;
+	} );
 };
 
 OSApp.Sites.updateControllerPrograms = function( callback ) {

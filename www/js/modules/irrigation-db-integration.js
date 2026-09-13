@@ -30,6 +30,45 @@ OSApp.Analog.IrrigationDB = {
     },
 
     /**
+     * Load the climate zones (A-F). Falls back to a static list when the
+     * database is not reachable so the dialog still opens.
+     */
+    getZones: function(callback) {
+        var fallback = [
+            { zone_code: "A", zone_name: "Humid Temperate" },
+            { zone_code: "B", zone_name: "Mediterranean" },
+            { zone_code: "C", zone_name: "Continental" },
+            { zone_code: "D", zone_name: "Central European" },
+            { zone_code: "E", zone_name: "Arid / Semi-arid" },
+            { zone_code: "F", zone_name: "Tropical" }
+        ];
+        if (this._zones && this._zones.length) {
+            callback(this._zones);
+            return;
+        }
+        var self = this;
+        $.ajax({
+            url: this.apiUrl,
+            data: { endpoint: 'zones' },
+            dataType: 'json',
+            timeout: 8000,
+            success: function(data) {
+                var zones = Array.isArray(data) ? data.filter(function(z) { return z && z.zone_code; }) : [];
+                zones = zones.map(function(z) {
+                    return { zone_code: z.zone_code, zone_name: z.zone_name_localized || z.zone_name || z.zone_code };
+                });
+                if (!zones.length) zones = fallback;
+                self._zones = zones;
+                callback(zones);
+            },
+            error: function(xhr) {
+                console.error('Error loading climate zones:', xhr);
+                callback(fallback);
+            }
+        });
+    },
+
+    /**
      * Search for plants (autocomplete)
      */
     searchPlants: function(query, callback) {

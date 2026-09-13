@@ -1,0 +1,32 @@
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const out = {};
+OSApp.UIDom.changePage("#analogsensorconfig"); await sleep(6000);
+out.page = $(".ui-page-active").attr("id");
+const addBtn = $(".add-progadjust").first(); out.addBtn = addBtn.length;
+addBtn.trigger("click"); await sleep(2500);
+const ed = $("#progAdjustEditor"); out.editorOpen = ed.length && ed.is(":visible");
+ed.find(".adj-name").val("cdp piecewise");
+ed.find("#type").val("5").change(); await sleep(800);
+out.rowsAfterType = ed.find(".adj-points-table tbody tr").length;
+ed.find(".adj-add-point").trigger("click"); await sleep(500);
+out.rowsAfterAdd = ed.find(".adj-points-table tbody tr").length;
+ed.find(".pt-x").eq(0).val("10"); ed.find(".pt-y").eq(0).val("100");
+ed.find(".pt-x").eq(1).val("30"); ed.find(".pt-y").eq(1).val("50");
+ed.find(".pt-x").eq(2).val("60"); ed.find(".pt-y").eq(2).val("20");
+ed.find(".pt-y").eq(2).change(); await sleep(1500);
+out.chart = ed.find("#adjchart svg").length;
+out.param = OSApp.Analog.getAdjustPointsParam(ed);
+const nr = parseInt(ed.find(".nr").val(), 10); out.nr = nr;
+ed.find(".submit").trigger("click"); await sleep(4000);
+const se = await OSApp.Firmware.sendToOS("/se?pw=&nr=" + nr, "json");
+out.saved = se && se.progAdjust && se.progAdjust[0] ? { type: se.progAdjust[0].type, points: se.progAdjust[0].points, name: se.progAdjust[0].name, min: se.progAdjust[0].min, max: se.progAdjust[0].max } : se;
+// list rendering
+out.listRow = $("tr:contains('cdp piecewise')").text().replace(/\s+/g, " ").slice(0, 120);
+// reopen and check rows restored, then delete via API
+$("a.edit-progadjust[value='" + nr + "']").first().trigger("click"); await sleep(2500);
+out.reopenRows = $("#progAdjustEditor .adj-points-table tbody tr").length;
+out.reopenType = $("#progAdjustEditor #type").val();
+$("#progAdjustEditor").popup("close"); await sleep(500);
+await OSApp.Firmware.sendToOS("/sb?pw=&nr=" + nr + "&type=0", "json");
+const se2 = await OSApp.Firmware.sendToOS("/se?pw=&nr=" + nr, "json"); out.deleted = se2.count === 0;
+return JSON.stringify(out);

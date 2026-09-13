@@ -117,6 +117,32 @@ OSApp.Lazy.ensureTimeline = function( callback ) {
 // the time the user navigates to a page that needs them, without blocking the
 // initial render. Failures are ignored here; the per-page guards re-attempt the
 // load on demand.
+OSApp.Lazy.hasChartJs = function() {
+	return typeof window.Chart !== "undefined";
+};
+
+// Ensure the Chart.js stack used by the Sensor Logs page and the program
+// sensor-adjustment editor is loaded (Chart.js, vis-timeline for Hammer touch
+// input, the touch shim, the zoom plugin and the date-fns adapter — in this
+// order). Returns a promise and runs the optional callback afterwards.
+OSApp.Lazy.ensureChartJs = function( callback ) {
+	callback = callback || function() {};
+	var promise;
+	if ( OSApp.Lazy.hasChartJs() && OSApp.Lazy._chartJsStackLoaded ) {
+		promise = Promise.resolve();
+	} else {
+		promise = OSApp.Lazy.loadScript( "vendor-js/chart.js" )
+			.then( function() { return OSApp.Lazy.ensureTimeline(); } )
+			.then( function() { return OSApp.Lazy.loadScript( "js/chart-touch.js" ); } )
+			.then( function() { return OSApp.Lazy.loadScript( "vendor-js/chartjs-plugin-zoom.min.js" ); } )
+			.then( function() { return OSApp.Lazy.loadScript( "vendor-js/chartjs-adapter-date-fns.bundle.min.js" ); } )
+			.then( function() { OSApp.Lazy._chartJsStackLoaded = true; } );
+	}
+	return promise.then( function() {
+		callback();
+	} );
+};
+
 OSApp.Lazy.prefetchCharts = function() {
 	if ( OSApp.Lazy._prefetched ) {
 		return;

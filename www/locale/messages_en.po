@@ -2928,3 +2928,329 @@ msgstr ""
 
 msgid "Update over OTC is enabled. The device will download and install firmware directly."
 msgstr ""
+
+# --- Expanded Sensors (ported from OpenSprinkler-App upstream) ---
+
+msgid "Item mismatch."
+msgstr ""
+
+msgid "A required field is missing."
+msgstr ""
+
+msgid "A value is out of range."
+msgstr ""
+
+msgid "A field has an invalid format."
+msgstr ""
+
+msgid "RF code error."
+msgstr ""
+
+msgid "Operation not permitted."
+msgstr ""
+
+msgid "Upload failed."
+msgstr ""
+
+msgid "Internal firmware error."
+msgstr ""
+
+msgid "Invalid program configuration in backup."
+msgstr ""
+
+msgid "Invalid program sensor adjustment in backup."
+msgstr ""
+
+msgid "Invalid sensor configuration in backup."
+msgstr ""
+
+msgid "Sensor definitions in this backup reference unavailable child sensors."
+msgstr ""
+
+msgid "The active controller changed. Please restart the restore."
+msgstr ""
+
+msgid "Weather Adjustment"
+msgstr ""
+
+msgid "Actual"
+msgstr ""
+
+msgid "Reset Zoom"
+msgstr ""
+
+msgid "Unable to load program adjustments. Try again."
+msgstr ""
+
+msgid "Adjustment Option"
+msgstr ""
+
+msgid "Apply Current Weather Adjustment"
+msgstr ""
+
+msgid "Apply Custom Adjustment"
+msgstr ""
+
+msgid "Custom Adjustment"
+msgstr ""
+
+msgid "Scheduling Option"
+msgstr ""
+
+msgid "Run After Others (Append)"
+msgstr ""
+
+msgid "Run Now and Pause Others (Insert to front)"
+msgstr ""
+
+msgid "Run Now and Cancel Others (Replace)"
+msgstr ""
+
+msgid "Zoom in"
+msgstr ""
+
+msgid "Zoom out"
+msgstr ""
+
+msgid "Move left"
+msgstr ""
+
+msgid "Move right"
+msgstr ""
+
+msgid "Loading program adjustments…"
+msgstr ""
+
+msgid "Number of Programs"
+msgstr ""
+
+msgid "Use Sensor Adjustment"
+msgstr ""
+
+msgid "Select Sensor"
+msgstr ""
+
+msgid "Current Sensor Value"
+msgstr ""
+
+msgid "Point"
+msgstr ""
+
+msgid "Sensor Value"
+msgstr ""
+
+msgid "Watering %"
+msgstr ""
+
+msgid "Add a Point"
+msgstr ""
+
+msgid "Program adjustments are unavailable."
+msgstr ""
+
+msgid "Error: Select a sensor before enabling sensor adjustment."
+msgstr ""
+
+msgid "Error: Complete or remove every sensor adjustment point."
+msgstr ""
+
+msgid "Error: Watering percentages cannot be negative."
+msgstr ""
+
+msgid "Error: Add at least one sensor adjustment point."
+msgstr ""
+
+msgid "Run this program?"
+msgstr ""
+
+msgid "Apply Weather Adjustment"
+msgstr ""
+
+msgid "Apply Sensor Adjustment"
+msgstr ""
+
+msgid "Create a single-run program for repeats"
+msgstr ""
+
+msgid "Run After Others"
+msgstr ""
+
+msgid "Run Now and Pause Others"
+msgstr ""
+
+msgid "Run Now and Cancel Others"
+msgstr ""
+
+msgid "The required hardware for this type was not detected."
+msgstr ""
+
+msgid "Configure Child Sensor"
+msgstr ""
+
+msgid "Sensor added successfully"
+msgstr ""
+
+msgid "Sensor updated successfully"
+msgstr ""
+
+msgid "Sensor deleted successfully"
+msgstr ""
+
+msgid "Current Value"
+msgstr ""
+
+msgid "Update Sensor"
+msgstr ""
+
+msgid "Please fill in all required fields"
+msgstr ""
+
+msgid "Delete Sensor"
+msgstr ""
+
+msgid "Are you sure you want to delete this sensor?"
+msgstr ""
+
+msgid "Click below to expand/edit. Be sure to save changes."
+msgstr ""
+
+msgid "Number of Sensors"
+msgstr ""
+
+msgid "Note: this page is for external (e.g. analog) and virtual sensors."
+msgstr ""
+
+msgid "Failed to load sensor descriptions"
+msgstr ""
+
+msgid "Edit Sensors"
+msgstr ""
+
+msgid "Add a Sensor"
+msgstr ""
+
+msgid "Show Inactive"
+msgstr ""
+
+msgid "Download All"
+msgstr ""
+
+msgid "Delete All"
+msgstr ""
+
+msgid "Failed to download sensor logs"
+msgstr ""
+
+msgid "No sensor logs found."
+msgstr ""
+
+msgid "Loading sensor data"
+msgstr ""
+
+msgid "No sensor data in the selected time range. Older data may exist; choose a longer range above."
+msgstr ""
+
+msgid "Failed to load sensor logs"
+msgstr ""
+
+msgid "Sensor Logs"
+msgstr ""
+
+msgid "Are you sure you want to delete all sensor logs?"
+msgstr ""
+
+msgid "Are you sure you want to download all log data?"
+msgstr ""
+
+msgid "This action can take a while depending on the number of log records."
+msgstr ""
+
+msgid "Retrieving sensor logs"
+msgstr ""
+
+msgid "Deleting sensor log"
+msgstr ""
+
+msgid "Delete the entire log of"
+msgstr ""
+
+msgid "Warning"
+msgstr ""
+
+msgid "This may take several minutes. Deleting a sensor's log does not free log capacity; use this only when you need to reset this sensor's recorded history."
+msgstr ""
+
+msgid "Loading log data"
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid "Stopping"
+msgstr ""
+
+msgid "Stopping after the current page"
+msgstr ""
+
+msgid "Less than a minute remaining"
+msgstr ""
+
+msgid "About %d minute remaining"
+msgstr ""
+
+msgid "About %d minutes remaining"
+msgstr ""
+
+msgid "Failed to delete sensor logs"
+msgstr ""
+
+msgid "Sensor log progress"
+msgstr ""
+
+msgid "Clear this alert"
+msgstr ""
+
+msgid "Sprinkler Logs"
+msgstr ""
+
+msgid "Show Sensor Log"
+msgstr ""
+
+msgid "Pause Runs"
+msgstr ""
+
+msgid "Configuration"
+msgstr ""
+
+msgid "Run immediately (preempt other zones in this group)"
+msgstr ""
+
+msgid "Update Firmware"
+msgstr ""
+
+msgid "Sensor 3 Update"
+msgstr ""
+
+msgid "Sensor 4 Update"
+msgstr ""
+
+msgid "This UI has limited support for ASB firmware."
+msgstr ""
+
+msgid "ASB firmware detected"
+msgstr ""
+
+msgid "This UI has limited support for it. Switch to OpenSprinklerASB app/UI."
+msgstr ""
+
+msgid "OpenSprinklerASB Firmware Detected"
+msgstr ""
+
+msgid "Curve points (sensor value and adjustment in %)"
+msgstr ""
+
+msgid "points"
+msgstr ""
+
+msgid "Piecewise linear curve"
+msgstr ""

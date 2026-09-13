@@ -176,6 +176,12 @@ OSApp.UIDom.launchApp = function() {
 		// Grabs the new page hash
 		hash = $.mobile.path.parseUrl( page ).hash;
 
+		if ( !OSApp.Supported.sensors() &&
+			$.inArray( hash, [ "#sensors", "#add-sensor", "#sensor-logs" ] ) !== -1 ) {
+			e.preventDefault();
+			return;
+		}
+
 		if ( currPage.length > 0 && hash === "#" + currPage.attr( "id" ) ) {
 			return;
 		}
@@ -187,10 +193,19 @@ OSApp.UIDom.launchApp = function() {
 		}
 
 		// Cycle through page possibilities and call their init functions
+		// The program editor draws the sensor-adjustment curve with Chart.js,
+		// which is loaded on demand (js/modules/lazy.js) when sensors are available.
+		var withCharts = function( fn ) {
+			if ( OSApp.Supported.sensors() && OSApp.Lazy && OSApp.Lazy.ensureChartJs ) {
+				OSApp.Lazy.ensureChartJs( fn ).catch( fn );
+			} else {
+				fn();
+			}
+		};
 		if ( hash === "#programs" ) {
-			OSApp.Programs.displayPage( data.options.programToExpand );
+			withCharts( function() { OSApp.Programs.displayPage( data.options.programToExpand ); } );
 		} else if ( hash === "#addprogram" ) {
-			OSApp.Programs.addProgram( data.options.copyID );
+			withCharts( function() { OSApp.Programs.addProgram( data.options.copyID ); } );
 		} else if ( hash === "#manual" ) {
 			OSApp.Programs.displayPageManual();
 		} else if ( hash === "#about" ) {
@@ -215,6 +230,12 @@ OSApp.UIDom.launchApp = function() {
 			OSApp.Analog.showAnalogSensorConfig();
 		} else if ( OSApp.Analog.checkAnalogSensorAvail() && hash === "#analogsensorchart" ) {
 			OSApp.Analog.showAnalogSensorCharts();
+		} else if ( hash === "#sensors" && OSApp.Supported.sensors() ) {
+			OSApp.Sensors.displayPage( data.options.expandUuid );
+		} else if ( hash === "#add-sensor" && OSApp.Supported.sensors() ) {
+			OSApp.Sensors.addSensor();
+		} else if ( hash === "#sensor-logs" && OSApp.Supported.sensors() ) {
+			withCharts( function() { OSApp.Sensors.displayLogs(); } );
 		} else if ( hash === "#statistics" ) {
 			OSApp.Statistics.displayPage();
 		} else if ( hash === "#preview" ) {
@@ -394,6 +415,7 @@ OSApp.UIDom.showHomeMenu = ( function() {
 				"<li><a href='#statistics'>" + OSApp.Language._( "Statistics" ) + "</a></li>" +
 				"<li><a href='#preview' class='squeeze'>" + OSApp.Language._( "Preview Programs" ) + "</a></li>" +
 				"<li><a href='#logs'>" + OSApp.Language._( "View Logs" ) + "</a></li>" +
+				( OSApp.Supported.sensors() ? "<li><a href='#sensor-logs'>" + OSApp.Language._( "Sensor Logs" ) + "</a></li>" : "" ) +
 				"<li data-role='list-divider'>" + OSApp.Language._( "Programs and Settings" ) + "</li>" +
 				"<li><a href='#raindelay'>" + OSApp.Language._( "Change Rain Delay" ) + "</a></li>" +
 				( OSApp.Supported.pausing() ?
@@ -403,6 +425,7 @@ OSApp.UIDom.showHomeMenu = ( function() {
 				"<li><a href='#runonce'>" + OSApp.Language._( "Run-Once Program" ) + "</a></li>" +
 				"<li><a href='#programs'>" + OSApp.Language._( "Edit Programs" ) + "</a></li>" +
 				"<li><a href='#os-options'>" + OSApp.Language._( "Edit Options" ) + "</a></li>" +
+				( OSApp.Supported.sensors() ? "<li><a href='#sensors'>" + OSApp.Language._( "Edit Sensors" ) + "</a></li>" : "" ) +
 
 				( OSApp.Analog.checkAnalogSensorAvail() ? (
 					"<li><a href='#analogsensorconfig'>" + OSApp.Language._( "Analog Sensor Config" ) + "</a></li>" +
@@ -1188,7 +1211,9 @@ OSApp.UIDom.goHome = function( firstLoad ) {
 			"#liveDebug": true,
 			"#statistics": true,
 			"#analogsensorconfig": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail(),
-			"#analogsensorchart": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail()
+			"#analogsensorchart": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail(),
+			"#sensors": OSApp.Supported && OSApp.Supported.sensors && OSApp.Supported.sensors(),
+			"#sensor-logs": OSApp.Supported && OSApp.Supported.sensors && OSApp.Supported.sensors()
 		};
 
 		if ( hash && allowed[ hash ] ) {
