@@ -90,6 +90,34 @@ OSApp.Language.canUseNativeStorage = function() {
 	);
 };
 
+// On iOS the app is served over the file:// scheme, where fetch()/XHR to local
+// locale files fail (null-origin CORS). The only reliable loader there is the
+// cordova-file plugin, which is not populated until `deviceready`. When the
+// language is restored during early boot the plugin can still be missing, so we
+// wait for it before attempting the load. Web builds (no Cordova) proceed at once.
+OSApp.Language.whenLocaleLoaderReady = function( callback ) {
+	callback = typeof callback === "function" ? callback : function() {};
+
+	if ( !window.cordova ) {
+		callback();
+		return;
+	}
+
+	if ( window.cordova.file && window.cordova.file.applicationDirectory ) {
+		callback();
+		return;
+	}
+
+	var waited = 0,
+		interval = window.setInterval( function() {
+			waited += 100;
+			if ( ( window.cordova.file && window.cordova.file.applicationDirectory ) || waited >= 4000 ) {
+				window.clearInterval( interval );
+				callback();
+			}
+		}, 100 );
+};
+
 OSApp.Language.readNativeStoredLang = function( callback ) {
 	var fileUrl;
 
@@ -357,7 +385,9 @@ OSApp.Language.updateLang = function( lang, callback ) {
 					onFailed( "error", "file_entry_error", 0 );
 				} );
 			}, function() {
-				return false;
+				// Advance to the next loader instead of silently dying when the
+				// file entry cannot be resolved.
+				onFailed( "error", "resolve_local_url_error", 0 );
 			} );
 
 			return true;
@@ -403,7 +433,9 @@ OSApp.Language.updateLang = function( lang, callback ) {
 		tryJquery();
 	};
 
-	tryLoad( 0 );
+	OSApp.Language.whenLocaleLoaderReady( function() {
+		tryLoad( 0 );
+	} );
 };
 
 OSApp.Language.languageSelect = function() {
