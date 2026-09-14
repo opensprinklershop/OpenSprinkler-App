@@ -1,0 +1,10 @@
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const out = {};
+OSApp.UIDom.showHomeMenu(); await sleep(1200);
+out.menu = $("#mainMenu a").map(function(){ return $(this).text().trim(); }).get();
+$("#mainMenu").popup("close"); await sleep(500);
+OSApp.UIDom.changePage("#sensors"); await sleep(2500);
+out.afterSensorsRoute = $(".ui-page-active").attr("id");
+OSApp.UIDom.changePage("#sensor-logs"); await sleep(8000);
+out.logsPage = $("#sensor-logs").length; out.logsCanvas = $("#sensor-logs canvas").length;
+return JSON.stringify(out);

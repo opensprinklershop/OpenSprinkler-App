@@ -1190,6 +1190,104 @@ OSApp.Analog.getExportMethodSensors = function(backuptype) {
 
 
 //Program adjustments editor
+/**
+ * Open one of the analog editors (sensor, program adjustment, monitor) as a
+ * full-screen page instead of a popup. The editor markup is built as a jQM
+ * popup container; its header is dropped (the global toolbar shows the title
+ * and a Back button) and the container is placed on a new page. `popup.popup("close")`
+ * keeps working: it navigates back to the page the editor was opened from.
+ * options.onShow runs once the page is visible (charts need the final size).
+ */
+OSApp.Analog.openEditorPage = function(popup, options) {
+	options = options || {};
+	var editorId = popup.attr("id") || "analogEditor",
+		pageId = editorId + "-page",
+		header = popup.children("[data-role='header']").first(),
+		title = options.title || header.find("h1").first().text(),
+		returnPageId = options.returnPageId || $(".ui-page-active").attr("id") || "sprinklers",
+		closed = false;
+
+	header.remove();
+	popup.removeAttr("data-role").addClass("analog-editor-container").css("max-width", "");
+
+	$("#" + pageId).remove();
+	var page = $("<div data-role='page' id='" + pageId + "' class='analog-editor-page'>" +
+		"<div class='ui-content' role='main'></div></div>");
+	page.find(".ui-content").append(popup);
+
+	var closeEditor = function() {
+		if (closed) return;
+		closed = true;
+		if ($(".ui-page-active").attr("id") === pageId) {
+			OSApp.UIDom.changePage("#" + returnPageId);
+		}
+	};
+	// Editors call popup.popup("close") after submit/delete — also on fresh
+	// selectors like $("#sensorEditor").popup("close"). Route those to the page
+	// close instead of the (never initialised) jQM popup widget.
+	popup.data("analogEditorClose", closeEditor);
+	if (!$.fn._analogEditorPopupPatched) {
+		var origPopup = $.fn.popup;
+		$.fn.popup = function(cmd) {
+			var close = this.data("analogEditorClose");
+			if (typeof close === "function" && cmd === "close") {
+				close();
+				return this;
+			}
+			if (typeof close === "function") {
+				return this;
+			}
+			return origPopup.apply(this, arguments);
+		};
+		$.fn._analogEditorPopupPatched = true;
+	}
+
+	// The editor's own Submit button moves into the toolbar ("Save", top right);
+	// the inline button stays in the DOM (hidden) so its click handlers keep working.
+	var submitBtn = popup.find(".submit").first();
+	var hideInlineSubmit = function() {
+		if (!submitBtn.length) return;
+		var wrapper = submitBtn.closest(".ui-btn");
+		(wrapper.length ? wrapper : submitBtn).addClass("analog-editor-inline-submit");
+	};
+	var setHeader = function() {
+		var header = {
+			title: title,
+			leftBtn: {
+				icon: "carat-l",
+				text: OSApp.Language._("Back"),
+				class: "ui-toolbar-back-btn",
+				on: function() { closeEditor(); }
+			}
+		};
+		if (submitBtn.length) {
+			header.rightBtn = {
+				icon: "check",
+				text: OSApp.Language._("Save"),
+				class: "analog-editor-save",
+				on: function() { submitBtn.trigger("click"); }
+			};
+		}
+		OSApp.UIDom.changeHeader(header);
+	};
+	page.on("pagebeforeshow", function() {
+		hideInlineSubmit();
+		setHeader();
+	});
+	page.one("pageshow", function() {
+		if (typeof options.onShow === "function") options.onShow(page);
+	});
+	page.one("pagehide", function() {
+		closed = true;
+		popup.trigger("popupafterclose");
+		page.remove();
+	});
+
+	$.mobile.pageContainer.append(page);
+	$.mobile.pageContainer.pagecontainer("change", page);
+	return page;
+};
+
 OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callbackCancel ) {
 
 	OSApp.Analog.getSupportedAdjustmentTypes().then(function (supportedAdjustmentTypes) {
@@ -1494,12 +1592,12 @@ OSApp.Analog.showAdjustmentsEditor = function( progAdjust, row, callback, callba
 
 		$("#progAdjustEditor").remove();
 
-		popup.css("max-width", "580px");
 		popup.find("#stale-policy").change();
 
-		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
-		updateTypeFields();
-		adjFunc();
+		OSApp.Analog.openEditorPage(popup, { onShow: function() {
+			updateTypeFields();
+			adjFunc();
+		} });
 	});
 };
 
@@ -2254,7 +2352,7 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 
 		OSApp.Analog.updateMonitorEditorType(popup, monitor.type);
 
-		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
+		OSApp.Analog.openEditorPage(popup);
 	});
 };
 
@@ -5289,10 +5387,7 @@ list += "</select></div>" +
 			preloadBluetoothDevices();
 		}
 
-		// Enhance jQuery Mobile elements before opening
-		popup.enhanceWithin();
-
-		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
+		OSApp.Analog.openEditorPage(popup);
 	});
 };
 
@@ -5664,20 +5759,26 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 		});
 	}
 
-	OSApp.UIDom.changeHeader({
-		title: OSApp.Language._("Analog Sensor Config"),
-		leftBtn: {
-			icon: "carat-l",
-			text: OSApp.Language._("Back"),
-			class: "ui-toolbar-back-btn",
-			on: function() { OSApp.UIDom.goBack(); }
-		},
-		rightBtn: {
-			icon: "refresh",
-			text: screen.width >= 500 ? OSApp.Language._("Refresh") : "",
-			on: function() { loadData(); }
-		}
-	});
+	var setConfigHeader = function() {
+		OSApp.UIDom.changeHeader({
+			title: OSApp.Language._("Analog Sensor Config"),
+			leftBtn: {
+				icon: "carat-l",
+				text: OSApp.Language._("Back"),
+				class: "ui-toolbar-back-btn",
+				on: function() { OSApp.UIDom.goBack(); }
+			},
+			rightBtn: {
+				icon: "refresh",
+				text: screen.width >= 500 ? OSApp.Language._("Refresh") : "",
+				on: function() { loadData(); }
+			}
+		});
+	};
+	setConfigHeader();
+	// The editors (sensor, adjustment, monitor) and the chart are full pages
+	// with their own toolbar: restore ours when coming back.
+	page.on("pagebeforeshow", setConfigHeader);
 
 	$("#analogsensorconfig").remove();
 

@@ -1,0 +1,16 @@
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const out = {};
+OSApp.UIDom.changePage("#analogsensorconfig"); await sleep(6000);
+const smt = OSApp.Analog.analogSensors.find(s => s.type >= 1 && s.type <= 5);
+out.sensor = smt ? { nr: smt.nr, type: smt.type, name: smt.name, port: smt.port, id: smt.id } : null;
+$("a.edit-sensor[value='" + smt.nr + "'], .edit-sensor[value='" + smt.nr + "']").first().trigger("click"); await sleep(3000);
+let ed = $("#sensorEditor"); if (!ed.length) ed = $(".ui-popup-active [data-role='popup']").first();
+out.editorId = ed.attr("id");
+const visLabels = ed.find("label:visible").map(function(){ return $(this).text().trim(); }).get();
+out.portLabels = visLabels.filter(t => /^Port$|RS485/.test(t));
+out.modbusLabels = visLabels.filter(t => /Modbus/.test(t));
+out.portVisible = ed.find(".port:visible").length; out.rs485PortVisible = ed.find(".rs485_port:visible").length;
+out.idVisible = ed.find(".id:visible").length; out.rs485IdVisible = ed.find(".rs485_id:visible").length;
+out.rs485PortVal = ed.find(".rs485_port").val(); out.idVal = ed.find(".id").val();
+ed.popup("close"); await sleep(500);
+return JSON.stringify(out);

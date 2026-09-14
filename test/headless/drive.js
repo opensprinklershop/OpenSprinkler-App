@@ -34,6 +34,7 @@ async function getJSON(url) { return new Promise((res, rej) => http.get(url, r =
   console.log("connected:", await ev(`JSON.stringify({fwv:OSApp.currentSession.controller.options.fwv, sensors:(OSApp.currentSession.controller.sensors||{}).count, analog:OSApp.Analog.analogSensors.length, supported:OSApp.Supported.sensors(), page:$(".ui-page-active").attr("id")})`));
   const scen = fs.readFileSync(S + "/scenario_" + scenario + ".js", "utf8");
   console.log("scenario result:", await ev(`(async()=>{ ${scen} })()`, true));
+  try { const shot = await send("Page.captureScreenshot", { format: "png" }); fs.writeFileSync(S + "/shot_" + scenario + ".png", Buffer.from(shot.result.data, "base64")); console.log("screenshot:", S + "/shot_" + scenario + ".png"); } catch (e) { console.log("screenshot failed", e); }
   console.log("errors:\n" + (errors.length ? errors.join("\n") : "(none)"));
   ws.close(); chrome.kill(); process.exit(0);
 })().catch(e => { console.error("driver failed", e); chrome.kill(); process.exit(1); });

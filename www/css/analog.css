@@ -127,79 +127,89 @@ html.theme-dark #os-sensor-show .sensor-stale-critical {
 	background-color: rgba(140, 55, 55, 0.42) !important;
 }
 
-/* Compact editor dialogs (sensor, program adjustment, monitor) */
-#sensorEditor .ui-content,
-#progAdjustEditor .ui-content,
-#monitorEditor .ui-content {
-	padding: 8px 10px !important;
-	font-size: 13px;
+/* ---------------------------------------------------------------------
+ * Full-screen editor pages (sensor, program adjustment, monitor)
+ * The editors used to be compact popups; as pages they use the normal
+ * jQuery Mobile element sizes, sit in a framed card and let long button
+ * labels wrap instead of being cut off.
+ * ------------------------------------------------------------------- */
+.analog-editor-page .ui-content {
+	padding: 10px 12px 24px 12px;
 }
-#sensorEditor label,
-#progAdjustEditor label,
-#monitorEditor label {
-	font-size: 12px !important;
-	margin: 4px 0 1px 0 !important;
+.analog-editor-container {
+	max-width: 680px;
+	margin: 0 auto;
+	padding: 14px 16px 18px 16px;
+	border: 1px solid #c9c9c9;
+	border-radius: 10px;
+	background: #ffffff;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+	box-sizing: border-box;
+}
+html.theme-dark .analog-editor-container {
+	border-color: #4a4a4a;
+	background: #1f1f1f;
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.analog-editor-container .ui-content {
+	padding: 0 !important;
+	font-size: 1em;
+}
+.analog-editor-container label {
+	font-size: 0.95em;
+	margin: 10px 0 3px 0;
 	font-weight: 600;
 }
-#sensorEditor .ui-input-text input,
-#sensorEditor input[type='text'],
-#sensorEditor input[type='number'],
-#progAdjustEditor input[type='text'],
-#progAdjustEditor input[type='number'],
-#monitorEditor input[type='text'],
-#monitorEditor input[type='number'] {
-	padding: 4px 6px !important;
-	font-size: 13px !important;
-	height: auto !important;
-	min-height: 0 !important;
+.analog-editor-container .ui-content p {
+	margin: 6px 0 10px 0;
 }
-#sensorEditor .ui-select .ui-btn,
-#progAdjustEditor .ui-select .ui-btn,
-#monitorEditor .ui-select .ui-btn {
-	padding-top: 4px !important;
-	padding-bottom: 4px !important;
-	font-size: 13px !important;
-	min-height: 0 !important;
+/* Uniform button size; long labels ("View sensor data", ...) wrap */
+.analog-editor-container .ui-btn:not(.ui-btn-icon-notext):not(.ui-slider-handle):not(.ui-flipswitch-on):not(.ui-flipswitch) {
+	font-size: 1em;
+	padding: 0.65em 1em;
+	min-height: 0;
+	line-height: 1.3;
+	white-space: normal;
+	overflow: visible;
+	text-overflow: clip;
 }
-#sensorEditor .ui-btn,
-#progAdjustEditor .ui-btn,
-#monitorEditor .ui-btn {
-	padding-top: 5px !important;
-	padding-bottom: 5px !important;
-	padding-right: 10px !important;
-	font-size: 13px !important;
-	margin: 4px 0 !important;
+/* keep room for jQM icons (the generic rule above resets the padding) */
+.analog-editor-container .ui-btn.ui-btn-icon-left:not(.ui-btn-icon-notext) {
+	padding-left: 2.5em !important;
 }
-#sensorEditor .ui-header h1,
-#progAdjustEditor .ui-header h1,
-#monitorEditor .ui-header h1 {
-	font-size: 15px !important;
+.analog-editor-container .ui-btn.ui-btn-icon-right:not(.ui-btn-icon-notext) {
+	padding-right: 2.5em !important;
 }
-#sensorEditor .ui-content p,
-#progAdjustEditor .ui-content p,
-#monitorEditor .ui-content p {
-	margin: 3px 0 !important;
-	font-size: 12px;
+.analog-editor-container .ui-btn.ui-btn-icon-top:not(.ui-btn-icon-notext) {
+	padding-top: 2.5em !important;
 }
-#sensorEditor .ui-content form,
-#progAdjustEditor .ui-content form,
-#monitorEditor .ui-content form {
-	margin: 0;
+.analog-editor-container .ui-btn.ui-btn-icon-bottom:not(.ui-btn-icon-notext) {
+	padding-bottom: 2.5em !important;
 }
-#sensorEditor .ui-content .ui-field-contain,
-#progAdjustEditor .ui-content .ui-field-contain,
-#monitorEditor .ui-content .ui-field-contain {
-	margin: 2px 0 !important;
-	padding: 0 !important;
+.analog-editor-container .ui-checkbox .ui-btn,
+.analog-editor-container .ui-radio .ui-btn {
+	white-space: normal;
 }
-#sensorEditor .ui-checkbox label,
-#monitorEditor .ui-checkbox label {
-	font-size: 12px !important;
-	padding: 4px 8px 4px 28px !important;
+.analog-editor-container .ui-btn.ui-mini,
+.analog-editor-container .ui-mini .ui-btn {
+	font-size: 1em;
 }
-#sensorEditor button[data-mini],
-#progAdjustEditor button[data-mini],
-#monitorEditor button[data-mini] {
-	font-size: 12px !important;
-	padding: 3px 8px !important;
+.analog-editor-container .ui-select .ui-btn {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.analog-editor-container .ui-input-text,
+.analog-editor-container .ui-input-search {
+	margin: 4px 0 8px 0;
+}
+.analog-editor-container .ui-input-text input,
+.analog-editor-container input[type='text'],
+.analog-editor-container input[type='number'] {
+	font-size: 1em;
+	padding: 0.5em 0.6em;
+}
+/* the inline Submit button moves to the toolbar (Save) */
+.analog-editor-container .analog-editor-inline-submit {
+	display: none !important;
 }

@@ -21,6 +21,7 @@
   "preview.js",
   "programs.js",
   "programview.js",
+  "sensors.js",
   "sites.js",
   "sites-otc.js",
   "station-attributes.js",

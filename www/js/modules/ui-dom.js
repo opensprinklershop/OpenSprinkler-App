@@ -176,8 +176,11 @@ OSApp.UIDom.launchApp = function() {
 		// Grabs the new page hash
 		hash = $.mobile.path.parseUrl( page ).hash;
 
-		if ( !OSApp.Supported.sensors() &&
-			$.inArray( hash, [ "#sensors", "#add-sensor", "#sensor-logs" ] ) !== -1 ) {
+		// The upstream sensor editor (#sensors, #add-sensor) is not offered: our
+		// sensors are configured on the Analog Sensor page. Only the sensor log
+		// page of the upstream module is used.
+		if ( $.inArray( hash, [ "#sensors", "#add-sensor" ] ) !== -1 ||
+			( !OSApp.Supported.sensors() && hash === "#sensor-logs" ) ) {
 			e.preventDefault();
 			return;
 		}
@@ -230,10 +233,6 @@ OSApp.UIDom.launchApp = function() {
 			OSApp.Analog.showAnalogSensorConfig();
 		} else if ( OSApp.Analog.checkAnalogSensorAvail() && hash === "#analogsensorchart" ) {
 			OSApp.Analog.showAnalogSensorCharts();
-		} else if ( hash === "#sensors" && OSApp.Supported.sensors() ) {
-			OSApp.Sensors.displayPage( data.options.expandUuid );
-		} else if ( hash === "#add-sensor" && OSApp.Supported.sensors() ) {
-			OSApp.Sensors.addSensor();
 		} else if ( hash === "#sensor-logs" && OSApp.Supported.sensors() ) {
 			withCharts( function() { OSApp.Sensors.displayLogs(); } );
 		} else if ( hash === "#statistics" ) {
@@ -425,7 +424,6 @@ OSApp.UIDom.showHomeMenu = ( function() {
 				"<li><a href='#runonce'>" + OSApp.Language._( "Run-Once Program" ) + "</a></li>" +
 				"<li><a href='#programs'>" + OSApp.Language._( "Edit Programs" ) + "</a></li>" +
 				"<li><a href='#os-options'>" + OSApp.Language._( "Edit Options" ) + "</a></li>" +
-				( OSApp.Supported.sensors() ? "<li><a href='#sensors'>" + OSApp.Language._( "Edit Sensors" ) + "</a></li>" : "" ) +
 
 				( OSApp.Analog.checkAnalogSensorAvail() ? (
 					"<li><a href='#analogsensorconfig'>" + OSApp.Language._( "Analog Sensor Config" ) + "</a></li>" +
@@ -1212,7 +1210,6 @@ OSApp.UIDom.goHome = function( firstLoad ) {
 			"#statistics": true,
 			"#analogsensorconfig": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail(),
 			"#analogsensorchart": OSApp.Analog && OSApp.Analog.checkAnalogSensorAvail && OSApp.Analog.checkAnalogSensorAvail(),
-			"#sensors": OSApp.Supported && OSApp.Supported.sensors && OSApp.Supported.sensors(),
 			"#sensor-logs": OSApp.Supported && OSApp.Supported.sensors && OSApp.Supported.sensors()
 		};
 
