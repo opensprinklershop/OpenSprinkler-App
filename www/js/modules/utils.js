@@ -597,3 +597,31 @@ Returns true when currentSession.controller.settings is populated
 OSApp.Utils.isSessionValid = function() {
 	return !$.isEmptyObject(OSApp.currentSession?.controller?.settings || {});
 };
+
+/*
+Returns true when the browser will block requests to this site as mixed content:
+the app is served over https but the controller is addressed over plain http.
+Loopback hosts are exempt (Chrome treats them as potentially trustworthy) and
+OTC tokens always go through the https cloud forwarder.
+*/
+OSApp.Utils.isMixedContentBlocked = function( siteData ) {
+	if ( !siteData || window.location.protocol !== "https:" ) {
+		return false;
+	}
+	if ( siteData.os_token ) {
+		return false;
+	}
+	if ( siteData.ssl === "1" || siteData.ssl === 1 || siteData.ssl === true ) {
+		return false;
+	}
+
+	var host = String( siteData.os_ip || "" ).replace( /^https?:\/\//i, "" ).split( "/" )[ 0 ].split( ":" )[ 0 ];
+	if ( /^https:\/\//i.test( siteData.os_ip || "" ) ) {
+		return false;
+	}
+	if ( host === "localhost" || host === "127.0.0.1" || host === "[::1]" || /\.localhost$/i.test( host ) ) {
+		return false;
+	}
+
+	return host !== "";
+};

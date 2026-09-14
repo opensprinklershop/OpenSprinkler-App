@@ -83,7 +83,27 @@
 								};
 								// Cloud-forwarded /jo can exceed a few seconds on weak links; keep
 								// the failsafe above request timeouts to avoid premature fallback.
-								var fastPathFailsafe = window.setTimeout(revealFastPath, 15000);
+								// Chrome's Local Network Access prompt holds the probe until the user answers;
+								// give them time before the failsafe reveals the site list.
+								var fastPathFailsafe = window.setTimeout(revealFastPath, 25000);
+
+								// An https page cannot probe a plain-http controller: the browser
+								// blocks it as mixed content. Probing anyway only burns the timeout
+								// and then redirects into an arbitrary version folder. Go straight to
+								// the site list, where the app explains the problem.
+								var mixedContentBlocked = (function() {
+									if (window.location.protocol !== "https:" || siteData.os_token) { return false; }
+									if (siteData.ssl === "1" || /^https:\/\//i.test(siteData.os_ip || "")) { return false; }
+									var h = String(siteData.os_ip || "").replace(/^https?:\/\//i, "").split("/")[0].split(":")[0];
+									if (!h || h === "localhost" || h === "127.0.0.1" || h === "[::1]" || /\.localhost$/i.test(h)) { return false; }
+									return true;
+								})();
+								if (mixedContentBlocked) {
+									window.clearTimeout(fastPathFailsafe);
+									try { localStorage.setItem("mixed_content_site", currentSite); } catch (e) {}
+									revealFastPath();
+									return;
+								}
 
 								// Inject loading indicator after DOMContentLoaded or inline if DOM is already parsed
 								var showLoader = function() {
@@ -110,8 +130,9 @@
 								}
 								// Fix C: keep the controller probe timeout low so a weak controller
 								// link does not dominate the "Connecting..." delay. The failsafe above
-								// (15s) still guards against a stuck redirect.
-								xhr.timeout = 5000;
+								// (25s) still guards against a stuck redirect.
+								// 20 s: long enough for the browser's local-network permission prompt.
+								xhr.timeout = 20000;
 
 								// Fix C: load versions.json in parallel with the controller probe
 								// instead of sequentially after it. The result is cached and any
@@ -158,106 +179,70 @@
 									return origin + (path.endsWith("/") ? path : path + "/");
 								};
 
+								// Same bundle selection as OSApp.Sites.mapFirmwareToUIVersion: exact
+								// snapshot for this build, else the closest not-newer one, a firmware
+								// newer than every snapshot gets "dev". Without a build number (only
+								// happens when the password was rejected) nothing is guessed.
+								var mapVersion = function(fwv, fwm, versions) {
+									if (!fwv) { return null; }
+									if (fwv < 221) { return "2.2.1"; }
+									if (fwv === 221) {
+										var c = "2.2.1." + fwm;
+										return (fwm !== undefined && fwm !== null && fwm !== "" && versions.indexOf(c) !== -1) ? c : "2.2.1";
+									}
+									var base = Math.floor(fwv / 100) + "." + Math.floor((fwv % 100) / 10) + "." + (fwv % 10);
+									var build = parseInt(fwm, 10);
+									if (!isNaN(build) && versions.indexOf(base + "." + build) !== -1) { return base + "." + build; }
+									var snaps = versions.filter(function(v) { return v.indexOf(base + ".") === 0; })
+										.map(function(v) { return { v: v, n: parseInt(v.split(".")[3], 10) }; })
+										.filter(function(x) { return !isNaN(x.n); })
+										.sort(function(x, y) { return x.n - y.n; });
+									if (!snaps.length) { return versions.indexOf(base) !== -1 ? base : null; }
+									if (isNaN(build)) { return null; }
+									var newest = snaps[snaps.length - 1];
+									if (build > newest.n) { return versions.indexOf("dev") !== -1 ? "dev" : newest.v; }
+									var older = snaps.filter(function(x) { return x.n < build; });
+									return older.length ? older[older.length - 1].v : snaps[0].v;
+								};
+
+								// Give up on the automatic connect: show the site manager (unchanged,
+								// newest version) and let it explain why. No guessing of a bundle.
+								var abortToSites = function(reason) {
+									window.clearTimeout(fastPathFailsafe);
+									try { localStorage.setItem("fastpath_notice", reason + ":" + currentSite); } catch (e) {}
+									revealFastPath();
+								};
+
 								var handleRedirect = function(fwv, fwm) {
+									if (!fwv) { abortToSites("unreachable"); return; }
 									whenVersions(function(vData) {
-										// Fall back to the catalog's own default so this stays
-										// correct across releases; the literal is only a last resort
-										// when versions.json cannot be loaded at all.
-										var targetVersion = (vData && vData.default) || "2.4.0.224";
-										try {
-											var versions = (vData && vData.versions) || [];
-											var preferredFromCatalog = null;
-											if (Array.isArray(versions)) {
-												preferredFromCatalog = versions.find(function(v) {
-													return typeof v === "string" && v !== "dev";
-												});
-											}
-											if (preferredFromCatalog) {
-												targetVersion = preferredFromCatalog;
-											}
-
-											if (!fwv || fwv < 221) {
-												targetVersion = "2.2.1";
-											} else if (fwv === 221) {
-												// Firmware 2.2.1: dedizierter Build-Ordner (z.B. 2.2.1.5) falls vorhanden, sonst 2.2.1
-												var fwm221 = (typeof fwm === "number" || (typeof fwm === "string" && fwm !== "")) ? ("2.2.1." + fwm) : "";
-												targetVersion = (fwm221 && versions.indexOf(fwm221) !== -1) ? fwm221 : "2.2.1";
-											} else {
-												// Determine matching version
-												var major = Math.floor(fwv / 100);
-												var minor = Math.floor((fwv % 100) / 10);
-												var patch = fwv % 10;
-												var fwvStr = major + "." + minor + "." + patch;
-
-												// Setup target version string
-												var fullFwvStr = fwvStr;
-												if (typeof fwm === "number" || (typeof fwm === "string" && fwm !== "")) {
-													fullFwvStr = fwvStr + "." + fwm;
-												}
-
-												// Match the longest/most-precise match first (e.g., "2.4.0.212" first, then "2.4.0")
-												var matching = versions.filter(function(v) {
-													return v.indexOf(fullFwvStr) === 0;
-												});
-
-												if (matching.length > 0) {
-													targetVersion = matching[0];
-												} else {
-													// Fallback to match standard prefix (e.g. "2.4.0" or matching prefix)
-													var baseMatching = versions.filter(function(v) {
-														return v.indexOf(fwvStr) === 0;
-													});
-													// Firmware newer than every snapshot of this base version (e.g. a
-													// development build 2.4.0.228 while the newest snapshot is 2.4.0.227):
-													// an older snapshot would lack the features the firmware offers, so use
-													// the current build instead ("dev" if published, else this root).
-													var fwmNum = parseInt(fwm, 10);
-													var newestSnapshot = -1;
-													baseMatching.forEach(function(v) {
-														var m = parseInt(v.split(".")[3], 10);
-														if (!isNaN(m) && m > newestSnapshot) { newestSnapshot = m; }
-													});
-													if (!isNaN(fwmNum) && baseMatching.length > 0 && fwmNum > newestSnapshot) {
-														targetVersion = (versions.indexOf("dev") !== -1) ? "dev" : "";
-													} else if (baseMatching.length > 0) {
-														targetVersion = baseMatching[0];
-													} else {
-														targetVersion = (vData && vData.default) || "2.4.0.224";
-													}
-												}
-											}
-										} catch (e) {}
-
+										var versions = (vData && Array.isArray(vData.versions)) ? vData.versions : [];
+										var targetVersion = mapVersion(fwv, fwm, versions);
+										if (!targetVersion) { abortToSites("noversion"); return; }
 										localStorage.removeItem("show_sites");
 										window.clearTimeout(fastPathFailsafe);
-										if (!targetVersion) {
-											// stay on this (newest) build
-											revealFastPath();
-											return;
-										}
+										try { localStorage.setItem("last_ui_version", targetVersion); } catch (e) {}
 										window.location.href = computeBaseHref() + targetVersion + "/index.html";
 									});
 								};
 
 								xhr.onload = function() {
-									var fwv = null;
-									var fwm = null;
-									try {
-										var resp = JSON.parse(xhr.responseText);
-										fwv = resp.fwv;
-										fwm = resp.fwm;
-									} catch(e) {}
-									handleRedirect(fwv, fwm);
+									var resp = null;
+									try { resp = JSON.parse(xhr.responseText); } catch (e) {}
+									if (!resp || typeof resp.fwv === "undefined") { abortToSites("unreachable"); return; }
+									// A rejected password is answered with 200 and only {"fwv"}.
+									if (typeof resp.tz === "undefined") { abortToSites("auth"); return; }
+									handleRedirect(resp.fwv, resp.fwm);
 								};
 								xhr.onerror = xhr.ontimeout = function() {
-									handleRedirect(null, null);
+									abortToSites("unreachable");
 								};
 								try {
 									xhr.send();
 								} catch (e) {
 									// A synchronous failure (e.g. blocked mixed-content request under
 									// file://) must not leave the body hidden forever.
-									handleRedirect(null, null);
+									abortToSites("unreachable");
 								}
 							}
 						} catch (e) {

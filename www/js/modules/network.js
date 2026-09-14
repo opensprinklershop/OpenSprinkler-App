@@ -961,7 +961,13 @@ OSApp.Network.changePassword = function( opt ) {
 					dataType: "json",
 					timeout: OSApp.currentSession.token ? 30000 : 10000
 				} ).then(
-					function() {
+					function( data ) {
+						// A rejected password is still HTTP 200, but {"result":2}; only a
+						// real /jc reply (no "result" key) proves the hashed password works.
+						if ( !data || typeof data.result !== "undefined" ) {
+							popup.popup( "open" );
+							return;
+						}
 						sites[ current ].os_pw = OSApp.currentSession.pass = pw;
 						OSApp.Storage.set( { "sites":JSON.stringify( sites ) }, () => OSApp.Network.cloudSaveSites() );
 						opt.callback();
