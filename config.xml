@@ -113,6 +113,9 @@
         <preference name="AutoHideSplashScreen" value="true" />
         <preference name="SplashScreenDelay" value="3000" />
         <resource-file src="res/android/network_security_config.xml" target="app/src/main/res/xml/network_security_config.xml" />
+        <!-- Trust anchor referenced by network_security_config.xml (@raw/server_cert). Copied by
+             cordova prepare so CI builds (no build.sh) get it too. -->
+        <resource-file src="cert/server_cert.der" target="app/src/main/res/raw/server_cert.der" />
         <!-- Monochrome small icon for FCM/local notifications. Without it Android
              renders the full-colour launcher icon as a white square. -->
         <resource-file src="res/android/notification/drawable-mdpi/notification_icon.png" target="app/src/main/res/drawable-mdpi/notification_icon.png" />

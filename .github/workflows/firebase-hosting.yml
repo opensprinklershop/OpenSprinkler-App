@@ -23,9 +23,27 @@ permissions:
   pull-requests: write
 
 jobs:
-  build_and_deploy:
+  # Secrets are not readable in a job-level `if:`; map presence to an output first.
+  check_secrets:
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.event_name == 'workflow_dispatch' }}
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          HAS_SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_OPENSPRINKLER_UI != '' }}
+        run: |
+          if [ "$HAS_SA" = "true" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::FIREBASE_SERVICE_ACCOUNT_OPENSPRINKLER_UI not configured - skipping Firebase deploy"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build_and_deploy:
+    needs: check_secrets
+    runs-on: ubuntu-latest
+    if: ${{ needs.check_secrets.outputs.configured == 'true' && (github.event_name == 'push' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.event_name == 'workflow_dispatch') }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -82,7 +100,11 @@ jobs:
         run: npm install
 
       - name: Build UI
-        run: npx grunt prepareFW
+        # This fork has no `prepareFW` task (upstream: generateScriptsJson + compress + unzip).
+        # makeFW = terser + cssmin + compress:makeFW -> build/firmware/UI.zip; unpack it for hosting.
+        run: |
+          npx grunt makeFW
+          cd build/firmware && unzip -o -q UI.zip && rm UI.zip
 
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0

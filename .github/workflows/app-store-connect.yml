@@ -9,7 +9,28 @@ permissions:
   contents: read
 
 jobs:
+  # Secrets are not readable in a job-level `if:`; map presence to an output first.
+  check_secrets:
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - id: check
+        env:
+          HAS_CERT: ${{ secrets.BUILD_CERTIFICATE_BASE64 != '' }}
+          HAS_PP: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 != '' }}
+          HAS_API_KEY: ${{ secrets.IOS_APPSTORE_API_PRIVATE_KEY != '' }}
+        run: |
+          if [ "$HAS_CERT" = "true" ] && [ "$HAS_PP" = "true" ] && [ "$HAS_API_KEY" = "true" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Apple signing/App Store Connect secrets not configured - skipping iOS/macOS build"
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build_ios:
+    needs: check_secrets
+    if: needs.check_secrets.outputs.configured == 'true'
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
