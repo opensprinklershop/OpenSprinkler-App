@@ -148,11 +148,34 @@ done
 # whose src/ios copy is what gets bundled. plugins/ is gitignored, so the tracked
 # master lives at the repo root.
 if [ -f GoogleService-Info.plist ]; then
+	if ! /usr/libexec/PlistBuddy -c "Print :REVERSED_CLIENT_ID" GoogleService-Info.plist >/dev/null 2>&1; then
+		CLIENT_ID=$(/usr/libexec/PlistBuddy -c "Print :CLIENT_ID" GoogleService-Info.plist 2>/dev/null || true)
+		if [ -n "$CLIENT_ID" ]; then
+			REVERSED_CLIENT_ID=$(echo "$CLIENT_ID" | awk -F. '{ for (i = NF; i >= 1; i--) { printf "%s", $i; if (i > 1) { printf "."; } } printf "\n"; }')
+			/usr/libexec/PlistBuddy -c "Add :REVERSED_CLIENT_ID string $REVERSED_CLIENT_ID" GoogleService-Info.plist
+			echo "Added missing REVERSED_CLIENT_ID to GoogleService-Info.plist"
+		else
+			echo "[WARN] GoogleService-Info.plist enthält keinen CLIENT_ID/REVERSED_CLIENT_ID."
+			echo "[WARN] Google Sign-In auf iOS funktioniert damit nicht (Push-Build bleibt möglich)."
+		fi
+	fi
+
 	cp GoogleService-Info.plist plugins/cordova-plugin-firebasex-core/src/ios/GoogleService-Info.plist
 	echo "Copied GoogleService-Info.plist into firebasex-core"
 fi
 
-cordova build ios --device --release --buildConfig build.json
+BUILD_CONFIG_ARGS=()
+if [ -f build.json ]; then
+	BUILD_CONFIG_ARGS=(--buildConfig build.json)
+elif [ -f build.json.example ]; then
+	echo "build.json fehlt; erstelle lokale build.json aus build.json.example"
+	cp build.json.example build.json
+	BUILD_CONFIG_ARGS=(--buildConfig build.json)
+else
+	echo "[WARN] build.json fehlt und keine build.json.example gefunden; baue ohne --buildConfig."
+fi
+
+cordova build ios --device --release "${BUILD_CONFIG_ARGS[@]}"
 
 # Clean up dynamically packaged UI versions from git-tracked workspace (keep versions.json if original exists)
 rm -rf www/[0-9]*
