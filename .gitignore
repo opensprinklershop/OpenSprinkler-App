@@ -66,3 +66,8 @@ DEADJOE
 .firebase
 GoogleService-Info.plist
 cert
+
+# Signing material: never commit (keystore + passwords live outside the repo)
+build.json
+*.keystore
+*.jks

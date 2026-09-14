@@ -1,5 +1,26 @@
 # Changelog
 
+## [2.4.229] - 2026-09-14
+
+Release 2.4.229 (Android Build 229 / iOS 2.4.229)
+
+### Hinzugefügt
+- **Offizielle „Expanded Sensor“-API**: Die App spricht jetzt die offizielle Sensor-API der OpenSprinkler-Firmware 2.2.1(5) (`/jsn`, `/jsd`, `/jsl`, `/jpa`), die die OpenSprinklerShop-Firmware ab 2.4.0(228) als Fassade über den vorhandenen Sensorspeicher bereitstellt. Die Seiten erscheinen nur, wenn die Firmware die API meldet; die bisherigen Analog-Sensor-Seiten bleiben erhalten.
+- **Sensor-Anpassung im Programm-Editor**: Programme können pro Sensor stückweise (Punkttabelle) angepasst werden, inklusive der Run-once-/Anpassungs-Ansicht aus der offiziellen App. Der klassische Anpassungs-Editor kennt den neuen Typ „OpenSprinklerShop-Sensor“ ebenfalls und akzeptiert Punktlisten.
+- **Sensor-Logs**: Neue Seite mit Diagrammen (Chart.js, wird erst beim Aufruf geladen; Zoom/Touch-Bedienung).
+- **ZigBee-Signal-Badges**: Stationsliste und Dashboard zeigen den ZigBee-Zustand jeder Station (unterwegs, Fehler, bestätigt) als Symbol.
+- **Headless-Testszenarien**: Chromium-basierte Prüfungen für Editoren, Menü, Routing, SMT100- und virtuelle Sensoren unter `test/headless/`.
+
+### Geändert
+- **Editoren als Vollbildseiten**: Sensor-, Programmanpassungs- und Monitor-Editor sind keine Popups mehr, sondern eigene Seiten mit der globalen Kopfzeile; Schließen führt auf die Ausgangsseite zurück.
+- **Statusabfrage stabilisiert**: Die 4-Sekunden-Abfrage überlappt nicht mehr, der manuelle Stationsstart wartet nicht mehr auf die komplette Aktualisierung.
+- **Build/CI**: Das Server-Zertifikat für den Android-Trust-Anchor wird über `config.xml` mitgeliefert (GitHub-Build war rot); iOS-, Firebase- und Play-Upload-Workflows überspringen ohne Secrets statt fehlzuschlagen. Signaturschlüssel und `build.json` liegen nicht mehr im Repository.
+
+### Behoben
+- **RS485-Editor**: Port und Modbus-ID wurden doppelt angezeigt.
+- **Bewässerungsdatenbank**: Der Zonen-Abruf im Integrationsdialog schlug fehl (fehlende `getZones`-Funktion).
+- **Unit-Tests**: Fünf seit August fehlschlagende Tests (Setup-Assistent, Hauptmenü, Regenverzögerung, Benachrichtigungsgruppen, entfernte Monitor-Benachrichtigung) an das aktuelle Verhalten angepasst.
+
 ## [2.4.227] - 2026-08-22
 
 Release 2.4.227 (Android Build 227 / iOS 2.4.227)

@@ -18,17 +18,27 @@ describe("Popup Checks", function () {
 		OSApp.Storage.remove(["sites", "current_site", "cloudToken", "setupWizardSeen"], function () {
 			assert.equal(OSApp.Welcome.shouldShowSetupWizard(), true);
 
+			// The wizard opens with the language chooser; the connection
+			// choices (Wi-Fi / Ethernet) live on the "connect" step.
 			$.mobile.document.one("popupafteropen", "#setupWizard", function () {
-				assert.equal($("#setupWizard .setup-wifi").length, 1);
-				assert.equal($("#setupWizard .setup-ethernet").length, 1);
-				$("#setupWizard .setup-skip").trigger("click");
-			});
+				assert.equal($("#setupWizard .setup-lang-next").length, 1);
+				assert.equal($("#setupWizard .setup-skip").length, 1);
 
-			$.mobile.document.one("popupafterclose", "#setupWizard", function () {
-				OSApp.Storage.get("setupWizardSeen", function (data) {
-					assert.equal(data.setupWizardSeen, "true");
-					done();
+				$.mobile.document.one("popupafteropen", "#setupWizard", function () {
+					assert.equal($("#setupWizard .setup-wifi").length, 1);
+					assert.equal($("#setupWizard .setup-ethernet").length, 1);
+
+					$.mobile.document.one("popupafterclose", "#setupWizard", function () {
+						OSApp.Storage.get("setupWizardSeen", function (data) {
+							assert.equal(data.setupWizardSeen, "true");
+							done();
+						});
+					});
+
+					$("#setupWizard .setup-skip").trigger("click");
 				});
+
+				OSApp.Welcome.showSetupWizard({ view: "steps", step: OSApp.Welcome.getWizardSteps().indexOf("connect") });
 			});
 
 			OSApp.Welcome.showSetupWizard();
@@ -158,12 +168,29 @@ describe("Popup Checks", function () {
 		OSApp.currentSession.controller.options.ife = 0;
 		OSApp.currentSession.controller.options.ife2 = 0;
 		OSApp.currentSession.controller.options.ife3 = 0;
-		$("#o49").val("0");
-		$("#o49").trigger("click");
-		assert.equal($("#notif-program").length, 1);
-		assert.equal($("#notif-program_end").length, 1);
-		assert.equal($(".ui-bar.ui-bar-a:contains('Programs')").length, 1);
-		assert.equal($(".ui-bar.ui-bar-a:contains('Alerts & Monitoring')").length, 1);
-		$(".ui-popup").popup("close").remove();
+
+		// The #o49 button and its click handler only exist on a rendered options page.
+		$("#os-options").remove();
+		OSApp.Options.showOptions();
+
+		var page = $("#os-options"),
+			groupTitle = function (popup, title) {
+				return popup.find("div").filter(function () {
+					return $(this).text().trim() === title;
+				});
+			};
+
+		page.find("#o49").val("0").trigger("click");
+
+		var popup = $("#notif-program").closest(".ui-popup");
+
+		assert.equal(popup.length, 1);
+		assert.equal(popup.find("#notif-program").length, 1);
+		assert.equal(popup.find("#notif-program_end").length, 1);
+		assert.equal(groupTitle(popup, "Programs").length, 1);
+		assert.equal(groupTitle(popup, "Alerts & Monitoring").length, 1);
+
+		popup.popup("close").remove();
+		page.remove();
 	});
 });

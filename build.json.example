@@ -1,0 +1,35 @@
+{
+	"android": {
+		"release": {
+			"keystore": "/path/to/upload.keystore",
+			"storePassword": "<store password>",
+			"alias": "<key alias>",
+			"password": "<key password>",
+			"keystoreType": "jks"
+		}
+	},
+	"ios": {
+		"debug": {
+			"codeSignIdentity": "Apple Development",
+			"developmentTeam": "4PRJY2T89D",
+			"packageType": "development",
+			"automaticProvisioning": true,
+			"buildFlag": [
+				"EMBEDDED_CONTENT_CONTAINS_SWIFT = YES",
+				"ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=NO",
+				"LD_RUNPATH_SEARCH_PATHS = \"@executable_path/Frameworks\""
+			]
+		},
+		"release": {
+			"codeSignIdentity": "Apple Development",
+			"developmentTeam": "4PRJY2T89D",
+			"packageType": "app-store",
+			"automaticProvisioning": true,
+			"buildFlag": [
+				"EMBEDDED_CONTENT_CONTAINS_SWIFT = YES",
+				"ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES=NO",
+				"LD_RUNPATH_SEARCH_PATHS = \"@executable_path/Frameworks\""
+			]
+		}
+	}
+}
