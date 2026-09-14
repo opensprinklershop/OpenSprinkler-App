@@ -98,13 +98,16 @@ jobs:
       - name: Build Android Release AAB (signed)
         if: env.HAS_KEYSTORE == 'true'
         run: |
-          npx cordova build android --release -- --keystore=${{ runner.temp }}/keystore.jks --storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }} --alias=release --password=${{ secrets.ANDROID_KEY_PASSWORD }} --packageType=bundle
+          npx cordova build android --release -- --keystore=${{ runner.temp }}/keystore.jks --storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }} --alias=${{ secrets.ANDROID_KEY_ALIAS || 'opensprinklerpro' }} --password=${{ secrets.ANDROID_KEY_PASSWORD }} --packageType=bundle
 
       - name: Build Android Release AAB (unsigned, no keystore secret configured)
         if: env.HAS_KEYSTORE != 'true'
         run: |
           echo "::notice::ANDROID_KEYSTORE_BASE64 not set - building unsigned AAB as a compile check only"
+          # build.json points at the maintainer's local keystore path; cordova reads it implicitly.
+          mv build.json build.json.local
           npx cordova build android --release -- --packageType=bundle
+          mv build.json.local build.json
 
       - name: Upload unsigned AAB as workflow artifact
         if: env.HAS_KEYSTORE != 'true'
