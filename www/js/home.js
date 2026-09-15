@@ -13,14 +13,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * Loader for the controller-hosted page (http://<device>/): the firmware emits
+ * `var ver=<fwv>, ipas=<ignore password>` and this script.
+ *
+ * Version aware since 2.4.0(229): only jQuery and the md5 helper come from the
+ * root of the UI host. After the password is known the loader asks the device
+ * for its exact version (/jo, same origin), picks the matching UI bundle from
+ * versions.json and loads styles, modules, main.js and the page markup from
+ * that bundle. A 2.4.0(227) controller therefore gets the 2.4.0.227 interface
+ * instead of the newest one, whose endpoints it may not have.
+ */
+
 // Disables site selection menu
 window.currLocal = true;
 
 ( function( document ) {
-	var assetLocation = getAssetLocation(),
+	var rootLocation = getRootLocation(),
+		assetLocation = rootLocation,
 		isReady = false;
 
-	function getAssetLocation() {
+	function getRootLocation() {
 		var mainScript = document.querySelector( "script[src$='home.js']" ).src,
 			def = "http://ui.opensprinkler.com/";
 
@@ -121,17 +134,119 @@ window.currLocal = true;
 	// Change title to reflect current state
 	document.title = "Loading...";
 
-	// Insert main application stylesheet
-	insertStyleSheet( assetLocation + "css/jqm.css" );
-	insertStyleSheet( assetLocation + "css/main.css" );
-	insertStyleSheet( assetLocation + "css/vis-timeline-graph2d.min.css" );
-	insertStyleSheet( assetLocation + "css/analog.css" );
-
 	// Insert favicon for web page
-	insertStyleSheet( assetLocation + "img/favicon.ico", "shortcut icon" );
+	insertStyleSheet( rootLocation + "img/favicon.ico", "shortcut icon" );
 
-	// Insert jQuery
-	insertScript( assetLocation + "vendor-js/jquery.js", function() {
+	// Insert home page icon for iOS
+	insertStyleSheet( rootLocation + "img/icon-512.png", "apple-touch-icon" );
+
+	//Insert the startup images for iOS
+	( function() {
+		var p, l, r = window.devicePixelRatio, h = window.screen.height;
+		if ( navigator.platform === "iPad" ) {
+				p = r === 2 ? "res/ios-web/screens/startup-tablet-portrait-retina.png" :
+					"res/ios-web/screens/startup-tablet-portrait.png";
+				l = r === 2 ? "res/ios-web/screens/startup-tablet-landscape-retina.png" :
+					"res/ios-web/screens/startup-tablet-landscape.png";
+				insertStyleSheet( rootLocation + l, "apple-touch-startup-image",
+					"screen and (orientation: landscape)" );
+				insertStyleSheet( rootLocation + p, "apple-touch-startup-image",
+					"screen and (orientation: portrait)" );
+		} else {
+				p = r === 2 ?
+					( h === 568 ? "res/ios-web/screens/startup-iphone5-retina.png" :
+						"res/ios-web/screens/startup-retina.png" ) :
+					"res/ios-web/screens/startup.png";
+				insertStyleSheet( rootLocation + p, "apple-touch-startup-image" );
+		}
+	} )();
+
+	// jQuery and the md5 helper are the only root assets; everything else comes
+	// from the bundle that matches the firmware.
+	insertScript( rootLocation + "vendor-js/jquery.js", function() {
+		insertScript( rootLocation + "js/hasher.js", function() {
+			if ( !document.createElementNS ||
+				!document.createElementNS( "http://www.w3.org/2000/svg", "svg" ).createSVGRect ) {
+				$( "html" ).addClass( "ui-nosvg" );
+			}
+			init();
+		} );
+	} );
+
+	function deviceBase() {
+		return document.URL.match( /(https?:\/\/.*?)\/.*?/ )[ 1 ];
+	}
+
+	// ---- version resolution ------------------------------------------------
+
+	function mapVersion( fwv, fwm, catalog ) {
+		var versions = catalog.versions || [];
+		if ( !fwv ) { return null; }
+		if ( fwv < 221 ) { return "2.2.1"; }
+		if ( fwv === 221 ) {
+			var c = "2.2.1." + fwm;
+			return ( fwm !== undefined && fwm !== null && versions.indexOf( c ) !== -1 ) ? c : "2.2.1";
+		}
+		var base = Math.floor( fwv / 100 ) + "." + Math.floor( ( fwv % 100 ) / 10 ) + "." + ( fwv % 10 );
+		var n = parseInt( fwm, 10 );
+		if ( !isNaN( n ) && versions.indexOf( base + "." + n ) !== -1 ) { return base + "." + n; }
+		var snaps = versions.filter( function( v ) { return v.indexOf( base + "." ) === 0; } )
+			.map( function( v ) { return { v: v, n: parseInt( v.split( "." )[ 3 ], 10 ) }; } )
+			.filter( function( x ) { return !isNaN( x.n ); } )
+			.sort( function( a, b ) { return a.n - b.n; } );
+		if ( !snaps.length ) { return versions.indexOf( base ) !== -1 ? base : null; }
+		if ( isNaN( n ) ) { return null; }
+		var newest = snaps[ snaps.length - 1 ];
+		if ( n > newest.n ) { return versions.indexOf( "dev" ) !== -1 ? "dev" : newest.v; }
+		var older = snaps.filter( function( x ) { return x.n < n; } );
+		return older.length ? older[ older.length - 1 ].v : snaps[ 0 ].v;
+	}
+
+	function fallbackVersion( catalog ) {
+		var rel = ( catalog.versions || [] ).filter( function( v ) { return v !== "dev"; } );
+		return catalog[ "default" ] || rel[ 0 ] || "dev";
+	}
+
+	// Ask the device for fwv/fwm (same origin, no CORS involved), then pick the
+	// bundle. Any failure falls back to the catalog default, never to the root,
+	// which no longer carries an application.
+	function resolveBundle( pw, done ) {
+		var catalog = null,
+			options = null,
+			pending = 2,
+			step = function() {
+				if ( --pending ) { return; }
+				catalog = catalog || { versions: [], "default": "" };
+				var target = ( options && mapVersion( options.fwv, options.fwm, catalog ) ) || fallbackVersion( catalog );
+				try { localStorage.setItem( "last_ui_version", target ); } catch ( err ) { void err; }
+				done( rootLocation + target + "/" );
+			};
+
+		$.ajax( { url: rootLocation + "versions.json", dataType: "json", cache: false, timeout: 8000 } )
+			.then( function( c ) { if ( c && c.versions ) { catalog = c; } } )
+			.always( step );
+
+		$.ajax( { url: deviceBase() + "/jo?pw=" + encodeURIComponent( pw || "" ), dataType: "json", cache: false, timeout: 10000 } )
+			.then( function( jo ) { if ( jo && typeof jo.fwv !== "undefined" && typeof jo.tz !== "undefined" ) { options = jo; } } )
+			.always( step );
+	}
+
+	// ---- application loading ------------------------------------------------
+
+	function loadApp( location, body ) {
+		assetLocation = location;
+
+		// Insert main application stylesheet
+		insertStyleSheet( assetLocation + "css/jqm.css" );
+		insertStyleSheet( assetLocation + "css/main.css" );
+		insertStyleSheet( assetLocation + "css/vis-timeline-graph2d.min.css" );
+		insertStyleSheet( assetLocation + "css/analog.css" );
+
+		var fail = function() {
+			body.html( "<div class='spinner'>" +
+					"<div class='logo'></div><span class='feedback'>Unable to load UI</span>" +
+				"</div>" );
+		};
 
 		// Insert libraries
 		insertScript( assetLocation + "vendor-js/libs.js", function() {
@@ -144,87 +259,109 @@ window.currLocal = true;
 			insertScript( assetLocation + "vendor-js/dataTables-2.1.8.min.js" );
 
 			fetch( assetLocation + "modules.json" )
-				.then( response => response.json() )
-				.then( modules => {
-					let loadedScripts = 0;
-					const totalScripts = modules.length;
+				.then( function( response ) { return response.json(); } )
+				.then( function( modules ) {
+					var loadedScripts = 0;
+					var totalScripts = modules.length;
 
 					function scriptLoaded() {
 						loadedScripts++;
 						if ( loadedScripts === totalScripts ) {
 							// Once all scripts loaded, insert main.js
-							insertScript( assetLocation + "js/main.js", function () {
-                                                                try {
-                                                                        OSApp.Storage.setItemSync( "testQuota", "true" );
-                                                                        OSApp.Storage.removeItemSync( "testQuota" );
-                                                                        init();
+							insertScript( assetLocation + "js/main.js", function() {
+								try {
+									OSApp.Storage.setItemSync( "testQuota", "true" );
+									OSApp.Storage.removeItemSync( "testQuota" );
+									startApp( body, fail );
 								} catch ( err ) {
 									if ( err.code === 22 ) {
 										document.body.innerHTML = "<div class='spinner'><div class='logo'></div>" +
 											"<span class='feedback'>Local storage is not enabled. You may be in private browsing mode.</span></div>";
 									}
 								}
-							});
+							} );
 						}
 					}
 
 					// Dynamically insert all scripts from modules.json
-					modules.forEach( script => {
+					modules.forEach( function( script ) {
 						insertScript( assetLocation + "js/modules/" + script, scriptLoaded );
-					});
-				});
+					} );
+				}, fail );
 		} );
-	} );
-
-	// Insert home page icon for iOS
-	insertStyleSheet( assetLocation + "img/icon-512.png", "apple-touch-icon" );
-
-	//Insert the startup images for iOS
-	( function() {
-		var p, l, r = window.devicePixelRatio, h = window.screen.height;
-		if ( navigator.platform === "iPad" ) {
-				p = r === 2 ? "res/ios-web/screens/startup-tablet-portrait-retina.png" :
-					"res/ios-web/screens/startup-tablet-portrait.png";
-				l = r === 2 ? "res/ios-web/screens/startup-tablet-landscape-retina.png" :
-					"res/ios-web/screens/startup-tablet-landscape.png";
-				insertStyleSheet( assetLocation + l, "apple-touch-startup-image",
-					"screen and (orientation: landscape)" );
-				insertStyleSheet( assetLocation + p, "apple-touch-startup-image",
-					"screen and (orientation: portrait)" );
-		} else {
-				p = r === 2 ?
-					( h === 568 ? "res/ios-web/screens/startup-iphone5-retina.png" :
-						"res/ios-web/screens/startup-retina.png" ) :
-					"res/ios-web/screens/startup.png";
-				insertStyleSheet( assetLocation + p, "apple-touch-startup-image" );
-		}
-	} )();
-
-	if ( !document.createElementNS ||
-		!document.createElementNS( "http://www.w3.org/2000/svg", "svg" ).createSVGRect ) {
-		$( "html" ).addClas( "ui-nosvg" );
 	}
+
+	function startApp( body, fail ) {
+		// Start checking for script load completion and callback when done
+		var interval = setInterval( function() {
+			if ( isReady ) {
+				clearInterval( interval );
+
+				// Load jQuery Mobile
+				$.ajax( {
+					url: assetLocation + "vendor-js/jqm.js",
+					dataType: "script",
+					cache: true
+				} );
+			}
+		}, 1 );
+
+		$.ajax( {
+			url: assetLocation + "index.html",
+			crossDomain: true,
+			cache: true,
+			type: "GET"
+		} ).then(
+			function( data ) {
+
+				// Grab the pages from index.html (body content)
+				var pages = data.match( /<body>([.\s\S]*)<\/body>/ )[ 1 ];
+
+				// Show the body when jQM attempts first page transition
+				$( document ).one( "mobileinit", function() {
+
+					// Change title to reflect loading finished
+					document.title = "OpenSprinkler";
+
+					// Inject pages into DOM
+					body.html( pages );
+
+					// Remove spinner code (no longer needed)
+					$( "head" ).find( "style" ).remove();
+
+					// Hide multi site features since using local device
+					body.find( ".multiSite" ).hide();
+
+					// Show local site features
+					body.find( "#logout" ).parent().removeClass( "hidden" );
+
+					if ( ver < 208 ) {
+						body.find( "#downgradeui" ).parent().removeClass( "hidden" );
+					}
+				} );
+
+				// Mark environment as loaded
+				isReady = true;
+			},
+			fail
+		);
+	}
+
+	// ---- login ------------------------------------------------------------
 
 	function init() {
 		var body = $( "body" ),
-			finishInit = function() {
-
-				// Start checking for script load completion and callback when done
-				var interval = setInterval( function() {
-					if ( isReady ) {
-						clearInterval( interval );
-
-						// Load jQuery Mobile
-						$.ajax( {
-							url: assetLocation + "vendor-js/jqm.js",
-							dataType: "script",
-							cache: true
-						} );
-					}
-				}, 1 );
+			sites = null,
+			loader,
+			proceed = function( pw ) {
+				body.html( "<div class='spinner'><h1>Loading</h1></div>" );
+				document.title = "Loading...";
+				resolveBundle( pw, function( location ) {
+					loadApp( location, body );
+				} );
 			},
 			savePassword = function( pw, isHashed ) {
-				var sites = {
+				var newSites = {
 					"Local": {
 						"os_ip": document.URL.match( /https?:\/\/(.*)\/.*?/ )[ 1 ],
 						"os_pw": pw,
@@ -232,17 +369,13 @@ window.currLocal = true;
 						"is183": ( ver < 204 ) ? true : false,
 						"ssl": location.protocol === "https:" ? "1" : undefined
 					}
-				},
-				currentSite = "Local";
+				};
 
-				// Show loading message and title
-				body.html( "<div class='spinner'><h1>Loading</h1></div>" );
-				document.title = "Loading...";
-
-				// Inject site information to storage so Application loads current device
-                                OSApp.Storage.setItemSync( "sites", JSON.stringify( sites ) );
-                                OSApp.Storage.setItemSync( "current_site", currentSite );
-				finishInit();
+				// Inject site information into storage so the application loads this
+				// device ("sites"/"current_site" are global keys shared by all bundles).
+				localStorage.setItem( "sites", JSON.stringify( newSites ) );
+				localStorage.setItem( "current_site", "Local" );
+				proceed( pw );
 			},
 			wrongPassword = function() {
 				var feedback = $( ".feedback" );
@@ -253,14 +386,9 @@ window.currLocal = true;
 				}, 2000 );
 
 				$( "#os_pw" ).val( "" );
-			},
-			fail = function() {
-				body.html( "<div class='spinner'>" +
-						"<div class='logo'></div><span class='feedback'>Unable to load UI</span>" +
-					"</div>" );
-			},
-                        sites = JSON.parse( OSApp.Storage.getItemSync( "sites" ) ),
-			loader;
+			};
+
+		try { sites = JSON.parse( localStorage.getItem( "sites" ) ); } catch ( err ) { void err; sites = null; }
 
 		// Fix to allow CORS ajax requests to work on IE8 and 9
 		/*!
@@ -275,11 +403,18 @@ window.currLocal = true;
 
 		if ( sites ) {
 
-			// If device has been logged into before, use available settings
+			// Logged in before: use the stored password of the current site, or the
+			// first one (the controller page only ever stores a single "Local" site,
+			// but a browser shared with the multi-version host may have more).
+			var current = localStorage.getItem( "current_site" );
+			var site = ( current && sites[ current ] ) || sites.Local || sites[ Object.keys( sites )[ 0 ] ] || {};
 			loader = $( "<div class='spinner'><h1>Loading</h1></div>" );
-			finishInit();
+			body.html( loader );
+			proceed( site.os_pw || "" );
+			return;
 		} else if ( ipas === 1 ) {
 			savePassword( "" );
+			return;
 		} else {
 
 			// If this is a new login, prompt for password
@@ -299,7 +434,7 @@ window.currLocal = true;
 				var pw = $( "#os_pw" ).val(),
 					homeCheckPW = function( pass, callback ) {
 						$.ajax( {
-							url: document.URL.match( /(https?:\/\/.*)\/.*?/ )[ 1 ] + "/sp?pw=" + encodeURIComponent( pass ) + "&npw=" + encodeURIComponent( pass ) + "&cpw=" + encodeURIComponent( pass ),
+							url: deviceBase() + "/sp?pw=" + encodeURIComponent( pass ) + "&npw=" + encodeURIComponent( pass ) + "&cpw=" + encodeURIComponent( pass ),
 							cache: false,
 							crossDomain: true,
 							type: "GET"
@@ -356,45 +491,5 @@ window.currLocal = true;
 
 		// Hide the body while we modify the DOM
 		body.html( loader );
-
-		$.ajax( {
-			url: assetLocation + "index.html",
-			crossDomain: true,
-			cache: true,
-			type: "GET"
-		} ).then(
-			function( data ) {
-
-				// Grab the pages from index.html (body content)
-				var pages = data.match( /<body>([.\s\S]*)<\/body>/ )[ 1 ];
-
-				// Show the body when jQM attempts first page transition
-				$( document ).one( "mobileinit", function() {
-
-					// Change title to reflect loading finished
-					document.title = "OpenSprinkler";
-
-					// Inject pages into DOM
-					body.html( pages );
-
-					// Remove spinner code (no longer needed)
-					$( "head" ).find( "style" ).remove();
-
-					// Hide multi site features since using local device
-					body.find( ".multiSite" ).hide();
-
-					// Show local site features
-					body.find( "#logout" ).parent().removeClass( "hidden" );
-
-					if ( ver < 208 ) {
-						body.find( "#downgradeui" ).parent().removeClass( "hidden" );
-					}
-				} );
-
-				// Mark environment as loaded
-				isReady = true;
-			},
-			fail
-		);
 	}
 }( document ) );

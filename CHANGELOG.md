@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.4.230] - 2026-09-15
+
+Release 2.4.230 (Android Build 230 / iOS 2.4.230)
+
+### Behoben
+- **Verbindung über ui.opensprinklershop.de mit älterer Firmware**: Controller mit Firmware 2.4.0(227) und älter liefen beim Verbinden in „Verbindungstimeout“. Ursache war die Sensor-API-Abfrage (`/jsn`, `/jsd`) der neuesten Oberfläche: Die Firmware antwortet mit 404 ohne CORS-Header, der Browser meldet Status 0, und die Wiederholungslogik räumte die gemeinsame Anfrage-Warteschlange ab, sodass die Verbindung bis zum 15-Sekunden-Watchdog hing. Sensor-API-Anfragen werden jetzt weder wiederholt noch brechen sie die Warteschlange ab.
+- **„Verbinden“ klärt zuerst die Version**: In der Standortverwaltung fragt „verbinden“ jetzt zuerst `/jo` ab, wählt anhand von `fwv`/`fwm` das exakt passende Oberflächen-Bundle (sonst den nächst-älteren Stand, für neuere Entwicklungsfirmware `dev`) und leitet erst dann weiter. Ohne Build-Nummer wird nicht mehr das neueste Bundle geraten. Bei nicht erreichbarem Gerät oder unbekannter Version bleibt man mit klarer Meldung in der Standortverwaltung.
+- **Falsches Passwort**: Die Firmware beantwortet ein abgelehntes Passwort mit HTTP 200 und nur `{"fwv"}`; das wurde bisher als Erfolg gewertet. Jetzt erscheint der Passwortdialog, und das akzeptierte Passwort wird für die Weiterleitung übernommen, auch wenn „Passwort speichern“ nicht angehakt ist. Der automatische Hash-Versuch des Dialogs prüft das Ergebnis, statt jede 200-Antwort zu akzeptieren (speicherte sonst `md5("")`).
+- **HTTP-Gerät auf der HTTPS-Seite**: Ein per `http://` eingetragener Controller kann von `https://ui.opensprinklershop.de` aus nicht angesprochen werden (Mixed Content). Statt eines Timeouts erscheint eine Erklärung mit Direktlink zur Oberfläche des Geräts sowie den Alternativen SSL und OTC.
+- **Service Worker**: Anfragen an fremde Ursprünge (Controller, OTC-Cloud, Wetter) werden nicht mehr vom Service Worker abgefangen. Chromes Local-Network-Access-Prüfung kann für Worker-Anfragen keinen Dialog zeigen und machte daraus ein künstliches 503 („gesperrt … oder Gerät offline“).
+
+### Geändert
+- **Geräteseite (`home.js`)**: Beim Aufruf über die Controller-IP werden nur noch jQuery und der Hash-Helfer von der Root geladen; nach der Anmeldung liest die Seite die Firmware-Version und lädt Stile, Module und Markup aus dem passenden versionierten Bundle. Ein 227-Controller bekommt so auch direkt die 227-Oberfläche.
+- **Gebündelter Versionskatalog**: `www/versions.json` enthält jetzt auch `2.4.0.228`.
+- **iOS-Build**: `buildios.sh` legt `build.json` bei Bedarf selbst an und unterstützt `REVERSED_CLIENT_ID` aus `GoogleService-Info.plist`.
+- **CI**: Der unsignierte Android-Prüfbau kommt ohne getracktes `build.json` aus.
+
 ## [2.4.229] - 2026-09-14
 
 Release 2.4.229 (Android Build 229 / iOS 2.4.229)

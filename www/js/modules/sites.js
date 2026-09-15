@@ -66,8 +66,9 @@ OSApp.Sites.getKnownFallbackVersion = function(versions) {
 };
 
 OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
+	versions = Array.isArray( versions ) ? versions : [];
 	if (!fwv) {
-		return OSApp.Sites.getKnownFallbackVersion(versions);
+		return null;
 	}
 
 	// 2.2.1 and below (fwv < 221) should use 2.2.1 legacy
@@ -85,34 +86,51 @@ OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
 	var minor = Math.floor((fwv % 100) / 10);
 	var patch = fwv % 10;
 	var fwvStr = major + "." + minor + "." + patch;
+	var build = parseInt(fwm, 10);
 
-	// Construct full target version string with minor/fwm if available
-	var fullFwvStr = fwvStr;
-	if (typeof fwm === "number" || (typeof fwm === "string" && fwm !== "")) {
-		fullFwvStr = fwvStr + "." + fwm;
+	// Exact bundle for this build.
+	if (!isNaN(build) && versions.indexOf(fwvStr + "." + build) !== -1) {
+		return fwvStr + "." + build;
 	}
 
-	// Match the longest/most-precise match first (e.g., "2.4.0.212" first, then "2.4.0")
-	var matching = versions.filter(function(v) {
-		return v.indexOf(fullFwvStr) === 0;
-	});
+	var snapshots = versions.filter(function(v) { return v.indexOf(fwvStr + ".") === 0; })
+		.map(function(v) { return { v: v, n: parseInt(v.split(".")[3], 10) }; })
+		.filter(function(x) { return !isNaN(x.n); })
+		.sort(function(a, b) { return a.n - b.n; });
 
-	if (matching.length > 0) {
-		return matching[0];
-	} else {
-		// Fallback to match standard prefix (e.g. "2.4.0")
-		var baseMatching = versions.filter(function(v) {
-			return v.indexOf(fwvStr) === 0;
-		});
-		if (baseMatching.length > 0) {
-			return baseMatching[0];
-		}
+	if (!snapshots.length) {
+		return versions.indexOf(fwvStr) !== -1 ? fwvStr : null;
 	}
 
-	return OSApp.Sites.getKnownFallbackVersion(versions);
+	// Without a build number the right snapshot cannot be told (the firmware only
+	// omits it when the password was not accepted). Do not guess the newest one:
+	// a UI newer than the firmware calls endpoints the firmware does not have.
+	if (isNaN(build)) {
+		return null;
+	}
+
+	var newest = snapshots[snapshots.length - 1];
+	if (build > newest.n) {
+		// Firmware newer than every snapshot (development build): an older snapshot
+		// would miss its features, use the current build when it is published.
+		return versions.indexOf("dev") !== -1 ? "dev" : newest.v;
+	}
+
+	// Otherwise the closest snapshot that is not newer than the firmware.
+	var older = snapshots.filter(function(x) { return x.n < build; });
+	return older.length ? older[older.length - 1].v : snapshots[0].v;
 };
 
 OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
+	// A plain-http controller is unreachable from this https page. Probing it only
+	// fails, and the fallback would then drop the user into an arbitrary version
+	// folder. Explain the problem instead of guessing a UI version.
+	if ( OSApp.Utils.isMixedContentBlocked( siteData ) ) {
+		$.mobile.loading( "hide" );
+		OSApp.Sites.showMixedContentHelp( newsite );
+		return;
+	}
+
 	$.mobile.loading( "show", {
 		html: "<h1>" + OSApp.Language._( "Connecting..." ) + "</h1>",
 		textVisible: true,
@@ -204,48 +222,108 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 		return;
 	}
 
+	var stayHere = function( message ) {
+		$.mobile.loading( "hide" );
+		if ( $( ".ui-page-active" ).attr( "id" ) !== "site-control" ) {
+			OSApp.UIDom.changePage( "#site-control", { transition: "none" } );
+		}
+		if ( message ) {
+			OSApp.Errors.showError( message, 4000 );
+		}
+	};
+
 	var prefix = siteData.ssl === "1" ? "https://" : "http://",
 		normalizedIp = ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) ? OSApp.Firmware.normalizeDirectHost( siteData.os_ip, prefix ) : siteData.os_ip,
 		urlDest = "/jo?pw=" + encodeURIComponent( siteData.os_pw ),
 		url = siteData.os_token ? OSApp.Utils.otcForwardBase( siteData.os_token, siteData.os_otc_server ) + urlDest : prefix + normalizedIp + urlDest;
 
+	// The password dialog (OSApp.Network.changePassword -> checkPW) and the
+	// mixed-content help read the target from the session. Callers other than
+	// updateSite (the boot-time auto connect, submitNewSite) may not have set it.
+	OSApp.currentSession.currentSite = newsite;
+	OSApp.currentSession.token = siteData.os_token;
+	OSApp.currentSession.otcServer = siteData.os_otc_server || OSApp.Utils.DEFAULT_OTC_SERVER;
+	OSApp.currentSession.ip = normalizedIp;
+	OSApp.currentSession.prefix = prefix;
+	OSApp.currentSession.pass = siteData.os_pw;
+	if ( typeof siteData.auth_user !== "undefined" && typeof siteData.auth_pw !== "undefined" ) {
+		OSApp.currentSession.auth = true;
+		OSApp.currentSession.authUser = siteData.auth_user;
+		OSApp.currentSession.authPass = siteData.auth_pw;
+	} else {
+		OSApp.currentSession.auth = false;
+	}
+	// This routine produces its own messages; drop a notice the fast path may
+	// have left for the site manager so it is not shown later, out of context.
+	try { localStorage.removeItem( "fastpath_notice" ); } catch ( err ) { void err; }
+
 	$.ajax( {
 		url: url,
 		type: "GET",
 		dataType: "json",
-		timeout: 10000,
+		timeout: 20000,
 		beforeSend: function( xhr ) {
 			if ( !siteData.os_token && typeof siteData.auth_user !== "undefined" && typeof siteData.auth_pw !== "undefined" ) {
 				xhr.setRequestHeader( "Authorization", "Basic " + btoa( siteData.auth_user + ":" + siteData.auth_pw ) );
 			}
 		}
 	} ).then(
-		function(options) {
+		function( options ) {
+			if ( OSApp.Firmware.isUnauthorizedOptions( options ) ) {
+				// A rejected password is answered with 200 and only {"fwv"}: there is
+				// no build number to route on. Ask for the password and try again.
+				$.mobile.loading( "hide" );
+				OSApp.Network.changePassword( {
+					fixIncorrect: true,
+					name: newsite,
+					callback: function() {
+						// The dialog keeps the accepted password in the session; it is only
+						// written to the site when "Save Password" was ticked.
+						OSApp.Storage.get( "sites", function( data ) {
+							var sites = OSApp.Sites.parseSites( data.sites );
+							if ( sites[ newsite ] ) {
+								if ( !sites[ newsite ].os_pw && OSApp.currentSession.pass ) {
+									// Not saved: hand it to the bundle we forward to for this
+									// browser session only, so it does not have to ask again.
+									try { sessionStorage.setItem( "os_session_pw:" + newsite, OSApp.currentSession.pass ); } catch ( err ) { void err; }
+								}
+								OSApp.Sites.routeToVersion( newsite, $.extend( {}, sites[ newsite ], { os_pw: OSApp.currentSession.pass } ) );
+							}
+						} );
+					},
+					cancel: function() { stayHere(); }
+				} );
+				return;
+			}
+
 			var fwv = options.fwv;
 			var fwm = options.fwm;
-			$.ajax({
+			$.ajax( {
 				url: "versions.json",
 				type: "GET",
 				dataType: "json",
-				timeout: 5000
-			}).then(
-				function(vData) {
-					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion(fwv, vData.versions || [], fwm);
+				timeout: 8000,
+				cache: false
+			} ).then(
+				function( vData ) {
+					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion( fwv, vData.versions || [], fwm );
+					if ( !targetVersion ) {
+						stayHere( OSApp.Language._( "The firmware version of" ) + " " + newsite + " " +
+							OSApp.Language._( "is unknown, so the matching interface cannot be chosen. Please check the device." ) );
+						return;
+					}
 					localStorage.setItem( "last_ui_version", targetVersion );
 					navigateToVersion( targetVersion );
 				},
 				function() {
-					resolveFallbackVersion( function( fallbackVer ) {
-						navigateToVersion( fallbackVer );
-					} );
+					stayHere( OSApp.Language._( "The interface version catalog could not be loaded. Please try again." ) );
 				}
 			);
 		},
 		function() {
-			console.log("Could not ping controller directly. Routing using cached/catalog fallback UI version.");
-			resolveFallbackVersion( function( fallbackVer ) {
-				navigateToVersion( fallbackVer );
-			} );
+			// Device not reachable: say so and stay in the site manager instead of
+			// guessing a version.
+			stayHere( OSApp.Language._( "Unable to connect to" ) + " " + newsite );
 		}
 	);
 };
@@ -278,6 +356,36 @@ OSApp.Sites.displayPage = function() {
 			} );
 
 			document.title = "OpenSprinkler";
+
+			// The fast path in index.html aborts an auto-connect it knows the browser
+			// will block and leaves a marker. Explain it here instead of leaving the
+			// user in front of a silent site list.
+			try {
+				var blockedSite = localStorage.getItem( "mixed_content_site" );
+				if ( blockedSite ) {
+					localStorage.removeItem( "mixed_content_site" );
+					setTimeout( function() {
+						OSApp.Sites.showMixedContentHelp( blockedSite );
+					}, 600 );
+				}
+				// "<reason>:<site>" written by the fast path when it gave up on an
+				// automatic connect (wrong password, device unreachable, unknown version).
+				var notice = localStorage.getItem( "fastpath_notice" );
+				if ( notice ) {
+					localStorage.removeItem( "fastpath_notice" );
+					var reason = notice.split( ":" )[ 0 ], siteName = notice.slice( reason.length + 1 ), text = "";
+					if ( reason === "auth" ) {
+						text = OSApp.Language._( "Incorrect password for " ) + siteName + ". " + OSApp.Language._( "Please re-enter password to try again." );
+					} else if ( reason === "noversion" ) {
+						text = OSApp.Language._( "The firmware version of" ) + " " + siteName + " " + OSApp.Language._( "is unknown, so the matching interface cannot be chosen. Please check the device." );
+					} else if ( reason === "unreachable" ) {
+						text = OSApp.Language._( "Unable to connect to" ) + " " + siteName;
+					}
+					if ( text ) {
+						setTimeout( function() { OSApp.Errors.showError( text, 4000 ); }, 600 );
+					}
+				}
+			} catch ( err ) { void err; }
 		},
 		popup = $( "<div data-role='popup' id='addsite' data-theme='b'>" +
 			"<ul data-role='listview'>" +
@@ -1413,6 +1521,59 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 };
 
 // Gather new controller information and load home page
+
+// Cached lookup of a stored site definition by name (synchronous storage mirror).
+OSApp.Sites.getCurrentSiteData = function( name ) {
+	try {
+		var sites = JSON.parse( OSApp.Storage.getItemSync( "sites" ) || "{}" );
+		return sites[ name ] || null;
+	} catch ( err ) {
+		void err;
+		return null;
+	}
+};
+
+// Explain why an https-hosted app cannot talk to a plain-http controller and
+// offer the two working alternatives instead of a generic timeout.
+OSApp.Sites.showMixedContentHelp = function( name ) {
+	var host = "";
+	var siteData = OSApp.Sites.getCurrentSiteData( name );
+	if ( siteData ) {
+		host = String( siteData.os_ip || "" ).replace( /^https?:\/\//i, "" );
+	}
+
+	var popup = $(
+		"<div data-role='popup' class='ui-content' data-theme='a' style='max-width:32em'>" +
+			"<h3>" + OSApp.Language._( "Connection blocked by the browser" ) + "</h3>" +
+			"<p>" + OSApp.Language._( "This page is loaded over HTTPS, but the controller is addressed over plain HTTP. Browsers block such mixed connections, so the device can never answer." ) + "</p>" +
+			( host ? "<a href='http://" + OSApp.Utils.htmlEscape( host ) + "/' data-role='button' data-theme='b' class='mixed-content-goto'>" +
+				OSApp.Language._( "Open the user interface directly from the controller" ) + "</a>" : "" ) +
+			"<p>" + OSApp.Language._( "Other options:" ) + "</p>" +
+			"<ul>" +
+				"<li>" + OSApp.Language._( "Enable 'Use SSL' for this site and trust the device certificate once." ) + "</li>" +
+				"<li>" + OSApp.Language._( "Add an OTC connection so the device is reached through the cloud." ) + "</li>" +
+			"</ul>" +
+			"<a href='#' data-role='button' class='mixed-content-close'>" + OSApp.Language._( "OK" ) + "</a>" +
+		"</div>"
+	);
+
+	var openPopup = function() {
+		popup.one( "popupafterclose", function() { popup.remove(); } );
+		popup.find( ".mixed-content-close" ).on( "click", function() {
+			popup.popup( "close" );
+			return false;
+		} );
+		OSApp.UIDom.openPopup( popup );
+	};
+
+	if ( $( ".ui-page-active" ).attr( "id" ) === "site-control" ) {
+		openPopup();
+	} else {
+		$.mobile.document.one( "pageshow", openPopup );
+		OSApp.UIDom.changePage( "#site-control", { transition: "none" } );
+	}
+};
+
 OSApp.Sites.newLoad = function( firstLoad ) {
 
 	// Get the current site name from the session (not from selector which may not be updated yet)
@@ -1459,6 +1620,16 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 
 	//Clear the current queued AJAX requests (used for previous OSApp.currentSession.controller connection)
 	$.ajaxq.abort( "default" );
+
+	// An https-hosted app cannot reach a plain-http controller: the browser blocks
+	// every request as mixed content, each one fails instantly and the connect
+	// chain only surfaces as "Connection timed-out" 15 s later. Say what is wrong
+	// and how to fix it instead of waiting for the watchdog.
+	if ( OSApp.Utils.isMixedContentBlocked( OSApp.Sites.getCurrentSiteData ? OSApp.Sites.getCurrentSiteData( name ) : null ) ) {
+		$.mobile.loading( "hide" );
+		OSApp.Sites.showMixedContentHelp( name );
+		return;
+	}
 
 	var didFinishConnect = false,
 		connectWatchdog = setTimeout( function() {
@@ -1581,6 +1752,10 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 				}
 			},
 			showFail = function() {
+				if ( OSApp.Utils.isMixedContentBlocked( OSApp.Sites.getCurrentSiteData ? OSApp.Sites.getCurrentSiteData( name ) : null ) ) {
+					OSApp.Sites.showMixedContentHelp( name );
+					return;
+				}
 				OSApp.Errors.showError( OSApp.Language._( "Unable to connect to" ) + " " + name, 3500 );
 			};
 
@@ -2182,6 +2357,11 @@ OSApp.Sites.updateSite = function( newsite, opts ) {
 
 						OSApp.currentSession.ip = sites[ newsite ].os_ip;
 						OSApp.currentSession.pass = sites[ newsite ].os_pw;
+						if ( !OSApp.currentSession.pass ) {
+							// Password entered on the site manager but not saved: the root
+							// bundle leaves it here for this browser session (see routeToVersion).
+							try { OSApp.currentSession.pass = sessionStorage.getItem( "os_session_pw:" + newsite ) || ""; } catch ( err ) { void err; }
+						}
 
 						if ( typeof sites[ newsite ].ssl !== "undefined" && sites[ newsite ].ssl === "1" ) {
 							OSApp.currentSession.prefix = "https://";
@@ -2212,6 +2392,15 @@ OSApp.Sites.updateSite = function( newsite, opts ) {
 						// Populate the panel site-selector; newLoad() alone does not, so
 						// connecting via the "connect" button would leave the dropdown empty.
 						OSApp.Sites.updateSiteList( Object.keys( sites ), newsite );
+
+						// On the multi-version host the root bundle is only the site manager.
+						// "Connect" must first learn the firmware version and forward to the
+						// matching bundle; loading the controller here would run the newest
+						// UI against whatever firmware answers.
+						if ( OSApp.Sites.isRootPath() ) {
+							OSApp.Sites.routeToVersion( newsite, sites[ newsite ] );
+							return;
+						}
 
 						OSApp.Sites.newLoad();
 						return;

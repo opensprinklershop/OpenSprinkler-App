@@ -623,7 +623,7 @@
     "Inactive": "Inaktiv",
     "Inch in": "Zoll in",
     "Incomplete parameters! Please check that all necessary input fields are filled in!": "Unvollständige Parameter! Bitte prüfen Sie, ob alle notwendigen Eingabefelder ausgefüllt sind!",
-    "Incorrect password for ": "Falsches Passwort für",
+    "Incorrect password for ": "Falsches Passwort für ",
     "InfluxDB": "InfluxDB",
     "InfluxDB Settings": "InfluxDB-Einstellungen",
     "Information": "Information",
@@ -1854,6 +1854,15 @@
     "OpenSprinklerASB Firmware Detected": "OpenSprinklerASB-Firmware erkannt",
     "Curve points (sensor value and adjustment in %)": "Kurvenpunkte (Sensorwert und Anpassung in %)",
     "points": "Punkte",
-    "Piecewise linear curve": "Stückweise lineare Kurve"
+    "Piecewise linear curve": "Stückweise lineare Kurve",
+    "Connection blocked by the browser": "Verbindung vom Browser blockiert",
+    "This page is loaded over HTTPS, but the controller is addressed over plain HTTP. Browsers block such mixed connections, so the device can never answer.": "Diese Seite wurde über HTTPS geladen, der Controller wird aber über einfaches HTTP angesprochen. Browser blockieren solche gemischten Verbindungen, das Gerät kann deshalb nicht antworten.",
+    "Enable 'Use SSL' for this site and trust the device certificate once.": "Aktivieren Sie „SSL verwenden“ für diesen Standort und vertrauen Sie dem Gerätezertifikat einmalig.",
+    "Add an OTC connection so the device is reached through the cloud.": "Fügen Sie eine OTC-Verbindung hinzu, damit das Gerät über die Cloud erreicht wird.",
+    "Open the user interface directly from the controller": "Benutzeroberfläche direkt vom Controller öffnen",
+    "Other options:": "Weitere Möglichkeiten:",
+    "The firmware version of": "Die Firmware-Version von",
+    "is unknown, so the matching interface cannot be chosen. Please check the device.": "ist unbekannt, die passende Oberfläche kann nicht gewählt werden. Bitte das Gerät prüfen.",
+    "The interface version catalog could not be loaded. Please try again.": "Der Versionskatalog der Oberfläche konnte nicht geladen werden. Bitte erneut versuchen."
   }
 }

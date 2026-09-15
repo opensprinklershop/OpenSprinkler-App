@@ -22,12 +22,14 @@
 
 // jshint ignore:end
 // jscs:enable
+// The router page (start.html) and home.js load this file only for md5();
+// there is no form at that point.
 var form = document.forms[ 0 ];
-if ( form.addEventListener ) {
+if ( form && form.addEventListener ) {
 
 	// Handle modern browsers
 	form.addEventListener( "submit", beforeSubmit, false );
-} else if ( form.attachEvent ) {
+} else if ( form && form.attachEvent ) {
 
 	// Handle old IE
 	form.attachEvent( "onsubmit", beforeSubmit );

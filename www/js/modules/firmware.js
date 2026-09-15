@@ -141,6 +141,15 @@ OSApp.Firmware.nativeHttpRequest = function( obj ) {
 
 // Requests that change controller state (routed through the "change" queue,
 // sent as POST on newer firmware). Includes the Expanded Sensor API mutations.
+// A /jo reply to an unaccepted password is HTTP 200 with only the firmware
+// version in it ({"fwv":240}). Without this check the caller mistakes it for a
+// successful probe, and every version/feature decision is then made on missing
+// data. A real reply always carries the timezone.
+OSApp.Firmware.isUnauthorizedOptions = function( data ) {
+	return !!( data && typeof data === "object" &&
+		typeof data.fwv !== "undefined" && typeof data.tz === "undefined" );
+};
+
 OSApp.Firmware.isChangeRequest = function( dest ) {
 	return /\/(?:cv|cs|csn|cr|cp|uwa|dp|dsn|dsl|co|cl|cu|up|cm|sp|pq|dl|sa|sc|sb|sn)(?:\?|$)/.test( dest );
 };
@@ -183,6 +192,22 @@ OSApp.Firmware.sendToOS = function( dest, type, options ) {
 			headers: {},
 			shouldRetry: function( xhr, current ) {
 				if ( requestOptions.signal && requestOptions.signal.aborted ) {
+					return false;
+				}
+				// Optional endpoints (Expanded Sensor API /jsn, /jsd) are absent on
+				// firmware < 2.4.0(228). Same-origin that is a clean 404; cross-origin
+				// (hosted UI -> device) the firmware's 404 carries no CORS header, so
+				// the browser hides it and reports status 0 ("CORS Missing Allow
+				// Origin"). Either way retrying is pointless. Crucially we must NOT run
+				// $.ajaxq.abort() here: /jsn and /jsd share the "default" queue with
+				// each other, so aborting the queue drops the sibling request without
+				// ever settling its promise and the connect chain in sites.js hangs
+				// until the 15 s watchdog fires "Connection timed-out". Give up only
+				// this one request.
+				if ( isSensorApi ) {
+					return false;
+				}
+				if ( xhr.status === 404 ) {
 					return false;
 				}
 				if ( xhr.status === 0 && xhr.statusText === "abort" || OSApp.Constants.http.RETRY_COUNT < current ) {
@@ -1216,7 +1241,9 @@ OSApp.Firmware.pollOTAProgress = function( popup ) {
 					} ).then( function( vData ) {
 						var versions = ( vData && Array.isArray( vData.versions ) ) ? vData.versions : [];
 						var targetVersion = OSApp.Sites.mapFirmwareToUIVersion( fwv, versions, fwm );
-						localStorage.setItem( "last_ui_version", targetVersion );
+						if ( targetVersion ) {
+							localStorage.setItem( "last_ui_version", targetVersion );
+						}
 						navigateAfterClose( targetVersion );
 					}, function() {
 						// versions.json unavailable — still trigger routeToVersion so it can

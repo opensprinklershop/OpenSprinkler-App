@@ -259,12 +259,23 @@ self.addEventListener("install", (e) => {
 });
 
 self.addEventListener("fetch", function (e) {
+    var requestUrl = new URL(e.request.url);
+
+    // Never intercept cross-origin requests (controller IP, OTC cloud, weather,
+    // update server). Chrome's Local Network Access checks cannot show the
+    // permission prompt for a fetch issued from inside a worker, so routing
+    // device requests through here turned every one of them into the synthetic
+    // 503 below ("Offline or blocked by network policy") even though the device
+    // was reachable. Left to the browser, the page gets the prompt and the real
+    // response. Same-origin traffic keeps the caching strategies below.
+    if (requestUrl.origin !== self.location.origin) {
+        return;
+    }
+
     if (e.request.method !== "GET") {
         e.respondWith(fetch(e.request));
         return;
     }
-
-    var requestUrl = new URL(e.request.url);
 
     // Speed up loading of static resources by using a Cache-First strategy
     // for all precached files (styles, scripts, images, locales) except the index page itself.
