@@ -1,6 +1,8 @@
 # Changelog
 
-## [2.4.231] - unveröffentlicht
+## [2.4.231] - 2026-09-16
+
+Release 2.4.231 (Android Build 231 / iOS 2.4.231)
 
 ### Behoben
 - **Android/iOS-App hängt beim Start in „Connecting to <Name>…“ (OTC-Standort)**: Der Schnellstart in `index.html` probte einen OTC-Standort immer über `cloud.openthings.io`, unabhängig vom eingestellten OTC-Server (z. B. `io.opensprinklershop.de`). Die Anfrage schlug sofort mit 404 fehl, und weil die Antwort vor `DOMContentLoaded` eintraf, wurde das Verbindungs-Overlay erst *nach* dem Aufräumen eingefügt und nie wieder entfernt; darunter war die Standortverwaltung längst benutzbar. Der Schnellstart nutzt jetzt denselben Server wie die App (`os_otc_server`, Abbildung wie `OSApp.Utils.otcForwardBase`), fügt das Overlay nach einem bereits beendeten Versuch nicht mehr ein, und der Start-Watchdog behandelt ein verwaistes Overlay wie einen schwarzen Bildschirm.
