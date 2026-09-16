@@ -177,6 +177,53 @@ fi
 
 cordova build ios --device --release "${BUILD_CONFIG_ARGS[@]}"
 
+# Auto-deploy upload to App Store Connect after a successful build.
+# Can be enabled non-interactively with AUTO_DEPLOY_IOS=y.
+if [ -t 0 ] || [ -n "$AUTO_DEPLOY_IOS" ]; then
+	if [ -z "$AUTO_DEPLOY_IOS" ]; then
+		read -r -p "Build automatisch zu App Store Connect hochladen? [y/N]: " AUTO_DEPLOY_IOS
+	fi
+else
+	AUTO_DEPLOY_IOS="n"
+fi
+AUTO_DEPLOY_IOS=${AUTO_DEPLOY_IOS:-n}
+
+if [[ "$AUTO_DEPLOY_IOS" =~ ^[Yy]$ ]]; then
+	IPA_PATH=""
+	for CANDIDATE in \
+		"build/OpenSprinklerASB.ipa" \
+		"platforms/ios/build/device/OpenSprinklerASB.ipa" \
+		"platforms/ios/build/Release-iphoneos/OpenSprinklerASB.ipa"; do
+		if [ -f "$CANDIDATE" ]; then
+			IPA_PATH="$CANDIDATE"
+			break
+		fi
+	done
+
+	if [ -z "$IPA_PATH" ]; then
+		IPA_PATH=$(find build platforms/ios -type f -name "*.ipa" 2>/dev/null | head -n 1)
+	fi
+
+	if [ -z "$IPA_PATH" ] || [ ! -f "$IPA_PATH" ]; then
+		echo "Fehler: Keine IPA-Datei gefunden. Upload abgebrochen."
+		exit 1
+	fi
+
+	echo "Starte App Store Connect Upload mit IPA: $IPA_PATH"
+
+	if [ -n "$APPSTORE_API_KEY_ID" ] && [ -n "$APPSTORE_API_ISSUER_ID" ]; then
+		echo "Upload via App Store Connect API Key"
+		xcrun altool --upload-app --type ios --file "$IPA_PATH" --apiKey "$APPSTORE_API_KEY_ID" --apiIssuer "$APPSTORE_API_ISSUER_ID"
+	elif [ -n "$APPSTORE_USERNAME" ] && [ -n "$APPSTORE_PASSWORD" ]; then
+		echo "Upload via Apple ID + app-spezifischem Passwort"
+		xcrun altool --upload-app --type ios --file "$IPA_PATH" --username "$APPSTORE_USERNAME" --password "$APPSTORE_PASSWORD"
+	else
+		echo "Fehler: Keine Upload-Credentials gefunden."
+		echo "Setze APPSTORE_USERNAME + APPSTORE_PASSWORD oder APPSTORE_API_KEY_ID + APPSTORE_API_ISSUER_ID."
+		exit 1
+	fi
+fi
+
 # Clean up dynamically packaged UI versions from git-tracked workspace (keep versions.json if original exists)
 rm -rf www/[0-9]*
 git checkout www/versions.json 2>/dev/null || true
