@@ -107,6 +107,10 @@
 
 								// Inject loading indicator after DOMContentLoaded or inline if DOM is already parsed
 								var showLoader = function() {
+									// The probe may already have failed (a fast 404/auth answer arrives
+									// before DOMContentLoaded). Adding the overlay then would cover the
+									// revealed site list forever: nothing removes it afterwards.
+									if (fastPathRevealed || document.getElementById("fast-path-loader")) { return; }
 									var container = document.createElement("div");
 									container.id = "fast-path-loader";
 									container.setAttribute("style", "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #1c1c1c; color: #fff; font-family: sans-serif; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999999; font-size: 1.2em;");
@@ -121,7 +125,16 @@
 								}
 
 								var urlDest = "/jo?pw=" + encodeURIComponent(siteData.os_pw);
-								var url = siteData.os_token ? "https://cloud.openthings.io/forward/v1/" + siteData.os_token + urlDest : (siteData.ssl === "1" ? "https://" : "http://") + siteData.os_ip + urlDest;
+								// Same host mapping as OSApp.Utils.otcForwardBase: the stored value is the
+								// WebSocket host (ws.cloud.openthings.io, io.opensprinklershop.de, ...),
+								// the HTTPS forward lives on the host without the "ws." label and port.
+								var otcForwardBase = function(token, server) {
+									var host = String(server || "ws.cloud.openthings.io").trim()
+										.replace(/^wss?:\/\//i, "").replace(/^https?:\/\//i, "").replace(/\/.*$/, "")
+										.replace(/:\d+$/, "").replace(/^ws\./i, "");
+									return "https://" + (host || "cloud.openthings.io") + "/forward/v1/" + token;
+								};
+								var url = siteData.os_token ? otcForwardBase(siteData.os_token, siteData.os_otc_server) + urlDest : (siteData.ssl === "1" ? "https://" : "http://") + siteData.os_ip + urlDest;
 
 								var xhr = new XMLHttpRequest();
 								xhr.open("GET", url, true);
@@ -213,16 +226,52 @@
 									revealFastPath();
 								};
 
+								var redirectTo = function(targetVersion) {
+									localStorage.removeItem("show_sites");
+									window.clearTimeout(fastPathFailsafe);
+									try { localStorage.setItem("last_ui_version", targetVersion); } catch (e) {}
+									window.location.href = computeBaseHref() + targetVersion + "/index.html";
+								};
+
+								// The mobile apps bundle only the released snapshots, not "dev": a firmware
+								// newer than every snapshot would be sent into a folder that does not
+								// exist (blank page / navigation error). Off opensprinklershop.de probe the
+								// bundle first; if it is missing, reveal the app and let it connect with
+								// this (newest) bundle instead (OSApp.Sites.routeToVersion does the same).
+								var redirectIfBundled = function(targetVersion) {
+									if (window.location.hostname.indexOf("opensprinklershop.de") !== -1) { redirectTo(targetVersion); return; }
+									var probe = new XMLHttpRequest();
+									var settled = false;
+									var once = function(fn) {
+										if (settled) { return; }
+										settled = true;
+										fn();
+									};
+									var connectHere = function() {
+										window.clearTimeout(fastPathFailsafe);
+										revealFastPath();
+										// revealFastPath() asks the next boot for the site list; here the
+										// app should auto-connect (OSApp.Sites.checkConfigured -> routeToVersion).
+										try { localStorage.removeItem("show_sites"); } catch (e) {}
+									};
+									probe.open("GET", computeBaseHref() + targetVersion + "/index.html", true);
+									probe.timeout = 3000;
+									probe.onload = function() {
+										once(function() {
+											if (probe.status >= 200 && probe.status < 300) { redirectTo(targetVersion); } else { connectHere(); }
+										});
+									};
+									probe.onerror = probe.ontimeout = function() { once(connectHere); };
+									try { probe.send(); } catch (e) { once(connectHere); }
+								};
+
 								var handleRedirect = function(fwv, fwm) {
 									if (!fwv) { abortToSites("unreachable"); return; }
 									whenVersions(function(vData) {
 										var versions = (vData && Array.isArray(vData.versions)) ? vData.versions : [];
 										var targetVersion = mapVersion(fwv, fwm, versions);
 										if (!targetVersion) { abortToSites("noversion"); return; }
-										localStorage.removeItem("show_sites");
-										window.clearTimeout(fastPathFailsafe);
-										try { localStorage.setItem("last_ui_version", targetVersion); } catch (e) {}
-										window.location.href = computeBaseHref() + targetVersion + "/index.html";
+										redirectIfBundled(targetVersion);
 									});
 								};
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.4.231] - unveröffentlicht
+
+### Behoben
+- **Android/iOS-App hängt beim Start in „Connecting to <Name>…“ (OTC-Standort)**: Der Schnellstart in `index.html` probte einen OTC-Standort immer über `cloud.openthings.io`, unabhängig vom eingestellten OTC-Server (z. B. `io.opensprinklershop.de`). Die Anfrage schlug sofort mit 404 fehl, und weil die Antwort vor `DOMContentLoaded` eintraf, wurde das Verbindungs-Overlay erst *nach* dem Aufräumen eingefügt und nie wieder entfernt; darunter war die Standortverwaltung längst benutzbar. Der Schnellstart nutzt jetzt denselben Server wie die App (`os_otc_server`, Abbildung wie `OSApp.Utils.otcForwardBase`), fügt das Overlay nach einem bereits beendeten Versuch nicht mehr ein, und der Start-Watchdog behandelt ein verwaistes Overlay wie einen schwarzen Bildschirm.
+- **Firmware neuer als alle gebündelten Bundles**: Die Apps bündeln nur die Release-Snapshots, nicht `dev`. Für eine Firmware neuer als der neueste Snapshot leitete der Schnellstart in den nicht vorhandenen Ordner `dev/` um (leere Seite bzw. Navigationsfehler), und `routeToVersion` → `updateSite` → `routeToVersion` drehte sich endlos. Außerhalb von opensprinklershop.de wird das Ziel-Bundle jetzt vor der Weiterleitung geprüft; fehlt es, verbindet die App mit dem aktuellen (neuesten) Bundle. `connectInCurrentBundle` lädt den Controller direkt statt über `updateSite`.
+
+### Geändert
+- **`OSApp.Sites.applySiteToSession`**: Gemeinsame Übernahme eines gespeicherten Standorts in die Sitzung (Token/OTC-Server, Adresse, Passwort inkl. Sitzungs-Fallback, SSL-Präfix, HTTP-Auth, 1.8.3-Flag); `updateSite` nutzt sie statt einer eigenen Kopie.
+
 ## [2.4.230] - 2026-09-15
 
 Release 2.4.230 (Android Build 230 / iOS 2.4.230)

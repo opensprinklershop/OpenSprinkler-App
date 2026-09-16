@@ -121,6 +121,38 @@ OSApp.Sites.mapFirmwareToUIVersion = function(fwv, versions, fwm) {
 	return older.length ? older[older.length - 1].v : snapshots[0].v;
 };
 
+// Point OSApp.currentSession at a stored site (token/OTC server, address,
+// password, SSL prefix, HTTP auth, 1.8.3 flag). Shared by the connect paths.
+OSApp.Sites.applySiteToSession = function( name, site ) {
+	OSApp.currentSession.currentSite = name;
+	OSApp.currentSession.token = site.os_token;
+	OSApp.currentSession.otcServer = site.os_otc_server || OSApp.Utils.DEFAULT_OTC_SERVER;
+
+	OSApp.currentSession.ip = site.os_ip;
+	OSApp.currentSession.pass = site.os_pw;
+	if ( !OSApp.currentSession.pass ) {
+		// Password entered on the site manager but not saved: the root
+		// bundle leaves it here for this browser session (see routeToVersion).
+		try { OSApp.currentSession.pass = sessionStorage.getItem( "os_session_pw:" + name ) || ""; } catch ( err ) { void err; }
+	}
+
+	OSApp.currentSession.prefix = ( typeof site.ssl !== "undefined" && site.ssl === "1" ) ? "https://" : "http://";
+
+	if ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) {
+		OSApp.currentSession.ip = OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix );
+	}
+
+	if ( typeof site.auth_user !== "undefined" && typeof site.auth_pw !== "undefined" ) {
+		OSApp.currentSession.auth = true;
+		OSApp.currentSession.authUser = site.auth_user;
+		OSApp.currentSession.authPass = site.auth_pw;
+	} else {
+		OSApp.currentSession.auth = false;
+	}
+
+	OSApp.currentSession.fw183 = !!site.is183;
+};
+
 OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 	// A plain-http controller is unreachable from this https page. Probing it only
 	// fails, and the fallback would then drop the user into an arbitrary version
@@ -152,13 +184,25 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 	var baseHref = origin + (path.endsWith("/") ? path : path + "/");
 	var connectInCurrentBundle = function() {
 		$.mobile.loading( "hide" );
-		localStorage.removeItem("show_sites");
+		localStorage.removeItem( "show_sites" );
 
-		if ( typeof OSApp.Sites.updateSite === "function" ) {
-			OSApp.Sites.updateSite( newsite, { goSprinklers: true } );
-		} else {
-			window.location.href = baseHref + "index.html";
-		}
+		// Load the controller with this bundle directly. Going through
+		// updateSite() would call routeToVersion() again on the root path and
+		// loop forever whenever the target folder is missing: the mobile apps
+		// bundle the released snapshots only, not "dev", so any firmware newer
+		// than the newest snapshot ends up here.
+		OSApp.Storage.get( "sites", function( data ) {
+			var sites = OSApp.Sites.parseSites( data.sites );
+			if ( !sites[ newsite ] ) {
+				OSApp.UIDom.changePage( "#site-control", { transition: "none" } );
+				return;
+			}
+			OSApp.Storage.set( { "current_site": newsite }, function() {
+				OSApp.Sites.applySiteToSession( newsite, sites[ newsite ] );
+				OSApp.Sites.updateSiteList( Object.keys( sites ), newsite );
+				OSApp.Sites.newLoad();
+			} );
+		} );
 	};
 	var resolveFallbackVersion = function( done ) {
 		var preferred = OSApp.Sites.getKnownFallbackVersion();
@@ -2351,43 +2395,7 @@ OSApp.Sites.updateSite = function( newsite, opts ) {
 			OSApp.UIDom.closePanel( function() {
 				OSApp.Storage.set( { "current_site":newsite }, function() {
 					if ( opts.goSprinklers === true ) {
-						OSApp.currentSession.currentSite = newsite;
-						OSApp.currentSession.token = sites[ newsite ].os_token;
-						OSApp.currentSession.otcServer = sites[ newsite ].os_otc_server || OSApp.Utils.DEFAULT_OTC_SERVER;
-
-						OSApp.currentSession.ip = sites[ newsite ].os_ip;
-						OSApp.currentSession.pass = sites[ newsite ].os_pw;
-						if ( !OSApp.currentSession.pass ) {
-							// Password entered on the site manager but not saved: the root
-							// bundle leaves it here for this browser session (see routeToVersion).
-							try { OSApp.currentSession.pass = sessionStorage.getItem( "os_session_pw:" + newsite ) || ""; } catch ( err ) { void err; }
-						}
-
-						if ( typeof sites[ newsite ].ssl !== "undefined" && sites[ newsite ].ssl === "1" ) {
-							OSApp.currentSession.prefix = "https://";
-						} else {
-							OSApp.currentSession.prefix = "http://";
-						}
-
-						if ( OSApp.Firmware && typeof OSApp.Firmware.normalizeDirectHost === "function" ) {
-							OSApp.currentSession.ip = OSApp.Firmware.normalizeDirectHost( OSApp.currentSession.ip, OSApp.currentSession.prefix );
-						}
-
-						if ( typeof sites[ newsite ].auth_user !== "undefined" &&
-							typeof sites[ newsite ].auth_pw !== "undefined" ) {
-
-							OSApp.currentSession.auth = true;
-							OSApp.currentSession.authUser = sites[ newsite ].auth_user;
-							OSApp.currentSession.authPass = sites[ newsite ].auth_pw;
-						} else {
-							OSApp.currentSession.auth = false;
-						}
-
-						if ( sites[ newsite ].is183 ) {
-							OSApp.currentSession.fw183 = true;
-						} else {
-							OSApp.currentSession.fw183 = false;
-						}
+						OSApp.Sites.applySiteToSession( newsite, sites[ newsite ] );
 
 						// Populate the panel site-selector; newLoad() alone does not, so
 						// connecting via the "connect" button would leave the dropdown empty.

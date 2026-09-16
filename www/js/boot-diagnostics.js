@@ -263,7 +263,10 @@
 	window.addEventListener(tapEventName, registerDevTap, true);
 
 	function isFastPathHidden() {
-		if (document.getElementById("fast-path-hide")) {
+		// The full-screen "Connecting to ..." overlay counts as hidden UI too: if
+		// it is orphaned (probe answered before it was even inserted) it covers a
+		// perfectly usable page and nothing else removes it.
+		if (document.getElementById("fast-path-hide") || document.getElementById("fast-path-loader")) {
 			return true;
 		}
 		if (document.body) {
