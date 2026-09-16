@@ -164,6 +164,18 @@ if [ -f GoogleService-Info.plist ]; then
 	echo "Copied GoogleService-Info.plist into firebasex-core"
 fi
 
+# Xcode 26/27 compatibility: some builds fail to resolve TSBackgroundFetch headers
+# depending on how the framework search path is evaluated during dependency scanning.
+# Normalize the import to a resilient multi-path form before the iOS build starts.
+for FETCH_SRC in \
+	"plugins/cordova-plugin-background-fetch/src/ios/CDVBackgroundFetch.m" \
+	"platforms/ios/App/Plugins/cordova-plugin-background-fetch/CDVBackgroundFetch.m"; do
+	if [ -f "$FETCH_SRC" ]; then
+		perl -0777 -i -pe 's|#if __has_include\(<TSBackgroundFetch/TSBackgroundFetch\.h>\)\n#import <TSBackgroundFetch/TSBackgroundFetch\.h>\n#elif __has_include\("TSBackgroundFetch\.h"\)\n#import "TSBackgroundFetch\.h"\n#elif __has_include\(<TSBackgroundFetch\.h>\)\n#import <TSBackgroundFetch\.h>\n#else\n#error "TSBackgroundFetch headers not found"\n#endif|#if __has_include("TSBackgroundFetch.xcframework/ios-arm64/TSBackgroundFetch.framework/Headers/TSBackgroundFetch.h")\n#import "TSBackgroundFetch.xcframework/ios-arm64/TSBackgroundFetch.framework/Headers/TSBackgroundFetch.h"\n#elif __has_include("TSBackgroundFetch.xcframework/ios-arm64_x86_64-simulator/TSBackgroundFetch.framework/Headers/TSBackgroundFetch.h")\n#import "TSBackgroundFetch.xcframework/ios-arm64_x86_64-simulator/TSBackgroundFetch.framework/Headers/TSBackgroundFetch.h"\n#elif __has_include(<TSBackgroundFetch/TSBackgroundFetch.h>)\n#import <TSBackgroundFetch/TSBackgroundFetch.h>\n#elif __has_include("TSBackgroundFetch.h")\n#import "TSBackgroundFetch.h"\n#else\n#error "TSBackgroundFetch headers not found"\n#endif|g; s|#import <TSBackgroundFetch/TSBackgroundFetch\.h>|#if __has_include("TSBackgroundFetch.xcframework/ios-arm64/TSBackgroundFetch.framework/Headers/TSBackgroundFetch.h")\n#import "TSBackgroundFetch.xcframework/ios-arm64/TSBackgroundFetch.framework/Headers/TSBackgroundFetch.h"\n#elif __has_include("TSBackgroundFetch.xcframework/ios-arm64_x86_64-simulator/TSBackgroundFetch.framework/Headers/TSBackgroundFetch.h")\n#import "TSBackgroundFetch.xcframework/ios-arm64_x86_64-simulator/TSBackgroundFetch.framework/Headers/TSBackgroundFetch.h"\n#elif __has_include(<TSBackgroundFetch/TSBackgroundFetch.h>)\n#import <TSBackgroundFetch/TSBackgroundFetch.h>\n#elif __has_include("TSBackgroundFetch.h")\n#import "TSBackgroundFetch.h"\n#else\n#error "TSBackgroundFetch headers not found"\n#endif|g' "$FETCH_SRC"
+		echo "Normalized TSBackgroundFetch include fallback in $FETCH_SRC"
+	fi
+done
+
 BUILD_CONFIG_ARGS=()
 if [ -f build.json ]; then
 	BUILD_CONFIG_ARGS=(--buildConfig build.json)
@@ -175,7 +187,12 @@ else
 	echo "[WARN] build.json fehlt und keine build.json.example gefunden; baue ohne --buildConfig."
 fi
 
-cordova build ios --device --release "${BUILD_CONFIG_ARGS[@]}"
+TSBF_DEVICE_PATH="$SCRIPT_DIR/platforms/ios/App/Plugins/cordova-plugin-background-fetch/TSBackgroundFetch.xcframework/ios-arm64"
+TSBF_SIM_PATH="$SCRIPT_DIR/platforms/ios/App/Plugins/cordova-plugin-background-fetch/TSBackgroundFetch.xcframework/ios-arm64_x86_64-simulator"
+TSBF_MACCAT_PATH="$SCRIPT_DIR/platforms/ios/App/Plugins/cordova-plugin-background-fetch/TSBackgroundFetch.xcframework/ios-arm64_x86_64-maccatalyst"
+TSBF_FRAMEWORK_FLAG="--buildFlag=FRAMEWORK_SEARCH_PATHS=\$(inherited) \"$TSBF_DEVICE_PATH\" \"$TSBF_SIM_PATH\" \"$TSBF_MACCAT_PATH\""
+
+cordova build ios --device --release "${BUILD_CONFIG_ARGS[@]}" -- "$TSBF_FRAMEWORK_FLAG"
 
 # Auto-deploy upload to App Store Connect after a successful build.
 # Can be enabled non-interactively with AUTO_DEPLOY_IOS=y.
