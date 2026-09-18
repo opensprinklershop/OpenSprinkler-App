@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.232] - 2026-09-18
+
+Release 2.4.232 (Android Build 232)
+
+### Behoben
+- **„Programme ändern“ zeigt nur einen schwarzen Bildschirm**: Auf Controllern mit Sensor-API wird Chart.js für den Sensoranpassungs-Editor erst bei Bedarf nachgeladen. Die Seiten `#programs`, `#addprogram` und `#sensor-logs` wurden dadurch erst *nach* dem Nachladen aufgebaut, jQuery Mobile sucht die Zielseite aber sofort beim Seitenwechsel. Der Wechsel schlug fehl: Die Kopfzeile zeigte bereits „Programme“, der Inhalt blieb leer bzw. schwarz. Ist Chart.js schon geladen, wird die Seite jetzt wieder sofort aufgebaut; andernfalls wird der Wechsel angehalten, Chart.js geladen und der Wechsel danach erneut ausgelöst. Schlägt das Nachladen fehl, öffnet die Seite ohne Diagramm statt gar nicht.
+
 ## [2.4.231] - 2026-09-16
 
 Release 2.4.231 (Android Build 231 / iOS 2.4.231)

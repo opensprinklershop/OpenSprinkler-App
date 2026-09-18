@@ -198,12 +198,26 @@ OSApp.UIDom.launchApp = function() {
 		// Cycle through page possibilities and call their init functions
 		// The program editor draws the sensor-adjustment curve with Chart.js,
 		// which is loaded on demand (js/modules/lazy.js) when sensors are available.
+		// jQM looks the target page up synchronously right after this event, so
+		// the page must be built before we return. If Chart.js still has to be
+		// fetched, cancel this change and issue it again once the load settled
+		// (chartsTried keeps a failed download from looping).
 		var withCharts = function( fn ) {
-			if ( OSApp.Supported.sensors() && OSApp.Lazy && OSApp.Lazy.ensureChartJs ) {
-				OSApp.Lazy.ensureChartJs( fn ).catch( fn );
-			} else {
+			var chartsReady = OSApp.Lazy && OSApp.Lazy.hasChartJs() && OSApp.Lazy._chartJsStackLoaded;
+			if ( !OSApp.Supported.sensors() || !OSApp.Lazy || !OSApp.Lazy.ensureChartJs ||
+				chartsReady || data.options.chartsTried ) {
 				fn();
+				return;
 			}
+
+			var retry = function() {
+				$.mobile.loading( "hide" );
+				$.mobile.pageContainer.pagecontainer( "change", page, $.extend( {}, data.options, { chartsTried: true } ) );
+			};
+
+			e.preventDefault();
+			$.mobile.loading( "show" );
+			OSApp.Lazy.ensureChartJs().then( retry, retry );
 		};
 		if ( hash === "#programs" ) {
 			withCharts( function() { OSApp.Programs.displayPage( data.options.programToExpand ); } );
