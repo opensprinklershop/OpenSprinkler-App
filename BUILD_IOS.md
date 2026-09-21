@@ -103,3 +103,24 @@ xcrun altool --upload-app \
 - **19952** - Entitlements Fixes, modules.json Integration
 - **19951** - iOS Startup Fix mit modules.json
 - **19950+** - Frühere Versionen
+
+## URL scheme and the self-updating UI copies (two releases, in this order)
+
+iOS ran under `ionic://localhost` from 2021 until the cordova-ios 8.1.1 update of 2026-08-07, which
+switched `config.xml` to `<preference name="scheme" value="file" />` unintentionally. Under `file://`
+the self-updating UI copies (`www/js/ui-updater.js`) stay idle: a page outside the app bundle cannot be
+loaded and WebCrypto is unavailable. Going back to a custom scheme changes the WebView origin, and
+`localStorage` (stored sites, passwords, settings) belongs to the origin. Therefore:
+
+1. **Release A — keep `scheme=file`.** Ships `www/js/storage-guard.js`, which mirrors `localStorage`
+   into `ls-backup.json` in the app data directory on every start, every minute and on pause. Leave this
+   release in the store long enough for users to open the app at least once (a few weeks).
+2. **Release B — set `scheme` to `ionic` (and keep `hostname` at its default `localhost`).** On the first
+   start the guard sees a backup written under another origin, restores it once and reloads. From then
+   on the updater is active; copies are served as
+   `ionic://localhost/_app_file_<dataDirectory>/ui/<id>/<version>/index.html`.
+
+Users who skip release A get whatever `ionic://` still holds from before August (or an empty site list).
+To verify on a device after release B: `window.isSecureContext` / `crypto.subtle` present, LAN controller
+requests, Gardena OAuth redirect, Firebase push, Google Maps, and the `[ui-updater]` / `[storage-guard]`
+lines in the Safari Web Inspector console.

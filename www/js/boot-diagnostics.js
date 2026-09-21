@@ -399,6 +399,17 @@
 		recovered = true;
 		pushError("watchdog", "UI appeared frozen — recovery triggered", reason || "");
 
+		// This page may be a downloaded copy of a UI snapshot (js/ui-updater.js).
+		// A copy that does not come up is blocked for good and the app restarts
+		// from its root, which then routes to the bundled snapshot again. Copies
+		// only exist under http(s)://localhost, where a navigation is safe.
+		try {
+			if (window.OSUIUpdater && window.OSUIUpdater.blockCurrentCopy(reason || "watchdog")) {
+				window.location.replace("/index.html");
+				return;
+			}
+		} catch (e) { void e; /* fall through to the normal recovery */ }
+
 		// Always reveal the UI first so the user never stares at a black screen.
 		revealUI();
 

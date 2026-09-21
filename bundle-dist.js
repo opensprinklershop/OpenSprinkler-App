@@ -38,6 +38,9 @@ while ((m = tagRe.exec(html)) !== null) {
 const isBundleSrc = (src) => {
 	const clean = src.split("?")[0];
 	if (clean === "js/boot-diagnostics.js") { return false; }
+	// Muss vor dem Inline-Schnellstart im <head> stehen bleiben (OSUIUpdater.resolve).
+	if (clean === "js/ui-updater.js") { return false; }
+	if (clean === "js/storage-guard.js") { return false; }
 	return /^(js\/|vendor-js\/)/.test(clean);
 };
 

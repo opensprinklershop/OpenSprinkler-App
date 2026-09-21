@@ -17,6 +17,10 @@
 		<title>OpenSprinkler</title>
 		<!-- Boot diagnostics must run first so startup failures are visible immediately. -->
 		<script src="js/boot-diagnostics.js"></script>
+		<!-- Updated copies of the versioned UI bundles (apps only); used by the fast path below -->
+		<script src="js/ui-updater.js"></script>
+		<!-- Mirrors localStorage into the app data directory (survives a change of the WebView origin) -->
+		<script src="js/storage-guard.js"></script>
 		<script>
 			(function() {
 				var path = window.location.pathname.replace(/\/index\.html$/, "").replace(/\/$/, "");
@@ -240,6 +244,30 @@
 								// this (newest) bundle instead (OSApp.Sites.routeToVersion does the same).
 								var redirectIfBundled = function(targetVersion) {
 									if (window.location.hostname.indexOf("opensprinklershop.de") !== -1) { redirectTo(targetVersion); return; }
+
+									// The apps may hold an updated copy of this snapshot (js/ui-updater.js).
+									// Probe it like a bundled folder; if it is gone, use the bundled one.
+									var copyHref = null;
+									try { copyHref = window.OSUIUpdater ? window.OSUIUpdater.resolve(targetVersion) : null; } catch (e) {}
+									if (copyHref && !redirectIfBundled.copyTried) {
+										redirectIfBundled.copyTried = true;
+										var copyProbe = new XMLHttpRequest(), copySettled = false;
+										var copyDone = function(ok) {
+											if (copySettled) { return; }
+											copySettled = true;
+											if (!ok) { redirectIfBundled(targetVersion); return; }
+											localStorage.removeItem("show_sites");
+											window.clearTimeout(fastPathFailsafe);
+											try { localStorage.setItem("last_ui_version", targetVersion); } catch (e) {}
+											window.location.href = copyHref;
+										};
+										copyProbe.open("GET", copyHref, true);
+										copyProbe.timeout = 3000;
+										copyProbe.onload = function() { copyDone(copyProbe.status >= 200 && copyProbe.status < 300 && !!copyProbe.responseText); };
+										copyProbe.onerror = copyProbe.ontimeout = function() { copyDone(false); };
+										try { copyProbe.send(); } catch (e) { copyDone(false); }
+										return;
+									}
 									var probe = new XMLHttpRequest();
 									var settled = false;
 									var once = function(fn) {
@@ -269,6 +297,12 @@
 									if (!fwv) { abortToSites("unreachable"); return; }
 									whenVersions(function(vData) {
 										var versions = (vData && Array.isArray(vData.versions)) ? vData.versions : [];
+										// Snapshots that only exist as an updated copy, and the firmware
+										// the updater should look up a snapshot for.
+										try {
+											localStorage.setItem("ui_last_fw", JSON.stringify({ fwv: fwv, fwm: fwm }));
+											if (window.OSUIUpdater) { versions = versions.concat(window.OSUIUpdater.extraVersions()); }
+										} catch (e) {}
 										var targetVersion = mapVersion(fwv, fwm, versions);
 										if (!targetVersion) { abortToSites("noversion"); return; }
 										redirectIfBundled(targetVersion);

@@ -124,6 +124,14 @@ for v in $VERSIONS; do
 		perl -0777 -pi -e 's{<head>}{<head>\n\t\t<script src="js/boot-diagnostics.js"></script>}' "$VER_DIR/index.html"
 		echo "   Injected watchdog into $VER_DIR/index.html"
 	fi
+	# Self-updating snapshot copies (idle under scheme "file") and the localStorage
+	# mirror that carries the stored sites across a change of the WebView origin.
+	for helper in ui-updater storage-guard; do
+		cp "www/js/$helper.js" "$VER_DIR/js/$helper.js"
+		if ! grep -q "js/$helper.js" "$VER_DIR/index.html"; then
+			perl -0777 -pi -e 's{(<script src="js/boot-diagnostics\.js"></script>)}{$1\n\t\t<script src="js/'"$helper"'.js"></script>}' "$VER_DIR/index.html"
+		fi
+	done
 done
 
 # === Harden bundled versioned index.html against Cordova file:// origin "null" ===

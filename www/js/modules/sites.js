@@ -231,8 +231,32 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 			done( preferred );
 		} );
 	};
-	var navigateToVersion = function( targetVersion ) {
+	var navigateToVersion = function( targetVersion, skipCopy ) {
 		var targetHref = baseHref + targetVersion + "/index.html";
+
+		// The apps may hold an updated copy of this snapshot (js/ui-updater.js).
+		// Probe it like a bundled folder; if it is gone, use the bundled one.
+		var copyHref = ( !skipCopy && window.OSUIUpdater ) ? window.OSUIUpdater.resolve( targetVersion ) : null;
+		if ( copyHref ) {
+			$.ajax( {
+				url: copyHref,
+				type: "GET",
+				dataType: "text",
+				timeout: 3000,
+				cache: false
+			} ).then( function( html ) {
+				if ( !html ) {
+					navigateToVersion( targetVersion, true );
+					return;
+				}
+				$.mobile.loading( "hide" );
+				localStorage.removeItem( "show_sites" );
+				window.location.href = copyHref;
+			}, function() {
+				navigateToVersion( targetVersion, true );
+			} );
+			return;
+		}
 
 		// On opensprinklershop.de we know the versioned folders are present.
 		// For all other hosts (localhost, 127.0.0.1, WKWebView, cordova, file:, etc.),
@@ -350,7 +374,16 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 				cache: false
 			} ).then(
 				function( vData ) {
-					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion( fwv, vData.versions || [], fwm );
+					// Snapshots that only exist as an updated copy, and the firmware the
+					// updater should look up a snapshot for (js/ui-updater.js).
+					var knownVersions = vData.versions || [];
+					try {
+						localStorage.setItem( "ui_last_fw", JSON.stringify( { fwv: fwv, fwm: fwm } ) );
+						if ( window.OSUIUpdater ) {
+							knownVersions = knownVersions.concat( window.OSUIUpdater.extraVersions() );
+						}
+					} catch ( err ) { void err; }
+					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion( fwv, knownVersions, fwm );
 					if ( !targetVersion ) {
 						stayHere( OSApp.Language._( "The firmware version of" ) + " " + newsite + " " +
 							OSApp.Language._( "is unknown, so the matching interface cannot be chosen. Please check the device." ) );

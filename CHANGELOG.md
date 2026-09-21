@@ -1,5 +1,15 @@
 # Changelog
 
+## [Unveröffentlicht]
+
+### Hinzugefügt
+- **Selbstaktualisierende Oberflächenstände in der Android-App**: Die App liefert die eingefrorenen Oberflächenstände (`2.4.0.228` usw.) mit aus; eine Korrektur darin erreichte Nutzer bisher erst mit dem nächsten Store-Release (siehe 2.4.233). Jetzt gleicht die App den Stand zur verbundenen Firmware im Hintergrund mit `ui.opensprinklershop.de` ab und hält eine aktualisierte Kopie im App-Datenverzeichnis (`js/ui-updater.js`). Unveränderte Dateien kommen aus dem mitgelieferten Stand, nur geänderte werden geladen; jede Datei wird gegen eine signierte Dateiliste (`filelist.json` + `filelist.sig`, ECDSA P-256) geprüft – der Webserver allein kann der App keinen Code unterschieben. Die Kopie wird erst nach vollständiger Prüfung aktiv, enthält nie die native Cordova-Bridge (die kommt immer aus der installierten App) und läuft unter demselben Ursprung, sodass Standorte und Passwörter erhalten bleiben. Startet eine Kopie nicht, sperrt der Start-Watchdog sie und die App nutzt wieder den mitgelieferten Stand. Auch ein Stand, der erst nach dem App-Build veröffentlicht wurde (neue Firmware), kann so nachgeladen werden. iOS und die Web-Oberfläche sind unverändert.
+- **Einstellungen wandern mit**: Die App speichert viele Einstellungen (Design, 12/24 h, Einheiten, Ansichten, Cloud-Server …) pro Oberflächenpfad. Beim Wechsel in eine aktualisierte Kopie werden sie übernommen, beim Rückfall auf den mitgelieferten Stand zurückgegeben; Reste nicht mehr vorhandener Kopien werden entfernt.
+- **Sicherung der gespeicherten Standorte (`js/storage-guard.js`)**: Die App spiegelt Standorte und Einstellungen in eine Datei im App-Datenverzeichnis und stellt sie einmalig wieder her, wenn sie unter einem anderen WebView-Ursprung startet. Das ist die Voraussetzung, um iOS wieder auf das eigene URL-Schema (`ionic://localhost`, versehentlich im August auf `file://` umgestellt) zurückzustellen, ohne dass Standorte verloren gehen – und damit für die selbstaktualisierenden Oberflächenstände auf iOS. Ablauf in zwei Releases, siehe `BUILD_IOS.md`. Eine leere Standortliste überschreibt die Sicherung nie.
+- **iOS-Ladeweg im Updater vorbereitet**: Unter einem eigenen URL-Schema liefert cordova-ios das Datenverzeichnis als `/_app_file_<Pfad>` aus; der Updater merkt sich die Kopien nur noch relativ und frischt die Basis bei jedem Start auf (der Container-Pfad ändert sich bei App-Updates). Unter `file://` bleibt er inaktiv.
+- **`scripts/gen-ui-filelist.js`**: Erzeugt und signiert die Dateilisten; `buildwebdeploy.sh` ruft es vor dem Upload auf. Der private Schlüssel liegt außerhalb des Repositorys (`UI_UPDATE_KEY`).
+- **Headless-Test `test/headless/updater.js`**: Installation, Routing in die Kopie, Rückweg in die Standortverwaltung, abgewiesene Manipulationen und Watchdog-Rückfall.
+
 ## [2.4.233] - 2026-09-21
 
 Release 2.4.233 (Android Build 233)

@@ -113,6 +113,15 @@ else
 	echo "INFO: No release version specified/detected. Updated root + dev only."
 fi
 
+# 4. Signed file lists for the self-updating snapshot copies in the mobile apps
+# (www/js/ui-updater.js). The versioned folders are deployed byte-identical (the
+# minify step below leaves them alone), so the hashes match what is served. An
+# unchanged snapshot keeps its list; without the signing key nothing is written
+# and the apps keep their bundled snapshots.
+echo "=== Signing snapshot file lists ==="
+node "$(cd "$(dirname "$0")" && pwd)/scripts/gen-ui-filelist.js" "$DST_DIR" ||
+	echo "WARN: file list generation failed, apps keep their bundled snapshots." >&2
+
 chown -R stefan:www "$DST_DIR" 2>/dev/null || true
 echo "=== ui deploy done ==="
 
