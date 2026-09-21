@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unveröffentlicht]
+## [2.4.234] - 2026-09-21
+
+Release 2.4.234 (Android Build 234)
 
 ### Hinzugefügt
 - **Selbstaktualisierende Oberflächenstände in der Android-App**: Die App liefert die eingefrorenen Oberflächenstände (`2.4.0.228` usw.) mit aus; eine Korrektur darin erreichte Nutzer bisher erst mit dem nächsten Store-Release (siehe 2.4.233). Jetzt gleicht die App den Stand zur verbundenen Firmware im Hintergrund mit `ui.opensprinklershop.de` ab und hält eine aktualisierte Kopie im App-Datenverzeichnis (`js/ui-updater.js`). Unveränderte Dateien kommen aus dem mitgelieferten Stand, nur geänderte werden geladen; jede Datei wird gegen eine signierte Dateiliste (`filelist.json` + `filelist.sig`, ECDSA P-256) geprüft – der Webserver allein kann der App keinen Code unterschieben. Die Kopie wird erst nach vollständiger Prüfung aktiv, enthält nie die native Cordova-Bridge (die kommt immer aus der installierten App) und läuft unter demselben Ursprung, sodass Standorte und Passwörter erhalten bleiben. Startet eine Kopie nicht, sperrt der Start-Watchdog sie und die App nutzt wieder den mitgelieferten Stand. Auch ein Stand, der erst nach dem App-Build veröffentlicht wurde (neue Firmware), kann so nachgeladen werden. iOS und die Web-Oberfläche sind unverändert.
