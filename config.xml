@@ -161,6 +161,7 @@
     <hook type="before_prepare" src="hooks/before_prepare/01-hide-android-res.js" />
     <hook type="after_prepare" src="hooks/after_prepare/01-restore-android-res.js" />
     <hook type="after_prepare" src="hooks/patch-android-statusbar.js" />
+    <hook type="after_prepare" src="hooks/patch-ios-statusbar.js" />
     <hook type="after_prepare" src="hooks/after_prepare/03-android-application-security-attrs.js" />
     <hook type="after_prepare" src="hooks/after_prepare/04-copy-cordova-into-version-bundles.js" />
     <hook type="after_prepare" src="hooks/after_prepare/05-ios-googlemaps-build-phase.js" />
