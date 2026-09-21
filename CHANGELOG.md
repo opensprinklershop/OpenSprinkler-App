@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.233] - 2026-09-21
+
+Release 2.4.233 (Android Build 233)
+
+### Behoben
+- **„Programme ändern“ zeigt weiterhin einen schwarzen Bildschirm (alle Plattformen mit Firmware 2.4.0(228))**: Die Korrektur aus 2.4.232 lag nur in der aktuellen Oberfläche. Controller mit Firmware 2.4.0(228) – ESP32-C5, ESP8266 und OSPi – werden aber auf den eingefrorenen Oberflächenstand `2.4.0.228` geleitet, der den Fehler noch enthielt; die Korrektur erreichte dadurch praktisch kein Gerät. Der Stand `2.4.0.228` enthält jetzt dieselbe Korrektur (Seitenaufbau vor dem Seitenwechsel, Chart.js wird bei Bedarf erst geladen und der Wechsel danach erneut ausgelöst), und die App liefert ihn mit aus.
+
 ## [2.4.232] - 2026-09-18
 
 Release 2.4.232 (Android Build 232)
