@@ -12,6 +12,9 @@ Release 2.4.234 (Android Build 234)
 - **`scripts/gen-ui-filelist.js`**: Erzeugt und signiert die Dateilisten; `buildwebdeploy.sh` ruft es vor dem Upload auf. Der private Schlüssel liegt außerhalb des Repositorys (`UI_UPDATE_KEY`).
 - **Headless-Test `test/headless/updater.js`**: Installation, Routing in die Kopie, Rückweg in die Standortverwaltung, abgewiesene Manipulationen und Watchdog-Rückfall.
 
+### Behoben
+- **iOS-App: Kopfzeile mit Zurück/Speichern/Hinzufügen liegt unter der Statusleiste**: `cordova-plugin-statusbar` (3.0.0 wie 4.0.0) liest die Höhe der Statusleiste über `[UIApplication sharedApplication].statusBarFrame`, seit iOS 13 veraltet. cordova-ios 8 startet die App über den UIScene-Lebenszyklus (`SceneDelegate`); dort liefert die Eigenschaft auf aktuellen iOS-Versionen ein Null-Rechteck, `StatusBar.overlaysWebView(false)` schiebt die WebView nicht mehr nach unten, und die farbige Fläche hinter der Statusleiste bekommt die Höhe 0. Der neue Hook `hooks/patch-ios-statusbar.js` (after_prepare, wie `patch-android-statusbar.js`) ersetzt die drei Lesestellen und die veraltete `statusBarOrientation`-Abfrage durch den `UIStatusBarManager` der Fenster-Szene, in der Plattformkopie und in `plugins/`. Upstream: apache/cordova-plugin-statusbar#294; das Plugin gilt dort seit cordova-ios 8 als veraltet, der Umstieg auf die eingebaute Statusleiste von cordova-ios/cordova-android steht noch aus.
+
 ## [2.4.233] - 2026-09-21
 
 Release 2.4.233 (Android Build 233)
