@@ -21,6 +21,13 @@ OSApp.Sites.isRootPath = function() {
 	var path = window.location.pathname;
 	path = path.replace(/\/index\.html$/, "").replace(/\/$/, "");
 
+	// A page served by the controller itself (home.js) has already picked its
+	// bundle and has no versions.json: no routing, connect directly. Its host may
+	// still look like the hosted UI, e.g. 127.0.0.1:<port> through an SSH tunnel.
+	if ( window.currLocal ) {
+		return false;
+	}
+
 	// Only treat as root path if we are on a platform that supports multiple UI versions!
 	var isVersionsSupported = (
 		window.location.hostname.indexOf("opensprinklershop.de") !== -1 ||
