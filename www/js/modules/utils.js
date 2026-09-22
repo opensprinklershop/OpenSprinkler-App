@@ -318,10 +318,16 @@ OSApp.Utils.buildOtcServerSelectHtml = function(id, selectedServer, selectedPort
 
 		html += "<option value='" + val + "' data-server='" + OSApp.Utils.htmlEscape(srv.server) + "' data-port='" + (srv.port || "") + "' data-account='" + OSApp.Utils.htmlEscape(srv.account || "") + "' data-token='" + OSApp.Utils.htmlEscape(srv.tokenUrl || "") + "'" + (isSelected ? " selected='selected'" : "") + ">" + OSApp.Utils.htmlEscape(srv.name) + "</option>";
 	};
-	void selectedPort;
-
 	servers.defaults.forEach(function(s, i) { addOption(s, i, false); });
 	servers.custom.forEach(function(s, i) { addOption(s, i, true); });
+
+	// A stored server that matches no entry (older/custom value, manager list
+	// not synced to this device) must not silently turn into the first preset
+	// when the dialog is submitted: keep it selectable as it is.
+	if (selectedServer && !servers.all.some(function(s) { return s.server === selectedServer; })) {
+		html += "<option value='stored' data-server='" + OSApp.Utils.htmlEscape(selectedServer) + "' data-port='" + (selectedPort || "") + "' data-account='' data-token='' selected='selected'>" +
+			OSApp.Utils.htmlEscape(selectedServer) + "</option>";
+	}
 
 	if (!options.noEdit) {
 		html += "<option value='edit_list'>" + OSApp.Language._( "Edit Server List..." ) + "</option>";
