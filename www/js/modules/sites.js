@@ -1594,7 +1594,9 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 				return;
 			}
 			$.ajax( {
-				url: token ? OSApp.Utils.otcForwardBase( token, otcServerInput ) : prefix + ip,
+				// Bare "/forward/v1/<token>" (no device path) is rejected by the
+				// forward server ("bad forward url"); always request the root path.
+				url: token ? OSApp.Utils.otcForwardBase( token, otcServerInput ) + "/" : prefix + ip,
 				type: "GET",
 				dataType: "text",
 				timeout: 10000,

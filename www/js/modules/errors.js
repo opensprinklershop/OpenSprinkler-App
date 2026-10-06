@@ -17,6 +17,22 @@
 var OSApp = OSApp || {};
 OSApp.Errors = OSApp.Errors || {};
 
+// Record a non-fatal exception. console.error is mirrored into the diagnostics
+// buffer by boot-diagnostics.js, so the entry shows up in the JavaScript Console
+// page (#jsConsole) and in the bug report.
+OSApp.Errors.logError = function( msg, err ) {
+	var detail = err && err.stack ? err.stack : String( err );
+
+	try {
+		if ( window.OSBoot && typeof window.OSBoot.recordError === "function" ) {
+			window.OSBoot.recordError( "handled", msg, detail );
+		}
+		//eslint-disable-next-line
+	} catch ( e ) {}
+
+	console.error( msg, err );
+};
+
 // Show error message box
 OSApp.Errors.showError = function( msg, dur ) {
 	dur = dur || 2500;

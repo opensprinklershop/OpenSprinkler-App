@@ -270,6 +270,14 @@ OSApp.UIDom.launchApp = function() {
 				$( hash ).one( "pageshow", function() { OSApp.Status.refreshStatus(); } );
 			}
 		}
+
+		// The page is built and appended by now; make sure jQuery Mobile really
+		// brings it up (see OSApp.UIDom.pageChangeWatchdog). A change we
+		// cancelled ourselves (lazy Chart.js load) re-arms the watchdog when it
+		// is issued again.
+		if ( !e.isDefaultPrevented() ) {
+			OSApp.UIDom.pageChangeWatchdog.arm( hash );
+		}
 	} )
 
 	// Handle OS resume event triggered by PhoneGap
@@ -1053,6 +1061,126 @@ OSApp.UIDom.bindPanel = function() {
 		return begin;
 	} )();
 };
+
+// A page change can die in flight: jQuery Mobile builds the page, then runs the
+// page life cycle events (pagecreate, pagebeforehide, pagebeforeshow) from inside
+// the transition. An exception thrown by any handler aborts the transition *and*
+// leaves jQM's internal transition lock set. The new page is then in the DOM,
+// fully rendered, but never gets the ui-page-active class - the user sees a blank
+// screen - and every later navigation is silently queued behind the lock, so the
+// app stays dead until it is reloaded. Watch every page change and repair that.
+OSApp.UIDom.pageChangeWatchdog = ( function() {
+	var timer = null,
+		pending = null,
+		repaired = null,
+		TIMEOUT = 3000;
+
+	function getContainerWidget() {
+		return $.mobile.pageContainer ? $.mobile.pageContainer.data( "mobile-pagecontainer" ) : null;
+	}
+
+	function releaseTransitionLock() {
+		var widget = getContainerWidget();
+
+		// The lock is a closure variable of the pagecontainer widget; the only
+		// thing that clears it is the private _releaseTransitionLock(). The
+		// widget bridge refuses method names starting with an underscore, so
+		// call it through the prototype.
+		if ( widget && $.mobile.pagecontainer && $.mobile.pagecontainer.prototype._releaseTransitionLock ) {
+			try {
+				$.mobile.pagecontainer.prototype._releaseTransitionLock.call( widget );
+			} catch ( err ) {
+				OSApp.Errors.logError( "pageChangeWatchdog: could not release the transition lock", err );
+			}
+		}
+	}
+
+	// Last resort when even the retry died the same way: put the page on screen
+	// by hand so the user is never left with a blank screen.
+	function forceShow( page ) {
+		var widget = getContainerWidget();
+
+		if ( !page.data( "mobile-page" ) ) {
+			page.page();
+		}
+
+		$( ".ui-page-active" ).not( page ).removeClass( "ui-page-active" );
+		page.addClass( "ui-page-active" );
+		$.mobile.activePage = page;
+		if ( widget ) {
+			widget.activePage = page;
+		}
+
+		try {
+			page.trigger( "pageshow" );
+		} catch ( err ) {
+			OSApp.Errors.logError( "pageChangeWatchdog: pageshow failed on the recovered page", err );
+		}
+	}
+
+	function check() {
+		var hash = pending,
+			page, isActivePage, neverEnhanced;
+
+		timer = null;
+		pending = null;
+
+		if ( !hash ) {
+			return;
+		}
+
+		page = $( hash );
+
+		// Page was never built (a change we cancelled on purpose) or it is up.
+		if ( !page.length ) {
+			return;
+		}
+		if ( page.hasClass( "ui-page-active" ) ) {
+			repaired = null;
+			return;
+		}
+
+		// Only act while this is still the page the app wants to be on. A change
+		// that was simply superseded by a later one must be left alone.
+		if ( $.mobile.path.parseUrl( location.href ).hash.split( "&" )[ 0 ] !== hash ) {
+			return;
+		}
+
+		// Two broken states: jQM already considers the page active but the
+		// transition never applied the class, or jQM never touched the page at
+		// all (it is still the raw div we appended).
+		isActivePage = !!( $.mobile.activePage && $.mobile.activePage.length && $.mobile.activePage[ 0 ] === page[ 0 ] );
+		neverEnhanced = !page.hasClass( "ui-page" );
+		if ( !isActivePage && !neverEnhanced ) {
+			return;
+		}
+
+		OSApp.Errors.logError( "pageChangeWatchdog: page change to " + hash + " never completed, recovering" );
+		releaseTransitionLock();
+
+		if ( repaired === hash ) {
+			repaired = null;
+			forceShow( page );
+			return;
+		}
+
+		// Retry through the normal route: the page is rebuilt from scratch,
+		// which also replaces a half-initialized node.
+		repaired = hash;
+		OSApp.UIDom.pageChangeWatchdog.arm( hash );
+		$.mobile.pageContainer.pagecontainer( "change", hash, { transition: "none" } );
+	}
+
+	return {
+		arm: function( hash ) {
+			if ( timer ) {
+				window.clearTimeout( timer );
+			}
+			pending = hash;
+			timer = window.setTimeout( check, TIMEOUT );
+		}
+	};
+} )();
 
 OSApp.UIDom.changePage = function( toPage, opts ) {
 	opts = opts || {};

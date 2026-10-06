@@ -40,15 +40,25 @@ OSApp.Programs.displayPage = function(programId) {
 		} )
 		.on( "pageshow", updateAdjustmentData )
 		.on( "pagebeforeshow", function() {
-			OSApp.Programs.updateProgramHeader();
 
-			if ( typeof expandId !== "number" && OSApp.currentSession.controller.programs.pd.length === 1 ) {
-				programId = 0;
-			}
+			// jQuery Mobile fires pagebeforeshow from inside the page transition.
+			// Anything that throws in here kills the transition *and* leaves jQM's
+			// internal transition lock set: the page stays in the DOM without
+			// ui-page-active (blank screen) and every later navigation is silently
+			// swallowed. Never let this handler escape with an exception.
+			try {
+				OSApp.Programs.updateProgramHeader( page );
 
-			if ( typeof programId === "number" ) {
-				page.find( "fieldset[data-collapsed='false']" ).collapsible( "collapse" );
-				$( "#program-" + programId ).collapsible( "expand" );
+				if ( typeof expandId !== "number" && OSApp.currentSession.controller.programs.pd.length === 1 ) {
+					programId = 0;
+				}
+
+				if ( typeof programId === "number" ) {
+					OSApp.Programs.collapsibleCall( page.find( "fieldset[data-collapsed='false']" ), "collapse" );
+					OSApp.Programs.collapsibleCall( page.find( "#program-" + programId ), "expand" );
+				}
+			} catch ( err ) {
+				OSApp.Errors.logError( "programs: pagebeforeshow failed", err );
 			}
 		} );
 
@@ -130,7 +140,7 @@ OSApp.Programs.displayPage = function(programId) {
 				OSApp.Sites.updateControllerPrograms( function() {
 					$.mobile.loading( "hide" );
 					page.trigger( "programrefresh" );
-					OSApp.Programs.updateProgramHeader();
+					OSApp.Programs.updateProgramHeader( page );
 				} );
 			} );
 
@@ -149,7 +159,7 @@ OSApp.Programs.displayPage = function(programId) {
 
 		OSApp.Programs.destroySensorAdjustmentCharts( page.find( "#programs_list" ) );
 		page.find( "#programs_list" ).html( list.enhanceWithin() );
-		OSApp.Programs.updateProgramHeader();
+		OSApp.Programs.updateProgramHeader( page );
 	}
 
 	function begin() {
@@ -2111,12 +2121,39 @@ OSApp.Programs.pidToName = function( pid ) {
 	return pname;
 };
 
+// Call a collapsible widget method only where the widget really exists. jQuery UI
+// throws ("cannot call methods on collapsible prior to initialization") on a node
+// that was not enhanced yet, and such a throw inside a page event handler breaks
+// the whole page transition.
+OSApp.Programs.collapsibleCall = function( elements, method ) {
+	$( elements ).each( function( i, el ) {
+		var item = $( el );
+
+		if ( item.data( "mobile-collapsible" ) ) {
+			item.collapsible( method );
+		}
+	} );
+};
+
 // Check each program and change the background color to red if disabled. Also apply program-disabled class for program hiding feature
-OSApp.Programs.updateProgramHeader = function() {
-	$( "#programs_list" ).find( "[id^=program-]" ).each( function( a, b ) {
+OSApp.Programs.updateProgramHeader = function( context ) {
+	var list = context ? $( context ).find( "#programs_list" ) : $( "#programs_list" );
+
+	list.find( "[id^=program-]" ).each( function( a, b ) {
 		var item = $( b ),
 			heading = item.find( ".ui-collapsible-heading-toggle" ),
-			en = ( OSApp.currentSession.controller.programs.pd[ a ][ 0 ] ) & 0x01;
+			program = OSApp.currentSession.controller.programs.pd[ a ],
+			en;
+
+		// The rendered list can outlive the data it was built from (program
+		// deleted, site switched while the page was still up). Never index into
+		// a missing entry: this runs from pagebeforeshow, where a TypeError
+		// aborts the page transition.
+		if ( !program ) {
+			return;
+		}
+
+		en = program[ 0 ] & 0x01;
 
 		if ( en ) {
 			heading.removeClass( "red" );
@@ -2790,7 +2827,16 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
         };
 
         const $senAdjCanvas = page.find( `#sensor-chart-${id}` );
-        senAdjGraph = new Chart( $senAdjCanvas[ 0 ], {
+
+        // Chart.js is loaded on demand (js/modules/lazy.js) and that load can
+        // fail (offline, blocked CDN). Expanding a program must not throw then:
+        // this runs from pagebeforeshow when a program is auto-expanded, and an
+        // exception there aborts the page transition and wedges jQuery Mobile.
+        const senAdjChartAvailable = typeof Chart !== "undefined" && $senAdjCanvas.length > 0;
+        if ( !senAdjChartAvailable ) {
+            OSApp.Errors.logError( "programs: sensor adjustment curve skipped, Chart.js is not available" );
+        }
+        senAdjGraph = !senAdjChartAvailable ? null : new Chart( $senAdjCanvas[ 0 ], {
             type: "line",
             options: {
                 responsive: true,
@@ -2818,6 +2864,9 @@ OSApp.Programs.makeProgram21 = function( n, isCopy ) {
 		$senAdjCanvas.data( "sensorAdjustmentRefreshHandler", refreshSensorAdjustment );
 
         function updateGraph() {
+            if ( !senAdjGraph ) {
+                return;
+            }
             const valid = splitPoints
                 .filter( p => Number.isFinite( p.x ) && Number.isFinite( p.y ) )
                 .sort( ( a, b ) => a.x - b.x );
