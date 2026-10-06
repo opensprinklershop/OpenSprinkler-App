@@ -173,8 +173,17 @@ window.currLocal = true;
 		} );
 	} );
 
+	// Origin of the device API. Through an OTC relay the page is served under
+	// https://<relay>/forward/v1/<token>/ and the device lives below that
+	// prefix, not at the relay root: keep the prefix, or every /jo and /sp call
+	// answers 404/502 and the password prompt reports "Invalid Password".
+	function forwardPrefix() {
+		var m = document.URL.match( /^https?:\/\/[^/?#]+(\/forward\/v1\/[A-Za-z0-9]+)(?=[/?#]|$)/ );
+		return m ? m[ 1 ] : "";
+	}
+
 	function deviceBase() {
-		return document.URL.match( /(https?:\/\/.*?)\/.*?/ )[ 1 ];
+		return document.URL.match( /(https?:\/\/.*?)\/.*?/ )[ 1 ] + forwardPrefix();
 	}
 
 	// ---- version resolution ------------------------------------------------
@@ -361,15 +370,23 @@ window.currLocal = true;
 				} );
 			},
 			savePassword = function( pw, isHashed ) {
-				var newSites = {
-					"Local": {
-						"os_ip": document.URL.match( /https?:\/\/(.*)\/.*?/ )[ 1 ],
+				var prefix = forwardPrefix(),
+					site = {
 						"os_pw": pw,
 						"isHashed": isHashed,
-						"is183": ( ver < 204 ) ? true : false,
-						"ssl": location.protocol === "https:" ? "1" : undefined
-					}
-				};
+						"is183": ( ver < 204 ) ? true : false
+					};
+
+				if ( prefix ) {
+					// Served through an OTC relay: store the site as an OTC site so the
+					// app keeps talking to the device through the relay.
+					site.os_token = prefix.split( "/" )[ 3 ];
+					site.os_otc_server = location.host;
+				} else {
+					site.os_ip = document.URL.match( /https?:\/\/(.*)\/.*?/ )[ 1 ];
+					site.ssl = location.protocol === "https:" ? "1" : undefined;
+				}
+				var newSites = { "Local": site };
 
 				// Inject site information into storage so the application loads this
 				// device ("sites"/"current_site" are global keys shared by all bundles).
