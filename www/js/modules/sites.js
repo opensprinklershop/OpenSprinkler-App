@@ -182,6 +182,30 @@ OSApp.Sites.getConnectTimeout = function() {
 	return Math.min( 120, Math.max( 5, seconds ) ) * 1000;
 };
 
+// Last successfully loaded interface version catalog (versions.json). When the
+// catalog cannot be fetched (slow or flaky link, host briefly unreachable) the
+// connect continues with the last known list instead of failing; the mapping
+// of firmware build to snapshot is the same. Shared with the fast path in
+// index.html through the localStorage key "ui_versions_catalog".
+OSApp.Sites.cacheVersionCatalog = function( vData ) {
+	try {
+		if ( vData && Array.isArray( vData.versions ) ) {
+			localStorage.setItem( "ui_versions_catalog", JSON.stringify( { versions: vData.versions, "default": vData[ "default" ] } ) );
+		}
+	} catch ( err ) { void err; }
+};
+
+OSApp.Sites.cachedVersionCatalog = function() {
+	try {
+		var raw = localStorage.getItem( "ui_versions_catalog" ),
+			data = raw ? JSON.parse( raw ) : null;
+		return ( data && Array.isArray( data.versions ) ) ? data : null;
+	} catch ( err ) {
+		void err;
+		return null;
+	}
+};
+
 OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 	// A plain-http controller is unreachable from this https page. Probing it only
 	// fails, and the fallback would then drop the user into an arbitrary version
@@ -395,33 +419,53 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 
 			var fwv = options.fwv;
 			var fwm = options.fwm;
+			var useCatalog = function( vData ) {
+				// Snapshots that only exist as an updated copy, and the firmware the
+				// updater should look up a snapshot for (js/ui-updater.js).
+				var knownVersions = vData.versions || [];
+				try {
+					localStorage.setItem( "ui_last_fw", JSON.stringify( { fwv: fwv, fwm: fwm } ) );
+					if ( window.OSUIUpdater ) {
+						knownVersions = knownVersions.concat( window.OSUIUpdater.extraVersions() );
+					}
+				} catch ( err ) { void err; }
+				var targetVersion = OSApp.Sites.mapFirmwareToUIVersion( fwv, knownVersions, fwm );
+				if ( !targetVersion ) {
+					stayHere( OSApp.Language._( "The firmware version of" ) + " " + newsite + " " +
+						OSApp.Language._( "is unknown, so the matching interface cannot be chosen. Please check the device." ) );
+					return;
+				}
+				localStorage.setItem( "last_ui_version", targetVersion );
+				navigateToVersion( targetVersion );
+			};
 			$.ajax( {
 				url: "versions.json",
 				type: "GET",
 				dataType: "json",
-				timeout: 8000,
+				timeout: OSApp.Sites.getConnectTimeout(),
 				cache: false
 			} ).then(
 				function( vData ) {
-					// Snapshots that only exist as an updated copy, and the firmware the
-					// updater should look up a snapshot for (js/ui-updater.js).
-					var knownVersions = vData.versions || [];
-					try {
-						localStorage.setItem( "ui_last_fw", JSON.stringify( { fwv: fwv, fwm: fwm } ) );
-						if ( window.OSUIUpdater ) {
-							knownVersions = knownVersions.concat( window.OSUIUpdater.extraVersions() );
-						}
-					} catch ( err ) { void err; }
-					var targetVersion = OSApp.Sites.mapFirmwareToUIVersion( fwv, knownVersions, fwm );
-					if ( !targetVersion ) {
-						stayHere( OSApp.Language._( "The firmware version of" ) + " " + newsite + " " +
-							OSApp.Language._( "is unknown, so the matching interface cannot be chosen. Please check the device." ) );
+					if ( vData && Array.isArray( vData.versions ) ) {
+						OSApp.Sites.cacheVersionCatalog( vData );
+						useCatalog( vData );
 						return;
 					}
-					localStorage.setItem( "last_ui_version", targetVersion );
-					navigateToVersion( targetVersion );
+					var cachedBad = OSApp.Sites.cachedVersionCatalog();
+					if ( cachedBad ) {
+						useCatalog( cachedBad );
+						return;
+					}
+					stayHere( OSApp.Language._( "The interface version catalog could not be loaded. Please try again." ) );
 				},
 				function() {
+					// Catalog not loadable right now: the last known one is good enough
+					// to pick the snapshot; only without any known catalog give up.
+					var cached = OSApp.Sites.cachedVersionCatalog();
+					if ( cached ) {
+						useCatalog( cached );
+						return;
+					}
 					stayHere( OSApp.Language._( "The interface version catalog could not be loaded. Please try again." ) );
 				}
 			);

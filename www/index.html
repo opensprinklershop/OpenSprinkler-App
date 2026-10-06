@@ -172,9 +172,18 @@
 									if (versionsDone) { cb(versionsResult); } else { versionsWaiters.push(cb); }
 								};
 								(function() {
+									// The last successfully loaded catalog is kept in localStorage
+									// ("ui_versions_catalog", shared with OSApp.Sites in js/modules/sites.js)
+									// and used when versions.json cannot be fetched on a slow or flaky link.
+									var cachedCatalog = function() {
+										try {
+											var d = JSON.parse(localStorage.getItem("ui_versions_catalog") || "null");
+											return (d && Array.isArray(d.versions)) ? d : null;
+										} catch (e) { return null; }
+									};
 									var vx = new XMLHttpRequest();
 									vx.open("GET", "versions.json", true);
-									vx.timeout = 4000;
+									vx.timeout = connectTimeout;
 									var finish = function(data) {
 										if (versionsDone) { return; }
 										versionsDone = true;
@@ -187,10 +196,15 @@
 									vx.onload = function() {
 										var d = null;
 										try { d = JSON.parse(vx.responseText); } catch (e) {}
-										finish(d);
+										if (d && Array.isArray(d.versions)) {
+											try { localStorage.setItem("ui_versions_catalog", JSON.stringify({ versions: d.versions, "default": d["default"] })); } catch (e) {}
+											finish(d);
+										} else {
+											finish(cachedCatalog());
+										}
 									};
-									vx.onerror = vx.ontimeout = function() { finish(null); };
-									try { vx.send(); } catch (e) { finish(null); }
+									vx.onerror = vx.ontimeout = function() { finish(cachedCatalog()); };
+									try { vx.send(); } catch (e) { finish(cachedCatalog()); }
 								})();
 
 								var computeBaseHref = function() {
