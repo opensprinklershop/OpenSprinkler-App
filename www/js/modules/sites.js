@@ -160,6 +160,28 @@ OSApp.Sites.applySiteToSession = function( name, site ) {
 	OSApp.currentSession.fw183 = !!site.is183;
 };
 
+// Timeout (ms) for the first /jo probe when connecting to a site. Slow paths
+// (SSH tunnel chains, roaming mobile links) can exceed the 20 s default, so it
+// is configurable without a rebuild: open the UI once with
+// ?connect_timeout=<seconds> (the value is stored) or set the localStorage key
+// "connect_timeout" (seconds). Range 5..120 s. index.html uses the same rule.
+OSApp.Sites.getConnectTimeout = function() {
+	var seconds = NaN;
+	try {
+		var match = /[?&#]connect_timeout=(\d+)/.exec( window.location.search + window.location.hash );
+		if ( match ) {
+			seconds = parseInt( match[ 1 ], 10 );
+			localStorage.setItem( "connect_timeout", String( seconds ) );
+		} else {
+			seconds = parseInt( localStorage.getItem( "connect_timeout" ) || "", 10 );
+		}
+	} catch ( err ) { void err; }
+	if ( isNaN( seconds ) || seconds <= 0 ) {
+		seconds = 20;
+	}
+	return Math.min( 120, Math.max( 5, seconds ) ) * 1000;
+};
+
 OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 	// A plain-http controller is unreachable from this https page. Probing it only
 	// fails, and the fallback would then drop the user into an arbitrary version
@@ -336,7 +358,7 @@ OSApp.Sites.routeToVersion = function(newsite, siteData, forceDefault) {
 		url: url,
 		type: "GET",
 		dataType: "json",
-		timeout: 20000,
+		timeout: OSApp.Sites.getConnectTimeout(),
 		beforeSend: function( xhr ) {
 			if ( !siteData.os_token && typeof siteData.auth_user !== "undefined" && typeof siteData.auth_pw !== "undefined" ) {
 				xhr.setRequestHeader( "Authorization", "Basic " + btoa( siteData.auth_user + ":" + siteData.auth_pw ) );

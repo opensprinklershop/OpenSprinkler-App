@@ -89,7 +89,20 @@
 								// the failsafe above request timeouts to avoid premature fallback.
 								// Chrome's Local Network Access prompt holds the probe until the user answers;
 								// give them time before the failsafe reveals the site list.
-								var fastPathFailsafe = window.setTimeout(revealFastPath, 25000);
+								// Probe timeout: ?connect_timeout=<seconds> (stored) or localStorage
+								// "connect_timeout", 5..120 s, default 20 s (same rule as
+								// OSApp.Sites.getConnectTimeout in js/modules/sites.js).
+								var connectTimeout = (function() {
+									var seconds = NaN;
+									try {
+										var m = /[?&#]connect_timeout=(\d+)/.exec(window.location.search + window.location.hash);
+										if (m) { seconds = parseInt(m[1], 10); localStorage.setItem("connect_timeout", String(seconds)); }
+										else { seconds = parseInt(localStorage.getItem("connect_timeout") || "", 10); }
+									} catch (e) {}
+									if (isNaN(seconds) || seconds <= 0) { seconds = 20; }
+									return Math.min(120, Math.max(5, seconds)) * 1000;
+								})();
+								var fastPathFailsafe = window.setTimeout(revealFastPath, connectTimeout + 5000);
 
 								// An https page cannot probe a plain-http controller: the browser
 								// blocks it as mixed content. Probing anyway only burns the timeout
@@ -147,9 +160,9 @@
 								}
 								// Fix C: keep the controller probe timeout low so a weak controller
 								// link does not dominate the "Connecting..." delay. The failsafe above
-								// (25s) still guards against a stuck redirect.
-								// 20 s: long enough for the browser's local-network permission prompt.
-								xhr.timeout = 20000;
+								// (timeout + 5 s) still guards against a stuck redirect.
+								// Default 20 s: long enough for the browser's local-network permission prompt.
+								xhr.timeout = connectTimeout;
 
 								// Fix C: load versions.json in parallel with the controller probe
 								// instead of sequentially after it. The result is cached and any

@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unveröffentlicht]
+
+### Geändert
+- **Verbindungs-Timeout beim Standortwechsel einstellbar**: Die erste Abfrage (`/jo`) beim Verbinden mit einem Standort brach bisher fest nach 20 s ab; über langsame Wege (SSH-Tunnelketten, Roaming-Mobilfunk) reichte das nicht immer und endete in „Unable to connect“. Der Wert ist jetzt ohne Neubau einstellbar: Oberfläche einmal mit `?connect_timeout=<Sekunden>` aufrufen (wird gespeichert) oder den localStorage-Schlüssel `connect_timeout` setzen, Bereich 5 bis 120 s, Standard weiterhin 20 s. Gilt für die Site-Verwaltung (`js/modules/sites.js`) und den Schnellstart in `index.html`, dessen Sicherheits-Timer jetzt 5 s über dem Timeout liegt statt fest bei 25 s.
+
 ## [2.4.234] - 2026-09-21
 
 Release 2.4.234 (Android Build 234)
