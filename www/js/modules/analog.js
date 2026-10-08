@@ -2585,6 +2585,7 @@ OSApp.Analog.saveSensor = function(popup, sensor, callback) {
 
 	OSApp.Analog.addToObjectInt(popup, ".ri", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, ".li", sensorOut);
+	OSApp.Analog.addToObjectInt(popup, ".ftol", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#factor", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#divider", sensorOut);
 	OSApp.Analog.addToObjectInt(popup, "#offset", sensorOut);
@@ -3728,6 +3729,9 @@ list += "</select></div>" +
 
 "<div class='li_label'><label for='sensor_li'>" + OSApp.Language._("Min. log interval (s, 0 = off)") + "</label>" +
 	"<input class='li' id='sensor_li' data-mini='true' type='number' inputmode='decimal' min='0' max='999999' value='" + (typeof sensor.li === "number" ? sensor.li : 0) + "'></div>" +
+
+"<div class='ftol_label'><label for='sensor_ftol'>" + OSApp.Language._("Fault tolerance (failed reads before invalid, 0 = off)") + "</label>" +
+	"<input class='ftol' id='sensor_ftol' data-mini='true' type='number' inputmode='decimal' min='0' max='20' value='" + (typeof sensor.ftol === "number" ? sensor.ftol : 3) + "'></div>" +
 
 			"<label for='enable'><input data-mini='true' id='enable' type='checkbox' " + ((sensor.enable === 1) ? "checked='checked'" : "") + ">" +
 			OSApp.Language._("Sensor Enabled") + "</label>" +
@@ -6546,11 +6550,24 @@ OSApp.Analog.buildSensorConfig = function() {
 			}
 		}
 
-		var lastText = "";
-		if ( Number.isFinite( lastTs ) && dataOk ) {
+		// The timestamp of the last valid value stays visible when the data is
+		// currently invalid (greyed); a pending retry (firmware fault tolerance)
+		// is marked with the failure count.
+		var lastText = "",
+			fails = Number( item.fails ) || 0;
+		if ( Number.isFinite( lastTs ) && lastTs > 0 ) {
 			var _ld = new Date( lastTs * 1000 ), _p = function(n) { return n < 10 ? "0"+n : ""+n; };
 			lastText = _p(_ld.getUTCDate()) + "." + _p(_ld.getUTCMonth()+1) + "." + String(_ld.getUTCFullYear()).slice(-2) +
 				" " + _p(_ld.getUTCHours()) + ":" + _p(_ld.getUTCMinutes());
+		}
+		var lastCell = $("<td class=\"hidecol2\">");
+		if ( !dataOk && lastText ) {
+			lastCell.append( $("<span>").attr( "title", OSApp.Language._( "Last valid value" ) ).css( "color", "#888" ).text( lastText ) );
+		} else {
+			lastCell.text( lastText );
+		}
+		if ( dataOk && fails > 0 ) {
+			lastCell.append( $("<span>").attr( "title", OSApp.Language._( "Read failed, retrying" ) ).css( { "color": "#b36b00", "margin-left": "4px" } ).text( "\u21bb" + fails ) );
 		}
 
 		var $tr = $("<tr>").addClass( rowClass ).append(
@@ -6567,7 +6584,7 @@ OSApp.Analog.buildSensorConfig = function() {
 			"<td>" + (item.enable ? checkpng : "") + "</td>",
 			"<td class=\"hidecol\">" + (item.log ? checkpng : "") + "</td>",
 			"<td class=\"hidecol\">" + (item.show ? checkpng : "") + "</td>",
-			$("<td class=\"hidecol2\">").text(lastText)
+			lastCell
 		);
 		if ( rowBg ) {
 			$tr.attr( "style", "background-color:" + rowBg + " !important;" );

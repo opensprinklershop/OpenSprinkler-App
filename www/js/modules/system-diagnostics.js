@@ -36,7 +36,9 @@ OSApp.SystemDiagnostics.showDiagnostics = function() {
 					( typeof OSApp.currentSession.controller.settings.lupt === "number" ? "<tr><td>" + OSApp.Language._( "Last Reboot" ) + "</td><td>" +
 						( OSApp.currentSession.controller.settings.lupt < 1000 ? "--" : OSApp.Dates.dateToString( new Date( OSApp.currentSession.controller.settings.lupt * 1000 ), null, 2 ) ) + "</td></tr>" : "" ) +
 					( typeof OSApp.currentSession.controller.settings.lrbtc === "number" ? "<tr><td>" + OSApp.Language._( "Reboot Reason" ) + "</td><td>" + OSApp.Firmware.getRebootReason( OSApp.currentSession.controller.settings.lrbtc ) + "</td></tr>" : "" ) +
-					( typeof OSApp.currentSession.controller.settings.RSSI === "number" ? "<tr><td>" + OSApp.Language._( "WiFi Strength" ) + "</td><td>" + OSApp.Network.getWiFiRating( OSApp.currentSession.controller.settings.RSSI ) + "</td></tr>" : "" ) +
+					( typeof OSApp.currentSession.controller.settings.eth === "number" ? "<tr><td>" + OSApp.Language._( "Connection" ) + "</td><td>" +
+						( OSApp.currentSession.controller.settings.eth === 1 ? OSApp.Language._( "Ethernet (LAN)" ) : OSApp.Language._( "WiFi" ) ) + "</td></tr>" : "" ) +
+					( typeof OSApp.currentSession.controller.settings.RSSI === "number" && OSApp.currentSession.controller.settings.eth !== 1 ? "<tr><td>" + OSApp.Language._( "WiFi Strength" ) + "</td><td>" + OSApp.Network.getWiFiRating( OSApp.currentSession.controller.settings.RSSI ) + "</td></tr>" : "" ) +
 					( typeof OSApp.currentSession.controller.settings.wterr === "number" ? "<tr><td>" + OSApp.Language._( "Weather Service" ) + "</td><td>" + OSApp.Weather.getWeatherStatus( OSApp.currentSession.controller.settings.wterr ) + "</td></tr>" : "" ) +
 					( typeof OSApp.currentSession.controller.settings.wtreason === "number" ? "<tr><td>" + OSApp.Language._( "Weather Reason" ) + "</td><td>" + OSApp.Weather.getWeatherReason( OSApp.currentSession.controller.settings.wtreason ) + "</td></tr>" : "" ) +
 				"</table>" +

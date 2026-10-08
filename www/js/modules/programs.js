@@ -74,19 +74,24 @@ OSApp.Programs.displayPage = function(programId) {
 		adjustmentRequest = request;
 		OSApp.Programs.waitForProgramAdjustments( page.find( "[id^='run-']" ), controller, request );
 		function loadFailed() {
-			if ( adjustmentRequest === request && OSApp.currentSession.controller === controller ) {
+			if ( adjustmentRequest === request ) {
 				OSApp.Errors.showError( OSApp.Language._( "Unable to load program adjustments. Try again." ) );
 			}
 		}
 		request.done( function( data ) {
-			if ( adjustmentRequest !== request || OSApp.currentSession.controller !== controller ) {
+			// The periodic status refresh replaces OSApp.currentSession.controller
+			// with a new object while this request is in flight (sites.js). The
+			// reply still belongs to this site, so validate and cache against the
+			// controller that is current *now*; only a superseded request is dropped.
+			var current = OSApp.currentSession.controller;
+			if ( adjustmentRequest !== request ) {
 				return;
 			}
-			if ( !OSApp.Programs.isProgramAdjustmentDataValid( data, controller ) ) {
+			if ( !OSApp.Programs.isProgramAdjustmentDataValid( data, current ) ) {
 				loadFailed();
 				return;
 			}
-			OSApp.Programs.cacheProgramAdjustmentData( controller, data );
+			OSApp.Programs.cacheProgramAdjustmentData( current, data );
 		} ).fail( function( error ) {
 			if ( !error || error.status !== 401 ) {
 				loadFailed();
@@ -822,14 +827,19 @@ OSApp.Programs.displayPagePreviewPrograms = function() {
 				adjustmentRequest = request;
 				showAdjustmentStatus( OSApp.Language._( "Loading program adjustments…" ), "preview-adjustment-loading" );
 				request.done( function( data ) {
-					if ( adjustmentRequest === request && OSApp.currentSession.controller === controller && OSApp.Programs.isProgramAdjustmentDataValid( data, controller ) ) {
-						OSApp.Programs.cacheProgramAdjustmentData( controller, data );
+					// See updateAdjustmentData in displayPage: the controller object may
+					// have been replaced by the status refresh meanwhile. Comparing it by
+					// identity here left the preview on "Loading program adjustments"
+					// forever on slow links (ticket GAP-EMX-DMY3).
+					var current = OSApp.currentSession.controller;
+					if ( adjustmentRequest === request && OSApp.Programs.isProgramAdjustmentDataValid( data, current ) ) {
+						OSApp.Programs.cacheProgramAdjustmentData( current, data );
 						adjustmentState = "ready";
 					}
 				} ).fail( function( error ) {
 					loadError = error;
 				} ).always( function() {
-					if ( adjustmentRequest !== request || OSApp.currentSession.controller !== controller ) {
+					if ( adjustmentRequest !== request ) {
 						return;
 					}
 					adjustmentRequest = null;
@@ -3077,9 +3087,8 @@ OSApp.Programs.waitForProgramAdjustments = function( runButton, controller, requ
 		.attr( "aria-busy", "true" );
 
 	function getCurrentButtons() {
-		if ( OSApp.currentSession.controller !== controller ) {
-			return $();
-		}
+		// Buttons are tied to the request, not to the controller object, which the
+		// status refresh replaces; comparing it left the Run buttons disabled.
 		return runButton.filter( function() {
 			return $.contains( document, this ) && $( this ).data( "programAdjustmentRequest" ) === request;
 		} );
@@ -3103,7 +3112,7 @@ OSApp.Programs.waitForProgramAdjustments = function( runButton, controller, requ
 		if ( !currentButtons.length ) {
 			return;
 		}
-		if ( !OSApp.Programs.isProgramAdjustmentDataValid( data, controller ) ) {
+		if ( !OSApp.Programs.isProgramAdjustmentDataValid( data, OSApp.currentSession.controller ) ) {
 			releaseButtons( currentButtons, false );
 			return;
 		}

@@ -97,6 +97,10 @@ window.currLocal = true;
 
 		var a = document.createElement( "script" );
 		a.src = src;
+		// The controller page may be served without a charset; scripts from the UI
+		// host inherit the document encoding and non-ASCII literals ("…") were
+		// shown as mojibake. Declare UTF-8 on every inserted script.
+		a.charset = "utf-8";
 		a.addEventListener( "load", callback, false );
 		document.getElementsByTagName( "head" )[ 0 ].appendChild( a );
 	}
