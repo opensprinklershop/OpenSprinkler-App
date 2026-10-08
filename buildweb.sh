@@ -26,7 +26,7 @@ sed -i "s/__BUILD_TIMESTAMP__/$BUILD_TS/g" www/sw.js
 #cd ..
 
 cordova build browser --release
-cp build/modules.json platforms/browser/www
+cp www/modules.json platforms/browser/www
 chown stefan:www platforms/* -R
 ./scripts/appGMK2.sh
 
