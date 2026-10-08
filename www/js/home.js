@@ -190,6 +190,21 @@ window.currLocal = true;
 		return document.URL.match( /(https?:\/\/.*?)\/.*?/ )[ 1 ] + forwardPrefix();
 	}
 
+	function connectTimeoutMs() {
+		var seconds = NaN;
+		try {
+			var match = /[?&#]connect_timeout=(\d+)/.exec( window.location.search + window.location.hash );
+			if ( match ) {
+				seconds = parseInt( match[ 1 ], 10 );
+				localStorage.setItem( "connect_timeout", String( seconds ) );
+			} else {
+				seconds = parseInt( localStorage.getItem( "connect_timeout" ) || "", 10 );
+			}
+		} catch ( err ) { void err; }
+		if ( isNaN( seconds ) || seconds <= 0 ) { seconds = 20; }
+		return Math.min( 120, Math.max( 5, seconds ) ) * 1000;
+	}
+
 	// ---- version resolution ------------------------------------------------
 
 	function mapVersion( fwv, fwm, catalog ) {
@@ -235,11 +250,15 @@ window.currLocal = true;
 				done( rootLocation + target + "/" );
 			};
 
-		$.ajax( { url: rootLocation + "versions.json", dataType: "json", cache: false, timeout: 8000 } )
+		// Same configurable timeout as the site manager (?connect_timeout=<s>,
+		// stored per origin; see OSApp.Sites.getConnectTimeout). The loader's
+		// fixed 8/10 s were too short on tunnelled or mobile links.
+		var connectTimeout = connectTimeoutMs();
+		$.ajax( { url: rootLocation + "versions.json", dataType: "json", cache: false, timeout: connectTimeout } )
 			.then( function( c ) { if ( c && c.versions ) { catalog = c; } } )
 			.always( step );
 
-		$.ajax( { url: deviceBase() + "/jo?pw=" + encodeURIComponent( pw || "" ), dataType: "json", cache: false, timeout: 10000 } )
+		$.ajax( { url: deviceBase() + "/jo?pw=" + encodeURIComponent( pw || "" ), dataType: "json", cache: false, timeout: connectTimeout } )
 			.then( function( jo ) { if ( jo && typeof jo.fwv !== "undefined" && typeof jo.tz !== "undefined" ) { options = jo; } } )
 			.always( step );
 	}

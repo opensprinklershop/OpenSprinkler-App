@@ -8,6 +8,7 @@
   "cards.js",
   "dashboard.js",
   "dates.js",
+  "device-config.js",
   "errors.js",
   "firmware.js",
   "groups.js",

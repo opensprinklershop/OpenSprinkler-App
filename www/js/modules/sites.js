@@ -2009,6 +2009,13 @@ OSApp.Sites.updateController = function( callback, fail ) {
 				delete OSApp.currentSession.controller.sensors;
 				delete OSApp.currentSession.controller.sensor_desc;
 			}
+			// Reconcile shared UI prefs (24h clock, AI assistant, hidden stations,
+			// ...) with the device store on every full load, not only on the
+			// /jo-only path in updateController: the controller-served page and
+			// a fresh/private browser otherwise never pick up the device values.
+			if ( OSApp.DeviceConfig && OSApp.DeviceConfig.syncAppSettings ) {
+				OSApp.DeviceConfig.syncAppSettings();
+			}
 
 			// Fix the station status array
 			OSApp.currentSession.controller.zigbeeStationStatus = OSApp.currentSession.controller.status.zst || [];

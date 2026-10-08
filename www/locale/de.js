@@ -678,6 +678,7 @@
     "Last": "Zuletzt",
     "Last Reboot": "Letzter Neustart",
     "Last valid value": "Letzter gültiger Wert",
+    "Gateway pings OK since boot": "Gateway-Pings OK seit Neustart (Prüfung alle 10 min)",
     "Read failed, retrying": "Abruf fehlgeschlagen, Wiederholung läuft",
     "Fault tolerance (failed reads before invalid, 0 = off)": "Fehlertoleranz (Fehlversuche bis ungültig, 0 = aus)",
     "Ethernet (LAN)": "Ethernet (LAN)",

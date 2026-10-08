@@ -84,7 +84,7 @@ OSApp.SystemDiagnostics.showDiagnostics = function() {
 				if (Object.hasOwn(status, "freeMemory"))
 					popup += "<tr><td>" + OSApp.Language._( "Free Memory" ) + "</td><td>" + OSApp.SystemDiagnostics.format2(status.freeMemory/1024) + " KB</td></tr>";
 				if (Object.hasOwn(status, "pingok"))
-					popup += "<tr><td>Ping check ok</td><td>" + status.pingok + "</td></tr>";
+					popup += "<tr><td>" + OSApp.Language._( "Gateway pings OK since boot" ) + "</td><td>" + status.pingok + "</td></tr>";
 				if (Object.hasOwn(status, "mqtt"))
 					popup += "<tr><td>MQTT</td><td>" + (status.mqtt?"connected":"disconnected") + "</td></tr>";
 				if (Object.hasOwn(status, "influxdb"))

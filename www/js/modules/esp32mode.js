@@ -6295,14 +6295,18 @@ OSApp.ESP32Mode.directRestoreAfterOTA = function( data, currentDevicePass, onDon
 	} );
 
 	if ( data.iopts && data.iopts.length ) {
+		// Index -> option name of the firmware's iopts array (/ub emits it
+		// positionally, see iopt_json_names in OpenSprinkler.cpp). The subnet
+		// mask lives at 58..61: the previous 60..63 restored subn3/subn4/fwire/
+		// laton into it (e.g. 255.255.0.0 became 0.0.1.0, ticket 5NZ-PGW-2SYW).
 		var ioptKeyMap = {
 			"3": "dhcp",
 			"4": "ip1", "5": "ip2", "6": "ip3", "7": "ip4",
 			"8": "gw1", "9": "gw2", "10": "gw3", "11": "gw4",
 			"12": "hp0", "13": "hp1",
 			"44": "dns1", "45": "dns2", "46": "dns3", "47": "dns4",
-			"60": "subn1", "61": "subn2", "62": "subn3", "63": "subn4",
-			"69": "wimod"
+			"58": "subn1", "59": "subn2", "60": "subn3", "61": "subn4",
+			"71": "wimod"
 		};
 		$.each( ioptKeyMap, function( idx, keyName ) {
 			var v = data.iopts[ parseInt( idx, 10 ) ];

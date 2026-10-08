@@ -764,13 +764,19 @@ OSApp.UIDom.bindPanel = function() {
 
 	// Keep the AI assistant menu entry in sync with its enabled flag: apply now
 	// (initial state) and again every time the panel opens so a disabled
-	// assistant never leaves a dead menu item behind.
-	if ( OSApp.AIAssistant && OSApp.AIAssistant.applyMenuVisibility ) {
-		OSApp.AIAssistant.applyMenuVisibility();
-		panel.on( "panelbeforeopen", function() {
+	// assistant never leaves a dead menu item behind. The assistant module is
+	// loaded lazily, so do not depend on it: read the flag directly
+	// (localStorage, mirrored from the device store by OSApp.DeviceConfig).
+	var applyAiMenu = function() {
+		if ( OSApp.AIAssistant && OSApp.AIAssistant.applyMenuVisibility ) {
 			OSApp.AIAssistant.applyMenuVisibility();
-		} );
-	}
+			return;
+		}
+		var enabled = localStorage.getItem( "osai_enabled" ) !== "0";
+		panel.find( ".ai-assistant-menu" ).toggleClass( "hidden", !enabled ).attr( "aria-hidden", enabled ? "false" : "true" );
+	};
+	applyAiMenu();
+	panel.on( "panelbeforeopen", applyAiMenu );
 
 	panel.find( "a[href='#site-control']" ).on( "click", function() {
 		OSApp.UIDom.changePage( "#site-control" );

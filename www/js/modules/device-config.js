@@ -126,6 +126,9 @@ OSApp.DeviceConfig.APP_SETTINGS = {
 			if ( OSApp.AIAssistant ) {
 				if ( OSApp.AIAssistant.applyMenuVisibility ) { OSApp.AIAssistant.applyMenuVisibility(); }
 				if ( OSApp.AIAssistant.applyFabVisibility ) { OSApp.AIAssistant.applyFabVisibility(); }
+			} else {
+				// Assistant module not loaded (lazy): hide/show the menu entry here.
+				$( ".ai-assistant-menu" ).toggleClass( "hidden", !on ).attr( "aria-hidden", on ? "false" : "true" );
 			}
 		},
 		fromLocal: function() {
