@@ -1330,7 +1330,10 @@ OSApp.Firmware.getVersionCatalog = function() {
 	var defer = $.Deferred();
 	var manifestUrl = OSApp.Firmware.getVersionCatalogUrl();
 
-	$.getJSON( manifestUrl ).done( function( data ) {
+	// cache: false — the upgrade host serves versions.json with a 30-day
+	// Cache-Control, so a plain GET kept showing the previous release as
+	// "up to date" until the browser cache expired.
+	$.ajax( { url: manifestUrl, dataType: "json", cache: false, timeout: 15000 } ).done( function( data ) {
 		if ( $.isArray( data ) ) {
 			defer.resolve( data );
 		} else {
