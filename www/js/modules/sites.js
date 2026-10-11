@@ -34,7 +34,8 @@ OSApp.Sites.isRootPath = function() {
 		window.location.hostname === "localhost" ||
 		window.location.hostname === "127.0.0.1" ||
 		window.location.protocol === "file:" ||
-		window.location.protocol.indexOf("app") === 0
+		window.location.protocol.indexOf("app") === 0 ||
+		window.location.protocol === "ionic:"
 	);
 	if (!isVersionsSupported) {
 		return false;

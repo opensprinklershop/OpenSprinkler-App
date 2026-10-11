@@ -23,8 +23,9 @@ OS_IP=192.168.0.151 node updater.js        # self-updating snapshot copies (www/
 Android app at `http://localhost`, the app data directory (`/__cdvfile_files__/`) and a signed
 update server with a throw-away key, then checks install, routing into the copy, the way back to
 the site manager, settings travelling with the copy, refused manipulations (wrong hash, edited
-list, foreign key), the watchdog fallback and the `storage-guard.js` backup/restore across an origin
-change (with an in-memory file system). It needs the Android platform assets (`platforms/android/.../assets/www`, i.e. one
+list, foreign key), the watchdog fallback, the `storage-guard.js` backup/restore across an origin
+change (with an in-memory file system) and the iOS path handling (`ionic://localhost`, copies below
+`/_app_file_<dataDirectory>`, settings moving along when the container path changes). It needs the Android platform assets (`platforms/android/.../assets/www`, i.e. one
 `./build.sh` run). Chromium fails to start when `TMPDIR` is a very long path.
 
 `drive.js` expects the UI at `http://127.0.0.1:8765/index.html`; the browser profile is

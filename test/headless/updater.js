@@ -175,6 +175,28 @@ srv.listen(HP, async () => {
     const r7 = JSON.parse(await guard(`localStorage.removeItem("sites"); var wrote = await OSStorageGuard.save(); return JSON.stringify({ wrote: wrote, stillThere: /Garten/.test(window.__fs["ls-backup.json"]) });`));
     expect("an empty store never overwrites the backup", r7.wrote === false && r7.stillThere === true, JSON.stringify(r7));
 
+    console.log("7) iOS path handling: copies below the app data directory under the custom scheme");
+    const C1 = "/var/mobile/Containers/Data/Application/AAAA-1111/Library/NoCloud/", C2 = "/var/mobile/Containers/Data/Application/BBBB-2222/Library/NoCloud/";
+    const COPY_ID = "abcdef0123456789", REL = "ui/" + COPY_ID + "/" + VERSION + "/index.html";
+    const ios = (container, pathname, body) => withUpdater(`
+      var savedDir = window.cordova && window.cordova.file ? window.cordova.file.dataDirectory : undefined;
+      window.cordova = window.cordova || {}; window.cordova.file = window.cordova.file || {}; window.cordova.file.dataDirectory = "file://${container}";
+      window.resolveLocalFileSystemURL = window.resolveLocalFileSystemURL || function() {};
+      window.CDV_ASSETS_URL = "ionic://localhost";
+      OSUIUpdater._setLocation({ protocol: "ionic:", host: "localhost", hostname: "localhost", pathname: "${pathname}" });
+      try { ${body} } finally { OSUIUpdater._setLocation(null); delete window.CDV_ASSETS_URL; window.cordova.file.dataDirectory = savedDir; }`);
+    await ev(`["ui_overlay_v1","ui_overlay_base","ui_overlay_bad"].forEach(function(k){ localStorage.removeItem(k); }); localStorage.setItem("ui_overlay_v1", JSON.stringify({ "${VERSION}": { id: "${COPY_ID}", rel: "${REL}", ts: 1 } })); 1`);
+    expect("no copy is resolved before the data directory is known", (await ios(C1, "/index.html", `return OSUIUpdater.resolve("${VERSION}");`)) === null);
+    const i1 = JSON.parse(await ios(C1, "/index.html", `OSUIUpdater._refreshBase(); return JSON.stringify({ base: localStorage.getItem("ui_overlay_base"), href: OSUIUpdater.resolve("${VERSION}"), extra: OSUIUpdater.extraVersions() });`));
+    expect("data directory is mapped to the cordova-ios /_app_file_ path", i1.base === "/_app_file_" + C1, i1.base);
+    expect("copy resolves on the app origin", i1.href === "ionic://localhost/_app_file_" + C1 + REL && i1.extra.includes(VERSION), i1.href);
+    expect("page inside the copy knows its id", (await ios(C1, "/_app_file_" + C1 + REL, `return OSUIUpdater.currentCopyId();`)) === COPY_ID);
+    await ev(`localStorage.setItem("/_app_file_${C1}ui/${COPY_ID}/${VERSION}:uiTheme", "ios-theme")`);
+    const i2 = JSON.parse(await ios(C2, "/index.html", `OSUIUpdater._refreshBase(); return JSON.stringify({ href: OSUIUpdater.resolve("${VERSION}"), moved: localStorage.getItem("/_app_file_${C2}ui/${COPY_ID}/${VERSION}:uiTheme"), old: localStorage.getItem("/_app_file_${C1}ui/${COPY_ID}/${VERSION}:uiTheme") });`));
+    expect("container path change (app update) moves the pointer and the copy settings", i2.href === "ionic://localhost/_app_file_" + C2 + REL && i2.moved === "ios-theme" && i2.old === null, JSON.stringify(i2));
+    expect("updater stays idle under scheme file", (await withUpdater(`OSUIUpdater._setLocation({ protocol: "file:", host: "", hostname: "", pathname: "/private/var/containers/Bundle/Application/X/OpenSprinkler.app/www/index.html" }); try { return OSUIUpdater.resolve("${VERSION}"); } finally { OSUIUpdater._setLocation(null); }`)) === null);
+    await ev(`["ui_overlay_v1","ui_overlay_base"].forEach(function(k){ localStorage.removeItem(k); }); 1`);
+
     const relevant = errs.filter(e => !/cordova|firebase/i.test(e));
     expect("no uncaught exceptions", relevant.length === 0, relevant.slice(0, 3).join(" | "));
     console.log(results.every(Boolean) ? "\nALL " + results.length + " CHECKS PASSED" : "\n" + results.filter(x => !x).length + " of " + results.length + " CHECKS FAILED");

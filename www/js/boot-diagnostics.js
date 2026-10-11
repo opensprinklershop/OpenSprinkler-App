@@ -402,7 +402,8 @@
 		// This page may be a downloaded copy of a UI snapshot (js/ui-updater.js).
 		// A copy that does not come up is blocked for good and the app restarts
 		// from its root, which then routes to the bundled snapshot again. Copies
-		// only exist under http(s)://localhost, where a navigation is safe.
+		// only exist under http(s)://localhost (Android) or the custom app scheme
+		// (iOS), where an absolute path resolves to the app root.
 		try {
 			if (window.OSUIUpdater && window.OSUIUpdater.blockCurrentCopy(reason || "watchdog")) {
 				window.location.replace("/index.html");

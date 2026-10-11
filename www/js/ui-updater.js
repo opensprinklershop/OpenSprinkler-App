@@ -75,7 +75,11 @@
 	};
 
 	var running = false,
-		adapter = null;
+		adapter = null,
+
+		// window.location, replaceable by the headless test (_setLocation) to
+		// exercise the iOS path handling from a browser.
+		loc = window.location;
 
 	function log() {
 		try {
@@ -163,11 +167,11 @@
 	// scheme as window.CDV_ASSETS_URL (absent under scheme "file", where a page
 	// outside the bundle cannot be loaded and WebCrypto is missing).
 	function platform() {
-		if ( /^https?:$/.test( window.location.protocol ) && window.location.hostname === "localhost" ) {
+		if ( /^https?:$/.test( loc.protocol ) && loc.hostname === "localhost" ) {
 			return "android";
 		}
-		if ( typeof window.CDV_ASSETS_URL === "string" && window.location.protocol !== "file:" &&
-			window.CDV_ASSETS_URL.indexOf( window.location.protocol + "//" + window.location.host ) === 0 ) {
+		if ( typeof window.CDV_ASSETS_URL === "string" && loc.protocol !== "file:" &&
+			window.CDV_ASSETS_URL.indexOf( loc.protocol + "//" + loc.host ) === 0 ) {
 			return "ios";
 		}
 		return null;
@@ -260,7 +264,7 @@
 	// still probe it (the data directory can be wiped independently).
 	function resolve( version ) {
 		var p = getPointer( version );
-		return p ? window.location.protocol + "//" + window.location.host + p.href : null;
+		return p ? loc.protocol + "//" + loc.host + p.href : null;
 	}
 
 	// Versions that exist only as an updated copy (snapshot newer than the app).
@@ -274,7 +278,7 @@
 	// Id of the copy the current page runs from, or null for a bundled page.
 	function currentCopyId() {
 		var base = copyBase(),
-			path = window.location.pathname;
+			path = loc.pathname;
 		if ( !base || path.indexOf( base + OVERLAY_ROOT + "/" ) !== 0 ) {
 			return null;
 		}
@@ -514,7 +518,7 @@
 	}
 
 	function currentPageVersion() {
-		var m = window.location.pathname.match( /\/([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)\/(?:index\.html)?$/ );
+		var m = loc.pathname.match( /\/([0-9]+\.[0-9]+\.[0-9]+(?:\.[0-9]+)?)\/(?:index\.html)?$/ );
 		return m ? m[ 1 ] : null;
 	}
 
@@ -739,6 +743,8 @@
 		check: check,
 		isSupported: isSupported,
 		_setAdapter: function( a ) { adapter = a; },
+		_setLocation: function( l ) { loc = l || window.location; },
+		_refreshBase: refreshBase,
 		_transformIndex: transformIndex,
 		_mapVersion: mapVersion
 	};

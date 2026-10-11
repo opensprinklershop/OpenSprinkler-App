@@ -124,7 +124,7 @@ for v in $VERSIONS; do
 		perl -0777 -pi -e 's{<head>}{<head>\n\t\t<script src="js/boot-diagnostics.js"></script>}' "$VER_DIR/index.html"
 		echo "   Injected watchdog into $VER_DIR/index.html"
 	fi
-	# Self-updating snapshot copies (idle under scheme "file") and the localStorage
+	# Self-updating snapshot copies (active under the custom scheme, see config.xml) and the localStorage
 	# mirror that carries the stored sites across a change of the WebView origin.
 	for helper in ui-updater storage-guard; do
 		cp "www/js/$helper.js" "$VER_DIR/js/$helper.js"
