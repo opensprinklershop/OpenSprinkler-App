@@ -4,7 +4,6 @@
     <trust-anchors>
         <certificates src="system" />
         <certificates src="user" />
-        <certificates src="@raw/server_cert" />
     </trust-anchors>
 </base-config>
 </network-security-config>

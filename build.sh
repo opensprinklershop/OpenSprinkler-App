@@ -111,11 +111,6 @@ if [ -x "platforms/android/gradlew" ]; then
 	(cd platforms/android && ./gradlew --stop >/dev/null 2>&1 || true)
 fi
 
-# Copy server certificate to Android raw resources for trust-anchors
-# (config.xml also declares it as <resource-file>, so cordova prepare copies it as well)
-mkdir -p platforms/android/app/src/main/res/raw/
-cp cert/server_cert.der platforms/android/app/src/main/res/raw/server_cert.der
-
 # Sync www/ into Android platform assets before building
 cordova prepare android
 
