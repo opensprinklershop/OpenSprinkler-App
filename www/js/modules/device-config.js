@@ -135,6 +135,23 @@ OSApp.DeviceConfig.APP_SETTINGS = {
 			return localStorage.getItem( "osai_enabled" ) === "0" ? 0 : 1;
 		}
 	},
+	showDisabled: {
+		// "Show disabled" (stations/programs) lived only in OSApp.Storage, so the
+		// HTTP interface in another browser or a private window never saw it
+		// (ticket QRH-T17-TBNL).
+		toLocal: function( v ) {
+			var on = ( v === true || v === 1 || v === "1" || v === "true" );
+			if ( OSApp.Storage && OSApp.Storage.set ) {
+				OSApp.Storage.set( { showDisabled: on } );
+			}
+		},
+		fromLocal: function() {
+			if ( !OSApp.Storage || !OSApp.Storage.getItemSync ) { return undefined; }
+			var s = OSApp.Storage.getItemSync( "showDisabled" );
+			if ( s === null || s === undefined ) { return undefined; }
+			return ( s === true || s === "true" ) ? 1 : 0;
+		}
+	},
 	displayOption: {
 		toLocal: function( v ) {
 			localStorage.setItem( "displayOption", v );

@@ -564,7 +564,10 @@ OSApp.Options.showOptions = function( expandItem ) {
 		"</select></div>";
 
 	//AI assistant on/off (floating assistant button)
-	var aiEnabled = !OSApp.AIAssistant || OSApp.AIAssistant.isEnabled();
+	// Read the stored value directly: on the controller-hosted page the assistant
+	// module is lazy-loaded, and "module missing" must not render as "On"
+	// (ticket QRH-T17-TBNL). Same source as ui-dom.js (osai_enabled, "0" = off).
+	var aiEnabled = localStorage.getItem( "osai_enabled" ) !== "0";
 	list += "<div class='ui-field-contain'>" +
 		"<label for='aiAssistantEnabled'>" + OSApp.Language._( "AI Assistant" ) +
 			"<button data-helptext='" +
@@ -1259,6 +1262,9 @@ OSApp.Options.showOptions = function( expandItem ) {
 
         page.find( "#showDisabled" ).on( "change", function() {
                 OSApp.Storage.set( { showDisabled: this.checked } );
+                if ( OSApp.DeviceConfig && OSApp.DeviceConfig.saveSetting ) {
+                        OSApp.DeviceConfig.saveSetting( "showDisabled", this.checked ? 1 : 0 );
+                }
                 return false;
         } );
 

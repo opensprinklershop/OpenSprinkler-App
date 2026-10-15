@@ -5929,6 +5929,9 @@ OSApp.Analog.setupGardenaCredentials = function() {
 		$(".ui-popup-active").find("[data-role='popup']").popup("close");
 
 		var gardena = data.gardena || {};
+		var hasSecret = gardena.has_secret === 1 || gardena.has_secret === true;
+		var pollMin = Math.max(5, Math.round((parseInt(gardena.poll, 10) || 1800) / 60));
+		var esc = function (v) { return $("<div>").text(v === undefined || v === null ? "" : String(v)).html(); };
 		var list =
 			"<div data-role='popup' data-theme='a' id='gardenaCred'>" +
 			"<div data-role='header' data-theme='b'>" +
@@ -5938,62 +5941,139 @@ OSApp.Analog.setupGardenaCredentials = function() {
 
 			"<div class='ui-content' style='padding:15px;'>" +
 			"<p style='font-size:13px; line-height:1.4; color:#333; margin-top:0;'>" +
-			OSApp.Language._("Gardena API relies on OAuth2. Register your free account on Husqvarna Developer Portal: ") +
+			OSApp.Language._("Register a free account on the Husqvarna Developer Portal, create an Application and connect it to the 'Authentication API' and the 'GARDENA smart system API'. Without the connected APIs Husqvarna rejects every request.") +
 			"<br><a href='https://developer.husqvarnagroup.cloud/' target='_blank' style='color:#1565c0; font-weight:bold; text-decoration:underline;'>developer.husqvarnagroup.cloud</a>" +
 			"</p>" +
 			"<p style='font-size:13px; line-height:1.4; color:#555;'>" +
-			OSApp.Language._("Create an Application, connect it to the 'Authentication API' and 'smart system API' to acquire your API Key (Client ID) and Client Secret, then generate your Refresh Token.") +
+			OSApp.Language._("Then copy the Application key and the Application secret from the portal into the fields below.") +
 			"</p>" +
-
-			"<div style='background:#f1f8e9; border:1px solid #c8e6c9; padding:12px; border-radius:4px; margin-bottom:15px; text-shadow:none;'>" +
-			"<p style='font-size:13px; font-weight:bold; color:#2e7d32; margin:0 0 10px 0;'>" +
-			OSApp.Language._("If you only have your Gardena email and password, click the button below to easily obtain your Refresh Token via secure assistant portal:") +
-			"</p>" +
-			"<button class='launch-assistant' data-theme='b' style='background:#2ecc71 !important; color:#fff !important; text-shadow:none !important; font-weight:bold; margin:0;'>" +
-			OSApp.Language._("Get Refresh Token via Login Assistant") +
-			"</button>" +
-			"</div>" +
 
 			"<form>" +
+			"<label>" + OSApp.Language._("Application key") + "</label>" +
+			"<input class='api_key' type='text' autocomplete='off' value='" + esc(gardena.api_key) + "'>" +
+			"<label>" + OSApp.Language._("Application secret") + "</label>" +
+			"<input class='client_secret' type='password' autocomplete='new-password' placeholder='" + (hasSecret ? OSApp.Language._("(stored, leave empty to keep)") : "") + "'>" +
+			"<label>" + OSApp.Language._("Poll interval (minutes)") + "</label>" +
+			"<input class='poll' type='number' min='5' max='1440' value='" + pollMin + "'>" +
+			"<p style='font-size:12px; color:#777; margin-top:0;'>" +
+			OSApp.Language._("One cloud request per interval is shared by all Gardena sensors and stations (Husqvarna limit: 700-1000 requests per week).") +
+			"</p>" +
 			"<div data-role='collapsible' data-collapsed='true' data-mini='true' data-theme='a' data-content-theme='a' style='margin-bottom:15px;'>" +
-			"<h3>" + OSApp.Language._("Advanced Developer Settings") + "</h3>" +
-			"<label>API Key</label>" +
-			"<input class='api_key' type='text' value='" + (gardena.api_key ? gardena.api_key : "") + "'>" +
-			"<label>Client ID</label>" +
-			"<input class='client_id' type='text' value='" + (gardena.client_id ? gardena.client_id : "") + "'>" +
-			"<label>Client Secret</label>" +
-			"<input class='client_secret' type='password' value='" + (gardena.client_secret ? gardena.client_secret : "") + "'>" +
-			"<label>Refresh Token</label>" +
-			"<input class='refresh_token' type='text' value='" + (gardena.refresh_token ? gardena.refresh_token : "") + "'>" +
-			"<label>Access Token</label>" +
-			"<input class='access_token' type='text' value='" + (gardena.access_token ? gardena.access_token : "") + "'>" +
-			"<label>Location ID</label>" +
-			"<input class='location_id' type='text' value='" + (gardena.location_id ? gardena.location_id : "") + "'>" +
+			"<h3>" + OSApp.Language._("Advanced") + "</h3>" +
+			"<label>" + OSApp.Language._("Location ID (optional, detected automatically)") + "</label>" +
+			"<input class='location_id' type='text' value='" + esc(gardena.location_id) + "'>" +
+			"<label>" + OSApp.Language._("Refresh Token (optional, from the login assistant)") + "</label>" +
+			"<input class='refresh_token' type='text' value='" + esc(gardena.refresh_token) + "'>" +
+			"<p style='font-size:12px; color:#777;'>" +
+			OSApp.Language._("If you only have your Gardena email and password, click the button below to easily obtain your Refresh Token via secure assistant portal:") +
+			"</p>" +
+			"<button class='launch-assistant' data-mini='true'>" + OSApp.Language._("Get Refresh Token via Login Assistant") + "</button>" +
 			"</div>" +
-			"<button class='submit' data-theme='b'>" + OSApp.Language._("Done") + "</button>" +
+			"<button class='submit' data-theme='b'>" + OSApp.Language._("Save and test") + "</button>" +
 			"</form>" +
 			"<hr style='margin:15px 0; border:0; border-top:1px solid #ccc;'>" +
-			"<h3>" + OSApp.Language._("Discovered Valves & Sensors") + "</h3>" +
+			"<div class='gardena-status' style='font-size:13px; margin-bottom:8px;'></div>" +
+			"<h3 style='margin-top:0;'>" + OSApp.Language._("Discovered Valves & Sensors") + "</h3>" +
 			"<div class='gardena-discovered-list' style='font-size:12px; max-height:220px; overflow-y:auto; background:#f9f9f9; border:1px solid #ddd; padding:10px; border-radius:4px;'>" +
 			OSApp.Language._("Loading list components...") +
 			"</div>" +
+			"<button class='reload-devices' data-mini='true' style='margin-top:8px;'>" + OSApp.Language._("Reload devices") + "</button>" +
 			"</div></div>";
 
 		let popup = $(list);
 
+		var renderStatus = function (result) {
+			var status = popup.find(".gardena-status");
+			if (!result || !result.configured) {
+				status.html("<span style='color:#d9534f; font-weight:bold;'>" + OSApp.Language._("Not configured") + "</span>");
+				return;
+			}
+			var parts = [];
+			if (result.token) {
+				parts.push("<span style='color:#2e7d32; font-weight:bold;'>" + OSApp.Language._("Connected") + "</span>");
+			} else {
+				parts.push("<span style='color:#d9534f; font-weight:bold;'>" + OSApp.Language._("Not connected") + "</span>");
+			}
+			if (result.error) {
+				parts.push("<span style='color:#d9534f;'>" + esc(result.error) + (result.http ? " (HTTP " + esc(result.http) + ")" : "") + "</span>");
+			}
+			parts.push(OSApp.Language._("Requests since boot") + ": " + esc(result.requests || 0));
+			if (result.cache_age !== undefined) {
+				parts.push(OSApp.Language._("Data age (min)") + ": " + Math.round((parseInt(result.cache_age, 10) || 0) / 60));
+			}
+			status.html(parts.join(" &middot; "));
+		};
+
+		var renderDevices = function (result) {
+			var listHtml = "";
+			var valves = result.valves || [];
+			var sensors = result.sensors || [];
+
+			if (valves.length === 0 && sensors.length === 0) {
+				listHtml = "<p style='color:#777; font-style:italic;'>" + OSApp.Language._("No valves or sensors found in your Gardena account.") + "</p>";
+			} else {
+				if (valves.length > 0) {
+					listHtml += "<b style='color:#333; text-transform:uppercase; font-size:11px;'>" + OSApp.Language._("Valves / Irrigation Controls (STN_TYPE_GARDENA / VALVE)") + ":</b>";
+					listHtml += "<table style='width:100%; border-collapse:collapse; margin-top:5px; margin-bottom:15px; text-align:left; font-size:12px;'>" +
+						"<thead><tr style='border-bottom:1px solid #bbb; background:#eaeaea;'><th style='padding:5px 8px;'>" + OSApp.Language._("Service Index") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Name") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("State") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Activity") + "</th></tr></thead><tbody>";
+					for (var i = 0; i < valves.length; i++) {
+						var v = valves[i];
+						var bg = i % 2 === 0 ? "#fdfdfd" : "#f4f4f4";
+						listHtml += "<tr style='border-bottom:1px solid #e0e0e0; background:" + bg + ";'>" +
+							"<td style='padding:5px 8px; font-weight:bold; color:#1565c0;'>" + esc(v.id) + "</td>" +
+							"<td style='padding:5px 8px; font-weight:500;'>" + esc(v.name || OSApp.Language._("Valve")) + "</td>" +
+							"<td style='padding:5px 8px;'>" + esc(v.state || "-") + "</td>" +
+							"<td style='padding:5px 8px; font-style:italic;'>" + esc(v.activity || "-") + "</td>" +
+							"</tr>";
+					}
+					listHtml += "</tbody></table>";
+				}
+				if (sensors.length > 0) {
+					listHtml += "<b style='color:#333; text-transform:uppercase; font-size:11px;'>" + OSApp.Language._("Sensors") + ":</b>";
+					listHtml += "<table style='width:100%; border-collapse:collapse; margin-top:5px; text-align:left; font-size:12px;'>" +
+						"<thead><tr style='border-bottom:1px solid #bbb; background:#eaeaea;'><th style='padding:5px 8px;'>" + OSApp.Language._("Sensor ID") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Name") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Details") + "</th></tr></thead><tbody>";
+					for (var j = 0; j < sensors.length; j++) {
+						var s = sensors[j];
+						var details = [];
+						if (s.soilHumidity !== null && s.soilHumidity !== undefined) details.push(OSApp.Language._("Moisture") + ": " + esc(s.soilHumidity) + "%");
+						if (s.soilTemperature !== null && s.soilTemperature !== undefined) details.push(OSApp.Language._("Soil Temp") + ": " + esc(s.soilTemperature) + "°C");
+						if (s.ambientTemperature !== null && s.ambientTemperature !== undefined) details.push(OSApp.Language._("Ambient Temp") + ": " + esc(s.ambientTemperature) + "°C");
+						if (s.lightIntensity !== null && s.lightIntensity !== undefined) details.push(OSApp.Language._("Light") + ": " + esc(s.lightIntensity) + " lx");
+						var sbg = j % 2 === 0 ? "#fdfdfd" : "#f4f4f4";
+						listHtml += "<tr style='border-bottom:1px solid #e0e0e0; background:" + sbg + ";'>" +
+							"<td style='padding:5px 8px; font-weight:bold; color:#1565c0;'>" + esc(s.id) + "</td>" +
+							"<td style='padding:5px 8px; font-weight:500;'>" + esc(s.name || OSApp.Language._("Sensor")) + "</td>" +
+							"<td style='padding:5px 8px;'>" + (details.length > 0 ? details.join(" | ") : "-") + "</td>" +
+							"</tr>";
+					}
+					listHtml += "</tbody></table>";
+				}
+			}
+			popup.find(".gardena-discovered-list").html(listHtml);
+		};
+
+		var loadDevices = function (force) {
+			popup.find(".gardena-status").html(OSApp.Language._("Checking connection..."));
+			popup.find(".gardena-discovered-list").html(OSApp.Language._("Loading list components..."));
+			return OSApp.Firmware.sendToOS("/gl?pw=" + (force ? "&refresh=1" : ""), "json").then(function (result) {
+				renderStatus(result);
+				renderDevices(result);
+			}).fail(function() {
+				popup.find(".gardena-status").html("");
+				popup.find(".gardena-discovered-list").html("<p style='color:#d9534f; font-weight:bold;'>" + OSApp.Language._("Failed to retrieve device list. Please verify your credentials and submit first.") + "</p>");
+			});
+		};
+
 		var tokenListener = function (event) {
 			if (event.data && event.data.type === 'gardena_tokens') {
 				var data = event.data;
-				popup.find(".client_id").val(data.client_id || "");
+				popup.find(".api_key").val(data.client_id || "");
 				popup.find(".client_secret").val(data.client_secret || "");
 				popup.find(".refresh_token").val(data.refresh_token || "");
-				popup.find(".access_token").val(data.access_token || "");
-				popup.find(".api_key").val(data.client_id || "");
 
-				// Automatically trigger form submit to save the credentials on OpenSprinkler
-				// and close the parent popup without manual user action.
+				// Automatically save the credentials obtained by the assistant.
 				setTimeout(function() {
-					popup.find("form").submit();
+					popup.find(".submit").trigger("click");
 				}, 800);
 			}
 		};
@@ -6017,23 +6097,31 @@ OSApp.Analog.setupGardenaCredentials = function() {
 			return false;
 		});
 
-		popup.find(".submit").on("click", function () {
-			var newData = {};
-			newData.gardena = {};
-			var apiKey = popup.find(".api_key").val();
-			var clientId = popup.find(".client_id").val();
-			var clientSecret = popup.find(".client_secret").val();
-			var refreshToken = popup.find(".refresh_token").val();
-			var accessToken = popup.find(".access_token").val();
-			var locationId = popup.find(".location_id").val();
-			if (apiKey.length > 0) newData.gardena.api_key = apiKey;
-			if (clientId.length > 0) newData.gardena.client_id = clientId;
+		popup.find(".reload-devices").on("click", function (e) {
+			e.preventDefault();
+			loadDevices(true);
+			return false;
+		});
+
+		popup.find(".submit").on("click", function (e) {
+			e.preventDefault();
+			var newData = { gardena: {} };
+			var apiKey = $.trim(popup.find(".api_key").val());
+			var clientSecret = $.trim(popup.find(".client_secret").val());
+			var pollVal = parseInt(popup.find(".poll").val(), 10);
+			// The firmware merges: missing keys are kept, empty strings clear a key,
+			// an empty secret keeps the stored one.
+			newData.gardena.api_key = apiKey;
+			newData.gardena.client_id = apiKey;
 			if (clientSecret.length > 0) newData.gardena.client_secret = clientSecret;
-			if (refreshToken.length > 0) newData.gardena.refresh_token = refreshToken;
-			if (accessToken.length > 0) newData.gardena.access_token = accessToken;
-			if (locationId.length > 0) newData.gardena.location_id = locationId;
-			OSApp.Analog.sendToOsObj("/co?pw=", newData);
-			popup.popup("close");
+			newData.gardena.refresh_token = $.trim(popup.find(".refresh_token").val());
+			newData.gardena.location_id = $.trim(popup.find(".location_id").val());
+			newData.gardena.poll = (isNaN(pollVal) ? 30 : Math.max(5, pollVal)) * 60;
+			OSApp.Analog.sendToOsObj("/co?pw=", newData).done(function () {
+				popup.find(".client_secret").val("");
+				if (clientSecret.length > 0) popup.find(".client_secret").attr("placeholder", OSApp.Language._("(stored, leave empty to keep)"));
+				loadDevices(true);
+			});
 			return false;
 		});
 
@@ -6041,60 +6129,9 @@ OSApp.Analog.setupGardenaCredentials = function() {
 		popup.css("max-width", "580px");
 		OSApp.UIDom.openPopup(popup, { positionTo: "origin" });
 
-		// Fetch discovered valves & sensors from /gl
-		OSApp.Firmware.sendToOS("/gl?pw=", "json").then(function (result) {
-			var listHtml = "";
-			var valves = result.valves || [];
-			var sensors = result.sensors || [];
-
-			if (valves.length === 0 && sensors.length === 0) {
-				listHtml = "<p style='color:#777; font-style:italic;'>" + OSApp.Language._("No valves or sensors found in your Gardena account.") + "</p>";
-			} else {
-				if (valves.length > 0) {
-					listHtml += "<b style='color:#333; text-transform:uppercase; font-size:11px;'>" + OSApp.Language._("Valves / Irrigation Controls (STN_TYPE_GARDENA / VALVE)") + ":</b>";
-					listHtml += "<table style='width:100%; border-collapse:collapse; margin-top:5px; margin-bottom:15px; text-align:left; font-size:12px;'>" +
-						"<thead><tr style='border-bottom:1px solid #bbb; background:#eaeaea;'><th style='padding:5px 8px;'>" + OSApp.Language._("Service Index") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Name") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("State") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Activity") + "</th></tr></thead><tbody>";
-					for (var i = 0; i < valves.length; i++) {
-						var v = valves[i];
-						var bg = i % 2 === 0 ? "#fdfdfd" : "#f4f4f4";
-						listHtml += "<tr style='border-bottom:1px solid #e0e0e0; background:" + bg + ";'>" +
-							"<td style='padding:5px 8px; font-weight:bold; color:#1565c0;'>" + v.id + "</td>" +
-							"<td style='padding:5px 8px; font-weight:500;'>" + (v.name || OSApp.Language._("Valve")) + "</td>" +
-							"<td style='padding:5px 8px;'>" + (v.state || "-") + "</td>" +
-							"<td style='padding:5px 8px; font-style:italic;'>" + (v.activity || "-") + "</td>" +
-							"</tr>";
-					}
-					listHtml += "</tbody></table>";
-				}
-				if (sensors.length > 0) {
-					listHtml += "<b style='color:#333; text-transform:uppercase; font-size:11px;'>" + OSApp.Language._("Sensors") + ":</b>";
-					listHtml += "<table style='width:100%; border-collapse:collapse; margin-top:5px; text-align:left; font-size:12px;'>" +
-						"<thead><tr style='border-bottom:1px solid #bbb; background:#eaeaea;'><th style='padding:5px 8px;'>" + OSApp.Language._("Sensor ID") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Name") + "</th><th style='padding:5px 8px;'>" + OSApp.Language._("Details") + "</th></tr></thead><tbody>";
-					for (var j = 0; j < sensors.length; j++) {
-						var s = sensors[j];
-						var details = [];
-						if (s.soilHumidity !== null && s.soilHumidity !== undefined) details.push(OSApp.Language._("Moisture") + ": " + s.soilHumidity + "%");
-						if (s.soilTemperature !== null && s.soilTemperature !== undefined) details.push(OSApp.Language._("Soil Temp") + ": " + s.soilTemperature + "°C");
-						if (s.ambientTemperature !== null && s.ambientTemperature !== undefined) details.push(OSApp.Language._("Ambient Temp") + ": " + s.ambientTemperature + "°C");
-						if (s.lightIntensity !== null && s.lightIntensity !== undefined) details.push(OSApp.Language._("Light") + ": " + s.lightIntensity + " lx");
-						var sbg = j % 2 === 0 ? "#fdfdfd" : "#f4f4f4";
-						listHtml += "<tr style='border-bottom:1px solid #e0e0e0; background:" + sbg + ";'>" +
-							"<td style='padding:5px 8px; font-weight:bold; color:#1565c0;'>" + s.id + "</td>" +
-							"<td style='padding:5px 8px; font-weight:500;'>" + (s.name || OSApp.Language._("Sensor")) + "</td>" +
-							"<td style='padding:5px 8px;'>" + (details.length > 0 ? details.join(" | ") : "-") + "</td>" +
-							"</tr>";
-					}
-					listHtml += "</tbody></table>";
-				}
-			}
-			popup.find(".gardena-discovered-list").html(listHtml);
-		}).fail(function() {
-			popup.find(".gardena-discovered-list").html("<p style='color:#d9534f; font-weight:bold;'>" + OSApp.Language._("Failed to retrieve device list. Please verify your credentials and submit first.") + "</p>");
-		});
+		loadDevices(false);
 	}, function() {
-		var resetGardena = {};
-		resetGardena.gardena = {};
-		OSApp.Analog.sendToOsObj("/co?pw=", resetGardena);
+		OSApp.Errors.showError(OSApp.Language._("Failed to retrieve device list. Please verify your credentials and submit first."));
 	});
 };
 

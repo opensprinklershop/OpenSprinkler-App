@@ -484,12 +484,18 @@ OSApp.UIDom.showHomeMenu = ( function() {
                                         $( ".disabled-programs-note" ).show();
                                         page.removeClass( "show-hidden" );
                                         OSApp.Storage.set( { showDisabled: false } );
+                                        if ( OSApp.DeviceConfig && OSApp.DeviceConfig.saveSetting ) {
+                                                OSApp.DeviceConfig.saveSetting( "showDisabled", 0 );
+                                        }
                                         showHidden = false;
                                 } else {
                                         $( ".station-hidden" ).show();
                                         $( ".disabled-programs-note" ).hide();
                                         page.addClass( "show-hidden" );
                                         OSApp.Storage.set( { showDisabled: true } );
+                                        if ( OSApp.DeviceConfig && OSApp.DeviceConfig.saveSetting ) {
+                                                OSApp.DeviceConfig.saveSetting( "showDisabled", 1 );
+                                        }
                                         showHidden = true;
                                 }
 			} else if ( href === "#raindelay" ) {

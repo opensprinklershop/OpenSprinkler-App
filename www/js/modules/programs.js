@@ -2124,6 +2124,9 @@ OSApp.Programs.pidToName = function( pid ) {
 		pname = OSApp.Language._( "Manual program" );
 	} else if ( pid === 254 || pid === 98 ) {
 		pname = OSApp.Language._( "Run-once program" );
+	} else if ( pid === 253 ) {
+		// Firmware queue id for station runs started directly by a monitor action
+		pname = OSApp.Language._( "Monitor" );
 	} else if ( pid >= 1 && pid <= OSApp.currentSession.controller.programs.pd.length && OSApp.currentSession.controller.programs.pd[ pid - 1 ] ) {
 		pname = OSApp.currentSession.controller.programs.pd[ pid - 1 ][ 5 ];
 	}
