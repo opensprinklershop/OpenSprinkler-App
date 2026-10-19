@@ -184,7 +184,7 @@ OSApp.Status.checkStatus = function() {
 			pid = OSApp.Stations.getPID( i );
 			pname = OSApp.Programs.pidToName( pid );
 			line = "<div><div class='running-icon'></div><div class='running-text pointer'>";
-			line += pname + " " + OSApp.Language._( "is running on station" ) + " <span class='nobr'>" + OSApp.Stations.getName( i ) + "</span> ";
+			line += pname + " " + OSApp.Language._( "is running on station" ) + " <span class='nobr'>" + OSApp.Utils.htmlEscape( OSApp.Stations.getName( i ) ) + "</span> ";
 			if ( OSApp.Stations.getRemainingRuntime( i ) > 0 ) {
 				line += "<span id='countdown' class='nobr'>(" + OSApp.Dates.sec2hms( OSApp.Stations.getRemainingRuntime( i ) ) + " " + OSApp.Language._( "remaining" ) + ")</span>";
 			}

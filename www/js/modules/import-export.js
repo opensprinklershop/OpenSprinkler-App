@@ -370,6 +370,13 @@ OSApp.ImportExport.importConfig = function( data, options ) {
 				if ( !isPi && typeof data.options.fwv === "number" && data.options.fwv >= 210 ) {
 					name = "&name=" + encodeURIComponent( prog[ 5 ] );
 
+					// Date range [endr, from, to] (exported as the 7th element) must be
+					// submitted as separate parameters, otherwise every imported
+					// program falls back to 01/01 - 12/31 (ticket 6RM-3W9-ATH4).
+					if ( Array.isArray( prog[ 6 ] ) && prog[ 6 ].length >= 3 && OSApp.Supported.dateRange() ) {
+						name += "&endr=" + ( prog[ 6 ][ 0 ] ? 1 : 0 ) + "&from=" + parseInt( prog[ 6 ][ 1 ], 10 ) + "&to=" + parseInt( prog[ 6 ][ 2 ], 10 );
+					}
+
 					// Truncate the program name off the array
 					prog = prog.slice( 0, 5 );
 				}

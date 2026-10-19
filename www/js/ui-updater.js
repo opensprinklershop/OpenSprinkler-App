@@ -37,6 +37,9 @@
 // - A copy goes live by writing one localStorage pointer after everything has
 //   been verified. If it does not boot, the startup watchdog blocks its id and
 //   the bundled snapshot is used again.
+// - While a copy is written, a notice at the bottom of the screen names the
+//   changed files and shows a progress bar. It needs no interaction and fades
+//   out a few seconds after the install finished (or failed).
 //
 // The file is dependency-free on purpose: build.sh injects it into the frozen
 // snapshots (like boot-diagnostics.js), which predate any helper it could use.
@@ -407,6 +410,130 @@
 	}
 
 	// ---------------------------------------------------------------------
+	// Progress notice (no interaction, fades out on its own)
+	// ---------------------------------------------------------------------
+
+	var NOTICE_ID = "os-ui-update-notice",
+		NOTICE_HIDE_MS = 5000,
+		NOTICE_MAX_NAMES = 4;
+
+	// The app's translations when they are loaded, else English. Frozen snapshots
+	// without these strings in their locale files fall back the same way.
+	function tr( text ) {
+		try {
+			if ( window.OSApp && window.OSApp.Language && typeof window.OSApp.Language._ === "function" ) {
+				return window.OSApp.Language._( text );
+			}
+		} catch ( e ) { void e; }
+		return text;
+	}
+
+	function baseName( path ) {
+		return String( path ).substring( String( path ).lastIndexOf( "/" ) + 1 );
+	}
+
+	function describeFiles( paths ) {
+		var names = paths.slice( 0, NOTICE_MAX_NAMES ).map( baseName ).join( ", " );
+		return paths.length > NOTICE_MAX_NAMES ? names + " (+" + ( paths.length - NOTICE_MAX_NAMES ) + ")" : names;
+	}
+
+	// Small card at the bottom of the screen: title, changed files, progress bar.
+	// pointer-events: none, so it never blocks the page underneath.
+	function progressNotice() {
+		var box = null, bar = null, title = null, detail = null, current = null, hideTimer = null;
+
+		function el( tag, css ) {
+			var node = document.createElement( tag );
+			node.style.cssText = css;
+			return node;
+		}
+
+		function build() {
+			if ( box || !document.body ) {
+				return !!box;
+			}
+			var old = document.getElementById( NOTICE_ID );
+			if ( old && old.parentNode ) {
+				old.parentNode.removeChild( old );
+			}
+			box = el( "div", "position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom, 0px));" +
+				"z-index:2147483000;max-width:420px;margin:0 auto;box-sizing:border-box;padding:10px 12px;border-radius:8px;" +
+				"background:rgba(33,33,33,0.92);color:#fff;font:13px/1.35 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;" +
+				"box-shadow:0 2px 10px rgba(0,0,0,0.35);pointer-events:none;opacity:0;transition:opacity 0.3s;text-align:left;" );
+			box.id = NOTICE_ID;
+			box.setAttribute( "role", "status" );
+			box.setAttribute( "aria-live", "polite" );
+			title = el( "div", "font-weight:600;" );
+			detail = el( "div", "margin-top:2px;opacity:0.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" );
+			current = el( "div", "margin-top:2px;font-size:11px;opacity:0.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" );
+			var track = el( "div", "margin-top:8px;height:4px;border-radius:2px;background:rgba(255,255,255,0.25);overflow:hidden;" );
+			bar = el( "div", "height:100%;width:0;background:#4caf50;transition:width 0.2s;" );
+			track.appendChild( bar );
+			box.appendChild( title );
+			box.appendChild( detail );
+			box.appendChild( current );
+			box.appendChild( track );
+			document.body.appendChild( box );
+			window.setTimeout( function() {
+				if ( box ) {
+					box.style.opacity = "1";
+				}
+			}, 20 );
+			return true;
+		}
+
+		function setProgress( fraction ) {
+			if ( bar ) {
+				bar.style.width = Math.round( Math.max( 0, Math.min( 1, fraction ) ) * 100 ) + "%";
+			}
+		}
+
+		function hide() {
+			if ( !box ) {
+				return;
+			}
+			var node = box;
+			box = null;
+			node.style.opacity = "0";
+			window.setTimeout( function() {
+				if ( node.parentNode ) {
+					node.parentNode.removeChild( node );
+				}
+			}, 400 );
+		}
+
+		return {
+			start: function( version, changed ) {
+				if ( !build() ) {
+					return;
+				}
+				title.textContent = tr( "Updating user interface" ) + " (" + version + ")";
+				detail.textContent = changed.length ? tr( "Updated files:" ) + " " + describeFiles( changed ) : "";
+				detail.title = changed.join( "\n" );
+				current.textContent = "";
+				setProgress( 0 );
+			},
+			progress: function( fraction, path ) {
+				if ( box ) {
+					setProgress( fraction );
+					current.textContent = path || "";
+				}
+			},
+			finish: function( ok ) {
+				if ( !box ) {
+					return;
+				}
+				setProgress( 1 );
+				bar.style.background = ok ? "#4caf50" : "#e53935";
+				title.textContent = tr( ok ? "User interface updated" : "User interface update failed" );
+				current.textContent = ok ? tr( "Active after the next app start." ) : "";
+				window.clearTimeout( hideTimer );
+				hideTimer = window.setTimeout( hide, NOTICE_HIDE_MS );
+			}
+		};
+	}
+
+	// ---------------------------------------------------------------------
 	// Storage adapter on top of cordova-plugin-file
 	// ---------------------------------------------------------------------
 
@@ -618,18 +745,51 @@
 		}, fromRemote );
 	}
 
-	function install( version, list ) {
+	// Whether the bundled snapshot already holds this file (same rule as obtainFile).
+	function bundledMatches( version, path, expected ) {
+		if ( path.indexOf( "locale/" ) === 0 ) {
+			return fetchBuffer( "/" + path, 10000 ).then( function() { return true; }, function() { return false; } );
+		}
+		return fetchBuffer( "/" + version + "/" + path, 10000 ).then( function( buffer ) {
+			return sha256( buffer ).then( function( digest ) { return digest === expected.sha256; } );
+		}, function() { return false; } );
+	}
+
+	// Paths that have to be downloaded, i.e. what the update actually changes.
+	function changedFiles( version, list ) {
+		var changed = [];
+		return list.paths.reduce( function( chain, path ) {
+			return chain.then( function() {
+				return bundledMatches( version, path, list.files[ path ] ).then( function( same ) {
+					if ( !same ) {
+						changed.push( path );
+					}
+				} );
+			} );
+		}, Promise.resolve() ).then( function() { return changed; } );
+	}
+
+	function install( version, list, notice ) {
 		var store = getAdapter(),
 			dir = OVERLAY_ROOT + "/" + list.id,
 			downloaded = 0,
-			index = 0;
+			index = 0,
+
+			// Progress by bytes; every file counts at least a little.
+			weight = function( path ) { return Math.max( 1024, list.files[ path ].size ); },
+			total = list.paths.reduce( function( sum, path ) { return sum + weight( path ); }, 0 ),
+			done = 0;
 
 		function next() {
 			if ( index >= list.paths.length ) {
 				return Promise.resolve();
 			}
 			var path = list.paths[ index++ ];
+			if ( notice ) {
+				notice.progress( done / total, path );
+			}
 			return obtainFile( version, path, list.files[ path ] ).then( function( file ) {
+				done += weight( path );
 				var buffer = file.buffer;
 				if ( file.downloaded ) {
 					downloaded++;
@@ -709,10 +869,24 @@
 				if ( pointer && pointer.id === list.id ) {
 					return { status: "current", version: version, id: list.id };
 				}
-				return install( version, list ).then( function( result ) {
-					return cleanup().then( function() {
-						result.status = "installed";
-						return result;
+				return changedFiles( version, list ).then( function( changed ) {
+
+					// Same content as the bundled snapshot: a copy would change nothing.
+					if ( !changed.length && !pointer ) {
+						return { status: "bundled", version: version, id: list.id };
+					}
+					var notice = progressNotice();
+					notice.start( version, changed );
+					return install( version, list, notice ).then( function( result ) {
+						return cleanup().then( function() {
+							notice.finish( true );
+							result.status = "installed";
+							result.changed = changed;
+							return result;
+						} );
+					}, function( err ) {
+						notice.finish( false );
+						throw err;
 					} );
 				} );
 			} );

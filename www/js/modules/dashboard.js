@@ -241,7 +241,7 @@ OSApp.Dashboard.displayPage = function() {
 			cards += "<img src='" + ( hasImage ? "data:image/jpeg;base64," + sites[ currentSite ].images[ sid ] : OSApp.UIDom.getAppURLPath() + "img/placeholder.png" ) + "' />";
 
 
-			cards += "<p class='station-name center inline-icon' id='station_" + sid + "'>" + OSApp.Stations.getName( sid) + "</p>";
+			cards += "<p class='station-name center inline-icon' id='station_" + sid + "'>" + OSApp.Utils.htmlEscape( OSApp.Stations.getName( sid ) ) + "</p>";
 			cards += "<span class='bno-border ui-btn ui-btn-icon-notext ui-corner-all card-icon station-status " +
 				( isRunning ? "on" : ( isScheduled ? "wait" : "off" ) ) + "'></span>";
 

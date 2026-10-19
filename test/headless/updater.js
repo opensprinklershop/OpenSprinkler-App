@@ -105,6 +105,11 @@ srv.listen(HP, async () => {
     const r1 = JSON.parse(await withUpdater(`return JSON.stringify(await OSUIUpdater.check(true));`));
     expect("check() installed a copy", r1.status === "installed" && r1.version === VERSION, JSON.stringify(r1));
     expect("only the changed files were downloaded", r1.downloaded === 2, "downloaded=" + r1.downloaded);
+    expect("changed files reported", JSON.stringify((r1.changed || []).slice().sort()) === JSON.stringify(["js/hotfix-extra.js", "js/modules/ui-dom.js"]), JSON.stringify(r1.changed));
+    const notice = JSON.parse(await ev(`(function(){ var n = document.getElementById("os-ui-update-notice"); return JSON.stringify(n ? { text: n.textContent, bar: n.querySelector("div[style*='transition:width'], div[style*='transition: width']") ? n.querySelector("div[style*='transition:width'], div[style*='transition: width']").style.width : null, pe: getComputedStyle(n).pointerEvents } : null); })()`));
+    expect("progress notice names the changed files and is complete", !!notice && /hotfix-extra\.js/.test(notice.text) && /ui-dom\.js/.test(notice.text) && notice.bar === "100%" && notice.pe === "none", JSON.stringify(notice));
+    await sleep(6000);
+    expect("progress notice fades out on its own", (await ev(`!document.getElementById("os-ui-update-notice")`)) === true);
     const copyDir = path.join(DATA, "ui", String(r1.id), VERSION);
     expect("copy has no native bridge of its own", !fs.existsSync(path.join(copyDir, "cordova.js")) && !fs.existsSync(path.join(copyDir, "plugins")));
     const idx = fs.existsSync(path.join(copyDir, "index.html")) ? fs.readFileSync(path.join(copyDir, "index.html"), "utf8") : "";

@@ -18,13 +18,29 @@ sed -i "s/__BUILD_TIMESTAMP__/$BUILD_TS/g" www/sw.js
 # === Dynamically package UI versions inside mobile app ===
 echo "=== Syncing UI Versions for Mobile App Bundle ==="
 VERSIONS_SRC="/srv/www/htdocs/ui-live/www/versions.json"
-if [ -f "www/versions.json" ]; then
-	echo "   Preserving existing www/versions.json"
-elif [ -f "$VERSIONS_SRC" ]; then
-	cp "$VERSIONS_SRC" www/versions.json
+VERSIONS_TMP=$(mktemp)
+if [ -f "$VERSIONS_SRC" ]; then
+	cp "$VERSIONS_SRC" "$VERSIONS_TMP"
 else
-	curl -s -o www/versions.json "https://ui.opensprinklershop.de/versions.json"
+	curl -s -o "$VERSIONS_TMP" "https://ui.opensprinklershop.de/versions.json"
 fi
+# Every fw.sh release promotes a new snapshot into ui-live and registers it there.
+# Take that catalog, keep versions only the tracked www/versions.json knows and
+# its "default", so new releases reach the app bundle without hand edits.
+node -e '
+	const fs = require("fs");
+	const read = f => { try { return JSON.parse(fs.readFileSync(f, "utf8")); } catch (e) { return null; } };
+	const live = read(process.argv[1]), local = read("www/versions.json");
+	const list = d => (d && Array.isArray(d.versions)) ? d.versions.filter(v => typeof v === "string") : [];
+	const versions = list(live);
+	list(local).forEach(v => { if (!versions.includes(v)) versions.push(v); });
+	if (!versions.length) { console.log("   [WARN] no version catalog available, keeping www/versions.json"); process.exit(0); }
+	const out = { versions: versions, default: (local && versions.includes(local.default)) ? local.default : (live && live.default) || "dev" };
+	const added = versions.filter(v => !list(local).includes(v));
+	fs.writeFileSync("www/versions.json", JSON.stringify(out, null, 2) + "\n");
+	console.log("   www/versions.json: " + versions.length + " entries" + (added.length ? ", new: " + added.join(" ") : ""));
+' "$VERSIONS_TMP"
+rm -f "$VERSIONS_TMP"
 
 VERSIONS=$(node -e '
 	try {
