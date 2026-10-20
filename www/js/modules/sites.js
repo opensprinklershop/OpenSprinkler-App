@@ -1727,11 +1727,39 @@ OSApp.Sites.showMixedContentHelp = function( name ) {
 	}
 };
 
+// Remember which sites are an OpenSprinkler Pro (ESP32-C5) so the connect screen can show the
+// Pro logo before /jo has answered. Kept apart from "sites" so it is not synced to the cloud.
+OSApp.Sites.isProSite = function( name ) {
+	try {
+		return !!JSON.parse( localStorage.getItem( "pro_sites" ) || "{}" )[ name ];
+	} catch {
+		return false;
+	}
+};
+
+OSApp.Sites.rememberProSite = function( name, isPro ) {
+	try {
+		var proSites = JSON.parse( localStorage.getItem( "pro_sites" ) || "{}" );
+		if ( !!proSites[ name ] === isPro ) {
+			return;
+		}
+		if ( isPro ) {
+			proSites[ name ] = 1;
+		} else {
+			delete proSites[ name ];
+		}
+		localStorage.setItem( "pro_sites", JSON.stringify( proSites ) );
+	} catch {
+
+		// Storage blocked (private mode): the connect screen just shows the default logo
+	}
+};
+
 OSApp.Sites.newLoad = function( firstLoad ) {
 
 	// Get the current site name from the session (not from selector which may not be updated yet)
 	var name = OSApp.currentSession.currentSite || $( "#site-selector" ).val(),
-		loading = "<div class='logo'></div>" +
+		loading = "<div class='logo" + ( OSApp.Sites.isProSite( name ) ? " logo-pro" : "" ) + "'></div>" +
 			"<h1 style='padding-top:5px'>" + OSApp.Language._( "Connecting to" ) + " " + name + "</h1>" +
 			"<p class='cancel tight center inline-icon'>" +
 				"<span class='btn-no-border ui-btn ui-icon-delete ui-btn-icon-notext'></span>" +
@@ -1816,6 +1844,7 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 				changePassword = $( ".changePassword" );
 
 			$.mobile.loading( "hide" );
+			OSApp.Sites.rememberProSite( name, OSApp.Analog.isESP32() );
 			OSApp.Weather.checkURLandUpdateWeather();
 
 			weatherAdjust.css( "display", "" );

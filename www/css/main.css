@@ -710,6 +710,16 @@ input[type=number] {
 .ui-nosvg .logo {
     background-image:url(../img/logo.png)
 }
+/* OpenSprinkler Pro (ESP32-C5, feature flag ESP32); 3x bitmap of OpenSprinklerPro-Logo.png, text recoloured white */
+.logo.logo-pro {
+    background:url(../img/logo-pro.png) no-repeat center;
+    background-size:204px 36px
+}
+/* the loader box is only 12.5em wide: scale the Pro logo to the box instead of cropping it */
+.ui-loader .logo.logo-pro,
+.spinner .logo.logo-pro {
+    background-size:92% auto
+}
 @media (max-width:480px) {
     #addnew, #raindelay, #site-select, #sure, .modal {
         width:250px

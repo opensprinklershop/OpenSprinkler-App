@@ -198,6 +198,7 @@ cacheFiles = cacheFiles.concat([
   "/img/bell.png",
   "/img/favicon.ico",
   "/img/logo.png",
+  "/img/logo-pro.png",
   "/img/norain.png",
   "/img/placeholder.png",
   "/img/relay.png",

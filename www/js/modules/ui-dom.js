@@ -1508,6 +1508,11 @@ OSApp.UIDom.changeHeader = function( opt ) {
 		opt.class = "logo";
 	}
 
+	// OpenSprinkler Pro (ESP32-C5) gets its own logo
+	if ( opt.class === "logo" && OSApp.Analog && OSApp.Analog.isESP32() ) {
+		opt.class = "logo logo-pro";
+	}
+
 	// If left button is a back button, also add a menu button for Android
 	// (Android hides back buttons via CSS, so the menu button provides navigation)
 	var hasBackBtn = opt.leftBtn.class.indexOf( "ui-toolbar-back-btn" ) !== -1;
