@@ -34,6 +34,12 @@ OSApp.Firmware.Constants = {
 		8: "Weather Failure",
 		9: "Network Failure",
 		10: "Clock Update",
+		11: "Program Triggered",
+		12: "Loop Stall",
+		13: "Crash (Exception)",
+		14: "Watchdog",
+		15: "Brownout",
+		16: "Software Restart",
 		99: "Power On"
 	}
 };
