@@ -227,6 +227,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Połącz wilgotność i temperaturę na jednym wykresie",
     "Combine Soil Moisture and Temperature in one chart": "Połącz wilgotność gleby i temperaturę na jednym wykresie",
+    "Show zone runs and rain sensor in charts": "Pokaż podlewanie stref i czujnik deszczu na wykresach",
+    "Irrigation time": "Czas nawadniania",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Obliczanie odcisku palca…",

@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Kombineer humiditeit en temperatuur in een grafiek",
     "Combine Soil Moisture and Temperature in one chart": "Kombineer grondvog en temperatuur in een grafiek",
+    "Show zone runs and rain sensor in charts": "Wys sone-lopies en reënsensor in grafieke",
+    "Irrigation time": "Besproeiingstyd",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Reken tans vingerafdruk …",

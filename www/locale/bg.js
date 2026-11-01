@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Обединяване на влажност и температура в една графика",
     "Combine Soil Moisture and Temperature in one chart": "Комбинирай влажност на почвата и температура в една графика",
+    "Show zone runs and rain sensor in charts": "Показване на поливанията по зони и датчика за дъжд в диаграмите",
+    "Irrigation time": "Време за поливане",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Изчислява се пръстов отпечатък...",

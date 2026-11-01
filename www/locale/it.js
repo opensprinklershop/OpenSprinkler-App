@@ -227,6 +227,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Combinare umidità e temperatura in un grafico",
     "Combine Soil Moisture and Temperature in one chart": "Combina umidità del suolo e temperatura in un unico grafico",
+    "Show zone runs and rain sensor in charts": "Mostra le irrigazioni delle zone e il sensore pioggia nei grafici",
+    "Irrigation time": "Tempo di irrigazione",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Calcolo delle impronte digitali...",

@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Páratartalom és hőmérséklet egy diagramon",
     "Combine Soil Moisture and Temperature in one chart": "Talajnedvesség és hőmérséklet kombinálása egy grafikonon",
+    "Show zone runs and rain sensor in charts": "Zónafutások és esőérzékelő megjelenítése a diagramokon",
+    "Irrigation time": "Öntözési idő",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Ujjlenyomat számítása…",

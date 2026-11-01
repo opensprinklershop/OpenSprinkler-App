@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Sameina raka og hita í einu grafi",
     "Combine Soil Moisture and Temperature in one chart": "Sameina jarðvegsraka og hitastig í einu línuriti",
+    "Show zone runs and rain sensor in charts": "Sýna keyrslur svæða og regnskynjara í línuritum",
+    "Irrigation time": "Vökvunartími",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Er að reikna fingrafar…",

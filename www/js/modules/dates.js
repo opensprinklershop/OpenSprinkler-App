@@ -299,6 +299,18 @@ OSApp.Dates.dhms2sec = function( arr ) {
 	return parseInt( ( arr.days * 86400 ) + ( arr.hours * 3600 ) + ( arr.minutes * 60 ) + arr.seconds );
 };
 
+// The one-time start date is typed as a plain text field. The order of day and
+// month follows the translated label "Start Date (mm/dd/yyyy)": translations
+// that put the month token second (de "TT/MM/JJJJ", pt/es "dd/mm/aaaa",
+// bg "дд/мм/гггг") expect day first, all others month first. Parsing and
+// formatting must use the same order; before, the German label promised
+// TT/MM but the parser read MM/TT, so 31/10/2026 became month 31 of 2026,
+// which JavaScript rolled over to 10 Jul 2028 (ticket 87Y-ZQA-A3PN).
+OSApp.Dates.dateInputDayFirst = function() {
+	var label = OSApp.Language._( "Start Date (mm/dd/yyyy)" ).toLowerCase();
+	return /\/(mm|мм)\//.test( label );
+};
+
 OSApp.Dates.dateToEpoch = function( dateString ) {
 	//return epoch days from date
 	var dateValues = OSApp.Dates.extractDateFromStringYear( dateString );
@@ -307,16 +319,45 @@ OSApp.Dates.dateToEpoch = function( dateString ) {
 	}
 
 	dateValues = dateValues[ 0 ].split( "/" );
-	var date = new Date(Date.UTC(parseInt(dateValues[ 2 ]), parseInt(dateValues[ 0 ]) - 1, parseInt(dateValues[ 1 ])));
+	var first = parseInt( dateValues[ 0 ], 10 ),
+		second = parseInt( dateValues[ 1 ], 10 ),
+		year = parseInt( dateValues[ 2 ], 10 ),
+		dayFirst = OSApp.Dates.dateInputDayFirst(),
+		month, day;
 
-	return Math.floor(date.getTime() / (1000 * 86400));
+	// A value above 12 can only be the day, whatever the label says.
+	if ( first > 12 && second <= 12 ) {
+		dayFirst = true;
+	} else if ( second > 12 && first <= 12 ) {
+		dayFirst = false;
+	}
+	month = dayFirst ? second : first;
+	day = dayFirst ? first : second;
+
+	if ( isNaN( year ) || year < 1970 || month < 1 || month > 12 || day < 1 || day > 31 ) {
+		return -1;
+	}
+
+	var date = new Date( Date.UTC( year, month - 1, day ) );
+
+	// Reject dates that JavaScript would silently roll over (e.g. 31 of a 30-day month).
+	if ( date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day ) {
+		return -1;
+	}
+
+	return Math.floor( date.getTime() / ( 1000 * 86400 ) );
 };
 
 OSApp.Dates.epochToDate = function( epochTime ) {
 	//return a date string from an epoch time in days
-	var date = new Date(epochTime * (1000 * 86400) );
+	var date = new Date( epochTime * ( 1000 * 86400 ) ),
+		month = date.getUTCMonth() + 1,
+		day = date.getUTCDate();
 
-	return (date.getUTCMonth() + 1) + "/" + date.getUTCDate() + "/" + date.getUTCFullYear();
+	if ( OSApp.Dates.dateInputDayFirst() ) {
+		return day + "/" + month + "/" + date.getUTCFullYear();
+	}
+	return month + "/" + day + "/" + date.getUTCFullYear();
 };
 
 OSApp.Dates.isLastDayOfMonth = function( month, year, day ) {

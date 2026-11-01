@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "שלב לחות וטמפרטורה בתרשים אחד",
     "Combine Soil Moisture and Temperature in one chart": "שלב לחות קרקע וטמפרטורה בתרשים אחד",
+    "Show zone runs and rain sensor in charts": "הצג הפעלות אזורים וחיישן גשם בתרשימים",
+    "Irrigation time": "זמן השקיה",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "מחשוב טביעת אצבע...",

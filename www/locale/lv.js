@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Apvienot mitrumu un temperatūru vienā diagrammā",
     "Combine Soil Moisture and Temperature in one chart": "Apvienot augsnes mitrumu un temperatūru vienā diagrammā",
+    "Show zone runs and rain sensor in charts": "Rādīt zonu laistīšanu un lietus sensoru diagrammās",
+    "Irrigation time": "Laistīšanas laiks",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Notiek pirksta nospieduma aprēķināšana…",

@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Kombiner fuktighet og temperatur i ett diagram",
     "Combine Soil Moisture and Temperature in one chart": "Kombiner jordfuktighet og temperatur i ett diagram",
+    "Show zone runs and rain sensor in charts": "Vis sonekjøringer og regnsensor i diagrammer",
+    "Irrigation time": "Vanningstid",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Databehandlingsfingeravtrykk …",

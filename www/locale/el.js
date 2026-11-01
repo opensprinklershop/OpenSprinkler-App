@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Συνδυασμός υγρασίας και θερμοκρασίας σε ένα γράφημα",
     "Combine Soil Moisture and Temperature in one chart": "Συνδυάστε την υγρασία εδάφους και τη θερμοκρασία σε ένα γράφημα",
+    "Show zone runs and rain sensor in charts": "Εμφάνιση εκτελέσεων ζωνών και αισθητήρα βροχής στα διαγράμματα",
+    "Irrigation time": "Χρόνος ποτίσματος",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Υπολογισμός δακτυλικού αποτυπώματος…",

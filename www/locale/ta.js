@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "ஈரப்பதம் மற்றும் வெப்பநிலையை ஒரு வரைபடத்தில் இணைக்கவும்",
     "Combine Soil Moisture and Temperature in one chart": "மண் ஈரப்பதமும் வெப்பநிலையும் ஒரே விளக்கப்படத்தில் இணைக்கவும்",
+    "Show zone runs and rain sensor in charts": "வரைபடங்களில் மண்டல இயக்கங்களையும் மழை உணரியையும் காட்டு",
+    "Irrigation time": "நீர்ப்பாசன நேரம்",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "கைரேகையை கணக்கிடுகிறது…",

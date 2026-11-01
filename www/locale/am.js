@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "እርጥበት እና ሙቀትን በአንድ ገበታ ያዋህዱ",
     "Combine Soil Moisture and Temperature in one chart": "የአፈር እርጥበትን እና ሙቀትን በአንድ ገበታ ውስጥ ያጣምሩ",
+    "Show zone runs and rain sensor in charts": "የዞን ሩጫዎችን እና የዝናብ ዳሳሽን በገበታዎች ውስጥ አሳይ",
+    "Irrigation time": "የመስኖ ጊዜ",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "የጣት አሻራ በማስላት ላይ…",

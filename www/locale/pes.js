@@ -236,6 +236,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "ترکیب رطوبت و دما در یک نمودار",
     "Combine Soil Moisture and Temperature in one chart": "ترکیب رطوبت خاک و دما در یک نمودار",
+    "Show zone runs and rain sensor in charts": "نمایش اجرای مناطق و حسگر باران در نمودارها",
+    "Irrigation time": "زمان آبیاری",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "در حال محاسبه اثر انگشت…",

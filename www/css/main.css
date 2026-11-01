@@ -1876,6 +1876,12 @@ div.running-text{
     background-color:#C96161!important;
     text-decoration:line-through!important;
 }
+/* Flow sensor volume entries: the vis default (#d5ddf6) is unreadable with the
+   white item text, use the same blue as the timeline frame (ticket DE1-PA5-PDDV). */
+.vis-item.flow {
+    background-color:#3D7FB5!important;
+    border-color:#2E6690!important;
+}
 #timeline-navigation {
     text-align:center;
     display: none;

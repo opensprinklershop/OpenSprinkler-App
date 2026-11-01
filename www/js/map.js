@@ -64,7 +64,11 @@ window.initMap = function() {
             // Setup Autocomplete for auto completion
             var controlBox = document.getElementById( "customControls" ),
                 searchField = document.getElementById( "pac-input" ),
-                autocomplete = new google.maps.places.Autocomplete( searchField );
+                autocomplete = new google.maps.places.Autocomplete( searchField, {
+                    // Only request what the map needs; without "fields" Google bills
+                    // Place Details incl. Contact + Atmosphere data on every selection.
+                    fields: [ "geometry", "name" ]
+                } );
 
             controlBox.style.display = "block";
 

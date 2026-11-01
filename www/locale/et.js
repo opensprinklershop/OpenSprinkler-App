@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Ühenda niiskus ja temperatuur ühel diagrammil",
     "Combine Soil Moisture and Temperature in one chart": "Ühenda mulla niiskus ja temperatuur ühele diagrammile",
+    "Show zone runs and rain sensor in charts": "Näita tsoonide kastmisi ja vihmaandurit diagrammidel",
+    "Irrigation time": "Kastmisaeg",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Sõrmejälje arvutamine…",

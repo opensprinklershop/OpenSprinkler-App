@@ -243,7 +243,7 @@ OSApp.Logs.displayPage = function() {
 						flSorted.push( {
 							"start": new Date( utc.getTime() - parseInt( this[ 2 ] * 1000 ) ),
 							"end": utc,
-							"className": "",
+							"className": "flow",
 							"content": formatVolume( volume ),
 							"group": OSApp.Language._( "Flow Sensor" )
 						} );

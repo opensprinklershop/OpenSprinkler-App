@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Combină umiditatea și temperatura într-un grafic",
     "Combine Soil Moisture and Temperature in one chart": "Combină umiditatea solului și temperatura într-un singur grafic",
+    "Show zone runs and rain sensor in charts": "Afișează udările pe zone și senzorul de ploaie în grafice",
+    "Irrigation time": "Timp de irigare",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Se calculează amprenta digitală...",

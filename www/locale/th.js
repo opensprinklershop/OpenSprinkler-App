@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "รวมความชื้นและอุณหภูมิในแผนภูมิเดียว",
     "Combine Soil Moisture and Temperature in one chart": "รวมความชื้นของดินและอุณหภูมิในแผนภูมิเดียว",
+    "Show zone runs and rain sensor in charts": "แสดงการรดน้ำของโซนและเซ็นเซอร์ฝนในแผนภูมิ",
+    "Irrigation time": "เวลารดน้ำ",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "กำลังประมวลผลลายนิ้วมือ...",

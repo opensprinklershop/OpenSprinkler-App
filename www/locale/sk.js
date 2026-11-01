@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Kombinovať vlhkosť a teplotu v jednom grafe",
     "Combine Soil Moisture and Temperature in one chart": "Spojiť vlhkosť pôdy a teplotu do jedného grafu",
+    "Show zone runs and rain sensor in charts": "Zobraziť behy zón a dažďový senzor v grafoch",
+    "Irrigation time": "Čas zavlažovania",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Počíta sa odtlačok prsta…",

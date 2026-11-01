@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Чийгшил ба температурыг нэг графикт нэгтгэх",
     "Combine Soil Moisture and Temperature in one chart": "Хөрсний чийг ба температурыг нэг графикт нэгтгэх",
+    "Show zone runs and rain sensor in charts": "Бүсийн усалгаа болон борооны мэдрэгчийг графикт харуулах",
+    "Irrigation time": "Усалгааны хугацаа",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Хурууны хээг тооцоолж байна...",

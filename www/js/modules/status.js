@@ -78,6 +78,11 @@ OSApp.Status.changeStatus = function( seconds, color, line, onclick ) {
 		typeof OSApp.currentSession.controller.settings.flwrt !== "undefined"
 	) {
 		html += "<span style='padding-left:5px'>" + OSApp.Language._( "Flow" ) + ": " + OSApp.Utils.formatNumber( parseFloat( ( OSApp.Utils.flowCountToVolume( OSApp.currentSession.controller.settings.flcrt ) / ( OSApp.currentSession.controller.settings.flwrt / 60 ) ).toFixed( OSApp.Utils.getFlowPrecision() ) ), { maximumFractionDigits: OSApp.Utils.getFlowPrecision() } ) + " L/min</span>";
+
+		// Volume measured since the current watering cycle started (firmware 2.4.0(230)+)
+		if ( OSApp.currentSession.controller.settings.flcrun > 0 ) {
+			html += "<span style='padding-left:5px'>" + OSApp.Language._( "Volume" ) + ": " + OSApp.Utils.formatNumber( parseFloat( OSApp.Utils.flowCountToVolume( OSApp.currentSession.controller.settings.flcrun ).toFixed( OSApp.Utils.getFlowPrecision() ) ), { maximumFractionDigits: OSApp.Utils.getFlowPrecision() } ) + " L</span>";
+		}
 	}
 
 	if ( html !== "" ) {

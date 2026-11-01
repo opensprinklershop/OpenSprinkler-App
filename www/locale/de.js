@@ -233,6 +233,8 @@
     "Colorful Mode": "Farbenfreudig",
     "Combine Humidity and Temperature in one chart": "Feuchtigkeit und Temperatur in einem Diagramm darstellen",
     "Combine Soil Moisture and Temperature in one chart": "Bodenfeuchte und Temperatur in einem Diagramm kombinieren",
+    "Show zone runs and rain sensor in charts": "Zonenläufe und Regensensor in Diagrammen anzeigen",
+    "Irrigation time": "Bewässerungszeit",
     "Commissioned": "In Betrieb genommen",
     "Computing fingerprint\\u2026": "Fingerprint wird berechnet...",
     "Computing fingerprint…": "Fingerprint wird berechnet...",

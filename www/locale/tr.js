@@ -226,6 +226,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "Nem ve sıcaklığı bir grafikte birleştir",
     "Combine Soil Moisture and Temperature in one chart": "Toprak nemi ve sıcaklığı tek bir grafikte birleştir",
+    "Show zone runs and rain sensor in charts": "Grafiklerde bölge sulamalarını ve yağmur sensörünü göster",
+    "Irrigation time": "Sulama süresi",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "Parmak izi hesaplanıyor…",

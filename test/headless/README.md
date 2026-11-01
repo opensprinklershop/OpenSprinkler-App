@@ -15,6 +15,7 @@ OS_IP=192.168.0.151 node drive.js adjust   # program adjustment editor (piecewis
 OS_IP=192.168.0.151 node drive.js pages    # #sensors, #sensor-logs, #programs sensor adjustment section
 OS_IP=192.168.0.151 node drive.js save     # creates/saves/deletes a piecewise adjustment end-to-end
 OS_IP=192.168.0.151 node drive.js pagewatchdog # page change wedged by a throwing handler -> recovery
+OS_IP=192.168.0.151 node drive.js runs     # sensor charts with zone runs / rain sensor overlay (/so takes ~45 s on .151)
 python3 cleanup.py                         # kills leftover headless browsers / the static server
 OS_IP=192.168.0.151 node updater.js        # self-updating snapshot copies (www/js/ui-updater.js), end to end
 ```

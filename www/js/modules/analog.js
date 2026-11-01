@@ -31,6 +31,7 @@ OSApp.Analog = {
 	configPageLoaded : false,
 	chartConvertTemp : 0, // 0=no conversion, 1=F->C, 2=C->F
 	chartCombineMoistTemp : false, // combine soil moisture and temperature in one chart
+	chartShowRuns : false, // overlay zone runs, rain sensor and rain delay periods (from /jl)
 
 	Constants: {
 		CHARTS: 18,
@@ -173,6 +174,9 @@ OSApp.Analog.syncChartOptionsFromController = function() {
 			if (typeof opts.comb === "number" && !isNaN(opts.comb)) {
 				OSApp.Analog.chartCombineMoistTemp = opts.comb === 1;
 			}
+			if (typeof opts.runs === "number" && !isNaN(opts.runs)) {
+				OSApp.Analog.chartShowRuns = opts.runs === 1;
+			}
 		}
 	} catch (e) { void e; }
 };
@@ -180,7 +184,8 @@ OSApp.Analog.syncChartOptionsFromController = function() {
 OSApp.Analog.saveChartOptions = function() {
 	var opts = {
 		tmpCo: OSApp.Analog.chartConvertTemp,
-		comb: OSApp.Analog.chartCombineMoistTemp ? 1 : 0
+		comb: OSApp.Analog.chartCombineMoistTemp ? 1 : 0,
+		runs: OSApp.Analog.chartShowRuns ? 1 : 0
 	};
 	try {
 		localStorage.setItem("OSApp.Analog.chartOptions", JSON.stringify(opts));
@@ -5682,6 +5687,12 @@ OSApp.Analog.showAnalogSensorConfig = function() {
 			OSApp.Analog.saveChartOptions();
 		});
 
+		// Chart option: Show zone runs and rain sensor periods
+		list.find(".chart-show-runs").on("change", function () {
+			OSApp.Analog.chartShowRuns = $(this).is(":checked");
+			OSApp.Analog.saveChartOptions();
+		});
+
 		list.find(".fytasetup").on("click", function () {
 			OSApp.Analog.expandItem.add("fytasetup");
 			OSApp.Analog.setupFytaCredentials();
@@ -6838,6 +6849,11 @@ OSApp.Analog.buildSensorConfig = function() {
 		OSApp.Language._("Combine Soil Moisture and Temperature in one chart") +
 		"</label>";
 
+	list += "<label for='chart-show-runs'>" +
+		"<input type='checkbox' id='chart-show-runs' class='chart-show-runs'" + (OSApp.Analog.chartShowRuns ? " checked='checked'" : "") + ">" +
+		OSApp.Language._("Show zone runs and rain sensor in charts") +
+		"</label>";
+
 	list += "</div>";
 
 	list += "</fieldset>";
@@ -6934,12 +6950,14 @@ OSApp.Analog.showAnalogSensorCharts = function(limit2sensor, returnPageId) {
 		if (unitid === OSApp.Analog.Constants.USERDEF_UNIT) max++;
 	}
 
-	var last = "", week = "", month = "";
+	var last = "<div id='chartRunLegend'></div>", week = "", month = "";
 	for (let j = 0; j <= max; j++) {
 		last += "<div id='myChart" + j + "'></div>";
 		week += "<div id='myChartW" + j + "'></div>";
 		month += "<div id='myChartM" + j + "'></div>";
 	}
+	week += "<div id='myChartWRuns'></div>";
+	month += "<div id='myChartMRuns'></div>";
 
 	var tableHtml = limit2sensor ?
 		"<div id='sensorDataTable' style='margin-top:16px;overflow-x:auto;'></div>" : "";
@@ -7008,10 +7026,34 @@ OSApp.Analog.updateCharts = function(limit2sensor) {
 	if (limit2sensor)
 		limit += "&nr="+limit2sensor;
 
-	OSApp.UIDom.showLoading( "#myChart0" );
-	OSApp.Firmware.sendToOS( lvl0 + limit, "text", 90000).then(function (csv1) {
-		OSApp.Analog.buildGraph("#myChart", chart1, csv1, lvl0text, "HH:mm", tzo, 0);
+	var showRuns = OSApp.Analog.chartShowRuns;
+	var nowLocal = Math.floor(Date.now() / 1000) + tzo;
+	var zoneFilter = showRuns ? OSApp.Analog.getRunZoneFilter(limit2sensor) : null;
+	var legend = document.getElementById("chartRunLegend");
+	if (legend) legend.replaceChildren();
+	["#myChartWRuns", "#myChartMRuns"].forEach(function(id) {
+		var el = document.querySelector(id);
+		if (el) el.replaceChildren();
+	});
 
+	OSApp.UIDom.showLoading( "#myChart0" );
+	var csvDay = "";
+	OSApp.Firmware.sendToOS( lvl0 + limit, "text", 90000).then(function (csv1) {
+		csvDay = csv1;
+		var buildLvl0 = function(events) {
+			OSApp.Analog.buildGraph("#myChart", chart1, csv1, lvl0text, "HH:mm", tzo, 0, events);
+			if (events) OSApp.Analog.buildRunLegend(events);
+		};
+		if (showRuns) {
+			var startLvl0 = nowLocal - (esp32 ? 96 : 48) * 3600;
+			OSApp.Analog.loadRunEvents(startLvl0, nowLocal, zoneFilter, function(events) { buildLvl0(events); loadLvl1(); });
+		} else {
+			buildLvl0(null);
+			loadLvl1();
+		}
+	});
+
+	var loadLvl1 = function() {
 		OSApp.UIDom.showLoading( "#myChartW0" );
 		OSApp.Firmware.sendToOS("/so?pw=&csv=2&log=1" + limit, "text", 90000).then(function (csv2) {
 			OSApp.Analog.buildGraph("#myChartW", chart2, csv2, OSApp.Language._("last weeks"), "dd.MM.yyyy", tzo, 1);
@@ -7020,11 +7062,254 @@ OSApp.Analog.updateCharts = function(limit2sensor) {
 			OSApp.Firmware.sendToOS("/so?pw=&csv=2&log=2" + limit, "text", 90000).then(function (csv3) {
 				OSApp.Analog.buildGraph("#myChartM", chart3, csv3, OSApp.Language._("last months"), "MM.yyyy", tzo, 2);
 				if (limit2sensor) {
-					OSApp.Analog.buildSensorTable(csv1, limit2sensor);
+					OSApp.Analog.buildSensorTable(csvDay, limit2sensor);
+				}
+				if (showRuns) {
+					// /jl allows at most 365 days; through the cloud (OTC) the response must stay small.
+					var maxDays = OSApp.currentSession.token ? 60 : 365;
+					var first = Math.min(OSApp.Analog.firstCsvTimestamp(csv2), OSApp.Analog.firstCsvTimestamp(csv3));
+					var start = Math.max(isFinite(first) ? first : nowLocal, nowLocal - maxDays * 86400);
+					if (start >= nowLocal) return;
+					OSApp.Analog.loadRunEvents(start, nowLocal, zoneFilter, function(events) {
+						if (!events) return;
+						OSApp.Analog.buildRunTimeChart("#myChartWRuns", events, OSApp.Language._("last weeks"), "dd.MM.yyyy", 1);
+						OSApp.Analog.buildRunTimeChart("#myChartMRuns", events, OSApp.Language._("last months"), "MM.yyyy", 2);
+					});
 				}
 			});
 		});
+	};
+};
+
+/**
+ * Zones belonging to a sensor: all stations with a duration in the programs
+ * adjusted by this sensor. Returns null (= show all zones) if no specific mapping exists.
+ */
+OSApp.Analog.getRunZoneFilter = function(sensorNr) {
+	if (!sensorNr) return null;
+	var pd = OSApp.currentSession.controller.programs ? OSApp.currentSession.controller.programs.pd : null;
+	if (!pd) return null;
+	var zones = new Set(), found = false;
+	for (var i = 0; i < OSApp.Analog.progAdjusts.length; i++) {
+		var adj = OSApp.Analog.progAdjusts[i];
+		if (Number(adj.sensor) !== Number(sensorNr)) continue;
+		var prog = pd[adj.prog - 1];
+		if (!prog || !Array.isArray(prog[4])) return null; // adjusts all/unknown programs
+		found = true;
+		for (var sid = 0; sid < prog[4].length; sid++) {
+			if (prog[4][sid] > 0) zones.add(sid);
+		}
+	}
+	return found ? zones : null;
+};
+
+/** Smallest timestamp (2nd column) of a sensor log CSV, Infinity if none. */
+OSApp.Analog.firstCsvTimestamp = function(csv) {
+	var first = Infinity;
+	var lines = (csv || "").split(/[\r\n]+/);
+	for (var i = 1; i < lines.length; i++) {
+		var ts = Number(lines[i].split(";")[1]);
+		if (ts > 0 && ts < first) first = ts;
+	}
+	return first;
+};
+
+/**
+ * Load zone runs, rain sensor and rain delay periods from the irrigation log (/jl)
+ * plus the currently running zones. All times are controller local time (seconds).
+ * callback(events|null), events: [{kind: "run"|"s1"|"s2"|"rd", sid, pid, start, end}]
+ */
+OSApp.Analog.loadRunEvents = function(start, end, zoneFilter, callback) {
+	var controller = OSApp.currentSession.controller;
+	var isBinarySensor = function(t) { return t === 1 || t === 3; }; // rain or soil sensor
+	var done = false;
+	var finish = function(data) {
+		if (done) return;
+		done = true;
+		if (!Array.isArray(data)) { callback(null); return; }
+		var events = [];
+		for (var i = 0; i < data.length; i++) {
+			var r = data[i];
+			if (!Array.isArray(r) || r.length < 4) continue;
+			var dur = Number(r[2]), stop = Number(r[3]);
+			if (isNaN(dur) || dur <= 0 || isNaN(stop) || stop <= start) continue;
+			if (typeof r[1] === "number") {
+				if (zoneFilter && !zoneFilter.has(r[1])) continue;
+				if (OSApp.Stations.isMaster && OSApp.Stations.isMaster(r[1])) continue;
+				events.push({ kind: "run", sid: r[1], pid: r[0], start: stop - dur, end: stop });
+			} else if ((r[1] === "s1" && isBinarySensor(controller.options.sn1t)) ||
+				(r[1] === "s2" && isBinarySensor(controller.options.sn2t)) || r[1] === "rd") {
+				events.push({ kind: r[1], start: stop - dur, end: stop });
+			}
+		}
+		// Running zones are logged only when they finish
+		var ps = controller.settings ? controller.settings.ps : null;
+		if (Array.isArray(ps)) {
+			for (var sid = 0; sid < ps.length; sid++) {
+				var st = ps[sid];
+				if (!st || !st[0] || !st[2] || st[2] > end) continue;
+				if (!OSApp.Stations.getStatus(sid) || OSApp.Stations.isMaster(sid)) continue;
+				if (zoneFilter && !zoneFilter.has(sid)) continue;
+				events.push({ kind: "run", sid: sid, pid: st[0], start: st[2], end: end });
+			}
+		}
+		events.sort(function(a, b) { return a.start - b.start; });
+		callback(events);
+	};
+	if (end - start > 365 * 86400) start = end - 365 * 86400;
+	OSApp.Firmware.sendToOS("/jl?pw=&start=" + Math.floor(start) + "&end=" + Math.floor(end), "json", 90000)
+		.done(finish).fail(function() { finish(null); });
+};
+
+OSApp.Analog.getRunColor = function(sid) {
+	return "hsl(" + Math.round((sid * 137.508) % 360) + ", 65%, 42%)";
+};
+
+OSApp.Analog.getRunZoneName = function(sid) {
+	var name = OSApp.Stations.getName(sid);
+	// log entries may refer to stations that no longer exist
+	return (typeof name === "string" && name !== "") ? name : "S" + String(sid + 1).padStart(2, "0");
+};
+
+OSApp.Analog.getRunEventName = function(ev) {
+	var options = OSApp.currentSession.controller.options;
+	var sensorName = function(t, fallback) {
+		return t === 3 ? OSApp.Language._("Soil Sensor") : (t === 1 ? OSApp.Language._("Rain Sensor") : fallback);
+	};
+	switch (ev.kind) {
+		case "run": return OSApp.Analog.getRunZoneName(ev.sid);
+		case "s1": return sensorName(options.sn1t, OSApp.Language._("Sensor 1"));
+		case "s2": return sensorName(options.sn2t, OSApp.Language._("Sensor 2"));
+		case "rd": return OSApp.Language._("Rain Delay");
+	}
+	return "";
+};
+
+/** Color legend for the zones / sensor periods shown in the charts. */
+OSApp.Analog.buildRunLegend = function(events) {
+	var el = document.getElementById("chartRunLegend");
+	if (!el) return;
+	var seen = new Map();
+	for (var i = 0; i < events.length; i++) {
+		var ev = events[i];
+		var key = ev.kind === "run" ? "z" + ev.sid : ev.kind;
+		if (!seen.has(key))
+			seen.set(key, { name: OSApp.Analog.getRunEventName(ev), color: OSApp.Analog.getRunEventColor(ev) });
+	}
+	var html = "";
+	seen.forEach(function(v) {
+		html += "<span style='display:inline-flex;align-items:center;margin:2px 10px 2px 0;font-size:0.8em;'>" +
+			"<span style='display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:4px;opacity:0.6;background:" + v.color + ";'></span>" +
+			OSApp.Utils.htmlEscape(String(v.name)) + "</span>";
 	});
+	el.innerHTML = html ? "<div style='margin:6px 0;'>" + html + "</div>" : "";
+};
+
+OSApp.Analog.getRunEventColor = function(ev) {
+	if (ev.kind === "run") return OSApp.Analog.getRunColor(ev.sid);
+	if (ev.kind === "rd") return "#3498db";
+	return "#7f8c8d";
+};
+
+OSApp.Analog.getSeriesXRange = function(series) {
+	var range = { min: Infinity, max: -Infinity };
+	for (var i = 0; i < series.length; i++) {
+		var data = series[i].data || [];
+		for (var j = 0; j < data.length; j++) {
+			if (data[j].x < range.min) range.min = data[j].x;
+			if (data[j].x > range.max) range.max = data[j].x;
+		}
+	}
+	return range;
+};
+
+/** ApexCharts x-axis annotations (background bands) for the given events, clipped to [minX, maxX] in ms. */
+OSApp.Analog.buildRunAnnotations = function(events, tzo, minX, maxX) {
+	var result = [], rows = new Map();
+	for (var i = 0; i < events.length; i++) {
+		var ev = events[i];
+		var x = Math.max((ev.start - tzo) * 1000, minX);
+		var x2 = Math.min((ev.end - tzo) * 1000, maxX);
+		if (x2 <= x) continue;
+		var isRun = ev.kind === "run";
+		var color = OSApp.Analog.getRunEventColor(ev);
+		var ann = {
+			x: x,
+			x2: x2,
+			fillColor: color,
+			borderColor: color,
+			opacity: isRun ? 0.2 : 0.12
+		};
+		// Zone runs are identified by the color legend; labels on every run clutter the chart
+		if (!isRun) {
+			if (!rows.has(ev.kind)) rows.set(ev.kind, rows.size);
+			ann.label = {
+				text: OSApp.Analog.getRunEventName(ev),
+				orientation: "horizontal",
+				position: "bottom",
+				offsetY: -rows.get(ev.kind) * 14,
+				borderColor: color,
+				style: { color: "#fff", background: color, fontSize: "9px" }
+			};
+		}
+		result.push(ann);
+	}
+	return result;
+};
+
+/** Stacked bar chart: irrigation minutes per zone and week (lvl 1) or month (lvl 2). */
+OSApp.Analog.buildRunTimeChart = function(selector, events, titleAdd, timestr, lvl) {
+	var el = document.querySelector(selector);
+	if (!el) return;
+	el.replaceChildren();
+	var fac = (lvl === 1 ? 7 : 30) * 24 * 60 * 60;
+	var keys = new Set(), zones = new Map();
+	for (var i = 0; i < events.length; i++) {
+		var ev = events[i];
+		if (ev.kind !== "run") continue;
+		// same bucketing as the sensor values in buildGraph
+		var key = Math.trunc(ev.start / fac) * fac * 1000;
+		keys.add(key);
+		if (!zones.has(ev.sid)) zones.set(ev.sid, new Map());
+		var z = zones.get(ev.sid);
+		z.set(key, (z.get(key) || 0) + (ev.end - ev.start) / 60);
+	}
+	if (zones.size === 0) return;
+	var sortedKeys = Array.from(keys).sort(function(a, b) { return a - b; });
+	var sids = Array.from(zones.keys()).sort(function(a, b) { return a - b; });
+	var series = sids.map(function(sid) {
+		var z = zones.get(sid);
+		return {
+			name: OSApp.Analog.getRunZoneName(sid),
+			color: OSApp.Analog.getRunColor(sid),
+			data: sortedKeys.map(function(k) { return { x: k, y: Math.round(z.get(k) || 0) }; })
+		};
+	});
+	var canExport = !OSApp.currentDevice.isAndroid && !OSApp.currentDevice.isiOS;
+	var chart = new ApexCharts(el, {
+		chart: {
+			type: "bar",
+			stacked: true,
+			animations: { speed: 500 },
+			width: "100%",
+			height: (screen.height > screen.width ? screen.height : screen.width) / 3,
+			toolbar: { show: canExport, tools: { download: canExport, selection: canExport, zoom: canExport, zoomin: canExport, zoomout: canExport, pan: canExport } },
+			zoom: { enabled: canExport }
+		},
+		dataLabels: { enabled: false },
+		plotOptions: { bar: { columnWidth: "60%" } },
+		series: series,
+		tooltip: { x: { format: timestr } },
+		xaxis: { type: "datetime", labels: { datetimeUTC: true, format: timestr } },
+		yaxis: {
+			title: { text: OSApp.Language._("Minutes") },
+			min: 0,
+			labels: { formatter: function(val) { return Math.round(val) + " min"; } }
+		},
+		legend: { showForSingleSeries: true, fontSize: "10px" },
+		title: { text: OSApp.Language._("Irrigation time") + " " + titleAdd }
+	});
+	chart.render();
 };
 
 OSApp.Analog.buildSensorTable = function(csv, sensorNr) {
@@ -7086,7 +7371,7 @@ OSApp.Analog.buildSensorTable = function(csv, sensorNr) {
 	container.innerHTML = html;
 };
 
-OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, lvl) {
+OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, lvl, runEvents) {
 	var csvlines = csv.split(/(?:\r\n|\n)+/).filter(function (el) { return el.length !== 0; });
 
 	var legends = [], opacities = [], widths = [], colors = [], coloridx = 0, sensor;
@@ -7564,6 +7849,14 @@ OSApp.Analog.buildGraph = function(prefix, chart, csv, titleAdd, timestr, tzo, l
 		var x = document.querySelector(prefix + c);
 		if (x) x.replaceChildren();
 		let options = AllOptions[c];
+		if (options && runEvents && runEvents.length) {
+			// Bands only inside the data range, otherwise they stretch the x axis
+			let range = OSApp.Analog.getSeriesXRange(options.series);
+			let runAnn = OSApp.Analog.buildRunAnnotations(runEvents, tzo, range.min, range.max);
+			if (runAnn.length) {
+				options.annotations = Object.assign({}, options.annotations, { xaxis: runAnn });
+			}
+		}
 		if (options) {
 			chart[c] = new ApexCharts(document.querySelector(prefix + c), options);
 			chart[c].render();

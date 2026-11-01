@@ -227,6 +227,8 @@
     "Colorful Mode": "Colorful Mode",
     "Combine Humidity and Temperature in one chart": "在一个图表中合并湿度和温度",
     "Combine Soil Moisture and Temperature in one chart": "将土壤湿度和温度合并到一张图表中",
+    "Show zone runs and rain sensor in charts": "在图表中显示区域运行和雨量传感器",
+    "Irrigation time": "灌溉时间",
     "Commissioned": "Commissioned",
     "Computing fingerprint\\u2026": "Computing fingerprint\\u2026",
     "Computing fingerprint…": "计算指纹...",
