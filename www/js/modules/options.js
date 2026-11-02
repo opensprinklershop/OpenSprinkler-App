@@ -380,6 +380,7 @@ OSApp.Options.showOptions = function( expandItem ) {
 					case "o53":
 					case "o79":
 					case "o82":
+					case "o84":
 						data = $item.is( ":checked" ) ? 1 : 0;
 						break;
 				}
@@ -512,6 +513,30 @@ OSApp.Options.showOptions = function( expandItem ) {
                        "<button data-helptext='" +
                                OSApp.Language._( "Enables WiFi modem sleep to lower power consumption and reduce self-heating, which can improve reception with weak signals. Leave disabled if you experience connection drops during continuous operation." ) +
                                "' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button></label>";
+       }
+
+       // Web UI stored on the controller (firmware >= 2.4.0(231), ESP32 / OSPi):
+       // source selection (uisr), fallback (uifb) and installation via /ul.
+       if ( typeof OSApp.currentSession.controller.options.uisr !== "undefined" &&
+                       OSApp.currentSession.controller.settings && typeof OSApp.currentSession.controller.settings.uiv !== "undefined" ) {
+               var uisr = OSApp.currentSession.controller.options.uisr,
+                       uiv = ( OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.uiv ) ||
+                               OSApp.currentSession.controller.options.uiv || "";
+               list += "<div class='ui-field-contain'><label for='o83' class='select'>" + OSApp.Language._( "Web UI Source" ) +
+                       "<button data-helptext='" +
+                               OSApp.Language._( "Where the browser loads the web interface from: the copy stored on the controller (works without Internet access) or an external server (UI URL under Advanced)." ) +
+                               "' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button></label>" +
+                       "<select data-mini='true' id='o83'>" +
+                               "<option value='0'" + ( uisr === 0 ? " selected" : "" ) + ">" + OSApp.Language._( "On the controller" ) + "</option>" +
+                               "<option value='1'" + ( uisr === 1 ? " selected" : "" ) + ">" + OSApp.Language._( "On the controller only" ) + "</option>" +
+                               "<option value='2'" + ( uisr === 2 ? " selected" : "" ) + ">" + OSApp.Language._( "External server" ) + "</option>" +
+                       "</select></div>";
+               list += "<label for='o84'><input data-mini='true' id='o84' type='checkbox' " +
+                               ( ( OSApp.currentSession.controller.options.uifb === 1 ) ? "checked='checked'" : "" ) + ">" +
+                       OSApp.Language._( "Use the controller copy when the external server cannot be reached" ) + "</label>";
+               list += "<div class='ui-field-contain'><label>" + OSApp.Language._( "Web UI on controller" ) + "</label>" +
+                       "<span id='ui-local-status'>" + OSApp.Utils.htmlEscape( uiv || OSApp.Language._( "not installed" ) ) + "</span> " +
+                       "<button class='noselect' data-mini='true' data-inline='true' id='ui-local-install'>" + OSApp.Language._( "Install/update" ) + "</button></div>";
        }
 
        list += "</fieldset><fieldset data-role='collapsible'" +
@@ -1698,6 +1723,35 @@ OSApp.Options.showOptions = function( expandItem ) {
 
 	page.find( "#o21" ).on( "change", function() {
 		page.find( "#o22" ).parent().toggleClass( "hidden", $( this ).is( ":checked" ) );
+	} );
+
+	// Install/update the web UI copy on the controller (/ul) and follow the progress.
+	page.find( "#ui-local-install" ).on( "click", function() {
+		var status = page.find( "#ui-local-status" ),
+			btn = $( this ),
+			poll = function() {
+				OSApp.Firmware.sendToOS( "/ul?pw=" ).done( function( j ) {
+					var txt = j.installed || OSApp.Language._( "not installed" );
+					if ( j.state > 0 && j.state < 4 ) {
+						txt += " \u2013 " + ( j.msg || "" ) + " " + j.progress + "%";
+						setTimeout( poll, 2000 );
+					} else {
+						if ( j.state === 5 || j.state === 4 ) {
+							txt += " \u2013 " + ( j.msg || "" );
+						}
+						btn.prop( "disabled", false );
+					}
+					status.text( txt );
+				} ).fail( function() {
+					btn.prop( "disabled", false );
+				} );
+			};
+
+		btn.prop( "disabled", true );
+		OSApp.Firmware.sendToOS( "/ul?pw=&install=1" ).done( poll ).fail( function() {
+			btn.prop( "disabled", false );
+		} );
+		return false;
 	} );
 
 	page.find( "#verify-api" ).on( "click", function() {
