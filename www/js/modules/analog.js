@@ -61,6 +61,7 @@ OSApp.Analog = {
 		MONITOR_MAX      : 2,
 		MONITOR_SENSOR12 : 3,
 		MONITOR_SET_SENSOR12 : 4,
+		MONITOR_SET_MASTER : 5,
 		MONITOR_AND      : 10,
 		MONITOR_OR       : 11,
 		MONITOR_XOR      : 12,
@@ -1108,6 +1109,7 @@ OSApp.Analog.getDefaultMonitorTypes = function() {
 		{ type: OSApp.Analog.Constants.MONITOR_MAX, name: "Max" },
 		{ type: OSApp.Analog.Constants.MONITOR_SENSOR12, name: "SN 1/2" },
 		{ type: OSApp.Analog.Constants.MONITOR_SET_SENSOR12, name: "SET SN 1/2" },
+		{ type: OSApp.Analog.Constants.MONITOR_SET_MASTER, name: "SET MASTER" },
 		{ type: OSApp.Analog.Constants.MONITOR_AND, name: "AND" },
 		{ type: OSApp.Analog.Constants.MONITOR_OR, name: "OR" },
 		{ type: OSApp.Analog.Constants.MONITOR_XOR, name: "XOR" },
@@ -1983,6 +1985,10 @@ OSApp.Analog.getMonitor = function(popup) {
 	} else if (result.type === OSApp.Analog.Constants.MONITOR_SET_SENSOR12) {
 		let subPopup = popup.find("#type_set_sensor12");
 		OSApp.Analog.addToObjectInt(subPopup, "#sensor12_2", result, "sensor12");
+	} else if (result.type === OSApp.Analog.Constants.MONITOR_SET_MASTER) {
+		let subPopup = popup.find("#type_set_master");
+		OSApp.Analog.addToObjectInt(subPopup, "#set_master_nr", result, "master");
+		OSApp.Analog.addToObjectInt(subPopup, "#set_master_monitor", result, "monitor");
 	}
 	//AND+OR+XOR
 	OSApp.Analog.addToObjectInt(popup, "#monitor1", result);
@@ -2223,6 +2229,19 @@ OSApp.Analog.showMonitorEditor = function(monitor, row, callback, callbackCancel
 			"<label for='set_monitor'>"+OSApp.Language._("Monitor")+"</label>"+OSApp.Analog.monitorSelection("set_monitor", monitor.monitor, monitor.nr)+
 			"</label></div>" +
 
+		//typ = SET_MASTER (water source switch: serve the bindings of one master through the other while the monitor is active)
+			"<div id='type_set_master'>"+
+			"<label for='set_master_nr'>" +
+			OSApp.Language._("Redirect master") +
+			"</label>" +
+			"<select data-mini='true' id='set_master_nr'>" +
+			"<option " + (monitor.master <= 1? "selected" : "") + " value='1'>" + OSApp.Language._("Master") + " 1 \u2192 " + OSApp.Language._("Master") + " 2</option>" +
+			"<option " + (monitor.master >= 2? "selected" : "") + " value='2'>" + OSApp.Language._("Master") + " 2 \u2192 " + OSApp.Language._("Master") + " 1</option>" +
+			"</select>"+
+			"<label for='set_master_monitor'>"+OSApp.Language._("Monitor")+"</label>"+OSApp.Analog.monitorSelection("set_master_monitor", monitor.monitor, monitor.nr)+
+			"<p class='help-block'>" + OSApp.Language._("While the selected monitor is active, stations bound to the redirected master run with the other master instead (e.g. cistern pump \u2192 city water valve). Station settings are not changed.") + "</p>" +
+			"</div>" +
+
 		//typ == ANDORXOR
 			"<div id='type_andorxor'>"+
 			"<label for='monitor1'>"+OSApp.Language._("Monitor 1")+"</label>"+OSApp.Analog.monitorSelection("monitor1", monitor.monitor1, monitor.nr)+
@@ -2365,6 +2384,7 @@ OSApp.Analog.updateMonitorEditorType = function(popup, type) {
 	popup.find("#type_minmax").hide();
 	popup.find("#type_sensor12").hide();
 	popup.find("#type_set_sensor12").hide();
+	popup.find("#type_set_master").hide();
 	popup.find("#type_andorxor").hide();
 	popup.find("#type_not").hide();
 	popup.find("#type_time").hide();
@@ -2381,6 +2401,9 @@ OSApp.Analog.updateMonitorEditorType = function(popup, type) {
 			break;
 		case OSApp.Analog.Constants.MONITOR_SET_SENSOR12:
 			popup.find("#type_set_sensor12").show();
+			break;
+		case OSApp.Analog.Constants.MONITOR_SET_MASTER:
+			popup.find("#type_set_master").show();
 			break;
 		case OSApp.Analog.Constants.MONITOR_AND:
 		case OSApp.Analog.Constants.MONITOR_OR:
@@ -6761,6 +6784,11 @@ OSApp.Analog.buildSensorConfig = function() {
 					source = OSApp.Analog.getMonitorName(item.monitor);
 					break;
 				}
+				case OSApp.Analog.Constants.MONITOR_SET_MASTER: {
+					var mFrom = item.master >= 2 ? 2 : 1;
+					source = "M" + mFrom + "\u2192M" + (3 - mFrom) + ": " + OSApp.Analog.getMonitorName(item.monitor);
+					break;
+				}
 
 				case OSApp.Analog.Constants.MONITOR_AND:
 				case OSApp.Analog.Constants.MONITOR_OR:
@@ -6908,6 +6936,7 @@ OSApp.Analog.getMonitorLogical = function(type) {
 		case OSApp.Analog.Constants.MONITOR_MAX: return OSApp.Language._("Max");
 		case OSApp.Analog.Constants.MONITOR_SENSOR12: return OSApp.Language._("SN 1/2");
 		case OSApp.Analog.Constants.MONITOR_SET_SENSOR12: return OSApp.Language._("SET SN 1/2");
+		case OSApp.Analog.Constants.MONITOR_SET_MASTER: return OSApp.Language._("SET MASTER");
 		case OSApp.Analog.Constants.MONITOR_AND: return OSApp.Language._("AND");
 		case OSApp.Analog.Constants.MONITOR_OR: return OSApp.Language._("OR");
 		case OSApp.Analog.Constants.MONITOR_XOR: return OSApp.Language._("XOR");

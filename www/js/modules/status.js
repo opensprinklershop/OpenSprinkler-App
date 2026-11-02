@@ -292,6 +292,13 @@ OSApp.Status.checkStatus = function() {
 		}
 	}
 
+	// Water source switch: a SET MASTER monitor serves the bindings of one master through the other
+	var masrd = OSApp.currentSession.controller.settings.masrd;
+	if ( masrd === 1 || masrd === 2 ) {
+		OSApp.Status.changeStatus( 0, "blue", "<p class='running-text center'>" + OSApp.Language._( "Master" ) + " " + masrd + " \u2192 " + OSApp.Language._( "Master" ) + " " + ( 3 - masrd ) + " (" + OSApp.Language._( "water source switched" ) + ")</p>" );
+		return;
+	}
+
 	// Handle manual mode enabled
 	if ( OSApp.currentSession.controller.settings.mm === 1 ) {
 		OSApp.Status.changeStatus( 0, "blue", "<p class='running-text center pointer'>" + OSApp.Language._( "Manual mode enabled" ) + "</p>", function() {
