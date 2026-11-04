@@ -6,6 +6,9 @@ rm ./www/locale/*~ 2>/dev/null
 
 # Build firmware and web assets
 ./scripts/appGMK.sh
+# Stamp the app version from config.xml into main.js (About page); buildweb.sh does the same for the web UI.
+APP_VERSION=$(node -p "require('fs').readFileSync('config.xml', 'utf8').match(/version=\"([^\"]+)\"/)[1]")
+sed -i -E "s/appVersion: '[^']*'/appVersion: '$APP_VERSION'/g" www/js/main.js
 grunt makeFW
 
 # Stamp sw.js with build timestamp to bust Service Worker cache
@@ -171,7 +174,8 @@ fi
 chown stefan:www platforms/* -R
 ./scripts/appGMK2.sh
 
-# Restore sw.js build timestamp placeholder for source control
+# Restore main.js appVersion and sw.js build timestamp placeholders for source control
+sed -i "s/appVersion: '$APP_VERSION'/appVersion: '0.0.0'/g" www/js/main.js
 sed -i "s/OpenSprinkler-v$BUILD_TS/OpenSprinkler-v__BUILD_TIMESTAMP__/g" www/sw.js
 
 # Clean up dynamically packaged UI versions from git-tracked workspace while preserving any
