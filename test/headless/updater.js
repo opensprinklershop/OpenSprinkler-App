@@ -117,6 +117,14 @@ srv.listen(HP, async () => {
     const r2 = JSON.parse(await withUpdater(`return JSON.stringify(await OSUIUpdater.check(true));`));
     expect("second check finds it current", r2.status === "current", JSON.stringify(r2));
 
+    console.log("2b) the check starts on its own after deviceready (cordova.js loads after the updater)");
+    // The bundled snapshot page has the updater from <head> and the test adapter from above;
+    // drop the throttle stamp, fire deviceready like cordova.js does, wait out START_DELAY_MS.
+    const armedAt = Date.now();
+    await ev(`localStorage.removeItem("ui_update_checked"); document.dispatchEvent(new Event("deviceready")); 1`);
+    let autoChecked = null; for (let i = 0; i < 70; i++) { await sleep(500); autoChecked = JSON.parse(await ev(`localStorage.getItem("ui_update_checked") || "null"`)); if (autoChecked && autoChecked[VERSION]) break; }
+    expect("automatic check ran after deviceready", !!(autoChecked && autoChecked[VERSION] >= armedAt), JSON.stringify(autoChecked));
+
     console.log("3) next boot runs from the copy");
     st = await boot();
     expect("routed to the copy", st.path === "/__cdvfile_files__/ui/" + r1.id + "/" + VERSION + "/index.html" && st.page === "sprinklers", JSON.stringify(st));

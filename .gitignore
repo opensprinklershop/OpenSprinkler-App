@@ -71,3 +71,9 @@ cert
 build.json
 *.keystore
 *.jks
+
+# Headless test driver: Chrome user profile created at runtime
+test/headless/profile/
+
+# Versioned UI snapshots (www/<fw-version>/), deployed separately
+www/[0-9]*/

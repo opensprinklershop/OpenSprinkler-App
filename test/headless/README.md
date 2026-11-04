@@ -22,7 +22,7 @@ OS_IP=192.168.0.151 node updater.js        # self-updating snapshot copies (www/
 
 `updater.js` is self-contained (own server on 8790, no static server needed): it emulates the
 Android app at `http://localhost`, the app data directory (`/__cdvfile_files__/`) and a signed
-update server with a throw-away key, then checks install, routing into the copy, the way back to
+update server with a throw-away key, then checks install, the automatic start of the check after `deviceready`, routing into the copy, the way back to
 the site manager, settings travelling with the copy, refused manipulations (wrong hash, edited
 list, foreign key), the watchdog fallback, the `storage-guard.js` backup/restore across an origin
 change (with an in-memory file system) and the iOS path handling (`ionic://localhost`, copies below

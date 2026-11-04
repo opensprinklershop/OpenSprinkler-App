@@ -923,14 +923,26 @@
 		_mapVersion: mapVersion
 	};
 
-	// cordova.file only exists after deviceready.
-	if ( window.cordova ) {
-		document.addEventListener( "deviceready", schedule, false );
-	} else {
-		window.addEventListener( "load", function() {
-			if ( adapter ) {
-				schedule();
-			}
-		} );
+	// cordova.file only exists after deviceready. This script is loaded in <head>,
+	// cordova.js at the end of <body>: window.cordova does not exist yet when this
+	// runs, so deviceready is awaited unconditionally. Cordova dispatches it as a
+	// DOM event on document, which reaches a listener registered before cordova.js
+	// loaded; once it has fired, cordova's addEventListener calls the listener
+	// right away. (Until 2.4.234 the listener was only installed when
+	// window.cordova already existed, so no app ever ran the check on its own.)
+	var armed = false;
+	function arm() {
+		if ( armed || !isSupported() ) {
+			return;
+		}
+		armed = true;
+		schedule();
 	}
+	document.addEventListener( "deviceready", arm, false );
+	window.addEventListener( "load", function() {
+		// Tests inject a storage adapter and have no native bridge.
+		if ( adapter ) {
+			arm();
+		}
+	} );
 } )();

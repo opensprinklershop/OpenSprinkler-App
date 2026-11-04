@@ -464,6 +464,17 @@ OSApp.Logs.displayPage = function() {
 				timeline = new vis.Timeline( logsList.get( 0 ), fullData, options );
 				timeline.setGroups( groups );
 
+				// The items are plotted in device time (see the UTC-field mapping
+				// above), the red "now" marker of vis-timeline defaults to the
+				// browser clock. Move it to the device clock like the program
+				// preview does, otherwise the two pages disagree whenever browser
+				// and controller are in different time zones (ticket 3ZU-UZY-1H86).
+				if ( OSApp.currentSession.controller.settings && OSApp.currentSession.controller.settings.devt ) {
+					var dev = new Date( OSApp.currentSession.controller.settings.devt * 1000 );
+					timeline.setCurrentTime( new Date( dev.getUTCFullYear(), dev.getUTCMonth(), dev.getUTCDate(),
+						dev.getUTCHours(), dev.getUTCMinutes(), dev.getUTCSeconds() ) );
+				}
+
 				$.mobile.window.on( "resize", resize );
 				page.one( "pagehide", reset );
 				page.find( "input:radio[name='log_type']" ).one( "change", reset );
