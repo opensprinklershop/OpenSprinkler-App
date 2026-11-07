@@ -29,6 +29,9 @@ jobs:
         run: npm install
 
       - name: Run test steps
+        # Use the project's grunt (devDependency); the Ubuntu 26 runner image
+        # (ubuntu-latest since 2026-10-19) no longer ships a global grunt-cli,
+        # the bare "grunt" failed with exit 127 on every run since 23.10.2026.
         run: |
-          grunt
+          npx grunt
           npm run test
