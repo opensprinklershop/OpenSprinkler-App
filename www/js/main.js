@@ -142,8 +142,24 @@ OSApp.uiState = {
 	showWeatherOptionsCorruptedNotification: false,
 	switching: false,
 	theme: { // Define the status bar color(s) and use a darker color for Android
-		mode: "light",
+		mode: "auto", // "auto" follows prefers-color-scheme (light/dark), see OSApp.UIDom.setThemeMode
 		presets: {
+			// Status bar colours match the header gradient start colours in main.css (--os-header-bg)
+			light: {
+				statusBarPrimary: "#0E4F4A",
+				statusBarOverlay: "#167A71"
+			},
+			dark: {
+				statusBarPrimary: "#12161D",
+				statusBarOverlay: "#171B22"
+			},
+			colorful: {
+				statusBarPrimary: "#4A3FC9",
+				statusBarOverlay: "#6D5BFF"
+			}
+		},
+		// Legacy colours, used while the classic look is selected (uiLook = "classic")
+		presetsClassic: {
 			light: {
 				statusBarPrimary: OSApp.currentDevice.isAndroid ? "#121212" : "#1D1D1D",
 				statusBarOverlay: OSApp.currentDevice.isAndroid ? "#151515" : "#202020"
@@ -157,8 +173,9 @@ OSApp.uiState = {
 				statusBarOverlay: "#7FD5FF"
 			}
 		},
-		statusBarPrimary: OSApp.currentDevice.isAndroid ? "#121212" : "#1D1D1D",
-		statusBarOverlay: OSApp.currentDevice.isAndroid ? "#151515" : "#202020"
+		look: "modern",
+		statusBarPrimary: "#0E4F4A",
+		statusBarOverlay: "#167A71"
 	},
 	timers: {}
 };

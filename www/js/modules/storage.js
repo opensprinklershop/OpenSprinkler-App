@@ -27,8 +27,12 @@ OSApp.Storage.prefix = ( function() {
 
 // Check if a key should be shared globally across all UI versions
 OSApp.Storage.isGlobalKey = function( key ) {
-       return key === "sites" || key === "current_site" || key === "cloudToken" || key === "lang" || key === "show_sites";
+       return key === "sites" || key === "current_site" || key === "cloudToken" || key === "lang" || key === "show_sites" ||
+               key === "uiTheme" || key === "uiLook";
 };
+
+// Keys that used to be stored per path and are global now; the first read migrates them.
+OSApp.Storage.migratedGlobalKeys = [ "lang", "uiTheme", "uiLook" ];
 
 OSApp.Storage._key = function( key ) {
        if ( OSApp.Storage.isGlobalKey( key ) ) {
@@ -40,13 +44,13 @@ OSApp.Storage._key = function( key ) {
 OSApp.Storage.getItemSync = function( key ) {
        var value = localStorage.getItem( OSApp.Storage._key( key ) );
 
-       if ( value === null && key === "lang" ) {
+       if ( value === null && OSApp.Storage.migratedGlobalKeys.indexOf( key ) !== -1 ) {
                var i,
                        legacyKey = null;
 
                for ( i = 0; i < localStorage.length; i++ ) {
                        var candidate = localStorage.key( i );
-                       if ( candidate && ( candidate === "lang" || candidate.endsWith( ":lang" ) ) ) {
+                       if ( candidate && ( candidate === key || candidate.endsWith( ":" + key ) ) ) {
                                legacyKey = candidate;
                                break;
                        }

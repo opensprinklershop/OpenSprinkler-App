@@ -199,7 +199,7 @@ OSApp.Utils.formatNumber = function( value, options ) {
 
 OSApp.Utils.parseNumber = function( value ) {
 	var locale = OSApp.Utils.getNumberLocale(),
-		decimalSeparator = ( locale === "de" || locale === "fr" || locale === "es" || locale === "it" || locale === "nl" || locale === "pt" || locale === "pl" || locale === "cs" || locale === "sk" || locale === "sv" || locale === "ru" || locale === "tr" || locale === "sl" || locale === "hr" || locale === "ro" || locale === "hu" || locale === "fi" || locale === "no" ) ? "," : ".",
+		decimalSeparator = ( locale === "de" || locale === "fr" || locale === "es" || locale === "it" || locale === "nl" || locale === "pt" || locale === "pl" || locale === "cs" || locale === "sk" || locale === "sv" || locale === "ru" || locale === "tr" || locale === "sl" || locale === "hr" || locale === "ro" || locale === "hu" || locale === "fi" || locale === "no" || locale === "uk" ) ? "," : ".",
 		otherSeparator = decimalSeparator === "," ? "." : ",",
 		normalized,
 		sanitized;

@@ -160,6 +160,7 @@ OSApp.UIDom.launchApp = function() {
 	.one( "mobileinit", function() {
 		$.support.cors = true;
 		$.mobile.allowCrossDomainPages = true;
+
 		OSApp.Storage.loadLocalSettings();
 	} )
 	.on( "pagebeforechange", function( e, data ) {
@@ -639,6 +640,16 @@ OSApp.UIDom.initAppData = function() {
 		OSApp.AIAssistant.initFab();
 	}
 
+	// Apply the stored appearance (modern/classic) before any page is enhanced.
+	// No stored choice yet: new installations get the modern look, existing ones keep classic.
+	OSApp.Storage.get( "uiLook", function( data ) {
+		if ( data.uiLook === "modern" || data.uiLook === "classic" ) {
+			OSApp.UIDom.setLookMode( data.uiLook, false );
+		} else {
+			OSApp.UIDom.setLookMode( OSApp.UIDom.defaultLookMode(), true );
+		}
+	} );
+
 	// Initialize the app header
 	$( "#header,#footer" ).toolbar();
 
@@ -696,7 +707,7 @@ OSApp.UIDom.initAppData = function() {
 
 	// Apply theme mode after UI is ready
 	OSApp.Storage.get( "uiTheme", function( data ) {
-		OSApp.UIDom.setThemeMode( data.uiTheme || OSApp.uiState.theme.mode || "light", false );
+		OSApp.UIDom.setThemeMode( data.uiTheme || OSApp.uiState.theme.mode || "auto", false );
 	} );
 
 	// Update the IP address of the device running the app
@@ -1558,25 +1569,115 @@ OSApp.UIDom.getPageTop = function() {
 	};
 };
 
-OSApp.UIDom.setThemeMode = function( mode, persist ) {
-	var themes = OSApp.uiState.theme && OSApp.uiState.theme.presets ? OSApp.uiState.theme.presets : {};
+// Resolve "auto" to the OS colour scheme; everything else is returned unchanged.
+OSApp.UIDom.resolveThemeMode = function( mode ) {
+	if ( mode !== "auto" ) {
+		return mode;
+	}
+	try {
+		return ( window.matchMedia && window.matchMedia( "(prefers-color-scheme: dark)" ).matches ) ? "dark" : "light";
+	} catch ( _err ) {
+		void _err;
+		return "light";
+	}
+};
 
-	if ( !themes[ mode ] ) {
-		mode = "light";
+// Appearance: "modern" (design tokens, flat cards; CSS scoped to html.theme-modern) or
+// "classic" (legacy jQuery Mobile look). Independent of the light/dark/colorful theme mode.
+OSApp.UIDom.isModernLook = function() {
+	return document.documentElement.classList.contains( "theme-modern" );
+};
+
+OSApp.UIDom.applyCollapsibleIcons = function() {
+	if ( !( $.mobile && $.mobile.collapsible ) ) {
+		return;
+	}
+	var modern = OSApp.UIDom.isModernLook();
+	$.mobile.collapsible.prototype.options.collapsedIcon = modern ? "carat-d" : "plus";
+	$.mobile.collapsible.prototype.options.expandedIcon = modern ? "carat-u" : "minus";
+};
+
+// Default appearance for installations without a stored choice: existing installations
+// (at least one stored site) keep the classic look, fresh installations start modern.
+OSApp.UIDom.defaultLookMode = function() {
+	try {
+		var sites = JSON.parse( OSApp.Storage.getItemSync( "sites" ) || "{}" ) || {};
+		return Object.keys( sites ).length ? "classic" : "modern";
+	} catch ( _err ) {
+		void _err;
+		return "modern";
+	}
+};
+
+OSApp.UIDom.setLookMode = function( look, persist ) {
+	look = ( look === "classic" ) ? "classic" : "modern";
+	OSApp.uiState.theme.look = look;
+	document.documentElement.classList.toggle( "theme-modern", look === "modern" );
+	OSApp.UIDom.applyCollapsibleIcons();
+
+	if ( persist !== false ) {
+		OSApp.Storage.set( { uiLook: look } );
 	}
 
+	// Status bar colours and chart colours depend on the look
+	OSApp.UIDom.setThemeMode( OSApp.uiState.theme.mode || "auto", false );
+	if ( OSApp.Status && OSApp.Status.checkStatus && OSApp.currentSession.isControllerConnected() ) {
+		OSApp.Status.checkStatus();
+	}
+};
+
+OSApp.UIDom.setThemeMode = function( mode, persist ) {
+	var classic = OSApp.uiState.theme && OSApp.uiState.theme.look === "classic",
+		themes = OSApp.uiState.theme && OSApp.uiState.theme.presets ? OSApp.uiState.theme.presets : {};
+
+	if ( classic && OSApp.uiState.theme.presetsClassic ) {
+		themes = OSApp.uiState.theme.presetsClassic;
+	}
+
+	if ( mode !== "auto" && !themes[ mode ] ) {
+		mode = "auto";
+	}
+	OSApp.UIDom.applyCollapsibleIcons();
+
+	var effective = OSApp.UIDom.resolveThemeMode( mode );
+
 	OSApp.uiState.theme.mode = mode;
-	if ( themes[ mode ] ) {
-		OSApp.uiState.theme.statusBarPrimary = themes[ mode ].statusBarPrimary;
-		OSApp.uiState.theme.statusBarOverlay = themes[ mode ].statusBarOverlay;
+	OSApp.uiState.theme.effectiveMode = effective;
+	if ( themes[ effective ] ) {
+		OSApp.uiState.theme.statusBarPrimary = themes[ effective ].statusBarPrimary;
+		OSApp.uiState.theme.statusBarOverlay = themes[ effective ].statusBarOverlay;
 	}
 
 	var root = document.documentElement;
 	root.classList.remove( "theme-dark", "theme-colorful" );
-	if ( mode === "dark" ) {
+	if ( effective === "dark" ) {
 		root.classList.add( "theme-dark" );
-	} else if ( mode === "colorful" ) {
+	} else if ( effective === "colorful" ) {
 		root.classList.add( "theme-colorful" );
+	}
+
+	// Follow live changes of the system scheme while in auto mode
+	if ( !OSApp.UIDom._schemeWatcher && window.matchMedia ) {
+		try {
+			OSApp.UIDom._schemeWatcher = window.matchMedia( "(prefers-color-scheme: dark)" );
+			var onSchemeChange = function() {
+				if ( OSApp.uiState.theme.mode === "auto" ) {
+					OSApp.UIDom.setThemeMode( "auto", false );
+				}
+			};
+			if ( OSApp.UIDom._schemeWatcher.addEventListener ) {
+				OSApp.UIDom._schemeWatcher.addEventListener( "change", onSchemeChange );
+			} else if ( OSApp.UIDom._schemeWatcher.addListener ) {
+				OSApp.UIDom._schemeWatcher.addListener( onSchemeChange );
+			}
+		} catch ( _err ) {
+			void _err;
+		}
+	}
+
+	// Charts and gauges pick their colours from the theme at render time
+	if ( OSApp.Analog ) {
+		OSApp.Analog.lastSensorStructKey = "";
 	}
 
 	if ( persist !== false ) {
@@ -1595,15 +1696,22 @@ OSApp.UIDom.showThemeSelector = function( button ) {
 	var popup = $( "<div data-role='popup' data-theme='a' id='themeSelect'>" +
 			"<ul data-role='listview' data-inset='true' data-corners='false'>" +
 				"<li data-role='list-divider'>" + OSApp.Language._( "Theme" ) + "</li>" +
+				"<li><a href='#' data-theme-mode='auto'>" + OSApp.Language._( "Follow System" ) + "</a></li>" +
 				"<li><a href='#' data-theme-mode='light'>" + OSApp.Language._( "Light Mode" ) + "</a></li>" +
 				"<li><a href='#' data-theme-mode='dark'>" + OSApp.Language._( "Dark Mode" ) + "</a></li>" +
 				"<li><a href='#' data-theme-mode='colorful'>" + OSApp.Language._( "Colorful Mode" ) + "</a></li>" +
+				"<li data-role='list-divider'>" + OSApp.Language._( "Appearance" ) + "</li>" +
+				"<li><a href='#' data-look-mode='modern'>" + OSApp.Language._( "Modern look" ) + "</a></li>" +
+				"<li><a href='#' data-look-mode='classic'>" + OSApp.Language._( "Classic look" ) + "</a></li>" +
 			"</ul>" +
 		"</div>" ),
 		updateSelection = function() {
 			popup.find( "a" ).each( function() {
-				var item = $( this );
-				if ( item.data( "theme-mode" ) === OSApp.uiState.theme.mode ) {
+				var item = $( this ),
+					selected = item.data( "theme-mode" ) ?
+						item.data( "theme-mode" ) === OSApp.uiState.theme.mode :
+						item.data( "look-mode" ) === ( OSApp.uiState.theme.look || "modern" );
+				if ( selected ) {
 					item.removeClass( "ui-icon-carat-r" ).addClass( "ui-icon-check" );
 				} else {
 					item.removeClass( "ui-icon-check" ).addClass( "ui-icon-carat-r" );
@@ -1612,8 +1720,12 @@ OSApp.UIDom.showThemeSelector = function( button ) {
 		};
 
 	popup.on( "click", "a", function() {
-		var mode = $( this ).data( "theme-mode" );
-		OSApp.UIDom.setThemeMode( mode );
+		var item = $( this );
+		if ( item.data( "look-mode" ) ) {
+			OSApp.UIDom.setLookMode( item.data( "look-mode" ) );
+		} else {
+			OSApp.UIDom.setThemeMode( item.data( "theme-mode" ) );
+		}
 		popup.popup( "close" );
 		return false;
 	} );

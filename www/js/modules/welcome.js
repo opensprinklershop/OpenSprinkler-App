@@ -218,6 +218,7 @@ OSApp.Welcome.ContinueNativeLabels = {
 	ta: "தமிழில் தொடரவும்",
 	th: "ดำเนินการต่อเป็นภาษาไทย",
 	tr: "Türkçe devam et",
+	uk: "Продовжити українською",
 	sv: "Fortsätt på svenska",
 	ro: "Continuați în română"
 };

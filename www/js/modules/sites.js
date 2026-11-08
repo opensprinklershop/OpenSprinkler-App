@@ -987,6 +987,16 @@ list.find( ".add-otc-connection" ).on( "click", function() {
 				} );
 
 				page.find( ".ui-content" ).html( list.enhanceWithin() );
+
+				// Appearance/theme switch is otherwise only reachable from the side panel of a
+				// connected controller; offer it here as well so the look can be changed any time.
+				var themeBtn = $( "<p class='center site-theme-switch'><a href='#' class='ui-btn ui-btn-inline ui-mini ui-btn-icon-left ui-icon-gear'>" +
+					OSApp.Language._( "Theme" ) + "</a></p>" );
+				themeBtn.find( "a" ).on( "click", function() {
+					OSApp.UIDom.showThemeSelector( $( this ) );
+					return false;
+				} );
+				page.find( ".ui-content" ).append( themeBtn );
 			}
 
 			if ( typeof data.cloudToken === "string" ) {
@@ -1763,7 +1773,7 @@ OSApp.Sites.newLoad = function( firstLoad ) {
 			"<h1 style='padding-top:5px'>" + OSApp.Language._( "Connecting to" ) + " " + name + "</h1>" +
 			"<p class='cancel tight center inline-icon'>" +
 				"<span class='btn-no-border ui-btn ui-icon-delete ui-btn-icon-notext'></span>" +
-				"Cancel" +
+				OSApp.Language._( "Cancel" ) +
 			"</p>";
 
 	$.mobile.loading( "show", {

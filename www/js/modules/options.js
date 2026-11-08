@@ -380,7 +380,6 @@ OSApp.Options.showOptions = function( expandItem ) {
 					case "o53":
 					case "o79":
 					case "o82":
-					case "o84":
 						data = $item.is( ":checked" ) ? 1 : 0;
 						break;
 				}
@@ -524,16 +523,19 @@ OSApp.Options.showOptions = function( expandItem ) {
                                OSApp.currentSession.controller.options.uiv || "";
                list += "<div class='ui-field-contain'><label for='o83' class='select'>" + OSApp.Language._( "Web UI Source" ) +
                        "<button data-helptext='" +
-                               OSApp.Language._( "Where the browser loads the web interface from: the copy stored on the controller (works without Internet access) or an external server (UI URL under Advanced)." ) +
+                               OSApp.Language._( "The external server is faster; the copy stored on the controller is used when the controller has no Internet access (offline operation)." ) +
                                "' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button></label>" +
                        "<select data-mini='true' id='o83'>" +
-                               "<option value='0'" + ( uisr === 0 ? " selected" : "" ) + ">" + OSApp.Language._( "On the controller" ) + "</option>" +
-                               "<option value='1'" + ( uisr === 1 ? " selected" : "" ) + ">" + OSApp.Language._( "On the controller only" ) + "</option>" +
-                               "<option value='2'" + ( uisr === 2 ? " selected" : "" ) + ">" + OSApp.Language._( "External server" ) + "</option>" +
+                               "<option value='0'" + ( uisr === 0 ? " selected" : "" ) + ">" + OSApp.Language._( "External server, controller copy when offline" ) + "</option>" +
+                               "<option value='1'" + ( uisr === 1 ? " selected" : "" ) + ">" + OSApp.Language._( "Always the controller copy" ) + "</option>" +
+                               "<option value='2'" + ( uisr === 2 ? " selected" : "" ) + ">" + OSApp.Language._( "External server only" ) + "</option>" +
                        "</select></div>";
-               list += "<label for='o84'><input data-mini='true' id='o84' type='checkbox' " +
-                               ( ( OSApp.currentSession.controller.options.uifb === 1 ) ? "checked='checked'" : "" ) + ">" +
-                       OSApp.Language._( "Use the controller copy when the external server cannot be reached" ) + "</label>";
+               list += "<div class='ui-field-contain'><label for='o84'>" + OSApp.Language._( "Switch to the controller copy after (seconds)" ) +
+                       "<button data-helptext='" +
+                               OSApp.Language._( "Seconds the browser waits for the external interface before it loads the copy from the controller. 0 = only when the external server reports an error." ) +
+                               "' class='help-icon btn-no-border ui-btn ui-icon-info ui-btn-icon-notext'></button></label>" +
+                       "<input data-mini='true' type='number' pattern='[0-9]*' min='0' max='60' id='o84' value='" +
+                               parseInt( OSApp.currentSession.controller.options.uifb || 0, 10 ) + "'></div>";
                list += "<div class='ui-field-contain'><label>" + OSApp.Language._( "Web UI on controller" ) + "</label>" +
                        "<span id='ui-local-status'>" + OSApp.Utils.htmlEscape( uiv || OSApp.Language._( "not installed" ) ) + "</span> " +
                        "<button class='noselect' data-mini='true' data-inline='true' id='ui-local-install'>" + OSApp.Language._( "Install/update" ) + "</button></div>";

@@ -2185,8 +2185,8 @@ OSApp.Programs.makeAllPrograms = function() {
 	}
 
 	var count = OSApp.currentSession.controller.programs.pd.length;
-	var list = "<p class='center'>" + OSApp.Language._( "Click any program below to expand/edit. Be sure to save changes." ) + "</p>" +
-		"<p class='center'>" + OSApp.Language._( "Number of Programs" ) + ": " + count + "</p>" +
+	var list = "<p class='center programs-help'>" + OSApp.Language._( "Click any program below to expand/edit. Be sure to save changes." ) + "</p>" +
+		"<p class='center list-hint'>" + OSApp.Language._( "Number of Programs" ) + ": " + count + "</p>" +
 		"<div data-role='collapsible-set'>";
 
 	var numDisabledPrograms = 0;

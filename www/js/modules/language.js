@@ -48,6 +48,7 @@ OSApp.Language.Constants = {
 		ta: "Tamil",
 		th: "Thai",
 		tr: "Turkish",
+		uk: "Ukrainian",
 		sv: "Swedish",
 		ro: "Romanian"
 	},

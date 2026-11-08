@@ -658,7 +658,7 @@ body, #loadingPage {
     height: 100%
 }
 body, input, select, textarea, button, .ui-btn {
-    font-family: "Inter", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+    font-family: "Lato", "Inter", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
     font-feature-settings: "liga" 1, "calt" 1, "kern" 1;
     font-variant-ligatures: common-ligatures;
     text-rendering: optimizeLegibility;
@@ -1338,7 +1338,7 @@ html.theme-colorful .station-status.off:after {
     text-shadow:none;
     background:#fff;
     border:1px solid #b4b4b4;
-    font:700 14px "Inter", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
+    font:700 14px "Lato", "Inter", "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", "Liberation Sans", Arial, sans-serif;
     padding:0;
     margin-top:10px;
     width:100%;
@@ -2620,4 +2620,871 @@ button[id^="start_1-"] {
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     padding: 12px 14px;
     margin: 24px 0;
+}
+
+/* ==========================================================================
+   Modern polish (2026-11): design tokens + flat component styling on top of
+   jQuery Mobile 1.4.5. Appended last on purpose so it wins the cascade against
+   the legacy !important rules above. Keep new colours in the tokens below.
+   ========================================================================== */
+html.theme-modern {
+    --os-bg: #f2f4f7;
+    --os-surface: #ffffff;
+    --os-surface-2: #f6f8fa;
+    --os-border: #e2e6ec;
+    --os-border-strong: #c9d0da;
+    --os-text: #1b2330;
+    --os-text-muted: #6b7684;
+    --os-accent: #1a9c8f;
+    --os-accent-strong: #137c71;
+    --os-accent-soft: rgba( 26, 156, 143, 0.14 );
+    --os-danger: #d64545;
+    --os-danger-soft: rgba( 214, 69, 69, 0.10 );
+    --os-warn: #e9a825;
+    --os-ok: #22a06b;
+    --os-header-bg: linear-gradient( 135deg, #0e4f4a 0%, #167a71 100% );
+    --os-header-text: #ffffff;
+    --os-footer-bg: #ffffff;
+    --os-footer-text: #1b2330;
+    --os-radius: 14px;
+    --os-radius-sm: 10px;
+    --os-shadow: 0 1px 2px rgba( 16, 24, 40, 0.05 ), 0 2px 6px rgba( 16, 24, 40, 0.06 );
+    --os-shadow-lg: 0 8px 24px rgba( 16, 24, 40, 0.18 );
+    --os-icon-filter: invert( 1 ) brightness( 0.35 );
+    --os-fab-bottom: calc( 62px + env( safe-area-inset-bottom, 0px ) );
+}
+html.theme-modern.theme-dark {
+    --os-bg: #0f1115;
+    --os-surface: #171b22;
+    --os-surface-2: #1d222b;
+    --os-border: #262c36;
+    --os-border-strong: #3a4250;
+    --os-text: #e7eaf0;
+    --os-text-muted: #98a2b3;
+    --os-accent: #3ccfbf;
+    --os-accent-strong: #5fdccf;
+    --os-accent-soft: rgba( 60, 207, 191, 0.16 );
+    --os-danger: #f06a6a;
+    --os-danger-soft: rgba( 240, 106, 106, 0.14 );
+    --os-warn: #f2b84b;
+    --os-ok: #3ccf8e;
+    --os-header-bg: #12161d;
+    --os-header-text: #e7eaf0;
+    --os-footer-bg: #12161d;
+    --os-footer-text: #e7eaf0;
+    --os-shadow: 0 1px 2px rgba( 0, 0, 0, 0.35 ), 0 2px 8px rgba( 0, 0, 0, 0.35 );
+    --os-shadow-lg: 0 10px 30px rgba( 0, 0, 0, 0.55 );
+    --os-icon-filter: none;
+}
+html.theme-modern.theme-colorful {
+    --os-bg: #f6f4ff;
+    --os-surface: rgba( 255, 255, 255, 0.92 );
+    --os-surface-2: rgba( 255, 255, 255, 0.75 );
+    --os-border: rgba( 215, 201, 255, 0.6 );
+    --os-border-strong: rgba( 156, 140, 255, 0.6 );
+    --os-text: #2a2440;
+    --os-text-muted: #6f6894;
+    --os-accent: #6d5bff;
+    --os-accent-strong: #5a48ea;
+    --os-accent-soft: rgba( 109, 91, 255, 0.14 );
+    --os-header-bg: linear-gradient( 135deg, #4a3fc9 0%, #6d5bff 60%, #58b7ff 100% );
+    --os-header-text: #ffffff;
+    --os-footer-bg: rgba( 255, 255, 255, 0.92 );
+    --os-footer-text: #2a2440;
+}
+
+/* --- Base surfaces --------------------------------------------------------- */
+html.theme-modern body, html.theme-modern #loadingPage, html.theme-modern.theme-dark body, html.theme-modern.theme-dark #loadingPage, html.theme-modern.theme-colorful body, html.theme-modern.theme-colorful #loadingPage {
+    background-color: var( --os-bg ) !important;
+    color: var( --os-text );
+}
+html.theme-modern .ui-page, html.theme-modern .ui-page-theme-a, html.theme-modern .ui-page-theme-b, html.theme-modern .ui-panel-wrapper, html.theme-modern.theme-dark .ui-page, html.theme-modern.theme-dark .ui-page-theme-a, html.theme-modern.theme-dark .ui-page-theme-b, html.theme-modern.theme-dark .ui-panel-wrapper, html.theme-modern.theme-dark .ui-content {
+    background-color: var( --os-bg ) !important;
+    color: var( --os-text ) !important;
+    text-shadow: none !important;
+}
+html.theme-modern.theme-colorful .ui-content {
+    background-color: transparent !important;
+}
+html.theme-modern .ui-page .ui-content {
+    padding: 12px 16px calc( 110px + env( safe-area-inset-bottom, 0px ) ) 16px;
+}
+html.theme-modern a, html.theme-modern.theme-dark a {
+    color: var( --os-accent-strong );
+}
+html.theme-modern .ui-page p.center:not(.running-text):not(.station-name):not(.rem) {
+    color: var( --os-text-muted );
+}
+
+/* --- Cards: ui-body, collapsibles, listviews -------------------------------- */
+html.theme-modern .ui-page .ui-body-a, html.theme-modern .ui-page .ui-body-b, html.theme-modern .ui-page .ui-body-inherit, html.theme-modern .ui-popup .ui-body-a, html.theme-modern .ui-popup .ui-body-b, html.theme-modern.theme-dark .ui-body-a, html.theme-modern.theme-dark .ui-body-b, html.theme-modern.theme-dark .ui-body-inherit, html.theme-modern.theme-colorful .ui-body-a, html.theme-modern.theme-colorful .ui-body-b {
+    background-color: var( --os-surface ) !important;
+    color: var( --os-text ) !important;
+    border: 1px solid var( --os-border ) !important;
+    border-radius: var( --os-radius ) !important;
+    box-shadow: var( --os-shadow );
+    text-shadow: none !important;
+}
+html.theme-modern .ui-page .ui-body-a .ui-body-a, html.theme-modern .ui-page .ui-collapsible-content .ui-body-a {
+    box-shadow: none;
+}
+html.theme-modern .ui-collapsible-content, html.theme-modern.theme-dark .ui-collapsible-content, html.theme-modern.theme-colorful .ui-collapsible-content {
+    background-color: var( --os-surface ) !important;
+    color: var( --os-text ) !important;
+    border: 1px solid var( --os-border ) !important;
+    border-top: 0 !important;
+    border-radius: 0 0 var( --os-radius ) var( --os-radius ) !important;
+    padding: 10px 14px 14px 14px;
+}
+html.theme-modern .ui-collapsible {
+    margin: 0 0 10px 0;
+}
+html.theme-modern .ui-collapsible-heading {
+    margin: 0;
+}
+html.theme-modern .ui-collapsible-heading .ui-btn, html.theme-modern.theme-dark .ui-collapsible-heading .ui-btn, html.theme-modern.theme-colorful .ui-collapsible-heading .ui-btn {
+    background-color: var( --os-surface ) !important;
+    color: var( --os-text ) !important;
+    border: 1px solid var( --os-border ) !important;
+    border-radius: var( --os-radius ) !important;
+    box-shadow: var( --os-shadow );
+    padding: 13px 16px 13px 2.6em;
+    font-size: 15px;
+    font-weight: 600 !important;
+    text-align: left;
+}
+html.theme-modern .ui-collapsible:not(.ui-collapsible-collapsed) > .ui-collapsible-heading .ui-btn {
+    border-radius: var( --os-radius ) var( --os-radius ) 0 0 !important;
+    box-shadow: none;
+}
+html.theme-modern .ui-collapsible-heading .ui-btn:after {
+    left: 0.7em;
+}
+html.theme-modern .ui-collapsible-heading .ui-btn.ui-btn-icon-right {
+    padding-left: 16px;
+}
+html.theme-modern .ui-collapsible-set > .ui-collapsible.ui-corner-all {
+    border-radius: var( --os-radius ) !important;
+}
+html.theme-modern .ui-collapsible-set .ui-collapsible-heading .ui-btn {
+    border-radius: var( --os-radius ) !important;
+}
+html.theme-modern .ui-listview > li.ui-li-static, html.theme-modern .ui-listview > li > .ui-btn, html.theme-modern .ui-listview .ui-li-divider, html.theme-modern.theme-dark .ui-listview > li.ui-li-static, html.theme-modern.theme-dark .ui-listview > li > .ui-btn {
+    text-shadow: none !important;
+}
+html.theme-modern .ui-listview-inset .ui-li-static, html.theme-modern .ui-listview-inset > li > .ui-btn {
+    border-color: var( --os-border ) !important;
+}
+html.theme-modern .ui-popup .ui-li-divider, html.theme-modern .ui-page .ui-li-divider, html.theme-modern.theme-dark .ui-li-divider {
+    background-color: var( --os-surface-2 ) !important;
+    color: var( --os-text-muted ) !important;
+    font-size: 11px;
+    letter-spacing: .04em !important;
+    text-transform: uppercase;
+    border-color: var( --os-border ) !important;
+}
+
+/* --- Buttons & inputs ------------------------------------------------------- */
+html.theme-modern .ui-page .ui-btn, html.theme-modern .ui-popup .ui-btn, html.theme-modern.theme-dark .ui-btn, html.theme-modern.theme-colorful .ui-btn {
+    font-weight: 500;
+    text-shadow: none !important;
+}
+html.theme-modern .ui-page .ui-btn:not(.ui-btn-icon-notext):not(.ui-li-static), html.theme-modern .ui-popup .ui-btn:not(.ui-btn-icon-notext) {
+    border-radius: var( --os-radius-sm );
+}
+html.theme-modern .ui-page-theme-a .ui-btn, html.theme-modern .ui-page-theme-b .ui-btn, html.theme-modern .ui-body-a .ui-btn, html.theme-modern .ui-body-b .ui-btn, html.theme-modern .ui-popup .ui-btn, html.theme-modern .ui-bar-a .ui-btn, html.theme-modern body .ui-group-theme-a .ui-btn, html.theme-modern.theme-dark .ui-btn {
+    background-color: var( --os-surface ) !important;
+    border-color: var( --os-border-strong ) !important;
+    color: var( --os-text ) !important;
+}
+html.theme-modern .ui-page .ui-btn.ui-btn-b, html.theme-modern .ui-page .ui-btn-b, html.theme-modern .ui-group-theme-b .ui-btn, html.theme-modern.theme-dark .ui-btn.ui-btn-b {
+    background-color: var( --os-surface-2 ) !important;
+    border-color: var( --os-border-strong ) !important;
+    color: var( --os-text ) !important;
+}
+html.theme-modern .ui-page .ui-btn:hover, html.theme-modern .ui-popup .ui-btn:hover {
+    background-color: var( --os-surface-2 ) !important;
+}
+html.theme-modern .ui-page .ui-btn:active, html.theme-modern .ui-popup .ui-btn:active {
+    background-color: var( --os-accent-soft ) !important;
+}
+/* selected / active states: tabs, toggles, checked boxes */
+html.theme-modern .ui-page .ui-btn.ui-btn-active, html.theme-modern .ui-popup .ui-btn.ui-btn-active, html.theme-modern button.ui-btn-active, html.theme-modern .activeButton, html.theme-modern .activeButton.ui-slider-bg, html.theme-modern .activeButton.ui-checkbox-on, html.theme-modern .ui-radio-on, html.theme-modern .ui-selectmenu-list .activeButton, html.theme-modern.theme-dark .ui-btn.ui-btn-active, html.theme-modern.theme-dark .activeButton, html.theme-modern.theme-dark button.ui-btn-active {
+    background-color: var( --os-accent ) !important;
+    border-color: var( --os-accent ) !important;
+    color: #fff !important;
+    text-shadow: none !important;
+}
+html.theme-modern .ui-btn.ui-checkbox-on:after, html.theme-modern.theme-dark .ui-btn.ui-checkbox-on:after, html.theme-modern .ui-radio-on:after {
+    background-color: var( --os-accent ) !important;
+    border-color: var( --os-accent ) !important;
+}
+html.theme-modern .ui-checkbox-off:after, html.theme-modern .ui-radio-off:after {
+    opacity: 1 !important;
+    background-color: transparent !important;
+    border: 2px solid var( --os-border-strong );
+    box-sizing: border-box;
+    filter: none !important;
+}
+html.theme-modern .ui-checkbox-off:after {
+    border-radius: 6px !important;
+}
+html.theme-modern .ui-checkbox .ui-btn, html.theme-modern .ui-radio .ui-btn {
+    font-weight: 500;
+}
+html.theme-modern .ui-flipswitch, html.theme-modern.theme-dark .ui-flipswitch {
+    border-radius: 1em !important;
+}
+html.theme-modern .ui-flipswitch-active, html.theme-modern.theme-dark .ui-flipswitch-active {
+    background-color: var( --os-accent ) !important;
+    border-color: var( --os-accent ) !important;
+}
+html.theme-modern .ui-input-text, html.theme-modern .ui-input-search, html.theme-modern .ui-select .ui-btn, html.theme-modern textarea.ui-input-text, html.theme-modern.theme-dark .ui-input-text, html.theme-modern.theme-dark .ui-input-search, html.theme-modern.theme-dark .ui-select .ui-btn, html.theme-modern.theme-colorful .ui-input-text, html.theme-modern.theme-colorful .ui-select .ui-btn {
+    background-color: var( --os-surface ) !important;
+    border: 1px solid var( --os-border-strong ) !important;
+    border-radius: var( --os-radius-sm ) !important;
+    color: var( --os-text ) !important;
+    box-shadow: none !important;
+}
+html.theme-modern .ui-input-text input, html.theme-modern .ui-input-search input, html.theme-modern.theme-dark .ui-input-text input {
+    color: var( --os-text ) !important;
+    text-shadow: none !important;
+}
+html.theme-modern .ui-input-text input::placeholder, html.theme-modern.theme-dark .ui-input-text input::placeholder {
+    color: var( --os-text-muted );
+    opacity: 1;
+}
+html.theme-modern .ui-focus, html.theme-modern .ui-btn:focus, html.theme-modern .ui-input-text.ui-focus, html.theme-modern.theme-dark .ui-focus {
+    box-shadow: 0 0 0 3px var( --os-accent-soft ) !important;
+    border-color: var( --os-accent ) !important;
+    outline: none;
+}
+html.theme-modern .ui-field-contain, html.theme-modern.theme-colorful .ui-field-contain {
+    border-bottom-color: var( --os-border ) !important;
+}
+html.theme-modern .ui-field-contain > label, html.theme-modern .ui-field-contain > .ui-controlgroup-label {
+    color: var( --os-text-muted );
+    font-weight: 500;
+}
+html.theme-modern .ui-slider-track, html.theme-modern.theme-dark .ui-slider-track {
+    background-color: var( --os-surface-2 ) !important;
+    border-color: var( --os-border ) !important;
+    border-radius: 1em !important;
+}
+html.theme-modern .ui-slider-handle, html.theme-modern.theme-dark .ui-slider-handle {
+    background-color: #fff !important;
+    border-color: var( --os-border-strong ) !important;
+    box-shadow: var( --os-shadow );
+}
+html.theme-modern .ui-controlgroup-controls .ui-btn, html.theme-modern.theme-dark .ui-controlgroup-controls .ui-btn {
+    border-color: var( --os-border-strong ) !important;
+}
+html.theme-modern .ui-controlgroup-horizontal .ui-controlgroup-controls {
+    border-radius: var( --os-radius-sm );
+    overflow: hidden;
+}
+/* status-coloured buttons keep their meaning but in the token palette */
+html.theme-modern .ui-page .red, html.theme-modern .ui-page .red.ui-btn, html.theme-modern .ui-popup .red, html.theme-modern.theme-dark .red, html.theme-modern.theme-dark .red.ui-btn {
+    background: var( --os-danger ) !important;
+    border-color: var( --os-danger ) !important;
+    color: #fff !important;
+}
+html.theme-modern .ui-page .green, html.theme-modern .ui-page .green.ui-btn, html.theme-modern.theme-dark .green, html.theme-modern.theme-dark .green.ui-btn {
+    background: var( --os-ok ) !important;
+    border-color: var( --os-ok ) !important;
+    color: #fff !important;
+}
+html.theme-modern .ui-page .yellow, html.theme-modern .ui-page .yellow.ui-btn, html.theme-modern.theme-dark .yellow, html.theme-modern.theme-dark .yellow.ui-btn {
+    background: var( --os-warn ) !important;
+    border-color: var( --os-warn ) !important;
+    color: #1b2330 !important;
+}
+html.theme-modern .ui-page .blue, html.theme-modern .ui-page .blue.ui-btn, html.theme-modern.theme-dark .blue, html.theme-modern.theme-dark .blue.ui-btn {
+    background: var( --os-accent ) !important;
+    border-color: var( --os-accent ) !important;
+    color: #fff !important;
+}
+html.theme-modern .red-text { color: var( --os-danger ) !important; }
+html.theme-modern .green-text { color: var( --os-ok ) !important; }
+html.theme-modern .blue-text { color: var( --os-accent-strong ) !important; }
+/* destructive actions inside lists become quiet ghost buttons */
+html.theme-modern .ui-page .delete-day.red, html.theme-modern .ui-page a.deletesite.ui-btn, html.theme-modern .ui-page .clear_logs.red, html.theme-modern.theme-dark .delete-day.red, html.theme-modern.theme-dark a.deletesite.ui-btn, html.theme-modern.theme-dark .clear_logs.red {
+    background: transparent !important;
+    color: var( --os-danger ) !important;
+    border: 1px solid var( --os-danger ) !important;
+    font-weight: 500;
+}
+html.theme-modern .ui-page .delete-day.red:active, html.theme-modern .ui-page a.deletesite.ui-btn:active {
+    background: var( --os-danger-soft ) !important;
+}
+/* primary actions */
+html.theme-modern .ui-page form .ui-input-btn, html.theme-modern .ui-page form .ui-input-btn.ui-btn, html.theme-modern #site-control .ui-input-btn, html.theme-modern.theme-dark .ui-page form .ui-input-btn {
+    background-color: var( --os-accent ) !important;
+    border-color: var( --os-accent ) !important;
+    color: #fff !important;
+    font-weight: 600;
+}
+html.theme-modern .ui-page form .ui-input-btn input {
+    color: #fff !important;
+}
+html.theme-modern .custom-count-pos, html.theme-modern .ui-btn-up-c.custom-count-pos {
+    background: var( --os-accent-soft );
+    color: var( --os-accent-strong );
+    border-radius: 999px;
+    border: 0;
+    padding: .25em .7em;
+    text-shadow: none;
+}
+html.theme-modern .delete-day, html.theme-modern .program-copy, html.theme-modern .connectnow, html.theme-modern .collapsible-button-right {
+    border-radius: 999px !important;
+    padding: .3em .8em;
+    margin-top: -2px;
+}
+html.theme-modern .ui-page .program-copy {
+    background: transparent !important;
+    color: var( --os-accent-strong ) !important;
+    border: 1px solid var( --os-accent ) !important;
+}
+html.theme-modern .ui-page .connectnow {
+    font-weight: 600;
+}
+
+/* --- Icons: drop the grey jQM icon disc, dark glyphs on light themes -------- */
+html.theme-modern .ui-page .ui-btn:after, html.theme-modern .ui-popup .ui-btn:after, html.theme-modern .ui-panel .ui-btn:after {
+    background-color: transparent !important;
+}
+html.theme-modern:not(.theme-dark) .ui-page .ui-btn:after, html.theme-modern:not(.theme-dark) .ui-popup .ui-btn:after {
+    filter: var( --os-icon-filter );
+}
+/* ...but keep coloured discs where the colour carries meaning */
+html.theme-modern:not(.theme-dark) .ui-page .ui-btn.ui-checkbox-on:after, html.theme-modern:not(.theme-dark) .ui-page .ui-btn.ui-radio-on:after, html.theme-modern:not(.theme-dark) .ui-page .ui-btn.ui-btn-active:after, html.theme-modern:not(.theme-dark) .ui-page .ui-btn.activeButton:after, html.theme-modern:not(.theme-dark) .ui-page .red.ui-btn:after, html.theme-modern:not(.theme-dark) .ui-page .green.ui-btn:after, html.theme-modern:not(.theme-dark) .ui-page .blue.ui-btn:after, html.theme-modern:not(.theme-dark) .ui-page .yellow.ui-btn:after, html.theme-modern:not(.theme-dark) .ui-page .station-status:after, html.theme-modern:not(.theme-dark) .ui-popup .ui-btn.ui-checkbox-on:after, html.theme-modern:not(.theme-dark) .ui-popup .ui-btn.ui-btn-active:after, html.theme-modern:not(.theme-dark) .ui-popup .red.ui-btn:after {
+    filter: none;
+}
+html.theme-modern .ui-page .ui-btn.ui-checkbox-on:after, html.theme-modern .ui-page .ui-btn.ui-radio-on:after, html.theme-modern .ui-page .ui-btn.ui-btn-active:after, html.theme-modern .ui-page .ui-btn.activeButton:after, html.theme-modern .ui-popup .ui-btn.ui-checkbox-on:after, html.theme-modern .ui-popup .ui-btn.ui-btn-active:after {
+    background-color: var( --os-accent ) !important;
+}
+html.theme-modern .ui-page .ui-btn.ui-radio-on:after {
+    border-color: var( --os-accent ) !important;
+}
+html.theme-modern .ui-page .red.ui-btn:after, html.theme-modern .ui-page .green.ui-btn:after, html.theme-modern .ui-page .blue.ui-btn:after, html.theme-modern .ui-page .yellow.ui-btn:after {
+    background-color: rgba( 255, 255, 255, 0.22 ) !important;
+}
+
+/* --- Header & footer -------------------------------------------------------- */
+html.theme-modern #header, html.theme-modern #header.ui-bar-b, html.theme-modern #header.ui-header, html.theme-modern.theme-dark #header, html.theme-modern.theme-colorful #header {
+    background: var( --os-header-bg ) !important;
+    color: var( --os-header-text ) !important;
+    border: 0 !important;
+    border-bottom: 1px solid rgba( 255, 255, 255, 0.08 ) !important;
+    box-shadow: 0 1px 0 rgba( 0, 0, 0, 0.08 );
+    text-shadow: none !important;
+}
+html.theme-modern #header .ui-title, html.theme-modern #header h3 {
+    color: var( --os-header-text ) !important;
+    font-weight: 600;
+    font-size: 17px;
+    letter-spacing: .01em !important;
+}
+html.theme-modern #header .ui-btn, html.theme-modern.theme-colorful #header .ui-btn {
+    color: var( --os-header-text ) !important;
+    font-weight: 500;
+    opacity: 0.95;
+}
+html.theme-modern #header .ui-btn:after {
+    background-color: transparent !important;
+}
+html.theme-modern #footer, html.theme-modern #footer.ui-bar-b, html.theme-modern #footer.ui-footer, html.theme-modern.theme-dark #footer, html.theme-modern.theme-colorful #footer {
+    background: var( --os-footer-bg ) !important;
+    color: var( --os-footer-text ) !important;
+    border: 0 !important;
+    border-top: 1px solid var( --os-border ) !important;
+    box-shadow: 0 -2px 12px rgba( 16, 24, 40, 0.06 );
+    padding-bottom: env( safe-area-inset-bottom, 0px );
+}
+html.theme-modern #footer-running {
+    min-height: 0;
+    padding: 6px 12px;
+}
+html.theme-modern #footer-running.ui-bar, html.theme-modern #footer-running .running-text {
+    color: var( --os-footer-text );
+    font-weight: 500;
+    font-size: 13px;
+    line-height: 1.35;
+}
+html.theme-modern #footer-running.transparent .running-text {
+    color: var( --os-text-muted );
+    font-size: 12px;
+}
+html.theme-modern #footer-running.green, html.theme-modern #footer-running.blue, html.theme-modern #footer-running.red, html.theme-modern #footer-running.yellow {
+    border-radius: 0;
+    margin: 0;
+}
+html.theme-modern #footer-running.green .running-text, html.theme-modern #footer-running.blue .running-text, html.theme-modern #footer-running.red .running-text {
+    color: #fff;
+}
+html.theme-modern #footer-running.yellow .running-text {
+    color: #1b2330;
+}
+html.theme-modern #footer-running .running-text.smaller:not(:first-child) {
+    font-size: 11px;
+    opacity: 0.85;
+}
+
+/* --- Floating buttons: one row above the footer, never over content -------- */
+html.theme-modern #footer-menu {
+    /* !important: a legacy Cordova rule further up pins the FABs at 10% / 10%+62px */
+    right: 16px !important;
+    bottom: var( --os-fab-bottom ) !important;
+    height: 52px;
+    width: 52px;
+    border-radius: 50% !important;
+    background: var( --os-accent ) !important;
+    box-shadow: var( --os-shadow-lg );
+    opacity: 1 !important;
+}
+html.theme-modern #footer-menu:after {
+    height: 52px;
+    width: 52px;
+    margin-top: -26px;
+    margin-left: -26px;
+    transform: scale( 1.15 );
+    background-color: transparent !important;
+    filter: none;
+}
+html.theme-modern #footer-menu:active {
+    transform: scale( 0.94 );
+}
+html.theme-modern #ai-fab {
+    right: 80px !important;
+    bottom: var( --os-fab-bottom ) !important;
+    height: 52px;
+    width: 52px;
+    box-shadow: var( --os-shadow-lg );
+    animation: none;
+}
+html.theme-modern #ai-fab .ai-fab-glyph {
+    animation: none;
+}
+
+/* --- Home: info card, stations, gauges, sensors ----------------------------- */
+html.theme-modern .info-card, html.theme-modern .ui-page .info-card.ui-body, html.theme-modern.theme-dark .info-card {
+    background-color: var( --os-surface ) !important;
+    border: 1px solid var( --os-border ) !important;
+    border-radius: var( --os-radius ) !important;
+    box-shadow: var( --os-shadow );
+    padding: 12px 14px;
+    margin: 0 auto 12px auto;
+    max-width: 1000px;
+}
+html.theme-modern .info-card .sitename {
+    font-size: 16px;
+    font-weight: 600;
+    padding-bottom: 4px;
+}
+html.theme-modern .info-card #clock-s, html.theme-modern .info-card #water-level {
+    color: var( --os-text-muted );
+    font-size: 13px;
+}
+html.theme-modern .info-card #water-level .waterlevel {
+    color: var( --os-text );
+    font-weight: 600;
+}
+html.theme-modern .home-info {
+    margin-left: 0;
+}
+html.theme-modern .card-group {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+html.theme-modern .card, html.theme-modern .card-group .card {
+    max-width: none;
+    width: 100%;
+    padding: 0;
+    margin: 0 0 8px 0;
+    box-sizing: border-box;
+    break-inside: avoid;
+}
+html.theme-modern .card > .ui-body, html.theme-modern .card > .ui-body.center, html.theme-modern.theme-dark .card > .ui-body, html.theme-modern.theme-colorful .card > .ui-body.center {
+    position: relative;
+    min-height: 0;
+    padding: 12px 118px 12px 40px !important;
+    text-align: left !important;
+    border-radius: var( --os-radius ) !important;
+}
+html.theme-modern .has-images .card > .ui-body {
+    padding-left: 84px !important;
+}
+html.theme-modern .has-images .card img {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY( -50% );
+    float: none;
+    border-radius: 10px;
+}
+html.theme-modern .station-name, html.theme-modern .has-images .station-name {
+    width: auto;
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    text-align: left !important;
+    white-space: nowrap;
+}
+html.theme-modern .card .rem, html.theme-modern .card p.rem {
+    text-align: left !important;
+    color: var( --os-text-muted );
+    font-size: 12px;
+    margin: 3px 0 0 0;
+}
+html.theme-modern .card .station-status, html.theme-modern .has-images .station-status {
+    top: 50% !important;
+    left: 14px !important;
+    right: auto !important;
+    bottom: auto !important;
+    margin-top: -11px;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    min-width: 0;
+}
+html.theme-modern .station-status:after {
+    width: 12px !important;
+    height: 12px !important;
+    left: 50% !important;
+    top: 50% !important;
+    margin: -6px 0 0 -6px !important;
+    border-radius: 50% !important;
+    background-image: none !important;
+    box-shadow: 0 0 0 3px var( --os-surface-2 );
+}
+html.theme-modern .station-status.off:after, html.theme-modern.theme-dark .station-status.off:after {
+    background-color: var( --os-border-strong ) !important;
+}
+html.theme-modern .station-status.on:after {
+    background-color: var( --os-ok ) !important;
+    box-shadow: 0 0 0 4px rgba( 34, 160, 107, 0.22 );
+}
+html.theme-modern .station-status.wait:after {
+    background-color: var( --os-warn ) !important;
+}
+html.theme-modern .card .card-icon.station-settings, html.theme-modern .card .card-icon.station-gid, html.theme-modern .card .card-icon.special-station, html.theme-modern .card .zigbee-station-battery {
+    top: 50% !important;
+    transform: translateY( -50% );
+    right: 8px !important;
+    bottom: auto !important;
+}
+/* jQM gives .ui-btn a .5em vertical margin, which pushed the icons below the text line */
+html.theme-modern .card .card-icon.station-settings, html.theme-modern .card .card-icon.station-gid,
+html.theme-modern .card .card-icon.special-station, html.theme-modern .card .zigbee-station-battery {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 28px;
+    line-height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+html.theme-modern .card .card-icon.station-settings {
+    width: 28px;
+}
+html.theme-modern .card .card-icon.station-gid {
+    margin-right: 36px !important;
+    color: var( --os-text-muted ) !important;
+    font-size: 12px;
+    font-weight: 600;
+}
+html.theme-modern .card .card-icon.special-station {
+    margin-right: 60px !important;
+    width: 28px;
+}
+html.theme-modern .card .zigbee-station-battery {
+    margin-right: 92px !important;
+}
+html.theme-modern .card .station-settings:after {
+    opacity: 0.6;
+}
+@media ( min-width: 700px ) {
+    html.theme-modern #os-stations-list, html.theme-modern #os-running-stations {
+        column-count: 2;
+        column-gap: 10px;
+    }
+}
+@media ( min-width: 1032px ) {
+    html.theme-modern #os-stations-list, html.theme-modern #os-running-stations {
+        column-count: 3;
+    }
+}
+html.theme-modern #os-program-show .ui-body, html.theme-modern #os-sensor-show .ui-body, html.theme-modern.theme-dark #os-sensor-show .ui-body {
+    margin: 0 0 10px 0;
+    padding: 8px 10px !important;
+}
+html.theme-modern #os-sensor-show table {
+    width: 100% !important;
+    max-width: none !important;
+    border-collapse: collapse;
+    margin: 0 !important;
+}
+html.theme-modern #os-sensor-show table td, html.theme-modern.theme-dark #os-sensor-show table td {
+    padding: 9px 6px !important;
+    border-bottom: 1px solid var( --os-border ) !important;
+    background-color: transparent !important;
+    font-size: 14px;
+    max-width: none !important;
+}
+html.theme-modern #os-sensor-show table tr:last-child td {
+    border-bottom: 0 !important;
+}
+html.theme-modern #os-sensor-show table td:first-child {
+    color: var( --os-text );
+    font-weight: 500;
+}
+html.theme-modern #os-sensor-show table td:nth-child(2) {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+}
+html.theme-modern #os-sensor-show table td:nth-child(3), html.theme-modern #os-sensor-show table td:nth-child(4) {
+    color: var( --os-text-muted );
+}
+html.theme-modern #os-sensor-show table td:nth-child(4) {
+    font-size: 13px !important;
+}
+html.theme-modern #os-sensor-show table td:first-child {
+    width: 40%;
+}
+html.theme-modern #os-sensor-show .dashboard-sensor-chart {
+    background: var( --os-accent-soft ) !important;
+    border-color: transparent !important;
+}
+html.theme-modern #os-sensor-show .apexcharts-canvas {
+    margin: 0 auto;
+}
+html.theme-modern #os-sensor-show table td[id^="mainpageChart-"] {
+    border-bottom: 0 !important;
+    padding: 0 !important;
+    width: auto;
+}
+html.theme-modern #os-sensor-show [id^="monitor-"] {
+    border-radius: var( --os-radius-sm ) !important;
+    padding: 8px 12px !important;
+    font-weight: 600;
+}
+
+/* --- Misc pages ------------------------------------------------------------- */
+html.theme-modern #programs .ui-collapsible-heading .program-name {
+    font-weight: 600;
+}
+html.theme-modern .list-hint {
+    color: var( --os-text-muted );
+    font-size: 13px;
+    margin: 4px 0 10px 0;
+}
+html.theme-modern #logs .ui-collapsible-heading .ui-btn {
+    font-size: 14px;
+}
+/* loader / popups */
+html.theme-modern .ui-popup, html.theme-modern .ui-popup.ui-body-a, html.theme-modern .ui-popup.ui-body-b, html.theme-modern.theme-dark .ui-popup, html.theme-modern.theme-colorful .ui-popup {
+    background-color: var( --os-surface ) !important;
+    color: var( --os-text ) !important;
+    border: 1px solid var( --os-border ) !important;
+    border-radius: var( --os-radius ) !important;
+    box-shadow: var( --os-shadow-lg ) !important;
+}
+html.theme-modern .ui-popup .ui-header, html.theme-modern .ui-popup .ui-bar-b, html.theme-modern .ui-popup .ui-bar-a, html.theme-modern.theme-dark .ui-popup .ui-bar-b {
+    background: var( --os-surface-2 ) !important;
+    color: var( --os-text ) !important;
+    border: 0 !important;
+    border-bottom: 1px solid var( --os-border ) !important;
+    border-radius: var( --os-radius ) var( --os-radius ) 0 0 !important;
+}
+html.theme-modern .ui-popup .ui-header .ui-title {
+    color: var( --os-text ) !important;
+}
+html.theme-modern .ui-popup .ui-header .ui-btn:after {
+    filter: var( --os-icon-filter );
+}
+/* side panel */
+html.theme-modern:not(.theme-colorful) #sprinklers-settings, html.theme-modern:not(.theme-colorful) #sprinklers-settings .ui-panel-inner, html.theme-modern:not(.theme-colorful) #sprinklers-settings .ui-listview, html.theme-modern:not(.theme-colorful) #sprinklers-settings .ui-btn {
+    background-color: #12161d !important;
+    color: #e7eaf0 !important;
+    border-color: #262c36 !important;
+}
+html.theme-modern #sprinklers-settings .ui-btn {
+    font-weight: 500;
+}
+html.theme-modern #sprinklers-settings .ui-li-divider {
+    background-color: #0f1115 !important;
+    color: #98a2b3 !important;
+}
+html.theme-modern #sprinklers-settings .ui-btn:after {
+    background-color: transparent !important;
+    opacity: 0.8;
+}
+/* tables (logs, sensors) */
+html.theme-modern .ui-page table.ui-table, html.theme-modern.theme-dark .ui-content table {
+    border-radius: var( --os-radius-sm );
+    overflow: hidden;
+}
+html.theme-modern .ui-page .ui-table th, html.theme-modern .ui-page .ui-table td, html.theme-modern.theme-dark .ui-content table th, html.theme-modern.theme-dark .ui-content table td {
+    border-color: var( --os-border ) !important;
+    background-color: var( --os-surface ) !important;
+    color: var( --os-text ) !important;
+}
+html.theme-modern .ui-page .ui-table th, html.theme-modern.theme-dark .ui-content table th {
+    background-color: var( --os-surface-2 ) !important;
+    color: var( --os-text-muted ) !important;
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .03em !important;
+}
+/* notifications badge */
+html.theme-modern .notificationCount {
+    border-radius: 999px;
+    padding: 0 5px;
+    min-width: 10px;
+    font-weight: 600;
+    background: var( --os-danger );
+}
+
+/* --- Polish round 2: small controls in headings, section bars, gauges, footer -- */
+html.theme-modern .ui-collapsible-heading .ui-btn.program-copy, html.theme-modern .ui-collapsible-heading .ui-btn.delete-day, html.theme-modern .ui-collapsible-heading .ui-btn.connectnow, html.theme-modern .ui-collapsible-heading .ui-btn.collapsible-button-right, html.theme-modern .ui-collapsible-heading .ui-btn.move-up, html.theme-modern .ui-collapsible-heading .ui-btn.help-icon, html.theme-modern.theme-dark .ui-collapsible-heading .ui-btn.program-copy, html.theme-modern.theme-dark .ui-collapsible-heading .ui-btn.delete-day, html.theme-modern.theme-dark .ui-collapsible-heading .ui-btn.connectnow, html.theme-modern.theme-dark .ui-collapsible-heading .ui-btn.move-up {
+    font-size: 12px;
+    font-weight: 600 !important;
+    padding: 5px 12px;
+    margin: -3px 0 0 8px;
+    box-shadow: none;
+    border-radius: 999px !important;
+    line-height: 1.3;
+    text-align: center;
+}
+html.theme-modern .ui-collapsible-heading .ui-btn.move-up, html.theme-modern .ui-collapsible-heading .ui-btn.collapsible-button-right, html.theme-modern .ui-collapsible-heading .ui-btn.help-icon, html.theme-modern.theme-dark .ui-collapsible-heading .ui-btn.move-up, html.theme-modern.theme-dark .ui-collapsible-heading .ui-btn.help-icon {
+    background: transparent !important;
+    border: 0 !important;
+    padding: 0;
+    width: 26px;
+    height: 26px;
+    min-width: 0;
+    margin-top: -2px;
+}
+html.theme-modern .ui-collapsible-heading .ui-btn.move-up:after, html.theme-modern .ui-collapsible-heading .ui-btn.help-icon:after {
+    left: 50%;
+    margin-left: -11px;
+}
+html.theme-modern .ui-collapsible-heading .custom-count-pos {
+    margin: 0 0 0 8px;
+    font-size: 11px;
+    line-height: 1.4;
+}
+html.theme-modern .ui-collapsible-heading h2, html.theme-modern .ui-collapsible-heading h3 {
+    display: flex;
+    align-items: center;
+    flex-direction: row-reverse;
+    justify-content: flex-start;
+    gap: 2px;
+}
+html.theme-modern .ui-collapsible-heading h2 > .ui-btn, html.theme-modern .ui-collapsible-heading h3 > .ui-btn, html.theme-modern .ui-collapsible-heading h3 > .custom-count-pos, html.theme-modern .ui-collapsible-heading h2 > .custom-count-pos {
+    float: none;
+    flex: 0 0 auto;
+}
+html.theme-modern .ui-collapsible-heading h3 > .program-name, html.theme-modern .ui-collapsible-heading h3 > span:not(.custom-count-pos) {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    order: 10;
+}
+html.theme-modern .ui-collapsible-heading h2, html.theme-modern .ui-collapsible-heading h3 {
+    flex-direction: row;
+}
+html.theme-modern .ui-collapsible-heading h2 > .ui-btn, html.theme-modern .ui-collapsible-heading h3 > .ui-btn, html.theme-modern .ui-collapsible-heading .custom-count-pos {
+    order: 20;
+}
+/* section bars (ui-bar) become the head of the card that follows */
+html.theme-modern .ui-page .ui-bar-a, html.theme-modern .ui-page .ui-bar-b, html.theme-modern.theme-dark .ui-page .ui-bar-a, html.theme-modern.theme-dark .ui-page .ui-bar-b, html.theme-modern.theme-colorful .ui-page .ui-bar-a {
+    background-color: var( --os-surface-2 ) !important;
+    color: var( --os-text ) !important;
+    border: 1px solid var( --os-border ) !important;
+    border-bottom: 0 !important;
+    border-radius: var( --os-radius ) var( --os-radius ) 0 0 !important;
+    padding: 10px 14px;
+    text-shadow: none !important;
+}
+html.theme-modern .ui-page .ui-bar-a h3, html.theme-modern .ui-page .ui-bar-b h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: .03em !important;
+    text-transform: uppercase;
+    color: var( --os-text-muted );
+}
+html.theme-modern .ui-page .ui-bar + .ui-body, html.theme-modern .ui-page .ui-bar + .ui-body-a, html.theme-modern .ui-page .ui-bar + .ui-body-b, html.theme-modern .ui-page .ui-bar + fieldset, html.theme-modern .ui-page .ui-bar + div.ui-field-contain {
+    border-top-left-radius: 0 !important;
+    border-top-right-radius: 0 !important;
+    margin-top: 0 !important;
+}
+html.theme-modern .ui-page .ui-body-a + .ui-bar, html.theme-modern .ui-page .ui-body-b + .ui-bar, html.theme-modern .ui-page .ui-body + .ui-bar {
+    margin-top: 12px;
+}
+/* gauge table: shrink to its content; hide the empty skeleton card */
+html.theme-modern #os-sensor-show table:has(td[id^="mainpageChart-"]) {
+    width: auto !important;
+    margin: 0 auto !important;
+}
+html.theme-modern #os-sensor-show .ui-body:not(:has(td)):not(:has(label)) {
+    display: none;
+}
+/* footer: allow the status line to wrap instead of being cut */
+html.theme-modern #footer-running .running-text {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+html.theme-modern div.running-text {
+    display: block;
+}
+
+/* header/footer buttons stay flat in every theme (the generic dark .ui-btn rule must not box them) */
+html.theme-modern #header .ui-btn, html.theme-modern #footer .ui-btn, html.theme-modern.theme-dark #header .ui-btn, html.theme-modern.theme-dark #footer .ui-btn, html.theme-modern.theme-colorful #header .ui-btn {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+/* sensor table on phones: keep the name column bounded so the chart button stays visible */
+@media ( max-width: 599px ) {
+    html.theme-modern #os-sensor-show table td:first-child {
+        width: auto;
+        max-width: 110px !important;
+    }
+    html.theme-modern #os-sensor-show table td {
+        padding: 9px 4px !important;
+    }
+}
+html.theme-modern.theme-colorful .ui-page .ui-btn:after, html.theme-modern.theme-colorful .ui-popup .ui-btn:after {
+    background-color: transparent !important;
+}
+
+/* loader overlay ("Connecting to ..."): icon-only buttons stay flat, no white box */
+html.theme-modern .ui-loader, html.theme-modern .ui-loader.ui-body-a, html.theme-modern.theme-dark .ui-loader {
+    border-radius: var( --os-radius ) !important;
+    border: 0 !important;
+    box-shadow: var( --os-shadow-lg ) !important;
+}
+html.theme-modern .ui-loader .ui-btn, html.theme-modern .ui-loader .ui-btn, html.theme-modern.theme-dark .ui-loader .ui-btn, html.theme-modern .ui-page .btn-no-border.ui-btn, html.theme-modern .ui-popup .btn-no-border.ui-btn, html.theme-modern.theme-dark .btn-no-border.ui-btn {
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    color: inherit !important;
+}
+html.theme-modern .ui-loader .ui-btn:after {
+    filter: none !important;
+}
+/* legacy program-list hint is replaced by the compact counter in the modern look */
+html.theme-modern .programs-help {
+    display: none;
+}
+html.theme-modern .card-group + .card-group {
+    margin-top: 12px;
+}
+html.theme-modern .card-group:empty {
+    display: none;
 }

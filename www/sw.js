@@ -238,6 +238,7 @@ cacheFiles = cacheFiles.concat([
 	"/locale/ta.js",
 	"/locale/th.js",
 	"/locale/tr.js",
+	"/locale/uk.js",
 	"/locale/zh.js"
 ]);
 

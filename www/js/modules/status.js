@@ -85,13 +85,23 @@ OSApp.Status.changeStatus = function( seconds, color, line, onclick ) {
 		}
 	}
 
-	if ( html !== "" ) {
+	// Show the current/flow line only while something runs or when a value is non-zero
+	// (an idle controller with 0 mA / 0 L/min just costs a footer line on every page).
+	var isActive = ( color === "green" || color === "yellow" ),
+		hasNonZero = false;
+	if ( OSApp.currentSession.isControllerConnected() ) {
+		var st = OSApp.currentSession.controller.settings;
+		hasNonZero = ( st.curr > 0 ) || ( st.vcurr > 0 ) || ( st.flcrt > 0 ) || ( st.flcrun > 0 );
+	}
+	var modernLook = document.documentElement.classList.contains( "theme-modern" );
+	if ( html !== "" && ( !modernLook || isActive || hasNonZero ) ) {
 		html = line + "<p class='running-text smaller center'>" + html + "</p>";
 	} else {
 		html = line;
 	}
 
 	footer.removeClass().addClass( color ).html( html ).off( "click" ).on( "click", onclick );
+	$( "#footer" ).toggleClass( "is-active", isActive );
 };
 
 // Update status bar based on device status

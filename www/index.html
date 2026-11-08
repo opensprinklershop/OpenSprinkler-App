@@ -373,7 +373,7 @@
 				}
 			})();
 		</script>
-		<meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0">
 		<meta content="yes" name="apple-mobile-web-app-capable">
 		<meta name="mobile-web-app-capable" content="yes">
 		<meta name="apple-mobile-web-app-title" content="OpenSprinkler">
@@ -382,10 +382,33 @@
 		<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: gap: local: blob: http: https:; script-src 'self' data: gap: blob: local: https: ms-appx-web: 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https: blob:; media-src *; img-src 'self' file: https: http: blob: data: ms-appdata:; connect-src 'self' blob: data: gap: local: http: https:">
 		<link rel="manifest" href="manifest.json">
 		<link rel="shortcut icon" href="img/favicon.ico">
+		<script>
+			// Apply the appearance ("modern" = refreshed look, "classic" = legacy jQuery Mobile look)
+			// before the stylesheets paint. "uiLook" is a global storage key (no path prefix).
+			// Rule: new installations start modern, existing installations (stored sites) keep classic;
+			// the choice is persisted once and can be changed any time in the theme menu.
+			(function() {
+				var look = "modern";
+				try {
+					look = localStorage.getItem( "uiLook" );
+					if ( look !== "modern" && look !== "classic" ) {
+						var sites = {};
+						try { sites = JSON.parse( localStorage.getItem( "sites" ) || "{}" ) || {}; } catch ( e ) { sites = {}; }
+						look = Object.keys( sites ).length ? "classic" : "modern";
+						localStorage.setItem( "uiLook", look );
+					}
+				} catch ( e ) {
+					look = "modern";
+				}
+				if ( look === "modern" ) {
+					document.documentElement.classList.add( "theme-modern" );
+				}
+			})();
+		</script>
 		<link rel="stylesheet" href="css/fonts.css">
 		<link rel="stylesheet" href="css/jqm.css">
 		<link rel="stylesheet" href="css/analog.css">
-		<link rel="stylesheet" href="css/main.css?v=osai8">
+		<link rel="stylesheet" href="css/main.css?v=osai9">
 		<link rel="stylesheet" href="css/vis-timeline-graph2d.min.css">
 		<link rel="stylesheet" href="css/dataTables-2.1.8.dataTables.min.css"></link>
 

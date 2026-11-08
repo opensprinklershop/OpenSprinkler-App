@@ -445,15 +445,21 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 	var body = document.body || document.getElementsByTagName("body")[0];
 	var isDark     = root.classList.contains("theme-dark")     || (body && body.classList.contains("theme-dark"));
 	var isColorful = root.classList.contains("theme-colorful") || (body && body.classList.contains("theme-colorful"));
+	var isModern   = root.classList.contains("theme-modern");
 	var css = getComputedStyle(root);
 	var theme = {
 		accent: isColorful ? css.getPropertyValue("--theme-colorful-text").trim() || "#7059ff" : (isDark ? "#3a8dde" : "#20E647"),
 		surfaceStrong: isColorful ? (css.getPropertyValue("--theme-colorful-surface-strong").trim() || "#fff") : (isDark ? "#151a22" : "#fff"),
-		gauge: {
+		gauge: isModern ? {
+			green:  isDark ? "#3ccf8e" : "#22a06b",
+			orange: isDark ? "#f2b84b" : "#e9a825",
+			red:    isDark ? "#f06a6a" : "#d64545"
+		} : {
 			green:  isDark ? "#18c36e" : "#20E647",
 			orange: isDark ? "#ff9f43" : "#FF8C00",
 			red:    isDark ? "#ff6b6b" : "#CD5C5C"
 		},
+		gaugeTrack: isDark ? "#262c36" : "#e2e6ec",
 		monitorBg: isColorful ? [
 			"rgba(141,120,235,0.15)", "rgba(141,120,235,0.25)", "rgba(141,120,235,0.35)"
 		] : (isDark ? [
@@ -461,7 +467,10 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 		] : [ "#e8f7ee", "#fff6db", "#ffe5e7" ])
 	};
 
-	var cols = Math.round(window.innerWidth / 300);
+	// Modern look: compact gauges, at least two per row on phones, up to six on a desktop
+	var cols = isModern ?
+		Math.max(2, Math.min(6, Math.round(Math.min(window.innerWidth, 1000) / 170))) :
+		Math.round(window.innerWidth / 300);
 
 	// Structural key: depends only on which items exist and their display order, not their values
 	var structKey =
@@ -469,7 +478,7 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 		"|cols:" + cols +
 		"|mon:" + orderedMonitors.filter(function(m) { return m.active && m.show !== 0; }).map(function(m) { return m.nr; }).join(",") +
 		"|sen:" + orderedSensors.filter(function(s) { return s.show; }).map(function(s) { return s.nr; }).join(",") +
-		"|dark:" + isDark + "|col:" + isColorful;
+		"|dark:" + isDark + "|col:" + isColorful + "|mod:" + isModern;
 
 	if (OSApp.Analog.lastSensorStructKey !== structKey) {
 		OSApp.Analog.lastSensorStructKey = structKey;
@@ -545,7 +554,37 @@ OSApp.Analog.updateSensorShowArea = function( page ) {
 		for (i = 0; i < orderedProgAdjusts.length; i++) {
 			var el = document.querySelector("#mainpageChart-" + i);
 			if (!el) continue;
-			var chartOptions = {
+			var chartOptions = isModern ? {
+				chart: {
+					height: 140, width: 150, parentHeightOffset: 0, type: "radialBar", offsetY: -8,
+					sparkline: { enabled: true },
+					animations: { enabled: true, dynamicAnimation: { enabled: true } }
+				},
+				series: [0],
+				colors: [ theme.gauge.green ],
+				plotOptions: {
+					radialBar: {
+						startAngle: -125, endAngle: 125,
+						hollow: { size: "62%" },
+						track: {
+							background: theme.gaugeTrack, startAngle: -125, endAngle: 125,
+							strokeWidth: "100%", margin: 0,
+							dropShadow: { enabled: false }
+						},
+						dataLabels: {
+							showOn: "always",
+							name:  { offsetY: 18, show: true, color: isDark ? "#98a2b3" : "#6b7684", fontSize: "11px", fontWeight: 500 },
+							value: {
+								color: isDark ? "#e7eaf0" : "#1b2330", fontSize: "22px", fontWeight: 600, offsetY: -14, show: true,
+								formatter: pctFormatter
+							}
+						}
+					}
+				},
+				fill: { type: "solid" },
+				stroke: { lineCap: "round" },
+				labels: [""]
+			} : {
 				chart: {
 					height: 180, parentHeightOffset: 0, type: "radialBar", offsetY: -20,
 					sparkline: { enabled: true },
