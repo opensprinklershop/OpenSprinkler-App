@@ -12,6 +12,13 @@ OSApp.SSL = OSApp.SSL || {};
  */
 OSApp.SSL.fetchDeviceCert = function( host, callback ) {
 	var h = host.replace( /^https?:\/\//i, "" ).replace( /\/$/, "" );
+
+	// On an https page the browser blocks this plain-http request as mixed content.
+	if ( !window.cordova && window.location.protocol === "https:" ) {
+		callback( null );
+		return;
+	}
+
 	$.ajax( {
 		url: "http://" + h + "/ca.der",
 		type: "GET",
@@ -83,20 +90,47 @@ OSApp.SSL.getCertFingerprint = function( derB64, callback ) {
 OSApp.SSL.showCertDialog = function( host, onComplete ) {
 	var isCordova = !!window.cordova;
 
+	// jQuery Mobile shows only one popup at a time: popup( "open" ) is silently
+	// ignored while another one (e.g. the "New Device" form) is active. In that
+	// case the dialog is rendered inside the open popup instead.
+	var hostPopup = ( $.mobile.popup && $.mobile.popup.active ) ? $.mobile.popup.active.element : null,
+		embedded = !!( hostPopup && hostPopup.length ),
+		hiddenParts = null,
+		closeDialog;
+
+	$( "#ssl-cert-popup" ).remove();
+
 	var popup = $(
-		"<div data-role='popup' id='ssl-cert-popup' class='ui-content' style='max-width:320px'>" +
+		"<div " + ( embedded ? "" : "data-role='popup' " ) + "id='ssl-cert-popup' class='ui-content' style='max-width:320px'>" +
 			"<h3>" + OSApp.Language._( "Self-Signed Certificate" ) + "</h3>" +
 			"<p id='ssl-cert-info'>" + OSApp.Language._( "Fetching certificate from device\u2026" ) + "</p>" +
 			"<div id='ssl-cert-buttons'></div>" +
 		"</div>"
 	);
 
-	$( "body" ).append( popup );
-	popup.enhanceWithin();
-	popup.one( "popupafterclose", function() {
-		popup.popup( "destroy" ).remove();
-	} );
-	popup.popup( { history: false, positionTo: "window" } ).popup( "open" );
+	if ( embedded ) {
+		hiddenParts = hostPopup.children( ":visible" ).not( ":jqmData(role='header')" ).hide();
+		hostPopup.append( popup );
+		popup.enhanceWithin();
+		hostPopup.popup( "reposition", { positionTo: "window" } );
+		closeDialog = function() {
+			popup.remove();
+			hiddenParts.show();
+			if ( hostPopup.data( "mobile-popup" ) ) {
+				hostPopup.popup( "reposition", { positionTo: "window" } );
+			}
+		};
+	} else {
+		$( "body" ).append( popup );
+		popup.enhanceWithin();
+		popup.one( "popupafterclose", function() {
+			popup.popup( "destroy" ).remove();
+		} );
+		popup.popup( { history: false, positionTo: "window" } ).popup( "open" );
+		closeDialog = function() {
+			popup.popup( "close" );
+		};
+	}
 
 	// Fetch the certificate live from the device and then populate the dialog
 	OSApp.SSL.fetchDeviceCert( host, function( derB64 ) {
@@ -131,12 +165,17 @@ OSApp.SSL.showCertDialog = function( host, onComplete ) {
 				"</ol>";
 			buttons =
 				"<a data-role='button' data-theme='b' id='ssl-open-btn' href='#'>" + OSApp.Language._( "Open Device URL" ) + "</a>" +
+				"<a data-role='button' id='ssl-retry-btn' href='#'>" + OSApp.Language._( "Retry" ) + "</a>" +
 				( derB64 ? "<a data-role='button' id='ssl-download-btn' href='#'>" + OSApp.Language._( "Download Certificate" ) + "</a>" : "" ) +
 				"<a data-role='button' data-theme='a' id='ssl-cancel-btn' href='#'>" + OSApp.Language._( "Cancel" ) + "</a>";
 		}
 
 		infoEl.html( instructions );
-		popup.find( "#ssl-cert-buttons" ).html( buttons ).trigger( "create" );
+		popup.find( "#ssl-cert-buttons" ).html( buttons );
+		popup.enhanceWithin();
+		if ( embedded && hostPopup.data( "mobile-popup" ) ) {
+			hostPopup.popup( "reposition", { positionTo: "window" } );
+		}
 
 		// Show SHA-256 fingerprint asynchronously once computed
 		if ( derB64 ) {
@@ -150,7 +189,7 @@ OSApp.SSL.showCertDialog = function( host, onComplete ) {
 
 		if ( isCordova ) {
 			popup.find( "#ssl-trust-btn" ).on( "click", function() {
-				popup.popup( "close" );
+				closeDialog();
 				OSApp.Firmware.nativeHttpReady = false;
 				OSApp.Firmware.ensurePinnedNativeHttp( function( ready ) {
 					if ( ready ) {
@@ -169,6 +208,13 @@ OSApp.SSL.showCertDialog = function( host, onComplete ) {
 				.attr( "href", "https://" + host )
 				.attr( "target", "_blank" )
 				.attr( "rel", "noopener" );
+			popup.find( "#ssl-retry-btn" ).on( "click", function() {
+				closeDialog();
+				if ( typeof onComplete === "function" ) {
+					onComplete( true );
+				}
+				return false;
+			} );
 			if ( derB64 ) {
 				popup.find( "#ssl-download-btn" ).on( "click", function( e ) {
 					e.preventDefault();
@@ -178,10 +224,11 @@ OSApp.SSL.showCertDialog = function( host, onComplete ) {
 		}
 
 		popup.find( "#ssl-cancel-btn" ).on( "click", function() {
-			popup.popup( "close" );
+			closeDialog();
 			if ( typeof onComplete === "function" ) {
 				onComplete( false );
 			}
+			return false;
 		} );
 	} );
 };

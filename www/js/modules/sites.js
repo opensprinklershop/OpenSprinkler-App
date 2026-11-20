@@ -1524,6 +1524,11 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 					if ( OSApp.SSL && typeof OSApp.SSL.showCertDialog === "function" ) {
 						OSApp.SSL.showCertDialog( ip, function( ready ) {
 							if ( !ready ) { return; }
+							if ( !window.cordova ) {
+								// Browser: the user accepted the certificate in another tab — run the HTTPS attempt again.
+								OSApp.Sites.submitNewSite( true, useAuth );
+								return;
+							}
 							// Certificate trusted — retry via native HTTP (cordova-plugin-advanced-http)
 							$.mobile.loading( "show" );
 							OSApp.Firmware.nativeHttpRequest( {
@@ -1602,6 +1607,12 @@ OSApp.Sites.submitNewSite = function( ssl, useAuth ) {
 	}
 
 	if ( $( "#os_usessl" ).is( ":checked" ) === true ) {
+		ssl = true;
+	}
+
+	// An https-hosted app can never reach a plain-http controller (mixed content),
+	// so skip the doomed http attempt and go straight to https.
+	if ( !ssl && !token && OSApp.Utils.isMixedContentBlocked( { os_ip: ip } ) ) {
 		ssl = true;
 	}
 
